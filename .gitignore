@@ -1,0 +1,95 @@
+# --- Dependencies ---
+# Match node_modules at any depth (root, apps/web, packages/ui, …)
+**/node_modules/
+node_modules/
+
+# pnpm
+.pnpm-store/
+.pnpm-debug.log*
+
+# --- Python / uv ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.uv/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# --- Build & cache ---
+apps/web/dist/
+*.tsbuildinfo
+.vite/
+.turbo/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.output/
+
+# --- Test & coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Uploads (runtime user content) ---
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# --- IDE & editors ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# --- OS ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Deploy ---
+.vercel/
+
+# --- Docker (local volume data) ---
+docker-data/
+
+# --- Misc ---
+*.local
+*.bak
+*.tmp
+*.temp

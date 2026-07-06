@@ -1,0 +1,10 @@
+Axiforge database migrations.
+
+```bash
+cd backend
+uv run alembic upgrade head    # apply all
+uv run alembic current         # show revision
+uv run alembic stamp head      # align version on existing dev DB
+```
+
+Revisions: `20260706_000` (baseline) → `20260706_001` (drop legacy tables).

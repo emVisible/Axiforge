@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "installCommand": "pnpm install",
+  "builds": [
+    {
+      "src": "backend/src/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "apps/web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "backend/src/main.py" },
+    { "src": "/uploads/(.*)", "dest": "backend/src/main.py" },
+    { "src": "/health", "dest": "backend/src/main.py" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/apps/web/dist/index.html" }
+  ],
+  "env": {
+    "PYTHONPATH": "backend"
+  }
+}

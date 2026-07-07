@@ -19,6 +19,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import type { AssetItemResponse } from "@/types/asset";
+import { getCreatorId } from "@/lib/creatorId";
 
 const ITEM_CATEGORIES = ["日常", "魔幻", "科技", "关键道具"];
 const ITEM_RARITIES = ["普通", "稀有", "传说"];
@@ -89,7 +90,7 @@ export default function ItemsPage() {
 
   const { data: items, isLoading } = useItems(
     tab === "my"
-      ? { author_id: "anonymous" }
+      ? { author_id: getCreatorId() }
       : { category: filter || undefined },
   );
   const createItem = useCreateItem();

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui";
 import { draftManager, CREATE_DRAFT_ID } from "@/lib/draftManager";
 import DraftRestoreDialog from "@/components/ui/DraftRestoreDialog";
 import { routes } from "@/lib/routes";
+import { getCreatorId } from "@/lib/creatorId";
+import { aiApi } from "@/api/ai";
 
 export default function CreateCharacterPage() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ export default function CreateCharacterPage() {
   const [isPublic, setIsPublic] = useState(false);
   const [imagePath, setImagePath] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -53,6 +56,35 @@ export default function CreateCharacterPage() {
 
   if (!draft || !ready) return null;
 
+  const handleAiSuggest = async () => {
+    if (!draft.anchor?.name?.trim()) {
+      setError("请先填写角色名称");
+      return;
+    }
+    setAiBusy(true);
+    setError(null);
+    try {
+      const res = await aiApi.suggestCharacter({
+        name: draft.anchor.name,
+        essence: draft.anchor.essence || "",
+        tags: draft.anchor.tags || [],
+      });
+      setDraft({
+        ...draft,
+        anchor: { ...draft.anchor, ...res.layers.anchor },
+        contour: { ...draft.contour, ...res.layers.contour },
+        demeanor: { ...draft.demeanor, ...res.layers.demeanor },
+        psyche: { ...draft.psyche, ...res.layers.psyche },
+        trace: { ...draft.trace, ...res.layers.trace },
+        bond: { ...draft.bond, ...res.layers.bond },
+      });
+    } catch {
+      setError("AI 建议生成失败");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!draft?.anchor?.essence?.trim()) {
       setError("请至少填写锚点中的「概括」");
@@ -69,6 +101,7 @@ export default function CreateCharacterPage() {
         character_data: draft,
         is_public: isPublic,
         image_path: imagePath || undefined,
+        author_id: getCreatorId(),
       });
       draftManager.remove(CREATE_DRAFT_ID);
       reset();
@@ -82,8 +115,15 @@ export default function CreateCharacterPage() {
   return (
     <div className="mx-auto max-w-4xl animate-fade-in px-4 py-8 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">创建角色</h1>
-        <p className="mt-2 text-gray-500">由表及里，逐层刻画一个立体的角色</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">创建角色</h1>
+            <p className="mt-2 text-gray-500">由表及里，逐层刻画一个立体的角色</p>
+          </div>
+          <Button variant="secondary" loading={aiBusy} onClick={handleAiSuggest}>
+            AI 填充六层建议
+          </Button>
+        </div>
       </div>
 
       <div className="mb-8 rounded-2xl border border-border bg-surface p-6 shadow-sm">

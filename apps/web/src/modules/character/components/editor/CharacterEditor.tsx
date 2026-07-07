@@ -15,6 +15,8 @@ import PsycheEditor from "./PsycheEditor";
 import AnchorEditor from "./AnchorEditor";
 import TraceEditor from "./TraceEditor";
 import BondEditor from "./BondEditor";
+import SpriteEditor from "./SpriteEditor";
+import { Images } from "lucide-react";
 
 interface LayerConfig {
   key: string;
@@ -204,6 +206,52 @@ export default function CharacterEditor({
           </div>
         );
       })}
+
+      {/* 立绘 / 表情差分（演出资产，非六层语义） */}
+      {(() => {
+        const isExpanded = expandedLayer === "sprites";
+        const count = Object.keys((draft as any).sprites || {}).length;
+        return (
+          <div
+            className={`border-2 rounded-xl transition-all duration-200 ${
+              isExpanded
+                ? "border-sky-300 bg-sky-50 overflow-visible"
+                : "border-gray-100 hover:border-gray-200 overflow-hidden"
+            }`}
+          >
+            <button
+              onClick={() => setExpandedLayer(isExpanded ? null : "sprites")}
+              className="w-full flex items-center gap-4 px-5 py-4 text-left"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/70">
+                <Images className="h-4 w-4 text-brand" strokeWidth={1.75} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-900">立绘 / 表情差分</span>
+                  <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+                    演出资产
+                  </span>
+                </div>
+                <p className="text-sm text-gray-500">
+                  {count > 0 ? `${count} 档差分` : "上传不同表情的立绘"}
+                </p>
+              </div>
+              <ChevronDown
+                className={`h-5 w-5 text-ink-muted transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                strokeWidth={1.75}
+              />
+            </button>
+            {isExpanded && (
+              <div className="px-5 pb-5">
+                <div className="border-t border-gray-100 pt-5">
+                  <SpriteEditor />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

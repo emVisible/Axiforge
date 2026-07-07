@@ -3,8 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { characterApi } from "@/api/characters";
 import { SearchInput } from "@/components/ui";
 import type { Character } from "@/types/character";
-
-const AUTHOR_ID = "anonymous";
+import { getCreatorId } from "@/lib/creatorId";
 
 interface CharacterSearchSelectProps {
   value?: string;
@@ -63,7 +62,7 @@ export default function CharacterSearchSelect({
     setLoading(true);
     Promise.all([
       characterApi.listPublic({ search: debouncedSearch, limit: 8 }),
-      characterApi.listUser(AUTHOR_ID),
+      characterApi.listUser(getCreatorId()),
     ])
       .then(([publicResult, userItems]) =>
         setResults(

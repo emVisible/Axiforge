@@ -2,6 +2,8 @@ const STUDIO = "/studio";
 
 export const routes = {
   studio: STUDIO,
+  discover: "/discover",
+  author: (id: string) => `/author/${id}`,
   projects: `${STUDIO}/projects`,
   projectNew: `${STUDIO}/projects/new`,
   project: (id: string) => `${STUDIO}/projects/${id}`,

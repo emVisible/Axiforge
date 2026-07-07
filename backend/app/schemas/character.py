@@ -56,6 +56,8 @@ class CharacterData(BaseModel):
     anchor: Anchor = Field(default_factory=Anchor)
     trace: Trace = Field(default_factory=Trace)
     bond: Bond = Field(default_factory=Bond)
+    # 表情差分组（桥5）：{ 表情key: 图片路径 }，供演出 show(char, expr) 直连立绘
+    sprites: Optional[Dict[str, str]] = None
 
 
 class CharacterCreate(BaseModel):

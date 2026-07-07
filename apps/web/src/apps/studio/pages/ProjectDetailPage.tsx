@@ -53,6 +53,9 @@ import type {
 import type { Character } from "@/types/character";
 import type { PlayerNode } from "@/types/runtime";
 import { routes } from "@/lib/routes";
+import GlossaryEditor, {
+  type GlossaryItem,
+} from "@/apps/studio/components/GlossaryEditor";
 
 // ================================================================
 // 常量
@@ -111,9 +114,11 @@ function MetaSection({
     rules: "",
     style_reference: "",
     is_public: false,
+    glossary: [] as GlossaryItem[],
   });
 
   const open = () => {
+    const meta = (project.play_meta || {}) as { glossary?: GlossaryItem[] };
     setForm({
       description: project.description || "",
       mechanism: project.mechanism || "",
@@ -122,12 +127,17 @@ function MetaSection({
       rules: project.rules || "",
       style_reference: project.style_reference || "",
       is_public: project.is_public || false,
+      glossary: Array.isArray(meta.glossary) ? meta.glossary : [],
     });
     setEditing(true);
   };
 
   const save = async () => {
-    await onSave(form);
+    const { glossary, ...rest } = form;
+    await onSave({
+      ...rest,
+      play_meta: { glossary },
+    });
     setEditing(false);
   };
 
@@ -191,6 +201,15 @@ function MetaSection({
           value={form.rules}
           onChange={(e) => setForm((p) => ({ ...p, rules: e.target.value }))}
         />
+        <div>
+          <span className="mb-2 block text-xs font-medium uppercase tracking-wider text-ink-muted">
+            术语库
+          </span>
+          <GlossaryEditor
+            items={form.glossary}
+            onChange={(glossary) => setForm((p) => ({ ...p, glossary }))}
+          />
+        </div>
         <CheckboxField
           checked={!!form.is_public}
           onChange={(checked) =>

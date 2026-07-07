@@ -26,7 +26,11 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           ref={ref}
           type="search"
           value={value}
-          className={cn(inputBase, "pl-10 pr-9", className)}
+          className={cn(
+            inputBase,
+            "py-2.5 !pl-10 !pr-9 [appearance:textfield] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
+            className,
+          )}
           {...props}
         />
         {hasValue && onClear && (

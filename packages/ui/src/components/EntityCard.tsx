@@ -11,6 +11,7 @@ interface EntityCardProps {
   badges?: ReactNode;
   meta?: ReactNode;
   leading?: ReactNode;
+  footer?: ReactNode;
   onDelete?: () => void;
   className?: string;
 }
@@ -22,6 +23,7 @@ export default function EntityCard({
   badges,
   meta,
   leading,
+  footer,
   onDelete,
   className = "",
 }: EntityCardProps) {
@@ -66,6 +68,7 @@ export default function EntityCard({
           )}
         </div>
       )}
+      {footer && <div className="mt-3">{footer}</div>}
     </CardLink>
   );
 }

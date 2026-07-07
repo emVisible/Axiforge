@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@axiforge/ui": path.resolve(__dirname, "../../packages/ui"),
+      "@axiforge/core": path.resolve(__dirname, "../../packages/core/src"),
     },
   },
   server: {

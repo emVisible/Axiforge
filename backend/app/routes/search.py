@@ -7,8 +7,35 @@ from app.database import get_db
 from app.models.asset import AssetItem, AssetScene
 from app.models.character import Character
 from app.models.project import Project
+from app.services.project import ProjectService
+from app.services.character import CharacterService
 
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
+
+
+@router.get("/discover")
+async def discover(
+    skip: int = 0,
+    limit: int = 12,
+    db: AsyncSession = Depends(get_db),
+):
+    """统一发现页数据：公开剧本 + 角色（v1.5）"""
+    projects = await ProjectService(db).list_public(skip, limit)
+    chars = await CharacterService(db).get_public_characters(skip=skip, limit=limit)
+    return {
+        "projects": projects,
+        "characters": [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "author_id": c.author_id,
+                "image_path": c.image_path,
+                "view_count": c.view_count,
+                "tags": [t.name for t in (c.tags or [])],
+            }
+            for c in chars
+        ],
+    }
 
 
 @router.get("/all")
@@ -23,7 +50,13 @@ async def search_all(
     results = []
 
     projects = (
-        (await db.execute(select(Project).where(Project.title.ilike(term)).limit(3)))
+        (
+            await db.execute(
+                select(Project)
+                .where(Project.title.ilike(term), Project.is_public == True)
+                .limit(3)
+            )
+        )
         .scalars()
         .all()
     )
@@ -33,14 +66,16 @@ async def search_all(
                 "id": str(p.id),
                 "name": p.title,
                 "type": "剧本",
-                "url": f"/studio/projects/{p.id}",
+                "url": f"/play/{p.id}",
             }
         )
 
     scenes = (
         (
             await db.execute(
-                select(AssetScene).where(AssetScene.name.ilike(term)).limit(3)
+                select(AssetScene)
+                .where(AssetScene.name.ilike(term), AssetScene.is_public == True)
+                .limit(3)
             )
         )
         .scalars()
@@ -57,7 +92,13 @@ async def search_all(
         )
 
     items = (
-        (await db.execute(select(AssetItem).where(AssetItem.name.ilike(term)).limit(3)))
+        (
+            await db.execute(
+                select(AssetItem)
+                .where(AssetItem.name.ilike(term), AssetItem.is_public == True)
+                .limit(3)
+            )
+        )
         .scalars()
         .all()
     )
@@ -74,7 +115,9 @@ async def search_all(
     characters = (
         (
             await db.execute(
-                select(Character).where(Character.name.ilike(term)).limit(3)
+                select(Character)
+                .where(Character.name.ilike(term), Character.is_public == True)
+                .limit(3)
             )
         )
         .scalars()
@@ -102,7 +145,9 @@ async def search_scenes(
         return []
     term = f"%{q}%"
     result = await db.execute(
-        select(AssetScene).where(AssetScene.name.ilike(term)).limit(8)
+        select(AssetScene)
+        .where(AssetScene.name.ilike(term), AssetScene.is_public == True)
+        .limit(8)
     )
     scenes = result.scalars().all()
     return [{"id": str(s.id), "name": s.name} for s in scenes]
@@ -117,7 +162,9 @@ async def search_items(
         return []
     term = f"%{q}%"
     result = await db.execute(
-        select(AssetItem).where(AssetItem.name.ilike(term)).limit(8)
+        select(AssetItem)
+        .where(AssetItem.name.ilike(term), AssetItem.is_public == True)
+        .limit(8)
     )
     items = result.scalars().all()
     return [{"id": str(i.id), "name": i.name} for i in items]

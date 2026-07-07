@@ -13,9 +13,11 @@ import {
   DetailEditPanel,
   DetailPanel,
   FormActions,
+  ImageUpload,
   Input,
   Textarea,
 } from "@/components/ui";
+import { getImageUrl } from "@/lib/imageUrl";
 import type { AssetSceneResponse } from "@/types/asset";
 
 export default function SceneAssetDetailPage() {
@@ -62,6 +64,7 @@ export default function SceneAssetDetailPage() {
       era: scene.era || "",
       world_setting: scene.world_setting || "",
       rules: scene.rules || "",
+      image_path: scene.image_path || "",
       is_public: scene.is_public,
     });
     setEditing(true);
@@ -76,6 +79,7 @@ export default function SceneAssetDetailPage() {
       era: form.era || null,
       world_setting: form.world_setting || null,
       rules: form.rules || null,
+      image_path: form.image_path || null,
       is_public: form.is_public || null,
     });
     await fetchScene();
@@ -114,6 +118,15 @@ export default function SceneAssetDetailPage() {
 
       {editing ? (
         <DetailEditPanel>
+          <div>
+            <span className="mb-2 block text-xs font-medium uppercase tracking-wider text-ink-muted">
+              背景图（演出 bg 与场景背景使用）
+            </span>
+            <ImageUpload
+              value={getImageUrl(form.image_path || undefined) || ""}
+              onChange={(u) => setForm((p) => ({ ...p, image_path: u }))}
+            />
+          </div>
           <Input
             label="名称"
             value={form.name}
@@ -178,6 +191,13 @@ export default function SceneAssetDetailPage() {
           description={scene.description || "暂无描述"}
           onEdit={openEdit}
         >
+          {scene.image_path && (
+            <img
+              src={getImageUrl(scene.image_path) || ""}
+              alt={scene.name}
+              className="mb-4 h-40 w-full rounded-xl object-cover"
+            />
+          )}
           <div className="mb-4 grid grid-cols-2 gap-4 text-sm">
             {scene.location && (
               <div>

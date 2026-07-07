@@ -24,6 +24,8 @@ import {
   Select,
 } from "@/components/ui";
 import type { ProjectResponse } from "@/types/project";
+import { getCreatorId } from "@/lib/creatorId";
+import { projectApi } from "@/api/editor";
 
 const MECHANISMS = [
   "日常校园",
@@ -92,7 +94,9 @@ function ProjectCard({
 export default function ProjectListPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [tab, setTab] = useState<"my" | "public">("my");
+  const [tab, setTab] = useState<"my" | "public" | "template">("my");
+  const [templates, setTemplates] = useState<ProjectResponse[]>([]);
+  const [forkingId, setForkingId] = useState<string | null>(null);
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterMechanism, setFilterMechanism] = useState("");
   const [filterGenre, setFilterGenre] = useState("");
@@ -103,7 +107,7 @@ export default function ProjectListPage() {
   const navigate = useNavigate();
 
   const { data: projects, isLoading } = useProjects(
-    tab === "my" ? { author_id: "anonymous" } : undefined,
+    tab === "my" ? { author_id: getCreatorId() } : undefined,
   );
   const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
@@ -112,6 +116,24 @@ export default function ProjectListPage() {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    if (tab !== "template") return;
+    projectApi
+      .listTemplates({ limit: 50 })
+      .then(setTemplates)
+      .catch(() => setTemplates([]));
+  }, [tab]);
+
+  const handleFork = async (id: string) => {
+    setForkingId(id);
+    try {
+      const forked = await projectApi.fork(id, { author_id: getCreatorId() });
+      navigate(`/studio/projects/${forked.id}`);
+    } catch {
+      setForkingId(null);
+    }
+  };
 
   const allTags = [
     ...new Set((projects || []).flatMap((p) => p.theme_tags)),
@@ -144,7 +166,10 @@ export default function ProjectListPage() {
   const handleCreate = async () => {
     if (!title.trim()) return;
     try {
-      const project = await createProject.mutateAsync({ title: title.trim() });
+      const project = await createProject.mutateAsync({
+        title: title.trim(),
+        author_id: getCreatorId(),
+      });
       setShowCreate(false);
       setTitle("");
       navigate(`/studio/projects/${project.id}`);
@@ -242,6 +267,7 @@ export default function ProjectListPage() {
           options={[
             { value: "my", label: "我的" },
             { value: "public", label: "大厅" },
+            { value: "template", label: "模板" },
           ]}
         />
         <Button
@@ -291,6 +317,46 @@ export default function ProjectListPage() {
         />
       </Modal>
 
+      {tab === "template" ? (
+        templates.length === 0 ? (
+          <EmptyState
+            icon={ScrollText}
+            title="暂无模板"
+            description="官方或社区发布的元剧本会出现在这里，可一键 Fork 为你的作品"
+          />
+        ) : (
+          <CardGrid>
+            {templates.map((p) => (
+              <EntityCard
+                key={p.id}
+                to={`/studio/projects/${p.id}`}
+                title={p.title}
+                description={p.description || "暂无描述"}
+                badges={
+                  <Badge variant="amber" size="sm">
+                    模板
+                  </Badge>
+                }
+                footer={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={forkingId === p.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleFork(p.id);
+                    }}
+                  >
+                    {forkingId === p.id ? "创建中..." : "以此创建"}
+                  </Button>
+                }
+              />
+            ))}
+          </CardGrid>
+        )
+      ) : (
+        <>
       {isLoading && (
         <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
       )}
@@ -317,6 +383,8 @@ export default function ProjectListPage() {
             />
           ))}
         </CardGrid>
+      )}
+        </>
       )}
     </Shell>
   );

@@ -1,4 +1,5 @@
 
+import copy
 from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -101,11 +102,145 @@ class ProjectService:
         projects = result.scalars().all()
         return [await self._to_response(p) for p in projects]
 
-    async def get(self, project_id: UUID) -> Optional[ProjectResponse]:
+    async def get(self, project_id: UUID, *, bump_view: bool = False) -> Optional[ProjectResponse]:
         project = await self._load_project(project_id)
         if not project:
             return None
+        if bump_view:
+            project.view_count = (project.view_count or 0) + 1
+            await self.db.commit()
+            await self.db.refresh(project)
         return await self._to_response(project)
+
+    async def increment_play_count(self, project_id: UUID) -> None:
+        project = await self.db.get(Project, project_id)
+        if project:
+            project.play_count = (project.play_count or 0) + 1
+            await self.db.commit()
+
+    async def list_templates(
+        self, skip: int = 0, limit: int = 20
+    ) -> List[ProjectResponse]:
+        """公开示范作 / 元剧本（is_meta），供「从模板创建」"""
+        result = await self.db.execute(
+            select(Project)
+            .options(
+                selectinload(Project.scenes).selectinload(ProjectScene.nodes),
+                selectinload(Project.roles),
+                selectinload(Project.asset_refs),
+                selectinload(Project.edges),
+            )
+            .where(Project.is_meta == True, Project.is_public == True)
+            .order_by(Project.updated_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return [await self._to_response(p) for p in result.scalars().all()]
+
+    async def fork_project(
+        self,
+        project_id: UUID,
+        new_author_id: str,
+        new_title: Optional[str] = None,
+    ) -> Optional[ProjectResponse]:
+        source = await self._load_project(project_id)
+        if not source:
+            return None
+        if not source.is_public and not source.is_meta:
+            raise ValueError("Only public or template projects can be forked")
+
+        forked = Project(
+            title=new_title or f"{source.title} (Fork)",
+            description=source.description or "",
+            cover_image=source.cover_image,
+            mechanism=source.mechanism,
+            style_reference=source.style_reference,
+            theme_tags=list(source.theme_tags or []),
+            genre=source.genre,
+            world_setting=source.world_setting,
+            rules=source.rules,
+            play_meta=copy.deepcopy(source.play_meta or {}),
+            is_public=False,
+            is_meta=False,
+            fork_from=source.id,
+            author_id=new_author_id,
+        )
+        self.db.add(forked)
+        await self.db.flush()
+
+        node_id_map: dict = {}
+        for scene in source.scenes or []:
+            new_scene = ProjectScene(
+                project_id=forked.id,
+                source=scene.source,
+                scene_ref_id=scene.scene_ref_id,
+                scene_data=copy.deepcopy(scene.scene_data) if scene.scene_data else None,
+                title=scene.title,
+                description=scene.description or "",
+                parent_scene_id=scene.parent_scene_id,
+                location=scene.location,
+                atmosphere=scene.atmosphere,
+                sort_order=scene.sort_order,
+            )
+            self.db.add(new_scene)
+            await self.db.flush()
+            for node in scene.nodes or []:
+                new_node = ProjectNode(
+                    scene_id=new_scene.id,
+                    editor_data=copy.deepcopy(node.editor_data or {}),
+                    narrative_data=copy.deepcopy(node.narrative_data or {}),
+                    sort_order=node.sort_order,
+                )
+                self.db.add(new_node)
+                await self.db.flush()
+                node_id_map[node.id] = new_node.id
+
+        for edge in source.edges or []:
+            src = node_id_map.get(edge.source_node_id)
+            tgt = node_id_map.get(edge.target_node_id)
+            if not src or not tgt:
+                continue
+            self.db.add(
+                ProjectEdge(
+                    project_id=forked.id,
+                    source_node_id=src,
+                    target_node_id=tgt,
+                    source_port=edge.source_port,
+                    label=edge.label,
+                    condition=copy.deepcopy(edge.condition) if edge.condition else None,
+                )
+            )
+
+        for role in source.roles or []:
+            self.db.add(
+                ProjectRole(
+                    project_id=forked.id,
+                    character_ref_id=role.character_ref_id,
+                    locked_version=copy.deepcopy(role.locked_version)
+                    if role.locked_version
+                    else None,
+                    importance=role.importance,
+                    role_description=role.role_description,
+                )
+            )
+
+        for ref in source.asset_refs or []:
+            self.db.add(
+                ProjectAssetRef(
+                    project_id=forked.id,
+                    asset_type=ref.asset_type,
+                    asset_id=ref.asset_id,
+                    locked_version=copy.deepcopy(ref.locked_version)
+                    if ref.locked_version
+                    else None,
+                )
+            )
+
+        await self.db.commit()
+        loaded = await self._load_project(forked.id)
+        if not loaded:
+            return None
+        return await self._to_response(loaded)
 
     # ================================================================
     # update — 只返回基本字段，不加载关联
@@ -134,10 +269,13 @@ class ProjectService:
             genre=project.genre,
             world_setting=project.world_setting,
             rules=project.rules,
+            play_meta=project.play_meta or {},
             is_public=project.is_public,
             is_meta=project.is_meta,
             view_count=project.view_count,
+            play_count=getattr(project, "play_count", 0) or 0,
             author_id=project.author_id,
+            fork_from=getattr(project, "fork_from", None),
             scenes=[],
             roles=[],
             asset_refs=[],
@@ -441,10 +579,13 @@ class ProjectService:
             genre=project.genre,
             world_setting=project.world_setting,
             rules=project.rules,
+            play_meta=project.play_meta or {},
             is_public=project.is_public,
             is_meta=project.is_meta,
             view_count=project.view_count,
+            play_count=getattr(project, "play_count", 0) or 0,
             author_id=project.author_id,
+            fork_from=getattr(project, "fork_from", None),
             scenes=[
                 ProjectSceneResponse(
                     id=s.id,

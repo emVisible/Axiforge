@@ -1,7 +1,7 @@
 
-from typing import List
+from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -14,9 +14,128 @@ from app.schemas.runtime import (
     SessionFlagResponse,
     CharacterRuntimeStateResponse,
 )
+from app.schemas.ir import StoryPackage
+from app.schemas.save import SaveSlotUpsert, SaveSlotResponse
 from app.services.player import PlayerService
+from app.services.compiler import StoryCompiler
+from app.services.save import SaveService
+from app.services.project import ProjectService
+from app.schemas.codex import CodexUpsert, CodexResponse
+from app.services.codex import CodexService
 
 router = APIRouter(prefix="/api/v1/play", tags=["player"])
+
+
+# ================================================================
+# Story Package（编译 IR，ADR-008）
+# ================================================================
+
+
+@router.get("/story/{project_id}", response_model=StoryPackage)
+async def get_story_package(
+    project_id: UUID,
+    author_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """把剧本编译为可移植的 StoryPackage IR，供 @axiforge/core 引擎本地播放。"""
+    try:
+        pkg = await StoryCompiler(db).compile(project_id, author_id=author_id)
+        await ProjectService(db).increment_play_count(project_id)
+        return pkg
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+# ================================================================
+# 存档槽（桥4 第二层·持久记忆，ADR-011）
+# ================================================================
+
+
+@router.get("/save/{project_id}/list", response_model=List[SaveSlotResponse])
+async def list_saves(
+    project_id: UUID,
+    player_token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """列出玩家在某作品下的全部存档槽。"""
+    return await SaveService(db).list_saves(project_id, player_token)
+
+
+@router.put("/save/{project_id}", response_model=SaveSlotResponse)
+async def upsert_save(
+    project_id: UUID,
+    data: SaveSlotUpsert,
+    db: AsyncSession = Depends(get_db),
+):
+    """写入/覆盖存档槽（单槽自动存档）。存整份 RuntimeState，跨会话存活。"""
+    try:
+        return await SaveService(db).upsert(project_id, data)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@router.get("/save/{project_id}", response_model=SaveSlotResponse)
+async def get_save(
+    project_id: UUID,
+    player_token: str,
+    slot: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """读取存档槽；无存档返回 404。"""
+    save = await SaveService(db).get(project_id, player_token, slot)
+    if not save:
+        raise HTTPException(404, "No save found")
+    return save
+
+
+@router.delete("/save/{project_id}", status_code=204)
+async def clear_save(
+    project_id: UUID,
+    player_token: str,
+    slot: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """删除存档槽（从头开始时清档）。"""
+    await SaveService(db).clear(project_id, player_token, slot)
+    return Response(status_code=204)
+
+
+# ================================================================
+# 跨作品 IP 账本（桥4 第三层，ADR-011 v1.6）
+# ================================================================
+
+
+@router.get("/codex", response_model=CodexResponse)
+async def get_codex(
+    player_token: str,
+    character_ids: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """读取玩家跨作品角色记忆账本。character_ids 逗号分隔，可选过滤。"""
+    ids = (
+        [x.strip() for x in character_ids.split(",") if x.strip()]
+        if character_ids
+        else None
+    )
+    ledger = await CodexService(db).get_ledger(player_token, ids)
+    return CodexResponse(ledger=ledger)
+
+
+@router.put("/codex", response_model=CodexResponse)
+async def upsert_codex(
+    data: CodexUpsert,
+    db: AsyncSession = Depends(get_db),
+):
+    """合并写入跨作品记忆（仅提交变更的 character/key 桶）。"""
+    await CodexService(db).upsert_entries(
+        data.player_token,
+        data.ledger,
+        data.source_project_id,
+    )
+    ledger = await CodexService(db).get_ledger(data.player_token)
+    return CodexResponse(ledger=ledger)
 
 
 # ================================================================

@@ -39,12 +39,16 @@ class Project(Base):
     genre = Column(String(100), nullable=True)  # 题材
     world_setting = Column(Text, nullable=True)  # 世界观
     rules = Column(Text, nullable=True)  # 规则
+    # 播放元数据：术语库、结局配置等（v1.4 桥6）
+    play_meta = Column(JSONB, default=dict)
 
     # 元数据
     is_public = Column(Boolean, default=False)
     is_meta = Column(Boolean, default=False)
     view_count = Column(Integer, default=0)
+    play_count = Column(Integer, default=0)
     author_id = Column(String(255), default="anonymous")
+    fork_from = Column(UUID(as_uuid=True), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

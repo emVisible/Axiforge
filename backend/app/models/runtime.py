@@ -1,6 +1,15 @@
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    DateTime,
+    ForeignKey,
+    Text,
+    Boolean,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
@@ -74,6 +83,44 @@ class SessionFlag(Base):
     )
     key = Column(String(255), nullable=False)
     value = Column(JSONB, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SaveSlot(Base):
+    """存档槽（桥4 第二层·持久记忆，ADR-011）
+
+    整份可序列化的 RuntimeState（memory/flags/角色关系值 + 进度）落库，
+    绑定匿名玩家标识 player_token（localStorage，ADR-006 可迁移匿名身份）。
+    v1.2 单槽（slot=0，自动存档）；多槽读档 v1.5。
+    """
+
+    __tablename__ = "save_slots"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "player_token", "slot", name="uq_save_slot_owner"
+        ),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # 匿名玩家标识（客户端生成，随时可升级为账号，ADR-006）
+    player_token = Column(String(64), nullable=False, index=True)
+    slot = Column(Integer, nullable=False, default=0)
+
+    # 完整可序列化的 @axiforge/core RuntimeState
+    state = Column(JSONB, nullable=False, default=dict)
+    # 列表页展示用摘要（最近一句台词 / 桥段标题）
+    summary = Column(String(500), nullable=True)
+    beat_id = Column(String(64), nullable=True)
+    # 存档缩略图（当前背景/场景图，v1.4）
+    thumb_path = Column(String(500), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

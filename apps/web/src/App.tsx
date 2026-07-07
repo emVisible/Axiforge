@@ -1,25 +1,32 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { UserProvider } from "@/contexts/UserContext";
 
+// 布局常驻（体积小、跨路由共享）
 import StudioLayout from "./apps/studio/layouts/StudioLayout";
-import ProjectListPage from "./apps/studio/pages/ProjectListPage";
-import ProjectCreatePage from "./apps/studio/pages/ProjectCreatePage";
-import ProjectDetailPage from "./apps/studio/pages/ProjectDetailPage";
-import ProjectFlowPage from "./apps/studio/pages/ProjectFlowPage";
-import ItemsPage from "./apps/studio/pages/ItemsPage";
-import ItemDetailPage from "./apps/studio/pages/ItemDetailPage";
-import SceneAssetsPage from "./apps/studio/pages/SceneAssetsPage";
-import SceneAssetDetailPage from "./apps/studio/pages/SceneAssetDetailPage";
-import PlayerPage from "./apps/player/pages/PlayerPage";
 import PlayerLayout from "./apps/player/layouts/PlayerLayout";
 
-import HallPage from "./modules/character/pages/HallPage";
-import CreateCharacterPage from "./modules/character/pages/CreateCharacterPage";
-import MyCharactersPage from "./modules/character/pages/MyCharactersPage";
-import CharacterDetailPage from "./modules/character/pages/CharacterDetailPage";
-import EditCharacterPage from "./modules/character/pages/EditCharacterPage";
-import StoryReadPage from "./modules/character/pages/StoryReadPage";
-import StoryEditPage from "./modules/character/pages/StoryEditPage";
+// 页面按路由懒加载（v1.3 工程：路由级 code-split，演出资产前先拆包）
+const ProjectListPage = lazy(() => import("./apps/studio/pages/ProjectListPage"));
+const ProjectCreatePage = lazy(() => import("./apps/studio/pages/ProjectCreatePage"));
+const ProjectDetailPage = lazy(() => import("./apps/studio/pages/ProjectDetailPage"));
+const ProjectFlowPage = lazy(() => import("./apps/studio/pages/ProjectFlowPage"));
+const ItemsPage = lazy(() => import("./apps/studio/pages/ItemsPage"));
+const ItemDetailPage = lazy(() => import("./apps/studio/pages/ItemDetailPage"));
+const SceneAssetsPage = lazy(() => import("./apps/studio/pages/SceneAssetsPage"));
+const SceneAssetDetailPage = lazy(() => import("./apps/studio/pages/SceneAssetDetailPage"));
+const PlayerPage = lazy(() => import("./apps/player/pages/PlayerPage"));
+const DiscoverPage = lazy(() => import("./apps/discover/pages/DiscoverPage"));
+const AuthorPage = lazy(() => import("./apps/discover/pages/AuthorPage"));
+
+const HallPage = lazy(() => import("./modules/character/pages/HallPage"));
+const CreateCharacterPage = lazy(() => import("./modules/character/pages/CreateCharacterPage"));
+const MyCharactersPage = lazy(() => import("./modules/character/pages/MyCharactersPage"));
+const CharacterDetailPage = lazy(() => import("./modules/character/pages/CharacterDetailPage"));
+const EditCharacterPage = lazy(() => import("./modules/character/pages/EditCharacterPage"));
+const StoryReadPage = lazy(() => import("./modules/character/pages/StoryReadPage"));
+const StoryEditPage = lazy(() => import("./modules/character/pages/StoryEditPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,44 +38,60 @@ const queryClient = new QueryClient({
   },
 });
 
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="h-7 w-7 animate-spin rounded-full border-2 border-gray-200 border-t-gray-400" />
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/studio" element={<StudioLayout />}>
-            <Route index element={<Navigate to="projects" replace />} />
-            <Route path="projects" element={<ProjectListPage />} />
-            <Route path="projects/new" element={<ProjectCreatePage />} />
-            <Route path="projects/:id" element={<ProjectDetailPage />} />
-            <Route path="projects/:id/flow" element={<ProjectFlowPage />} />
-            <Route path="items" element={<ItemsPage />} />
-            <Route path="items/:id" element={<ItemDetailPage />} />
-            <Route path="scenes" element={<SceneAssetsPage />} />
-            <Route path="scenes/:id" element={<SceneAssetDetailPage />} />
+      <UserProvider>
+        <BrowserRouter>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/studio" element={<StudioLayout />}>
+              <Route index element={<Navigate to="projects" replace />} />
+              <Route path="projects" element={<ProjectListPage />} />
+              <Route path="projects/new" element={<ProjectCreatePage />} />
+              <Route path="projects/:id" element={<ProjectDetailPage />} />
+              <Route path="projects/:id/flow" element={<ProjectFlowPage />} />
+              <Route path="items" element={<ItemsPage />} />
+              <Route path="items/:id" element={<ItemDetailPage />} />
+              <Route path="scenes" element={<SceneAssetsPage />} />
+              <Route path="scenes/:id" element={<SceneAssetDetailPage />} />
 
-            <Route path="characters" element={<HallPage />} />
-            <Route path="characters/new" element={<CreateCharacterPage />} />
-            <Route path="characters/mine" element={<MyCharactersPage />} />
-            <Route path="characters/:id" element={<CharacterDetailPage />} />
-            <Route path="characters/:id/edit" element={<EditCharacterPage />} />
-            <Route
-              path="characters/:id/stories/:storyId"
-              element={<StoryReadPage />}
-            />
-            <Route
-              path="characters/:id/stories/:storyId/edit"
-              element={<StoryEditPage />}
-            />
-          </Route>
+              <Route path="characters" element={<HallPage />} />
+              <Route path="characters/new" element={<CreateCharacterPage />} />
+              <Route path="characters/mine" element={<MyCharactersPage />} />
+              <Route path="characters/:id" element={<CharacterDetailPage />} />
+              <Route path="characters/:id/edit" element={<EditCharacterPage />} />
+              <Route
+                path="characters/:id/stories/:storyId"
+                element={<StoryReadPage />}
+              />
+              <Route
+                path="characters/:id/stories/:storyId/edit"
+                element={<StoryEditPage />}
+              />
+            </Route>
 
-          <Route path="/play/:projectId" element={<PlayerLayout />}>
-            <Route index element={<PlayerPage />} />
-          </Route>
-          <Route path="/" element={<Navigate to="/studio" replace />} />
-          <Route path="*" element={<Navigate to="/studio" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="/play/:projectId" element={<PlayerLayout />}>
+              <Route index element={<PlayerPage />} />
+            </Route>
+
+            <Route path="/discover" element={<DiscoverPage />} />
+            <Route path="/author/:authorId" element={<AuthorPage />} />
+
+            <Route path="/" element={<Navigate to="/discover" replace />} />
+            <Route path="*" element={<Navigate to="/discover" replace />} />
+          </Routes>
+        </Suspense>
+        </BrowserRouter>
+      </UserProvider>
     </QueryClientProvider>
   );
 }

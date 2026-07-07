@@ -23,6 +23,67 @@
   animation: fadeIn 0.35s ease-out;
 }
 
+/* ============================================================
+   演出运行时特效（v1.3 桥2）
+   ============================================================ */
+
+/* 镜头震屏 */
+@keyframes stageShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(var(--shake), calc(var(--shake) * -0.6)); }
+  40% { transform: translate(calc(var(--shake) * -0.8), var(--shake)); }
+  60% { transform: translate(var(--shake), var(--shake)); }
+  80% { transform: translate(calc(var(--shake) * -0.5), calc(var(--shake) * -0.5)); }
+}
+.fx-shake {
+  animation: stageShake 0.5s ease-in-out;
+}
+
+/* 闪白 */
+@keyframes fxFlash {
+  0% { opacity: 0; }
+  10% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+.fx-flash {
+  animation: fxFlash 0.6s ease-out;
+  background: #fff;
+}
+
+/* 画面转场（黑场淡入淡出） */
+@keyframes fxTransition {
+  0% { opacity: 0; }
+  45% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.fx-transition {
+  background: #05050a;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 落下的粒子（雨/雪/樱花共用，靠时长与字符区分） */
+@keyframes fxFall {
+  0% { transform: translateY(-10vh) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(110vh) translateX(2vw); opacity: 0.9; }
+}
+.fx-particle {
+  position: absolute;
+  top: 0;
+  animation-name: fxFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+/* ruby 注音 */
+ruby rt {
+  font-size: 0.55em;
+  opacity: 0.7;
+  letter-spacing: 0;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -44,4 +105,52 @@
 ::selection {
   background-color: color-mix(in srgb, var(--color-brand) 18%, white);
   color: var(--color-brand);
+}
+
+/* ============================================================
+   演出运行时特效（v1.3 桥2）
+   ============================================================ */
+
+/* 闪白 */
+@keyframes vnFlash {
+  0% { opacity: 0; }
+  12% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+.vn-flash {
+  animation: vnFlash var(--vn-fx-ms, 600ms) ease-out;
+}
+
+/* 震屏 */
+@keyframes vnShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(calc(var(--vn-shake, 8px) * -1), var(--vn-shake, 8px)); }
+  40% { transform: translate(var(--vn-shake, 8px), calc(var(--vn-shake, 8px) * -1)); }
+  60% { transform: translate(calc(var(--vn-shake, 8px) * -0.6), calc(var(--vn-shake, 8px) * 0.6)); }
+  80% { transform: translate(calc(var(--vn-shake, 8px) * 0.6), calc(var(--vn-shake, 8px) * -0.6)); }
+}
+.vn-shake {
+  animation: vnShake 0.5s ease-in-out;
+}
+
+/* 转场遮罩：从黑淡出 */
+@keyframes vnTransition {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.vn-transition {
+  animation: vnTransition var(--vn-fx-ms, 400ms) ease-out;
+}
+
+/* 落下粒子（雨/雪/樱） */
+@keyframes vnFall {
+  0% { transform: translateY(-10vh) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(110vh) translateX(var(--vn-drift, 0)); opacity: 0.9; }
+}
+.vn-particle {
+  position: absolute;
+  top: 0;
+  animation: vnFall linear infinite;
+  will-change: transform;
 }

@@ -37,11 +37,13 @@ export default function AnchorEditor({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-5 p-4 bg-gray-50 rounded-xl">
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-canvas/50 p-4 sm:flex-row sm:items-start">
         {onImageChange && (
-          <ImageUpload value={imagePath || ""} onChange={onImageChange} />
+          <div className="shrink-0">
+            <ImageUpload value={imagePath || ""} onChange={onImageChange} />
+          </div>
         )}
-        <div className="flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-3">
           <Input
             label="姓名/称谓"
             required
@@ -50,12 +52,12 @@ export default function AnchorEditor({
             placeholder="角色如何称呼"
           />
           {onPublicChange !== undefined && (
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-muted">
               <input
                 type="checkbox"
                 checked={isPublic}
                 onChange={(e) => onPublicChange(e.target.checked)}
-                className="rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                className="rounded border-border text-brand focus:ring-brand/30"
               />
               公开到角色大厅
             </label>

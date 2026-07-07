@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useCreateProject } from "@/hooks/useProjects";
 import Shell from "@/components/Shell";
+import { getCreatorId } from "@/lib/creatorId";
 
 const MECHANISMS = [
   "日常校园",
@@ -34,6 +35,7 @@ export default function ProjectCreatePage() {
       mechanism: mechanism || undefined,
       genre: genre || undefined,
       theme_tags: tags,
+      author_id: getCreatorId(),
     });
     navigate(`/studio/projects/${project.id}`);
   };

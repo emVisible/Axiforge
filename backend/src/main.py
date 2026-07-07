@@ -11,10 +11,14 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import init_db
 from app.routes.character import router as character_router
+from app.routes.editor.ai import router as editor_ai_router
 from app.routes.editor.asset import router as editor_asset_router
 from app.routes.editor.project import router as editor_project_router
+from app.routes.identity import router as identity_router
 from app.routes.player import router as player_router
 from app.routes.relation import router as relation_router
+from app.routes.report import router as report_router
+from app.routes.user import router as user_router
 from app.routes.search import router as search_router
 from app.routes.story import router as story_router
 from app.routes.tag import router as tag_router
@@ -63,8 +67,12 @@ def create_app() -> FastAPI:
     application.include_router(upload_router)
     application.include_router(editor_project_router)
     application.include_router(editor_asset_router)
+    application.include_router(editor_ai_router)
     application.include_router(player_router)
     application.include_router(search_router)
+    application.include_router(identity_router)
+    application.include_router(report_router)
+    application.include_router(user_router)
 
     @application.get("/")
     async def root():

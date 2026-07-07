@@ -11,8 +11,8 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { routes } from "@/lib/routes";
+import { getCreatorId } from "@/lib/creatorId";
 
-const TEMP_USER_ID = "anonymous";
 const PAGE_SIZE = 12;
 
 export default function MyCharactersPage() {
@@ -28,7 +28,7 @@ export default function MyCharactersPage() {
     data: allCharacters,
     isLoading,
     error,
-  } = useUserCharacters(TEMP_USER_ID);
+  } = useUserCharacters(getCreatorId());
 
   const filtered =
     allCharacters?.filter((c) => {

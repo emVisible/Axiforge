@@ -25,7 +25,7 @@ export default function SegmentedControl<T extends string>({
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-xl bg-gray-100/80 p-0.5",
+        "inline-flex items-stretch rounded-xl bg-gray-100/80 p-0.5",
         className,
       )}
       role="tablist"
@@ -40,7 +40,7 @@ export default function SegmentedControl<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded-lg font-medium transition-all duration-200",
+              "relative inline-flex min-w-[3.25rem] shrink-0 items-center justify-center rounded-lg font-medium whitespace-nowrap transition-colors duration-200",
               btnSize,
               active
                 ? "bg-surface text-ink shadow-sm"

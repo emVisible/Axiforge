@@ -17,6 +17,11 @@ from pydantic import BaseModel, Field
 # ============================================================
 
 
+class ProjectForkRequest(BaseModel):
+    new_title: Optional[str] = Field(None, max_length=255)
+    author_id: str = Field("anonymous", max_length=255)
+
+
 class ProjectCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     description: str = ""
@@ -42,6 +47,7 @@ class ProjectUpdate(BaseModel):
     genre: Optional[str] = None
     world_setting: Optional[str] = None
     rules: Optional[str] = None
+    play_meta: Optional[dict] = None
     is_public: Optional[bool] = None
     is_meta: Optional[bool] = None
 
@@ -57,10 +63,13 @@ class ProjectResponse(BaseModel):
     genre: Optional[str] = None
     world_setting: Optional[str] = None
     rules: Optional[str] = None
+    play_meta: dict = {}
     is_public: bool
     is_meta: bool
     view_count: int
+    play_count: int = 0
     author_id: str
+    fork_from: Optional[UUID] = None
     scenes: List["ProjectSceneResponse"] = []
     roles: List["ProjectRoleResponse"] = []
     asset_refs: List["ProjectAssetRefResponse"] = []

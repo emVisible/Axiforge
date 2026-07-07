@@ -22,6 +22,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import type { AssetSceneResponse } from "@/types/asset";
+import { getCreatorId } from "@/lib/creatorId";
 
 function SceneCard({
   scene,
@@ -80,7 +81,7 @@ export default function SceneAssetsPage() {
   const [form, setForm] = useState(emptyForm);
 
   const { data: scenes, isLoading } = useSceneAssets(
-    tab === "my" ? { author_id: "anonymous" } : undefined,
+    tab === "my" ? { author_id: getCreatorId() } : undefined,
   );
   const createScene = useCreateSceneAsset();
   const qc = useQueryClient();

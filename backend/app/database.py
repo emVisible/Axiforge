@@ -32,9 +32,14 @@ def register_models() -> None:
         ProjectScene,
     )
     from app.models.relation import CharacterRelation  # noqa: F401
+    from app.models.codex import PlayerCodexEntry  # noqa: F401
+    from app.models.identity import IdentityLink  # noqa: F401
+    from app.models.report import ContentReport  # noqa: F401
+    from app.models.user import UserAccount  # noqa: F401
     from app.models.runtime import (  # noqa: F401
         CharacterRuntimeState,
         RuntimeSession,
+        SaveSlot,
         SessionEvent,
         SessionFlag,
         SessionMemory,
@@ -48,3 +53,26 @@ async def init_db():
     register_models()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # v1.4 增量列：create_all 不修改已有表，开发/测试库需补列
+        from sqlalchemy import text
+
+        await conn.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_meta JSONB DEFAULT '{}'::jsonb"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE save_slots ADD COLUMN IF NOT EXISTS thumb_path VARCHAR(500)"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS play_count INTEGER DEFAULT 0"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS fork_from UUID"
+            )
+        )

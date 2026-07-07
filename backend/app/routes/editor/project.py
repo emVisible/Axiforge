@@ -9,6 +9,7 @@ from app.schemas.project import (
     ProjectCreate,
     ProjectUpdate,
     ProjectResponse,
+    ProjectForkRequest,
     ProjectSceneCreate,
     ProjectSceneUpdate,
     ProjectSceneResponse,
@@ -36,6 +37,41 @@ router = APIRouter(prefix="/api/v1/editor/projects", tags=["editor-projects"])
 @router.post("/", response_model=ProjectResponse, status_code=201)
 async def create_project(data: ProjectCreate, db: AsyncSession = Depends(get_db)):
     return await ProjectService(db).create(data)
+
+
+@router.get("/templates", response_model=List[ProjectResponse])
+async def list_templates(
+    skip: int = 0,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+):
+    """公开示范作 / 元剧本列表（从模板创建）"""
+    return await ProjectService(db).list_templates(skip, limit)
+
+
+@router.post("/seed/showcase")
+async def seed_showcase(db: AsyncSession = Depends(get_db)):
+    """创建官方 3 部示范作（幂等）"""
+    from app.services.seed_showcase import seed_all_showcases
+
+    return await seed_all_showcases(db)
+
+
+@router.post("/{project_id}/fork", response_model=ProjectResponse, status_code=201)
+async def fork_project(
+    project_id: UUID,
+    data: ProjectForkRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        forked = await ProjectService(db).fork_project(
+            project_id, data.author_id, data.new_title
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if not forked:
+        raise HTTPException(404, "Project not found")
+    return forked
 
 
 @router.get("/public", response_model=List[ProjectResponse])

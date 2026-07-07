@@ -2,650 +2,39 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useSearchParams } from "react-router";
 import {
-  Anchor,
-  Clapperboard,
-  FileText,
-  MessageSquare,
-  Search,
-  Sparkles,
-} from "lucide-react";
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  addEdge,
   useNodesState,
   useEdgesState,
   type Node,
   type Edge,
   type Connection,
-  BackgroundVariant,
-  MarkerType,
-  Handle,
-  Position,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import Shell from "@/components/Shell";
 import Toast from "@/components/Toast";
-import {
-  BackLink,
-  Button,
-  CheckboxField,
-  Input,
-  Select,
-  Textarea,
-  cn,
-  inputCompact,
-  labelSm,
-} from "@/components/ui";
-import { tokens } from "@axiforge/ui";
+import { BackLink, Button } from "@/components/ui";
+import type { Instruction, Condition } from "@axiforge/core";
 import { projectApi } from "@/api/editor";
 import { characterApi } from "@/api/characters";
+import ScriptPreview from "../components/ScriptPreview";
+import type { SimTarget } from "../components/ConditionSimulator";
+import FlowCanvas, { addEdge, MarkerType } from "../flow/FlowCanvas";
+import FlowNodePalette from "../flow/FlowNodePalette";
+import NodeInspectorPanel, {
+  type PanelTab,
+} from "../flow/NodeInspectorPanel";
+import {
+  flowEdgeStroke,
+  type ConditionItem,
+  type EffectItem,
+  type NodeFormState,
+  type ProjectRoleOption,
+} from "../flow/types";
 import type {
   ProjectResponse,
   ProjectSceneResponse,
   ProjectNodeResponse,
 } from "@/types/project";
 
-interface ProjectRoleOption {
-  roleId: string;
-  characterRefId: string;
-  name: string;
-}
-
-function parseCharStateKey(key: string): { charId: string; field: string } {
-  const parts = key ? key.split(".") : [];
-  if (parts.length !== 2) return { charId: "", field: "" };
-  if (parts[0] === "char_id") return { charId: "", field: parts[1] };
-  return { charId: parts[0], field: parts[1] };
-}
-
-// ================================================================
-// 自定义节点 — 单输出端口
-// ================================================================
-function StoryNode({
-  data,
-  selected,
-}: {
-  data: Record<string, unknown>;
-  selected: boolean;
-}) {
-  const title = (data.title as string) || "未命名";
-  const description = (data.description as string) || "";
-  const isAnchor = Boolean(data.is_anchor);
-  const speaker = (data.speaker as string) || "";
-  const hasConditions = Boolean(data.has_conditions);
-  const hasEffects = Boolean(data.has_effects);
-
-  return (
-    <div
-      className={cn(
-        "relative min-w-[220px] max-w-[280px] rounded-xl border-2 shadow-sm transition-all duration-200",
-        selected
-          ? "border-brand bg-surface shadow-lg shadow-brand/10"
-          : "border-border bg-surface hover:border-gray-300",
-      )}
-    >
-      <Handle
-        type="target"
-        position={Position.Top}
-        className="!-top-1.5 !h-3 !w-3 !border-2 !border-surface !bg-brand"
-      />
-      <div
-        className={cn(
-          "flex items-center gap-2 rounded-t-[10px] px-4 py-2.5",
-          isAnchor ? "bg-amber-50" : "bg-canvas",
-        )}
-      >
-        <span className="flex h-5 w-5 items-center justify-center">
-          {isAnchor ? (
-            <Anchor className="h-3.5 w-3.5 text-amber-600" strokeWidth={1.75} />
-          ) : (
-            <MessageSquare
-              className="h-3.5 w-3.5 text-ink-muted"
-              strokeWidth={1.75}
-            />
-          )}
-        </span>
-        <span className="flex-1 truncate text-sm font-medium text-ink">
-          {title}
-        </span>
-        <div className="flex items-center gap-1">
-          {hasConditions && (
-            <span className="rounded bg-purple-100 px-1 py-0.5 text-[9px] text-purple-600">
-              条件
-            </span>
-          )}
-          {hasEffects && (
-            <span className="rounded bg-emerald-100 px-1 py-0.5 text-[9px] text-emerald-600">
-              效果
-            </span>
-          )}
-          {isAnchor && (
-            <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-600">
-              锚点
-            </span>
-          )}
-          {speaker && (
-            <span className="rounded bg-brand/10 px-1 py-0.5 text-[9px] text-brand">
-              {speaker}
-            </span>
-          )}
-        </div>
-      </div>
-      {description && (
-        <div className="line-clamp-2 border-t border-border/60 px-4 py-2 text-[11px] leading-relaxed text-ink-muted">
-          {description}
-        </div>
-      )}
-      <div className="flex items-center justify-center border-t border-border px-3 py-1.5">
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="output"
-          className="!relative !bottom-auto !left-auto !right-auto !top-auto !h-3 !w-3 !translate-none !border-2 !border-surface !bg-brand"
-        />
-        <span className="ml-1 text-[10px] text-ink-muted">输出</span>
-      </div>
-    </div>
-  );
-}
-
-const nodeTypes = { custom: StoryNode };
-
-const flowSelectClass = cn(inputCompact, "bg-surface");
-const flowEdgeStroke = tokens.brand;
-const flowEdgeStrokeHover = tokens.brandHover;
-
-const EDGE_LABELS = [
-  "",
-  "接受",
-  "拒绝",
-  "继续",
-  "离开",
-  "追问",
-  "沉默",
-  "拥抱",
-  "逃跑",
-  "分支A",
-  "分支B",
-  "分支C",
-];
-
-// ================================================================
-// 条件/效果类型
-// ================================================================
-interface ConditionItem {
-  type: "memory" | "flag" | "character_state" | "node_completed";
-  key: string;
-  operator: "eq" | "ne" | "gt" | "lt" | "contains";
-  value: string;
-}
-interface EffectItem {
-  type: "memory" | "flag" | "character_state";
-  key: string;
-  value: string;
-}
-
-const CHARACTER_STATE_PRESETS = [
-  {
-    key: "mood",
-    label: "情绪",
-    values: [
-      "neutral",
-      "happy",
-      "sad",
-      "angry",
-      "scared",
-      "thoughtful",
-      "determined",
-    ],
-  },
-  {
-    key: "affection",
-    label: "好感度",
-    values: ["-100", "-50", "-25", "0", "25", "50", "100"],
-  },
-  { key: "health", label: "健康", values: ["healthy", "injured", "critical"] },
-  {
-    key: "trust",
-    label: "信任",
-    values: ["none", "low", "medium", "high", "absolute"],
-  },
-  { key: "location", label: "位置", values: [] },
-];
-
-const CONDITION_TYPES = [
-  {
-    value: "memory" as const,
-    label: "记忆",
-    color: "bg-purple-50 border-purple-200 text-purple-700",
-  },
-  {
-    value: "flag" as const,
-    label: "标志",
-    color: "bg-red-50 border-red-200 text-red-700",
-  },
-  {
-    value: "character_state" as const,
-    label: "角色状态",
-    color: "bg-blue-50 border-blue-200 text-blue-700",
-  },
-  {
-    value: "node_completed" as const,
-    label: "前置节点",
-    color: "bg-amber-50 border-amber-200 text-amber-700",
-  },
-];
-
-const EFFECT_TYPES = [
-  {
-    value: "memory" as const,
-    label: "写入记忆",
-    color: "bg-purple-50 border-purple-200 text-purple-700",
-  },
-  {
-    value: "flag" as const,
-    label: "设置标志",
-    color: "bg-red-50 border-red-200 text-red-700",
-  },
-  {
-    value: "character_state" as const,
-    label: "改变状态",
-    color: "bg-blue-50 border-blue-200 text-blue-700",
-  },
-];
-
-const OPERATORS = [
-  { value: "eq" as const, label: "=" },
-  { value: "ne" as const, label: "≠" },
-  { value: "gt" as const, label: ">" },
-  { value: "lt" as const, label: "<" },
-  { value: "contains" as const, label: "包含" },
-];
-
-// ================================================================
-// 条件编辑器
-// ================================================================
-function ConditionEditor({
-  conditions,
-  onChange,
-  roles,
-}: {
-  conditions: ConditionItem[];
-  onChange: (c: ConditionItem[]) => void;
-  roles: ProjectRoleOption[];
-}) {
-  const add = () =>
-    onChange([
-      ...conditions,
-      { type: "memory", key: "", operator: "eq", value: "" },
-    ]);
-  const update = (i: number, d: Partial<ConditionItem>) => {
-    const u = [...conditions];
-    u[i] = { ...u[i], ...d };
-    if (d.type && d.type !== conditions[i]?.type) {
-      u[i].key = "";
-      u[i].value = "";
-    }
-    onChange(u);
-  };
-  const remove = (i: number) => onChange(conditions.filter((_, j) => j !== i));
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className={labelSm}>触发条件</label>
-        <button
-          onClick={add}
-          className="text-[10px] font-medium text-brand hover:underline"
-        >
-          + 添加
-        </button>
-      </div>
-      {conditions.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-canvas/50 py-6 text-center">
-          <p className="text-[11px] text-ink-muted/60">无条件 — 始终可用</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {conditions.map((c, i) => {
-            const tc =
-              CONDITION_TYPES.find((t) => t.value === c.type) ||
-              CONDITION_TYPES[0];
-            const isCS = c.type === "character_state";
-            const { charId, field: spk } = parseCharStateKey(c.key);
-            const mp = CHARACTER_STATE_PRESETS.find((p) => p.key === spk);
-            return (
-              <div
-                key={i}
-                className={`rounded-xl border bg-surface p-3 ${tc.color}`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <select
-                    value={c.type}
-                    onChange={(e) =>
-                      update(i, {
-                        type: e.target.value as ConditionItem["type"],
-                      })
-                    }
-                    className="text-[11px] font-medium bg-transparent border-none outline-none cursor-pointer"
-                  >
-                    {CONDITION_TYPES.map((ct) => (
-                      <option key={ct.value} value={ct.value}>
-                        {ct.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => remove(i)}
-                    className="ml-auto text-xs text-ink-muted/60 hover:text-red-500"
-                  >
-                    ×
-                  </button>
-                </div>
-                {c.type === "node_completed" ? (
-                  <input
-                    value={c.key}
-                    onChange={(e) => update(i, { key: e.target.value })}
-                    placeholder="节点 ID"
-                    className={cn(inputCompact, "w-full bg-surface")}
-                  />
-                ) : isCS ? (
-                  <div className="space-y-1.5">
-                    <select
-                      value={charId}
-                      onChange={(e) => {
-                        const cid = e.target.value;
-                        update(i, {
-                          key: cid && spk ? `${cid}.${spk}` : "",
-                        });
-                      }}
-                      className={flowSelectClass}
-                    >
-                      <option value="">选择角色...</option>
-                      {roles.map((r) => (
-                        <option key={r.characterRefId} value={r.characterRefId}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex items-center gap-1.5">
-                      <select
-                        value={spk}
-                        onChange={(e) => {
-                          const p = CHARACTER_STATE_PRESETS.find(
-                            (x) => x.key === e.target.value,
-                          );
-                          update(i, {
-                            key: charId && e.target.value
-                              ? `${charId}.${e.target.value}`
-                              : "",
-                            value: p?.values?.[0] || "",
-                          });
-                        }}
-                        className={cn(flowSelectClass, "flex-1")}
-                      >
-                        <option value="">选择状态...</option>
-                        {CHARACTER_STATE_PRESETS.map((p) => (
-                          <option key={p.key} value={p.key}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={c.operator}
-                        onChange={(e) =>
-                          update(i, {
-                            operator: e.target
-                              .value as ConditionItem["operator"],
-                          })
-                        }
-                        className={cn(flowSelectClass, "w-12 px-1")}
-                      >
-                        {OPERATORS.map((op) => (
-                          <option key={op.value} value={op.value}>
-                            {op.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {mp && mp.values.length > 0 ? (
-                      <select
-                        value={c.value}
-                        onChange={(e) => update(i, { value: e.target.value })}
-                        className={flowSelectClass}
-                      >
-                        {mp.values.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        value={c.value}
-                        onChange={(e) => update(i, { value: e.target.value })}
-                        placeholder="值"
-                        className={cn(inputCompact, "w-full bg-surface")}
-                      />
-                    )}
-                    <p className="text-[9px] text-ink-muted">
-                      {roles.length === 0
-                        ? "请先在剧本详情页关联角色"
-                        : "选择剧本已关联的角色"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      value={c.key}
-                      onChange={(e) => update(i, { key: e.target.value })}
-                      placeholder="键名"
-                      className={cn(flowSelectClass, "flex-1")}
-                    />
-                    <select
-                      value={c.operator}
-                      onChange={(e) =>
-                        update(i, {
-                          operator: e.target.value as ConditionItem["operator"],
-                        })
-                      }
-                      className={cn(flowSelectClass, "w-12 px-1")}
-                    >
-                      {OPERATORS.map((op) => (
-                        <option key={op.value} value={op.value}>
-                          {op.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      value={c.value}
-                      onChange={(e) => update(i, { value: e.target.value })}
-                      placeholder="值"
-                      className={cn(flowSelectClass, "w-20")}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ================================================================
-// 效果编辑器
-// ================================================================
-function EffectEditor({
-  effects,
-  onChange,
-  roles,
-}: {
-  effects: EffectItem[];
-  onChange: (e: EffectItem[]) => void;
-  roles: ProjectRoleOption[];
-}) {
-  const add = () =>
-    onChange([...effects, { type: "memory", key: "", value: "" }]);
-  const update = (i: number, d: Partial<EffectItem>) => {
-    const u = [...effects];
-    u[i] = { ...u[i], ...d };
-    if (d.type && d.type !== effects[i]?.type) {
-      u[i].key = "";
-      u[i].value = "";
-    }
-    onChange(u);
-  };
-  const remove = (i: number) => onChange(effects.filter((_, j) => j !== i));
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className={labelSm}>完成效果</label>
-        <button
-          onClick={add}
-          className="text-[10px] font-medium text-brand hover:underline"
-        >
-          + 添加
-        </button>
-      </div>
-      {effects.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-canvas/50 py-6 text-center">
-          <p className="text-[11px] text-ink-muted/60">无效果 — 纯叙事节点</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {effects.map((e, i) => {
-            const tc =
-              EFFECT_TYPES.find((t) => t.value === e.type) || EFFECT_TYPES[0];
-            const isCS = e.type === "character_state";
-            const { charId, field: spk } = parseCharStateKey(e.key);
-            const mp = CHARACTER_STATE_PRESETS.find((p) => p.key === spk);
-            return (
-              <div
-                key={i}
-                className={`rounded-xl border bg-surface p-3 ${tc.color}`}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <select
-                    value={e.type}
-                    onChange={(ev) =>
-                      update(i, { type: ev.target.value as EffectItem["type"] })
-                    }
-                    className="text-[11px] font-medium bg-transparent border-none outline-none cursor-pointer"
-                  >
-                    {EFFECT_TYPES.map((et) => (
-                      <option key={et.value} value={et.value}>
-                        {et.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => remove(i)}
-                    className="ml-auto text-xs text-ink-muted/60 hover:text-red-500"
-                  >
-                    ×
-                  </button>
-                </div>
-                {isCS ? (
-                  <div className="space-y-1.5">
-                    <select
-                      value={charId}
-                      onChange={(ev) => {
-                        const cid = ev.target.value;
-                        update(i, {
-                          key: cid && spk ? `${cid}.${spk}` : "",
-                        });
-                      }}
-                      className={flowSelectClass}
-                    >
-                      <option value="">选择角色...</option>
-                      {roles.map((r) => (
-                        <option key={r.characterRefId} value={r.characterRefId}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={spk}
-                      onChange={(ev) => {
-                        const p = CHARACTER_STATE_PRESETS.find(
-                          (x) => x.key === ev.target.value,
-                        );
-                        update(i, {
-                          key: charId && ev.target.value
-                            ? `${charId}.${ev.target.value}`
-                            : "",
-                          value: p?.values?.[0] || "",
-                        });
-                      }}
-                      className={flowSelectClass}
-                    >
-                      <option value="">选择状态...</option>
-                      {CHARACTER_STATE_PRESETS.map((p) => (
-                        <option key={p.key} value={p.key}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                    {mp && mp.values.length > 0 ? (
-                      <select
-                        value={e.value}
-                        onChange={(ev) => update(i, { value: ev.target.value })}
-                        className={flowSelectClass}
-                      >
-                        {mp.values.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        value={e.value}
-                        onChange={(ev) => update(i, { value: ev.target.value })}
-                        placeholder="值"
-                        className={cn(inputCompact, "w-full bg-surface")}
-                      />
-                    )}
-                    <p className="text-[9px] text-ink-muted">
-                      {roles.length === 0
-                        ? "请先在剧本详情页关联角色"
-                        : "选择剧本已关联的角色"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      value={e.key}
-                      onChange={(ev) => update(i, { key: ev.target.value })}
-                      placeholder="键名"
-                      className={cn(flowSelectClass, "flex-1")}
-                    />
-                    <span className="text-[11px] text-ink-muted">=</span>
-                    <input
-                      value={e.value}
-                      onChange={(ev) => update(i, { value: ev.target.value })}
-                      placeholder="值"
-                      className={cn(flowSelectClass, "flex-1")}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ================================================================
-// 主页面
-// ================================================================
 export default function ProjectFlowPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -666,22 +55,24 @@ export default function ProjectFlowPage() {
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<
-    "content" | "conditions" | "effects"
-  >("content");
+  const [activePanel, setActivePanel] = useState<PanelTab>("content");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
 
-  const [nodeForm, setNodeForm] = useState({
+  const [nodeForm, setNodeForm] = useState<NodeFormState>({
     title: "",
     description: "",
     is_anchor: false,
+    is_ending: false,
+    ending_label: "",
     speaker: "",
     dialogue: "",
     narration: "",
   });
   const [conditions, setConditions] = useState<ConditionItem[]>([]);
   const [effects, setEffects] = useState<EffectItem[]>([]);
+  const [script, setScript] = useState<Instruction[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   const showToast = (m: string, t: "success" | "error" = "success") => {
     setToast({ message: m, type: t });
@@ -695,7 +86,7 @@ export default function ProjectFlowPage() {
     if (historyRef.current.length > 50) historyRef.current.shift();
   };
 
-  const undo = () => {
+  const undo = useCallback(() => {
     if (historyRef.current.length <= 1) return;
     historyRef.current.pop();
     const s = historyRef.current[historyRef.current.length - 1];
@@ -704,9 +95,8 @@ export default function ProjectFlowPage() {
       setEdges(s.edges);
       showToast("已撤销");
     }
-  };
+  }, [setNodes, setEdges]);
 
-  // 加载
   const fetchData = async () => {
     if (!id) return;
     const p = await projectApi.get(id);
@@ -720,6 +110,8 @@ export default function ProjectFlowPage() {
           roleId: role.id,
           characterRefId: role.character_ref_id,
           name: char.name,
+          imagePath: char.image_path,
+          spriteKeys: Object.keys(char.character_data?.sprites || {}),
         });
       } catch {
         roleOptions.push({
@@ -758,11 +150,15 @@ export default function ProjectFlowPage() {
             title: nd.title || "未命名",
             description: nd.description || "",
             is_anchor: Boolean(nd.is_anchor),
+            is_ending: Boolean(nd.is_ending),
+            ending_label: (nd.ending_label as string) || "",
             speaker: nd.speaker || "",
             dialogue: nd.dialogue || "",
             narration: nd.narration || "",
-            has_conditions: Boolean((tc as any)?.conditions?.length),
+            script: (nd.script as Instruction[]) || [],
+            has_conditions: Boolean((tc as { conditions?: unknown[] })?.conditions?.length),
             has_effects: Boolean(ef?.length),
+            has_script: Boolean((nd.script as Instruction[])?.length),
             trigger_condition: tc,
             effects: ef || [],
           },
@@ -781,14 +177,14 @@ export default function ProjectFlowPage() {
           sceneNodeIds.has(String(e.target_node_id)),
       )
       .map((e) => ({
-      id: e.id,
-      source: e.source_node_id,
-      target: e.target_node_id,
-      sourceHandle: "output",
-      markerEnd: { type: MarkerType.ArrowClosed },
-      style: { stroke: flowEdgeStroke, strokeWidth: 2 },
-      label: e.label || "",
-    }));
+        id: e.id,
+        source: e.source_node_id,
+        target: e.target_node_id,
+        sourceHandle: "output",
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: flowEdgeStroke, strokeWidth: 2 },
+        label: e.label || "",
+      }));
     setEdges(loadedEdges);
     pushHistory(loadedNodes, loadedEdges);
   };
@@ -797,7 +193,6 @@ export default function ProjectFlowPage() {
     fetchData();
   }, [id, sceneId]);
 
-  // 键盘
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "z") {
@@ -825,12 +220,8 @@ export default function ProjectFlowPage() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [undo, selectedNode, nodes, edges]);
+  }, [undo, selectedNode, nodes, edges, setNodes]);
 
-  // 拖放
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -852,8 +243,10 @@ export default function ProjectFlowPage() {
           speaker: "",
           dialogue: "",
           narration: "",
+          script: [],
           has_conditions: false,
           has_effects: false,
+          has_script: false,
           trigger_condition: null,
           effects: [],
         },
@@ -864,10 +257,9 @@ export default function ProjectFlowPage() {
         return n;
       });
     },
-    [nodes, edges],
+    [nodes, edges, setNodes],
   );
 
-  // 连线 — 单端口
   const onConnect = useCallback(
     (params: Connection) => {
       if (!params.source || !params.target) return;
@@ -887,7 +279,7 @@ export default function ProjectFlowPage() {
         return e;
       });
     },
-    [nodes, edges],
+    [nodes, edges, setEdges],
   );
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -898,6 +290,8 @@ export default function ProjectFlowPage() {
       title: (node.data.title as string) || "",
       description: (node.data.description as string) || "",
       is_anchor: Boolean(node.data.is_anchor),
+      is_ending: Boolean(node.data.is_ending),
+      ending_label: (node.data.ending_label as string) || "",
       speaker: (node.data.speaker as string) || "",
       dialogue: (node.data.dialogue as string) || "",
       narration: (node.data.narration as string) || "",
@@ -905,18 +299,20 @@ export default function ProjectFlowPage() {
     const tc = node.data.trigger_condition as Record<string, unknown> | null;
     setConditions((tc?.conditions as ConditionItem[]) || []);
     setEffects((node.data.effects as EffectItem[]) || []);
+    setScript((node.data.script as Instruction[]) || []);
   }, []);
 
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
     setSelectedEdge(edge);
     setSelectedNode(null);
   }, []);
+
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
     setSelectedEdge(null);
   }, []);
 
-  const updateSelectedNode = (data: Partial<typeof nodeForm>) => {
+  const updateSelectedNode = (data: Partial<NodeFormState>) => {
     if (!selectedNode) return;
     const nd = { ...nodeForm, ...data };
     setNodeForm(nd);
@@ -925,7 +321,12 @@ export default function ProjectFlowPage() {
         n.id === selectedNode.id
           ? {
               ...n,
-              data: { ...n.data, ...nd, is_anchor: Boolean(nd.is_anchor) },
+              data: {
+                ...n.data,
+                ...nd,
+                is_anchor: Boolean(nd.is_anchor),
+                is_ending: Boolean(nd.is_ending),
+              },
             }
           : n,
       ),
@@ -949,7 +350,7 @@ export default function ProjectFlowPage() {
         ),
       );
     },
-    [selectedNode],
+    [selectedNode, setNodes],
   );
 
   const updateEffects = useCallback(
@@ -971,7 +372,29 @@ export default function ProjectFlowPage() {
         ),
       );
     },
-    [selectedNode],
+    [selectedNode, setNodes],
+  );
+
+  const updateScript = useCallback(
+    (newS: Instruction[]) => {
+      setScript(newS);
+      if (!selectedNode) return;
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === selectedNode.id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  script: newS,
+                  has_script: newS.length > 0,
+                },
+              }
+            : n,
+        ),
+      );
+    },
+    [selectedNode, setNodes],
   );
 
   const deleteSelectedNode = () => {
@@ -989,7 +412,20 @@ export default function ProjectFlowPage() {
     setSelectedNode(null);
   };
 
-  // 保存
+  const handleEdgeLabelChange = (edgeId: string, label: string) => {
+    setEdges((eds) =>
+      eds.map((e) => (e.id === edgeId ? { ...e, label } : e)),
+    );
+    setSelectedEdge((prev) =>
+      prev && prev.id === edgeId ? { ...prev, label } : prev,
+    );
+  };
+
+  const handleDeleteEdge = (edgeId: string) => {
+    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+    setSelectedEdge(null);
+  };
+
   const saveAll = async () => {
     if (!id || !currentScene) return;
     setSaving(true);
@@ -1000,7 +436,9 @@ export default function ProjectFlowPage() {
         if (!currentIds.has(String(node.id))) {
           try {
             await projectApi.deleteNode(id, sid, node.id);
-          } catch {}
+          } catch {
+            /* 已删除则忽略 */
+          }
         }
       }
 
@@ -1013,9 +451,12 @@ export default function ProjectFlowPage() {
               title: (n.data.title as string) || "未命名",
               description: (n.data.description as string) || "",
               is_anchor: Boolean(n.data.is_anchor),
+              is_ending: Boolean(n.data.is_ending),
+              ending_label: (n.data.ending_label as string) || null,
               speaker: (n.data.speaker as string) || null,
               dialogue: (n.data.dialogue as string) || null,
               narration: (n.data.narration as string) || null,
+              script: (n.data.script as Instruction[]) || [],
               trigger_condition: n.data.trigger_condition || null,
               effects: n.data.effects || [],
             },
@@ -1033,9 +474,12 @@ export default function ProjectFlowPage() {
             title: (n.data.title as string) || "未命名",
             description: (n.data.description as string) || "",
             is_anchor: Boolean(n.data.is_anchor),
+            is_ending: Boolean(n.data.is_ending),
+            ending_label: (n.data.ending_label as string) || null,
             speaker: (n.data.speaker as string) || null,
             dialogue: (n.data.dialogue as string) || null,
             narration: (n.data.narration as string) || null,
+            script: (n.data.script as Instruction[]) || [],
             trigger_condition: n.data.trigger_condition || null,
             effects: n.data.effects || [],
           },
@@ -1097,26 +541,20 @@ export default function ProjectFlowPage() {
     }
   };
 
-  const draggableLabels = [
-    {
-      label: "对话节点",
-      icon: MessageSquare,
-      color:
-        "border-border bg-surface text-ink-muted shadow-sm hover:border-gray-300 hover:bg-canvas",
-    },
-    {
-      label: "锚点事件",
-      icon: Anchor,
-      color:
-        "border-amber-200 bg-amber-50 text-amber-600 shadow-sm hover:bg-amber-100",
-    },
-  ];
-
-  const panelTabs = [
-    { key: "content" as const, label: "内容", icon: FileText },
-    { key: "conditions" as const, label: "条件", icon: Search },
-    { key: "effects" as const, label: "效果", icon: Sparkles },
-  ];
+  const simTargets: SimTarget[] = selectedNode
+    ? edges
+        .filter((e) => e.source === selectedNode.id)
+        .map((e) => {
+          const tgt = nodes.find((n) => n.id === e.target);
+          return {
+            edgeId: e.id,
+            label: (e.label as string) || "",
+            targetTitle: (tgt?.data.title as string) || "未命名",
+            trigger:
+              (tgt?.data.trigger_condition as Condition | null) ?? null,
+          };
+        })
+    : [];
 
   return (
     <Shell>
@@ -1125,6 +563,13 @@ export default function ProjectFlowPage() {
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
+        />
+      )}
+      {showPreview && (
+        <ScriptPreview
+          script={script}
+          roles={projectRoles}
+          onClose={() => setShowPreview(false)}
         />
       )}
       <div className="mb-4 flex items-center justify-between">
@@ -1155,291 +600,45 @@ export default function ProjectFlowPage() {
       </div>
 
       <div className="flex gap-4" style={{ height: "calc(100vh - 10rem)" }}>
-        <div className="w-36 flex-shrink-0 space-y-3">
-          <p className={cn(labelSm, "px-1")}>节点类型</p>
-          {draggableLabels.map((item) => {
-            const DragIcon = item.icon;
-            return (
-            <div
-              key={item.label}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData("application/reactflow", item.label);
-              }}
-              className={`px-4 py-3 text-xs rounded-xl border-2 border-dashed cursor-grab active:cursor-grabbing text-center transition-all hover:border-solid ${item.color}`}
-            >
-              <DragIcon className="mx-auto mb-1 h-4 w-4" strokeWidth={1.75} />
-              {item.label}
-            </div>
-            );
-          })}
-          <div className="border-t border-border pt-4">
-            <p className={cn(labelSm, "mb-2 px-1")}>操作提示</p>
-            <div className="space-y-2 text-[10px] text-ink-muted">
-              <p>拖入节点到画布</p>
-              <p>从端口拖线连接</p>
-              <p>滚轮缩放画布</p>
-              <p>Ctrl+Z 撤销</p>
-              <p>Delete 删除选中</p>
-            </div>
-          </div>
-        </div>
+        <FlowNodePalette />
 
-        <div
-          className="flex-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
-          ref={wrapperRef}
-        >
-          <ReactFlow
-            nodes={nodes}
-            edges={edges.map((e) => ({
-              ...e,
-              style: {
-                ...e.style,
-                strokeWidth: e.id === hoveredEdge ? 4 : 2,
-                stroke: e.id === hoveredEdge ? flowEdgeStrokeHover : flowEdgeStroke,
-              },
-            }))}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onEdgeClick={onEdgeClick}
-            onPaneClick={onPaneClick}
-            onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
-            onEdgeMouseLeave={() => setHoveredEdge(null)}
-            onDragOver={onDragOver}
-            onDrop={onDrop}
-            nodeTypes={nodeTypes}
-            fitView
-            snapToGrid
-            snapGrid={[16, 16]}
-            deleteKeyCode={["Backspace", "Delete"]}
-            multiSelectionKeyCode={["Shift"]}
-            selectionOnDrag
-            panOnDrag={[1, 2]}
-          >
-            <Background
-              variant={BackgroundVariant.Dots}
-              gap={20}
-              size={1}
-              color={tokens.border}
-            />
-            <Controls className="!rounded-xl !border-border !bg-surface/90 !shadow-sm !backdrop-blur-sm" />
-            <MiniMap
-              style={{ background: tokens.canvas }}
-              nodeColor={(n) => (n.data?.is_anchor ? "#d97706" : flowEdgeStroke)}
-              maskColor="rgba(0,0,0,0.05)"
-              className="!rounded-xl !border-border !shadow-sm"
-            />
-          </ReactFlow>
-        </div>
+        <FlowCanvas
+          wrapperRef={wrapperRef}
+          nodes={nodes}
+          edges={edges}
+          hoveredEdge={hoveredEdge}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          onPaneClick={onPaneClick}
+          onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
+          onEdgeMouseLeave={() => setHoveredEdge(null)}
+          onDrop={onDrop}
+        />
 
-        <div className="flex w-80 flex-shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm">
-          {selectedNode ? (
-            <>
-              <div className="flex border-b border-border">
-                {panelTabs.map((tab) => {
-                  const TabIcon = tab.icon;
-                  return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActivePanel(tab.key)}
-                    className={cn(
-                      "inline-flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium transition-all",
-                      activePanel === tab.key
-                        ? "border-b-2 border-brand bg-brand/5 text-brand"
-                        : "text-ink-muted hover:text-ink",
-                    )}
-                  >
-                    <TabIcon className="h-3 w-3" strokeWidth={1.75} />
-                    {tab.label}
-                  </button>
-                  );
-                })}
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                {activePanel === "content" && (
-                  <div className="space-y-4">
-                    <Input
-                      label="节点标题"
-                      value={nodeForm.title}
-                      onChange={(e) =>
-                        updateSelectedNode({ title: e.target.value })
-                      }
-                    />
-                    <Select
-                      label="说话角色"
-                      value={nodeForm.speaker}
-                      onChange={(e) =>
-                        updateSelectedNode({ speaker: e.target.value })
-                      }
-                    >
-                      <option value="">旁白（无说话人）</option>
-                      {projectRoles.map((r) => (
-                        <option key={r.characterRefId} value={r.name}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </Select>
-                    <Textarea
-                      label="对话"
-                      value={nodeForm.dialogue}
-                      onChange={(e) =>
-                        updateSelectedNode({ dialogue: e.target.value })
-                      }
-                      rows={3}
-                      placeholder="角色台词..."
-                    />
-                    <Textarea
-                      label="旁白"
-                      value={nodeForm.narration}
-                      onChange={(e) =>
-                        updateSelectedNode({ narration: e.target.value })
-                      }
-                      rows={2}
-                      placeholder="叙述性文字..."
-                    />
-                    <Textarea
-                      label="备注"
-                      value={nodeForm.description}
-                      onChange={(e) =>
-                        updateSelectedNode({ description: e.target.value })
-                      }
-                      rows={2}
-                      placeholder="编辑器内部备注..."
-                    />
-                    <CheckboxField
-                      checked={nodeForm.is_anchor}
-                      onChange={(checked) =>
-                        updateSelectedNode({ is_anchor: checked })
-                      }
-                      label="锚点事件（剧情关键转折点）"
-                      className="rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2.5"
-                    />
-                  </div>
-                )}
-                {activePanel === "conditions" && (
-                  <ConditionEditor
-                    conditions={conditions}
-                    onChange={updateConditions}
-                    roles={projectRoles}
-                  />
-                )}
-                {activePanel === "effects" && (
-                  <EffectEditor
-                    effects={effects}
-                    onChange={updateEffects}
-                    roles={projectRoles}
-                  />
-                )}
-              </div>
-              <div className="border-t border-border px-4 py-3">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  className="w-full"
-                  onClick={deleteSelectedNode}
-                >
-                  删除节点
-                </Button>
-              </div>
-            </>
-          ) : selectedEdge ? (
-            <div className="flex-1 flex flex-col">
-              <div className="border-b border-border px-4 py-3">
-                <h3 className="text-sm font-semibold text-ink">连线属性</h3>
-              </div>
-              <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                <div>
-                  <label className={cn(labelSm, "mb-2 block")}>分支标签</label>
-                  <div className="mb-3 flex flex-wrap gap-1.5">
-                    {EDGE_LABELS.map((l) => (
-                      <button
-                        key={l}
-                        onClick={() => {
-                          setEdges((eds) =>
-                            eds.map((e) =>
-                              e.id === selectedEdge.id ? { ...e, label: l } : e,
-                            ),
-                          );
-                          setSelectedEdge((prev) =>
-                            prev ? { ...prev, label: l } : null,
-                          );
-                        }}
-                        className={cn(
-                          "rounded-lg border px-2.5 py-1.5 text-[11px] transition-all",
-                          selectedEdge.label === l
-                            ? "border-brand bg-brand text-white shadow-sm"
-                            : "border-border text-ink-muted hover:border-gray-300 hover:bg-canvas",
-                        )}
-                      >
-                        {l || "无"}
-                      </button>
-                    ))}
-                  </div>
-                  <Input
-                    value={String(selectedEdge.label || "")}
-                    onChange={(e) => {
-                      setEdges((eds) =>
-                        eds.map((ed) =>
-                          ed.id === selectedEdge.id
-                            ? { ...ed, label: e.target.value }
-                            : ed,
-                        ),
-                      );
-                      setSelectedEdge((prev) =>
-                        prev ? { ...prev, label: e.target.value } : null,
-                      );
-                    }}
-                    placeholder="自定义标签"
-                    label="自定义标签"
-                  />
-                </div>
-              </div>
-              <div className="border-t border-border px-4 py-3">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => {
-                    setEdges((eds) =>
-                      eds.filter((e) => e.id !== selectedEdge.id),
-                    );
-                    setSelectedEdge(null);
-                  }}
-                >
-                  删除连线
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center p-6">
-              <div className="space-y-4 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/5 text-brand">
-                  <Clapperboard className="h-7 w-7" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-ink">叙事画布</p>
-                  <p className="mt-1 text-xs text-ink-muted">点击节点编辑属性</p>
-                </div>
-                <div className="space-y-2 rounded-xl bg-canvas p-4 text-left text-[11px] text-ink-muted">
-                  <p>
-                    <strong>对话节点</strong> — 角色台词，连线分支
-                  </p>
-                  <p>
-                    <strong>锚点事件</strong> — 剧情转折点
-                  </p>
-                  <p>
-                    <strong>条件</strong> — 控制节点可见性
-                  </p>
-                  <p>
-                    <strong>效果</strong> — 记忆/标志/状态变化
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <NodeInspectorPanel
+          selectedNode={selectedNode}
+          selectedEdge={selectedEdge}
+          activePanel={activePanel}
+          onActivePanelChange={setActivePanel}
+          nodeForm={nodeForm}
+          onNodeFormChange={updateSelectedNode}
+          conditions={conditions}
+          onConditionsChange={updateConditions}
+          effects={effects}
+          onEffectsChange={updateEffects}
+          script={script}
+          onScriptChange={updateScript}
+          projectRoles={projectRoles}
+          nodes={nodes}
+          simTargets={simTargets}
+          onPreviewScript={() => setShowPreview(true)}
+          onDeleteNode={deleteSelectedNode}
+          onEdgeLabelChange={handleEdgeLabelChange}
+          onDeleteEdge={handleDeleteEdge}
+        />
       </div>
     </Shell>
   );

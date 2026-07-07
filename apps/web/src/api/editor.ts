@@ -37,6 +37,17 @@ export const projectApi = {
   delete: (id: string) =>
     apiClient.delete<void>(`/editor/projects/${id}`),
 
+  listTemplates: (params?: { skip?: number; limit?: number }) =>
+    apiClient.get<ProjectResponse[]>('/editor/projects/templates', params),
+
+  fork: (id: string, body: { author_id: string; new_title?: string }) =>
+    apiClient.post<ProjectResponse>(`/editor/projects/${id}/fork`, body),
+
+  seedShowcase: () =>
+    apiClient.post<{ character_id: string; projects: { id: string; title: string; status: string }[] }>(
+      "/editor/projects/seed/showcase",
+    ),
+
   // Scene
   addScene: (projectId: string, data: ProjectSceneCreate) =>
     apiClient.post<ProjectSceneResponse>(`/editor/projects/${projectId}/scenes`, data),

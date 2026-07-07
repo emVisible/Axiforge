@@ -42,6 +42,8 @@ export interface NarrativeNodeData {
   title?: string;
   description?: string;
   is_anchor?: boolean;
+  is_ending?: boolean;
+  ending_label?: string | null;
   speaker?: string | null;
   dialogue?: string | null;
   narration?: string | null;
@@ -82,6 +84,7 @@ export interface ProjectUpdate {
   genre?: string | null;
   world_setting?: string | null;
   rules?: string | null;
+  play_meta?: Record<string, unknown>;
   is_public?: boolean;
   is_meta?: boolean;
 }
@@ -97,10 +100,13 @@ export interface ProjectResponse {
   genre: string | null;
   world_setting: string | null;
   rules: string | null;
+  play_meta?: Record<string, unknown>;
   is_public: boolean;
   is_meta: boolean;
   view_count: number;
+  play_count?: number;
   author_id: string;
+  fork_from?: string | null;
   scenes: ProjectSceneResponse[];
   roles: ProjectRoleResponse[];
   asset_refs: ProjectAssetRefResponse[];

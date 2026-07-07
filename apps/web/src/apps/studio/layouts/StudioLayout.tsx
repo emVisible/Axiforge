@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "react-router";
+import { Outlet, useLocation, Link } from "react-router";
 import {
   MapPin,
   Package,
@@ -12,6 +12,7 @@ import { TabBar } from "@axiforge/ui";
 import type { TabItem } from "@axiforge/ui";
 
 import GlobalSearch from "@/components/GlobalSearch";
+import UserAccountMenu from "@/components/UserAccountMenu";
 import { APP_NAME } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
@@ -54,9 +55,16 @@ export default function StudioLayout() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              to={routes.discover}
+              className="hidden rounded-lg border border-border px-3 py-1.5 text-xs text-ink-muted hover:bg-canvas hover:text-ink sm:inline"
+            >
+              发现
+            </Link>
             <GlobalSearch />
+            <UserAccountMenu />
             <span className="hidden font-mono text-[10px] text-ink-muted sm:inline">
-              v1.0
+              v1.5
             </span>
           </div>
         </div>
@@ -77,12 +85,6 @@ export default function StudioLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
-
-      <footer className="border-t border-border py-3 text-center">
-        <span className="font-mono text-[10px] text-ink-muted/70">
-          Axiforge · Narrative Simulation Platform
-        </span>
-      </footer>
     </div>
   );
 }

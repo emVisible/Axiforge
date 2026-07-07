@@ -48,6 +48,8 @@ export interface CharacterData {
   anchor: Anchor;
   trace: Trace;
   bond: Bond;
+  // 表情差分组（桥5）：{ 表情key: 图片路径 }，供演出 show(char, expr) 直连立绘
+  sprites?: Record<string, string>;
 }
 
 
@@ -98,6 +100,7 @@ export interface CharacterCreate {
   character_data: CharacterData;
   is_public: boolean;
   image_path?: string;
+  author_id?: string;
 }
 
 export interface CharacterUpdate {

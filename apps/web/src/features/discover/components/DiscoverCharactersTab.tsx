@@ -85,11 +85,10 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <SegmentedControl
           value={sort}
           onChange={setSort}
-          variant="dark"
           options={[
             { value: "recent", label: "最新" },
             { value: "popular", label: "最热" },
@@ -99,7 +98,6 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
           <Button
             variant="ghost"
             size="sm"
-            tone="dark"
             className="text-red-400 hover:text-red-300"
             onClick={clearFilters}
           >
@@ -109,12 +107,11 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
       </div>
 
       {visibleTags.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="flex flex-wrap gap-1.5">
             {displayTags.map((tag) => (
               <FilterChip
                 key={tag.id}
-                variant="dark"
                 label={tag.name}
                 color={tag.color}
                 count={tag.usage_count}
@@ -123,22 +120,12 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
               />
             ))}
             {hiddenCount > 0 && !showAllTags && (
-              <Button
-                variant="ghost"
-                size="sm"
-                tone="dark"
-                onClick={() => setShowAllTags(true)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowAllTags(true)}>
                 +{hiddenCount} 更多
               </Button>
             )}
             {showAllTags && hiddenCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                tone="dark"
-                onClick={() => setShowAllTags(false)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowAllTags(false)}>
                 收起
               </Button>
             )}
@@ -147,24 +134,19 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
       )}
 
       {result && (
-        <p className="mb-4 text-xs text-white/30">共 {result.total} 个公开角色</p>
+        <p className="mb-3 text-xs text-ink-faint">共 {result.total} 个公开角色</p>
       )}
 
       {isLoading && page === 0 && (
         <div className="flex justify-center py-20">
-          <LoadingSpinner variant="dark" />
+          <LoadingSpinner />
         </div>
       )}
       {error && (
-        <ErrorDisplay
-          theme="dark"
-          message="加载角色失败"
-          onRetry={() => window.location.reload()}
-        />
+        <ErrorDisplay message="加载角色失败" onRetry={() => window.location.reload()} />
       )}
       {result && allCharacters.length === 0 && (
         <EmptyState
-          theme="dark"
           framed
           title={hasFilters ? "没有匹配的角色" : "还没有公开角色"}
           description={
@@ -179,7 +161,6 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
           {!hasFilters && (
             <WorkflowGuide
               steps={DISCOVER_WORKFLOW}
-              theme="dark"
               compact
               className="max-w-2xl text-left"
             />
@@ -189,16 +170,16 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
 
       {allCharacters.length > 0 && (
         <>
-          <CharacterGrid characters={allCharacters} theme="dark" />
-          <div className="mt-8 text-center">
-            {isLoading && page > 0 && <LoadingSpinner variant="dark" />}
+          <CharacterGrid characters={allCharacters} density="compact" />
+          <div className="mt-6 text-center">
+            {isLoading && page > 0 && <LoadingSpinner />}
             {hasMore && !isLoading && (
-              <Button tone="dark" variant="secondary" onClick={() => setPage((p) => p + 1)}>
+              <Button variant="secondary" onClick={() => setPage((p) => p + 1)}>
                 加载更多（{result!.total - (skip + PAGE_SIZE)} 个剩余）
               </Button>
             )}
             {!hasMore && allCharacters.length > 0 && (
-              <p className="text-sm text-white/25">已显示全部 {result?.total} 个角色</p>
+              <p className="text-sm text-ink-faint">已显示全部 {result?.total} 个角色</p>
             )}
           </div>
         </>

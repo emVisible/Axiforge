@@ -37,10 +37,15 @@ export default function AnchorEditor({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-canvas/50 p-4 sm:flex-row sm:items-start">
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-panel p-4 sm:flex-row sm:items-stretch">
         {onImageChange && (
-          <div className="shrink-0">
-            <ImageUpload value={imagePath || ""} onChange={onImageChange} />
+          <div className="h-32 w-full shrink-0 sm:h-auto sm:w-36">
+            <ImageUpload
+              fill
+              value={imagePath || ""}
+              onChange={onImageChange}
+              className="h-full"
+            />
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-3">
@@ -95,35 +100,36 @@ export default function AnchorEditor({
         <label className="block text-sm font-medium text-ink mb-1.5">
           标签
         </label>
-        <div className="flex gap-2 mb-2">
+        <div className="mb-2 flex items-center gap-2">
           <Input
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}
             placeholder="输入标签后按回车"
           />
-          {tagInput.trim() && (
-            <div className="flex items-center gap-2 mt-1 mb-2">
-              <span className="text-xs text-ink-muted">预览：</span>
-              <span
-                className="px-2.5 py-1 text-xs font-medium rounded-full border"
-                style={{
-                  color: generateTagColor(tagInput.trim()),
-                  borderColor: generateTagColor(tagInput.trim()) + "40",
-                  backgroundColor: generateTagColor(tagInput.trim()) + "10",
-                }}
-              >
-                {tagInput.trim()}
-              </span>
-            </div>
-          )}
           <button
+            type="button"
             onClick={addTag}
-            className="flex-shrink-0 rounded-lg bg-canvas px-4 py-2.5 text-sm transition-colors hover:bg-border/40"
+            className="shrink-0 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink transition-colors hover:bg-panel"
           >
             添加
           </button>
         </div>
+        {tagInput.trim() && (
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-xs text-ink-muted">预览：</span>
+            <span
+              className="rounded-full border px-2.5 py-1 text-xs font-medium"
+              style={{
+                color: generateTagColor(tagInput.trim()),
+                borderColor: generateTagColor(tagInput.trim()) + "40",
+                backgroundColor: generateTagColor(tagInput.trim()) + "10",
+              }}
+            >
+              {tagInput.trim()}
+            </span>
+          </div>
+        )}
         <div className="flex flex-wrap gap-1.5">
           {draft.anchor.tags.map((tag, i) => (
             <Badge

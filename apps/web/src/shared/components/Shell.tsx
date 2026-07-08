@@ -29,12 +29,17 @@ export default function Shell({
 export function CanvasWorkspace({
   children,
   className = "",
+  immersive = false,
 }: {
   children: ReactNode;
   className?: string;
+  /** 锁定视口高度，仅面板内部滚动（剪辑台/画布） */
+  immersive?: boolean;
 }) {
   return (
-    <div className={`flex min-h-[calc(100vh-3.5rem)] flex-col ${className}`}>
+    <div
+      className={`flex flex-col ${immersive ? "h-full min-h-0 overflow-hidden" : "min-h-[calc(100vh-3.5rem)]"} ${className}`}
+    >
       {children}
     </div>
   );

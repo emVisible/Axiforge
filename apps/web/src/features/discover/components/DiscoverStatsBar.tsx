@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "@/shared/components/ui";
 
 import { projectApi, itemApi, sceneAssetApi } from "@/shared/api/editor";
 import { characterApi } from "@/shared/api/characters";
@@ -17,8 +19,18 @@ const defaultStats: DiscoverStats = {
   scenes: 0,
 };
 
-export default function DiscoverStatsBar() {
+interface DiscoverStatsBarProps {
+  variant?: "standalone" | "inline";
+  collapsible?: boolean;
+}
+
+export default function DiscoverStatsBar({
+  variant = "standalone",
+  collapsible = false,
+}: DiscoverStatsBarProps) {
   const [stats, setStats] = useState<DiscoverStats>(defaultStats);
+  const [collapsed, setCollapsed] = useState(false);
+  const inline = variant === "inline";
 
   useEffect(() => {
     let cancelled = false;
@@ -47,20 +59,41 @@ export default function DiscoverStatsBar() {
     { label: "公开剧本", value: stats.projects },
     { label: "公开角色", value: stats.characters },
     { label: "公开道具", value: stats.items },
-    { label: "场景模板", value: stats.scenes },
+    { label: "公开场景", value: stats.scenes },
   ];
 
+  const chipClass = inline
+    ? "rounded-full border border-border bg-panel px-2.5 py-1 text-[10px] text-ink-muted"
+    : "rounded-full border border-border bg-panel px-3 py-1.5 text-xs text-ink-muted";
+
   return (
-    <div className="mb-6 flex flex-wrap gap-2">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/50"
+    <div
+      className={cn(
+        inline ? "flex flex-wrap items-center justify-end gap-1.5" : "mb-5 flex flex-wrap gap-2",
+      )}
+    >
+      {collapsible && inline && (
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          className="mr-1 flex items-center gap-0.5 text-[10px] text-ink-faint hover:text-ink-muted"
+          aria-expanded={!collapsed}
         >
-          <span className="font-medium text-white/80">{item.value}</span>
-          <span className="ml-1.5">{item.label}</span>
-        </div>
-      ))}
+          统计
+          {collapsed ? (
+            <ChevronDown className="h-3 w-3" />
+          ) : (
+            <ChevronUp className="h-3 w-3" />
+          )}
+        </button>
+      )}
+      {(!collapsible || !collapsed) &&
+        items.map((item) => (
+          <div key={item.label} className={chipClass}>
+            <span className="font-medium text-ink">{item.value}</span>
+            <span className="ml-1">{item.label}</span>
+          </div>
+        ))}
     </div>
   );
 }

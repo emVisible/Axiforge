@@ -90,12 +90,12 @@ export default function StoryReadPage() {
                   <del className="line-through text-ink-muted">{children}</del>
                 ),
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-[3px] border-amber-300 pl-6 py-2 my-6 italic text-ink-muted bg-amber-50/40 rounded-r-lg">
+                  <blockquote className="border-l-[3px] border-accent/40 pl-6 py-2 my-6 italic text-ink-muted bg-accent/5 rounded-r-lg">
                     {children}
                   </blockquote>
                 ),
                 hr: () => (
-                  <div className="my-10 text-center text-amber-300 text-lg">
+                  <div className="my-10 text-center text-accent/60 text-lg">
                     ❧
                   </div>
                 ),

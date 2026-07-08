@@ -73,21 +73,19 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
     <div>
       {loading && page === 0 && (
         <div className="flex justify-center py-20">
-          <LoadingSpinner variant="dark" />
+          <LoadingSpinner />
         </div>
       )}
 
       {!loading && items.length === 0 && (
         <EmptyState
-          theme="dark"
           framed
-          title={debouncedSearch ? "没有匹配的场景模板" : "还没有公开场景模板"}
+          title={debouncedSearch ? "没有匹配的场景" : "还没有公开场景"}
           description={debouncedSearch ? "试试其他关键词" : undefined}
         >
           {!debouncedSearch && (
             <WorkflowGuide
               steps={DISCOVER_WORKFLOW}
-              theme="dark"
               compact
               className="max-w-2xl text-left"
             />
@@ -97,34 +95,33 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
 
       {items.length > 0 && (
         <>
-          <p className="mb-4 text-xs text-white/30">共 {total} 个场景模板</p>
-          <CardGrid stagger>
+          <p className="mb-3 text-xs text-ink-faint">共 {total} 个场景</p>
+          <CardGrid stagger density="compact">
             {items.map((scene) => (
               <EntityCard
                 key={scene.id}
-                theme="dark"
                 to={routes.scene(scene.id)}
                 title={scene.name}
                 description={scene.description || scene.world_setting || "暂无描述"}
                 leading={
-                  <EntityIcon theme="dark">
+                  <EntityIcon>
                     <MapPin className="h-5 w-5" strokeWidth={1.75} />
                   </EntityIcon>
                 }
                 badges={
                   <>
                     {scene.location && (
-                      <Badge variant="default" size="sm" tone="dark">
+                      <Badge variant="default" size="sm">
                         {scene.location}
                       </Badge>
                     )}
                     {scene.atmosphere && (
-                      <Badge variant="blue" size="sm" tone="dark">
+                      <Badge variant="blue" size="sm">
                         {scene.atmosphere}
                       </Badge>
                     )}
                     {scene.view_count > 0 && (
-                      <Badge variant="default" size="sm" tone="dark">
+                      <Badge variant="default" size="sm">
                         {scene.view_count} 浏览
                       </Badge>
                     )}
@@ -133,15 +130,15 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
               />
             ))}
           </CardGrid>
-          <div className="mt-8 text-center">
-            {loadingMore && <LoadingSpinner variant="dark" />}
+          <div className="mt-6 text-center">
+            {loadingMore && <LoadingSpinner />}
             {hasMore && !loadingMore && (
-              <Button tone="dark" variant="secondary" onClick={() => setPage((p) => p + 1)}>
+              <Button variant="secondary" onClick={() => setPage((p) => p + 1)}>
                 加载更多（{total - items.length} 个剩余）
               </Button>
             )}
             {!hasMore && (
-              <p className="text-sm text-white/25">已显示全部 {total} 个场景模板</p>
+              <p className="text-sm text-ink-faint">已显示全部 {total} 个场景</p>
             )}
           </div>
         </>

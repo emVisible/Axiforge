@@ -104,7 +104,7 @@ export default function SceneAssetDetailPage() {
       )}
 
       <div className="mb-6 flex items-center justify-between">
-        <BackLink to="/studio/scenes">场景模板列表</BackLink>
+        <BackLink to="/studio/scenes">场景列表</BackLink>
         <Button
           variant="ghost"
           size="sm"

@@ -21,6 +21,8 @@ const axsTheme = EditorView.theme({
     height: "100%",
     fontSize: "13px",
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    color: "var(--ax-ink)",
+    backgroundColor: "transparent",
   },
   ".cm-scroller": {
     overflow: "auto",
@@ -28,15 +30,24 @@ const axsTheme = EditorView.theme({
   },
   ".cm-content": {
     padding: "12px 0",
-    caretColor: "var(--color-brand, #6366f1)",
+    caretColor: "var(--ax-brand)",
   },
   ".cm-gutters": {
     backgroundColor: "transparent",
     border: "none",
-    color: "#9ca3af",
+    color: "var(--ax-ink-faint)",
   },
-  ".cm-activeLine": { backgroundColor: "rgba(99, 102, 241, 0.04)" },
-  ".cm-activeLineGutter": { color: "#6366f1", fontWeight: "500" },
+  ".cm-gutterElement": {
+    padding: "0 10px 0 12px",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "color-mix(in srgb, var(--ax-brand) 8%, transparent)",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "transparent",
+    color: "var(--ax-brand)",
+    fontWeight: "600",
+  },
   ".cm-lintRange-error": { backgroundImage: "url('data:image/svg+xml,...')" },
 });
 
@@ -246,12 +257,18 @@ export default function AxsCodeEditor({
   return (
     <div className="axs-cm-host h-full min-h-0 flex-1 overflow-hidden">
       <style>{`
-        .axs-cm-host .cm-editor { height: 100%; outline: none; }
-        .axs-cm-host .cm-axs-heading { color: #4338ca; font-weight: 600; }
-        .axs-cm-host .cm-axs-directive { color: #0891b2; }
-        .axs-cm-host .cm-axs-speaker { color: #059669; font-weight: 500; }
-        .axs-cm-host .cm-axs-comment { color: #9ca3af; font-style: italic; }
+        .axs-cm-host .cm-editor { height: 100%; outline: none; background: transparent; }
         .axs-cm-host .cm-lineNumbers { min-width: 2.5rem; }
+        [data-theme="light"] .axs-cm-host .cm-axs-heading { color: #4338ca; font-weight: 600; }
+        [data-theme="light"] .axs-cm-host .cm-axs-directive { color: #0891b2; }
+        [data-theme="light"] .axs-cm-host .cm-axs-speaker { color: #059669; font-weight: 500; }
+        [data-theme="light"] .axs-cm-host .cm-axs-comment { color: #9ca3af; font-style: italic; }
+        [data-theme="dark"] .axs-cm-host .cm-axs-heading { color: #a5b4fc; font-weight: 600; }
+        [data-theme="dark"] .axs-cm-host .cm-axs-directive { color: #67e8f9; }
+        [data-theme="dark"] .axs-cm-host .cm-axs-speaker { color: #6ee7b7; font-weight: 500; }
+        [data-theme="dark"] .axs-cm-host .cm-axs-comment { color: var(--ax-ink-faint); font-style: italic; }
+        [data-theme="dark"] .axs-cm-host .cm-cursor { border-left-color: var(--ax-ink); }
+        [data-theme="dark"] .axs-cm-host .cm-selectionBackground { background: color-mix(in srgb, var(--ax-brand) 35%, transparent) !important; }
       `}</style>
       <div ref={hostRef} className="h-full" />
     </div>

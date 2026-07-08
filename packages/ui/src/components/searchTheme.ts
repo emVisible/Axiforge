@@ -1,21 +1,22 @@
 export type SurfaceTheme = "light" | "dark";
 
+/** Search field shells — semantic tokens only (light/dark still differ in elevation). */
 export const searchTheme = {
   light: {
     shell:
       "border-border/70 bg-canvas/60 hover:border-border hover:bg-surface " +
       "focus-within:border-brand/40 focus-within:bg-surface focus-within:ring-2 focus-within:ring-brand/10",
-    icon: "text-ink-muted/40",
-    input: "text-ink placeholder:text-ink-muted/45",
-    clear: "text-ink-muted/40 hover:bg-canvas hover:text-ink",
+    icon: "text-ink-faint",
+    input: "text-ink placeholder:text-ink-faint",
+    clear: "text-ink-faint hover:bg-canvas hover:text-ink",
   },
   dark: {
     shell:
-      "border-white/10 bg-white/[0.04] hover:border-white/15 hover:bg-white/[0.06] " +
-      "focus-within:border-white/20 focus-within:bg-white/[0.06] focus-within:ring-2 focus-within:ring-white/[0.06]",
-    icon: "text-white/35",
-    input: "text-white/90 placeholder:text-white/30",
-    clear: "text-white/35 hover:bg-white/10 hover:text-white/70",
+      "border-border bg-panel hover:border-border-strong hover:bg-panel-raised " +
+      "focus-within:border-brand/40 focus-within:bg-surface-raised focus-within:ring-2 focus-within:ring-brand/15",
+    icon: "text-ink-faint",
+    input: "text-ink placeholder:text-ink-faint",
+    clear: "text-ink-faint hover:bg-panel-raised hover:text-ink",
   },
 } as const;
 

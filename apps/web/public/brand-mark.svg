@@ -1,20 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <defs>
-    <linearGradient id="bg" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3b3473"/>
-      <stop offset="1" stop-color="#4a4380"/>
-    </linearGradient>
-    <linearGradient id="axis" x1="16" y1="8" x2="16" y2="24" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#c4944a" stop-opacity="0.3"/>
-      <stop offset="0.5" stop-color="#c4944a"/>
-      <stop offset="1" stop-color="#c4944a" stop-opacity="0.3"/>
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="8" fill="url(#bg)"/>
-  <path d="M16 7.5 23.5 12v8L16 24.5 8.5 20v-8L16 7.5Z" stroke="white" stroke-opacity="0.22" stroke-width="1"/>
-  <path d="M16 10.5 20.5 13.25v5.5L16 21.5 11.5 18.75v-5.5L16 10.5Z" stroke="white" stroke-opacity="0.45" stroke-width="1"/>
-  <path d="M16 13.5 17.75 14.5v3L16 18.5 14.25 17.5v-3L16 13.5Z" stroke="#c4944a" stroke-opacity="0.85" stroke-width="1"/>
-  <line x1="16" y1="8" x2="16" y2="24" stroke="url(#axis)" stroke-width="1.25" stroke-linecap="round"/>
-  <circle cx="16" cy="16" r="2" fill="#c4944a"/>
-  <circle cx="16" cy="16" r="1" fill="white" fill-opacity="0.9"/>
+  <style>
+    .mark { fill: #3b3473; }
+    .soft { fill: #3b3473; fill-opacity: 0.38; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #d4d0e8; }
+      .soft { fill: #d4d0e8; fill-opacity: 0.32; }
+    }
+  </style>
+  <path class="mark" fill-rule="evenodd" clip-rule="evenodd" d="M15.4 27.8V20.4H11.5V13.2c0-3.8 3.1-6.9 6.9-7.2 2.8-.2 5.3 1.2 6.6 3.5l2.6 1-2.4 1.7c-.8-1.7-2.5-2.8-4.6-2.6-2.6.2-4.6 2.3-4.6 5.1v8.2h3.9v7.4H15.4ZM16.6 27.8V20.4h1.2v7.4h-1.2Z"/>
+  <path class="soft" d="M12.9 17.6V14.9c0-1.2 1-2.2 2.2-2.3 1-.08 1.9.45 2.35 1.3l-1.2.85c-.25-.5-.75-.78-1.3-.74-.7.05-1.25.65-1.25 1.42v3.52H12.9Z"/>
 </svg>

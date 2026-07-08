@@ -13,6 +13,23 @@ export default defineConfig({
       "@axiforge/axs": path.resolve(__dirname, "../../packages/axs/src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes("node_modules/reactflow") ||
+            id.includes("node_modules/@reactflow")
+          ) {
+            return "vendor-reactflow";
+          }
+          if (id.includes("node_modules/@codemirror")) {
+            return "vendor-codemirror";
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5174,
     proxy: {

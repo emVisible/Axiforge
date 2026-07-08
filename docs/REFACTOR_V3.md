@@ -155,3 +155,7 @@ Player 与角色创作路径仍使用散落色值、重复页面壳，且 `HallP
 | A 创作者面板 | `/creator/dashboard` + Studio 概览页 | 🚧 |
 | C 评论 | 楼中楼 + 最新/最热 + Discover 详情讨论区 | 🚧 |
 | I 整合 | LLM 状态 UI + E2E + 文档勾选 | 🚧 |
+
+## v5 / Cut Studio（ADR-022）
+
+剪辑工作台为剧本编辑默认入口：预览 + 时间轴壳 + 素材库；与 AXS 文本轨、Flow 结构图三轨投影。详见 [REFACTOR_CUT_STUDIO.md](./REFACTOR_CUT_STUDIO.md)。

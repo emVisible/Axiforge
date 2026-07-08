@@ -19,7 +19,7 @@ export default function AppBrand({
 
   return (
     <Link to={href} className="flex items-center gap-2.5">
-      <AppIcon size="md" />
+      <AppIcon size="md" variant={variant} />
       <div className="flex items-baseline gap-2">
         <span
           className={`text-sm font-semibold tracking-tight ${

@@ -3,9 +3,11 @@ import { Link } from "react-router";
 
 import { cardTheme, type SurfaceTheme } from "./cardTheme";
 import { cn } from "./formStyles";
+import { useResolvedSurfaceTheme } from "../hooks/useSurfaceTheme";
 
 interface CoverCardBaseProps {
   theme?: SurfaceTheme;
+  density?: "default" | "compact";
   title: string;
   description?: string;
   cover?: ReactNode;
@@ -29,7 +31,8 @@ interface CoverCardButtonProps extends CoverCardBaseProps {
 type CoverCardProps = CoverCardLinkProps | CoverCardButtonProps;
 
 export default function CoverCard({
-  theme = "light",
+  theme,
+  density = "default",
   title,
   description,
   cover,
@@ -39,11 +42,19 @@ export default function CoverCard({
   className = "",
   ...action
 }: CoverCardProps) {
-  const t = cardTheme[theme];
+  const resolvedTheme = useResolvedSurfaceTheme(theme);
+  const t = cardTheme[resolvedTheme];
+  const compact = density === "compact";
 
   const body = (
     <>
-      <div className={cn("relative h-36 overflow-hidden", t.cover)}>
+      <div
+        className={cn(
+          "relative overflow-hidden",
+          compact ? "h-32" : "h-36",
+          t.cover,
+        )}
+      >
         <div className="h-full w-full transition-transform duration-300 group-hover:scale-[1.03]">
           {cover}
         </div>
@@ -58,12 +69,13 @@ export default function CoverCard({
           <div className="absolute right-2 top-2 z-10">{menu}</div>
         )}
       </div>
-      <div className="flex flex-1 flex-col p-4">
+      <div className={cn("flex flex-1 flex-col", compact ? "p-3" : "p-4")}>
         <h3 className={cn("mb-1 text-sm font-semibold", t.title)}>{title}</h3>
         {description && (
           <p
             className={cn(
-              "mb-3 line-clamp-2 flex-1 text-xs leading-relaxed",
+              "line-clamp-2 flex-1 text-xs leading-relaxed",
+              compact ? "mb-2" : "mb-3",
               t.description,
             )}
           >
@@ -76,7 +88,8 @@ export default function CoverCard({
   );
 
   const shellClass = cn(
-    "group flex cursor-pointer flex-col overflow-hidden rounded-2xl border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg",
+    "group flex cursor-pointer flex-col overflow-hidden border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg",
+    compact ? "rounded-xl" : "rounded-2xl",
     t.surface,
     className,
   );

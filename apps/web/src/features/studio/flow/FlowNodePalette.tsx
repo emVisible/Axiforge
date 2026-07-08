@@ -13,7 +13,7 @@ const DRAGGABLE_LABELS = [
     label: "锚点事件",
     icon: Anchor,
     color:
-      "border-amber-200 bg-amber-50 text-amber-600 shadow-sm hover:bg-amber-100",
+      "border-amber-400/40 bg-amber-500/10 text-amber-500 shadow-sm hover:bg-amber-500/20",
   },
 ];
 

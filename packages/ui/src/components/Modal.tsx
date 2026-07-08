@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import Button from "./Button";
@@ -29,34 +29,39 @@ export default function Modal({
   footer,
   size = "md",
 }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
+    dialogRef.current?.focus();
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div
         className="fixed inset-0 bg-ink/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal
         aria-labelledby="modal-title"
+        tabIndex={-1}
         className={cn(
-          "relative flex max-h-[85vh] w-full flex-col rounded-2xl border border-border bg-surface shadow-2xl animate-fade-in",
+          "relative flex max-h-[min(85vh,calc(100dvh-2rem))] w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl animate-fade-in",
           sizeClasses[size],
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 py-4">
           <div>
             <h2 id="modal-title" className="text-base font-semibold text-ink">
               {title}
@@ -68,15 +73,17 @@ export default function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-gray-100 hover:text-ink"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-panel hover:text-ink"
             aria-label="关闭"
-          >
+            >
             <X className="h-4 w-4" strokeWidth={1.75} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+          {children}
+        </div>
         {footer !== undefined ? (
-          <div className="border-t border-border px-6 py-4">{footer}</div>
+          <div className="shrink-0 border-t border-border px-6 py-4">{footer}</div>
         ) : null}
       </div>
     </div>

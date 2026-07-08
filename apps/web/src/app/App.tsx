@@ -1,7 +1,8 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes, useParams, useSearchParams } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserProvider } from "@/app/providers/UserContext";
+import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { LoadingSpinner } from "@/shared/components/ui";
 
 // 布局常驻（体积小、跨路由共享）
@@ -13,8 +14,14 @@ import { DiscoverLayout, AccountLayout } from "@/shared/layouts/PublicLayout";
 const CreatorDashboardPage = lazy(() => import("@/features/studio/pages/CreatorDashboardPage"));
 const ProjectListPage = lazy(() => import("@/features/studio/pages/ProjectListPage"));
 const ProjectCreatePage = lazy(() => import("@/features/studio/pages/ProjectCreatePage"));
-const ProjectDetailPage = lazy(() => import("@/features/studio/pages/ProjectDetailPage"));
 const ProjectFlowPage = lazy(() => import("@/features/studio/pages/ProjectFlowPage"));
+
+function ProjectFlowLegacyRedirect() {
+  const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const qs = searchParams.toString();
+  return <Navigate to={`/studio/projects/${id}${qs ? `?${qs}` : ""}`} replace />;
+}
 const ItemsPage = lazy(() => import("@/features/studio/pages/ItemsPage"));
 const ItemDetailPage = lazy(() => import("@/features/studio/pages/ItemDetailPage"));
 const SceneAssetsPage = lazy(() => import("@/features/studio/pages/SceneAssetsPage"));
@@ -55,6 +62,7 @@ function RouteFallback() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
       <UserProvider>
         <BrowserRouter>
         <Suspense fallback={<RouteFallback />}>
@@ -64,8 +72,8 @@ export default function App() {
               <Route path="dashboard" element={<CreatorDashboardPage />} />
               <Route path="projects" element={<ProjectListPage />} />
               <Route path="projects/new" element={<ProjectCreatePage />} />
-              <Route path="projects/:id" element={<ProjectDetailPage />} />
-              <Route path="projects/:id/flow" element={<ProjectFlowPage />} />
+              <Route path="projects/:id" element={<ProjectFlowPage />} />
+              <Route path="projects/:id/flow" element={<ProjectFlowLegacyRedirect />} />
               <Route path="items" element={<ItemsPage />} />
               <Route path="items/:id" element={<ItemDetailPage />} />
               <Route path="scenes" element={<SceneAssetsPage />} />
@@ -106,6 +114,7 @@ export default function App() {
         </Suspense>
         </BrowserRouter>
       </UserProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

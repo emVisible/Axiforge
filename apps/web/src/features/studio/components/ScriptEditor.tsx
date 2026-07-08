@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Instruction, InstructionOp, ChoiceOption } from "@axiforge/core";
 import { Input, Select, Textarea, cn, labelSm, Button } from "@/shared/components/ui";
 import { aiApi } from "@/shared/api/ai";
@@ -20,6 +20,7 @@ interface ScriptEditorProps {
   roles: RoleOption[];
   nodes: NodeOption[];
   onChange: (next: Instruction[]) => void;
+  highlightIndex?: number | null;
 }
 
 const OP_META: { op: InstructionOp; label: string }[] = [
@@ -87,12 +88,19 @@ export default function ScriptEditor({
   roles,
   nodes,
   onChange,
+  highlightIndex = null,
 }: ScriptEditorProps) {
   const [aiOpen, setAiOpen] = useState(false);
   const [prose, setProse] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSource, setAiSource] = useState<string | undefined>();
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (highlightIndex == null || highlightIndex < 0) return;
+    highlightRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [highlightIndex]);
 
   const runAiDraft = async (mode: "replace" | "append") => {
     if (!prose.trim()) return;
@@ -208,7 +216,11 @@ export default function ScriptEditor({
       {script.map((inst, i) => (
         <div
           key={i}
-          className="rounded-xl border border-border bg-surface p-3 shadow-sm"
+          ref={highlightIndex === i ? highlightRef : undefined}
+          className={cn(
+            "rounded-xl border border-border bg-surface p-3 shadow-sm",
+            highlightIndex === i && "border-brand ring-2 ring-brand/20",
+          )}
         >
           <div className="mb-2 flex items-center justify-between">
             <span className="rounded-md bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand">

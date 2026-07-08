@@ -10,12 +10,14 @@ import {
   type SurfaceTheme,
 } from "./searchTheme";
 import { cn } from "./formStyles";
+import { useResolvedSurfaceTheme } from "../hooks/useSurfaceTheme";
 
 interface SearchInputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {
   onClear?: () => void;
   className?: string;
   containerClassName?: string;
+  /** @deprecated 读 runtime `data-theme` */
   variant?: SurfaceTheme;
   size?: SearchSize;
   width?: SearchWidth;
@@ -28,7 +30,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       onClear,
       className = "",
       containerClassName = "",
-      variant = "light",
+      variant,
       size = "md",
       width = "full",
       disabled,
@@ -36,8 +38,9 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     },
     ref,
   ) => {
+    const resolvedTheme = useResolvedSurfaceTheme(variant);
     const hasValue = value !== undefined && String(value).length > 0;
-    const theme = searchTheme[variant];
+    const theme = searchTheme[resolvedTheme];
     const sizing = searchSizeClasses[size];
 
     return (

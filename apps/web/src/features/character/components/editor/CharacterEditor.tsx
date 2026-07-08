@@ -70,7 +70,7 @@ export default function CharacterEditor({
         Icon: UserRound,
         description: "表象·可见",
         distance: "外层",
-        color: "border-blue-300 bg-blue-50",
+        color: "border-blue-400/40 bg-blue-500/10",
         component: ContourEditor,
       },
       {
@@ -79,7 +79,7 @@ export default function CharacterEditor({
         Icon: Drama,
         description: "行为·可观察",
         distance: "外层",
-        color: "border-cyan-300 bg-cyan-50",
+        color: "border-cyan-400/40 bg-cyan-500/10",
         component: DemeanorEditor,
       },
       {
@@ -88,7 +88,7 @@ export default function CharacterEditor({
         Icon: Brain,
         description: "心理·需深入",
         distance: "中层",
-        color: "border-rose-300 bg-rose-50",
+        color: "border-rose-400/40 bg-rose-500/10",
         component: PsycheEditor,
       },
       {
@@ -97,7 +97,7 @@ export default function CharacterEditor({
         Icon: ScrollText,
         description: "历史·塑造",
         distance: "中层",
-        color: "border-amber-300 bg-amber-50",
+        color: "border-amber-400/40 bg-amber-500/10",
         component: TraceEditor,
       },
       {
@@ -106,7 +106,7 @@ export default function CharacterEditor({
         Icon: Link2,
         description: "关系·连接",
         distance: "外层",
-        color: "border-emerald-300 bg-emerald-50",
+        color: "border-emerald-400/40 bg-emerald-500/10",
         component: BondEditor,
       },
     ],
@@ -215,7 +215,7 @@ export default function CharacterEditor({
           <div
             className={`border-2 rounded-xl transition-all duration-200 ${
               isExpanded
-                ? "border-sky-300 bg-sky-50 overflow-visible"
+                ? "border-sky-400/40 bg-sky-500/10 overflow-visible"
                 : "border-border hover:border-border overflow-hidden"
             }`}
           >

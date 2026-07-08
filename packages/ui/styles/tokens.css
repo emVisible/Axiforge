@@ -1,12 +1,65 @@
+/* Runtime palette (--ax-*) + Tailwind @theme bridged to semantic utilities. */
+
+:root,
+[data-theme="light"] {
+  --ax-brand: #3b3473;
+  --ax-brand-hover: #4a4380;
+  --ax-brand-muted: color-mix(in srgb, #3b3473 10%, transparent);
+  --ax-canvas: #f8f7f4;
+  --ax-surface: #ffffff;
+  --ax-surface-raised: #ffffff;
+  --ax-panel: #f0eeea;
+  --ax-panel-raised: #e8e6e0;
+  --ax-ink: #1f2937;
+  --ax-ink-muted: #6b7280;
+  --ax-ink-faint: #9ca3af;
+  --ax-border: #e5e7eb;
+  --ax-border-strong: #d1d5db;
+  --ax-accent: #c4944a;
+  --ax-accent-soft: #6c8cff;
+  --ax-danger: #dc2626;
+  --ax-scrollbar: #d1d5db;
+  --ax-scrollbar-hover: #9ca3af;
+  --ax-font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  --ax-brand: #8b83c4;
+  --ax-brand-hover: #a39cdb;
+  --ax-brand-muted: color-mix(in srgb, #8b83c4 18%, transparent);
+  --ax-canvas: #0e0e14;
+  --ax-surface: #16161e;
+  --ax-surface-raised: #1a1a22;
+  --ax-panel: #14141c;
+  --ax-panel-raised: #1e1e28;
+  --ax-ink: #e8e8f0;
+  --ax-ink-muted: #8a8aa0;
+  --ax-ink-faint: #5a5a6a;
+  --ax-border: #2a2a36;
+  --ax-border-strong: #3a3a48;
+  --ax-accent: #d4a44a;
+  --ax-accent-soft: #6c8cff;
+  --ax-danger: #f87171;
+  --ax-scrollbar: #3a3a48;
+  --ax-scrollbar-hover: #5a5a6a;
+}
+
 @theme {
-  --color-brand: #3b3473;
-  --color-brand-hover: #4a4380;
-  --color-brand-muted: color-mix(in srgb, #3b3473 10%, transparent);
-  --color-canvas: #f8f7f4;
-  --color-surface: #ffffff;
-  --color-ink: #1f2937;
-  --color-ink-muted: #6b7280;
-  --color-border: #f3f4f6;
-  --color-accent: #c4944a;
-  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --color-brand: var(--ax-brand);
+  --color-brand-hover: var(--ax-brand-hover);
+  --color-brand-muted: var(--ax-brand-muted);
+  --color-canvas: var(--ax-canvas);
+  --color-surface: var(--ax-surface);
+  --color-surface-raised: var(--ax-surface-raised);
+  --color-panel: var(--ax-panel);
+  --color-panel-raised: var(--ax-panel-raised);
+  --color-ink: var(--ax-ink);
+  --color-ink-muted: var(--ax-ink-muted);
+  --color-ink-faint: var(--ax-ink-faint);
+  --color-border: var(--ax-border);
+  --color-border-strong: var(--ax-border-strong);
+  --color-accent: var(--ax-accent);
+  --color-accent-soft: var(--ax-accent-soft);
+  --color-danger: var(--ax-danger);
+  --font-sans: var(--ax-font-sans);
 }

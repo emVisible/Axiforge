@@ -64,8 +64,10 @@ interface NodeInspectorPanelProps {
   simTargets: SimTarget[];
   onPreviewScript: () => void;
   onDeleteNode: () => void;
+  highlightScriptIndex?: number | null;
   onEdgeLabelChange: (edgeId: string, label: string) => void;
   onDeleteEdge: (edgeId: string) => void;
+  variant?: "default" | "nle";
 }
 
 export default function NodeInspectorPanel({
@@ -92,14 +94,30 @@ export default function NodeInspectorPanel({
   simTargets,
   onPreviewScript,
   onDeleteNode,
+  highlightScriptIndex = null,
   onEdgeLabelChange,
   onDeleteEdge,
+  variant = "default",
 }: NodeInspectorPanelProps) {
+  const isNle = variant === "nle";
+
   return (
-    <div className="flex w-80 flex-shrink-0 flex-col rounded-2xl border border-border bg-surface shadow-sm">
+    <div
+      className={cn(
+        "flex flex-col",
+        isNle
+          ? "h-full min-h-0 w-full border-0 bg-transparent shadow-none"
+          : "w-80 shrink-0 rounded-2xl border border-border bg-surface shadow-sm",
+      )}
+    >
       {selectedNode ? (
-        <>
-          <div className="flex border-b border-border">
+        <div className={cn("flex flex-col", isNle && "min-h-0 flex-1")}>
+          <div
+            className={cn(
+              "flex border-b",
+              isNle ? "border-border bg-surface-raised" : "border-border",
+            )}
+          >
             {PANEL_TABS.map((tab) => {
               const TabIcon = tab.icon;
               return (
@@ -110,8 +128,12 @@ export default function NodeInspectorPanel({
                   className={cn(
                     "inline-flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium transition-all",
                     activePanel === tab.key
-                      ? "border-b-2 border-brand bg-brand/5 text-brand"
-                      : "text-ink-muted hover:text-ink",
+                      ? isNle
+                        ? "border-b-2 border-accent-soft bg-panel-raised text-ink"
+                        : "border-b-2 border-brand bg-brand/5 text-brand"
+                      : isNle
+                        ? "text-ink-faint hover:text-ink-muted"
+                        : "text-ink-muted hover:text-ink",
                   )}
                 >
                   <TabIcon className="h-3 w-3" strokeWidth={1.75} />
@@ -120,7 +142,12 @@ export default function NodeInspectorPanel({
               );
             })}
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto p-4",
+              isNle && "bg-surface text-ink",
+            )}
+          >
             {activePanel === "content" && (
               <div className="space-y-4">
                 {scenes.length > 0 && (
@@ -259,6 +286,7 @@ export default function NodeInspectorPanel({
                     title: (n.data.title as string) || "未命名",
                   }))}
                   onChange={onScriptChange}
+                  highlightIndex={highlightScriptIndex}
                 />
               </div>
             )}
@@ -282,7 +310,12 @@ export default function NodeInspectorPanel({
               />
             )}
           </div>
-          <div className="border-t border-border px-4 py-3">
+          <div
+            className={cn(
+              "border-t px-4 py-3",
+              isNle ? "border-border bg-panel" : "border-border",
+            )}
+          >
             <Button
               variant="danger"
               size="sm"
@@ -292,7 +325,7 @@ export default function NodeInspectorPanel({
               删除节点
             </Button>
           </div>
-        </>
+        </div>
       ) : selectedEdge ? (
         <div className="flex flex-1 flex-col">
           <div className="border-b border-border px-4 py-3">
@@ -340,21 +373,31 @@ export default function NodeInspectorPanel({
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 items-center justify-center p-6">
+        <div className={cn("flex flex-1 items-center justify-center p-6", isNle && "min-h-0 overflow-y-auto")}>
           <div className="space-y-4 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/5 text-brand">
+            <div
+              className={cn(
+                "mx-auto flex h-16 w-16 items-center justify-center rounded-2xl",
+                isNle ? "bg-panel-raised text-accent-soft" : "bg-brand/5 text-brand",
+              )}
+            >
               <Clapperboard className="h-7 w-7" strokeWidth={1.5} />
             </div>
             <div>
-              <p className="text-sm font-medium text-ink">叙事画布</p>
-              <p className="mt-1 text-xs text-ink-muted">点击节点编辑属性</p>
+              <p className={cn("text-sm font-medium", isNle ? "text-ink" : "text-ink")}>
+                {isNle ? "检查器" : "叙事画布"}
+              </p>
+              <p className={cn("mt-1 text-xs", isNle ? "text-ink-faint" : "text-ink-muted")}>
+                {isNle ? "从左侧选择 Beat 开始剪辑" : "点击节点编辑属性"}
+              </p>
             </div>
+            {!isNle && (
             <div className="space-y-2 rounded-xl bg-canvas p-4 text-left text-[11px] text-ink-muted">
               <p>
                 <strong>对话节点</strong> — 角色台词，连线分支
               </p>
               <p>
-                <strong>锚点事件</strong> — 剧情转折点
+                <strong>锚点事件</strong> — 剧情关键转折点
               </p>
               <p>
                 <strong>条件</strong> — 控制节点可见性
@@ -363,6 +406,7 @@ export default function NodeInspectorPanel({
                 <strong>效果</strong> — 记忆/标志/状态变化
               </p>
             </div>
+            )}
           </div>
         </div>
       )}

@@ -1,15 +1,28 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
+import { cn } from "./formStyles";
 
 interface ImageUploadProps {
   value?: string;
   onChange: (url: string) => void;
+  /** Fill parent instead of fixed 128px box */
+  fill?: boolean;
+  className?: string;
 }
 
-export default function ImageUpload({ value, onChange }: ImageUploadProps) {
+export default function ImageUpload({
+  value,
+  onChange,
+  fill = false,
+  className,
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value || "");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setPreview(value || "");
+  }, [value]);
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -29,30 +42,31 @@ export default function ImageUpload({ value, onChange }: ImageUploadProps) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", fill && "h-full w-full", className)}>
       <div
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
           const f = e.dataTransfer.files[0];
-          if (f) handleFile(f);
+          if (f) void handleFile(f);
         }}
-        className="relative w-32 h-32 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center cursor-pointer hover:border-blue-300 transition-colors overflow-hidden group"
+        className={cn(
+          "relative flex cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-border bg-panel transition-colors hover:border-brand/40 group",
+          fill ? "h-full min-h-[7.5rem] w-full" : "h-32 w-32",
+        )}
       >
         {preview ? (
           <>
-            <img src={preview} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs">
+            <img src={preview} alt="" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center bg-ink/40 text-xs text-surface opacity-0 transition-opacity group-hover:opacity-100">
               更换图片
             </div>
           </>
         ) : (
-          <div className="text-center text-gray-400">
+          <div className="px-3 text-center text-ink-faint">
             <ImagePlus className="mx-auto mb-1 h-6 w-6" strokeWidth={1.75} />
-            <div className="text-xs">
-              {uploading ? "上传中..." : "拖拽或点击"}
-            </div>
+            <div className="text-xs">{uploading ? "上传中..." : "拖拽或点击"}</div>
           </div>
         )}
         <input
@@ -62,17 +76,18 @@ export default function ImageUpload({ value, onChange }: ImageUploadProps) {
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) handleFile(f);
+            if (f) void handleFile(f);
           }}
         />
       </div>
       {preview && (
         <button
+          type="button"
           onClick={() => {
             setPreview("");
             onChange("");
           }}
-          className="text-xs text-gray-400 hover:text-red-500"
+          className="text-xs text-ink-faint hover:text-danger"
         >
           移除图片
         </button>

@@ -81,10 +81,9 @@ export default function DiscoverItemsTab({ search }: DiscoverItemsTabProps) {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap gap-2">
         {["", ...ITEM_CATEGORIES].map((c) => (
           <FilterChip
-            variant="dark"
             key={c || "all"}
             label={c || "全部"}
             active={category === c}
@@ -95,13 +94,12 @@ export default function DiscoverItemsTab({ search }: DiscoverItemsTabProps) {
 
       {loading && page === 0 && (
         <div className="flex justify-center py-20">
-          <LoadingSpinner variant="dark" />
+          <LoadingSpinner />
         </div>
       )}
 
       {!loading && items.length === 0 && (
         <EmptyState
-          theme="dark"
           framed
           title={debouncedSearch || category ? "没有匹配的道具" : "还没有公开道具"}
           description={
@@ -111,7 +109,6 @@ export default function DiscoverItemsTab({ search }: DiscoverItemsTabProps) {
           {!debouncedSearch && !category && (
             <WorkflowGuide
               steps={DISCOVER_WORKFLOW}
-              theme="dark"
               compact
               className="max-w-2xl text-left"
             />
@@ -121,30 +118,29 @@ export default function DiscoverItemsTab({ search }: DiscoverItemsTabProps) {
 
       {items.length > 0 && (
         <>
-          <p className="mb-4 text-xs text-white/30">共 {total} 个道具</p>
-          <CardGrid stagger>
+          <p className="mb-3 text-xs text-ink-faint">共 {total} 个道具</p>
+          <CardGrid stagger density="compact">
             {items.map((item) => (
               <EntityCard
                 key={item.id}
-                theme="dark"
                 to={routes.item(item.id)}
                 title={item.name}
                 description={item.description || "暂无描述"}
                 leading={
-                  <EntityIcon theme="dark">
+                  <EntityIcon>
                     <Package className="h-5 w-5" strokeWidth={1.75} />
                   </EntityIcon>
                 }
                 badges={
                   <>
-                    <Badge variant="default" size="sm" tone="dark">
+                    <Badge variant="default" size="sm">
                       {item.category}
                     </Badge>
-                    <Badge variant={rarityVariant(item.rarity)} size="sm" tone="dark">
+                    <Badge variant={rarityVariant(item.rarity)} size="sm">
                       {item.rarity}
                     </Badge>
                     {item.view_count > 0 && (
-                      <Badge variant="default" size="sm" tone="dark">
+                      <Badge variant="default" size="sm">
                         {item.view_count} 浏览
                       </Badge>
                     )}
@@ -153,15 +149,15 @@ export default function DiscoverItemsTab({ search }: DiscoverItemsTabProps) {
               />
             ))}
           </CardGrid>
-          <div className="mt-8 text-center">
-            {loadingMore && <LoadingSpinner variant="dark" />}
+          <div className="mt-6 text-center">
+            {loadingMore && <LoadingSpinner />}
             {hasMore && !loadingMore && (
-              <Button tone="dark" variant="secondary" onClick={() => setPage((p) => p + 1)}>
+              <Button variant="secondary" onClick={() => setPage((p) => p + 1)}>
                 加载更多（{total - items.length} 个剩余）
               </Button>
             )}
             {!hasMore && (
-              <p className="text-sm text-white/25">已显示全部 {total} 个道具</p>
+              <p className="text-sm text-ink-faint">已显示全部 {total} 个道具</p>
             )}
           </div>
         </>

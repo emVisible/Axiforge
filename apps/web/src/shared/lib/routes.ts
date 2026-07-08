@@ -9,7 +9,8 @@ export const routes = {
   projects: `${STUDIO}/projects`,
   projectNew: `${STUDIO}/projects/new`,
   project: (id: string) => `${STUDIO}/projects/${id}`,
-  projectFlow: (id: string) => `${STUDIO}/projects/${id}/flow`,
+  /** @deprecated 与 project 同址，保留兼容旧链接 */
+  projectFlow: (id: string) => `${STUDIO}/projects/${id}`,
   items: `${STUDIO}/items`,
   item: (id: string) => `${STUDIO}/items/${id}`,
   scenes: `${STUDIO}/scenes`,

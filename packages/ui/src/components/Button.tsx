@@ -4,11 +4,12 @@ import { Link } from "react-router";
 import type { SurfaceTheme } from "./cardTheme";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-type ButtonSize = "sm" | "md" | "lg";
+type ButtonSize = "sm" | "md" | "lg" | "toolbar";
 
 interface ButtonBaseProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** @deprecated 样式由 token 驱动，light/dark 等效 */
   tone?: SurfaceTheme;
   loading?: boolean;
   icon?: ReactNode;
@@ -21,29 +22,21 @@ type ButtonAsButton = ButtonBaseProps &
 type ButtonAsLink = ButtonBaseProps & { as: "link"; to: string };
 type ButtonProps = ButtonAsButton | ButtonAsLink;
 
-const lightVariantClasses: Record<ButtonVariant, string> = {
+const variantClasses: Record<ButtonVariant, string> = {
   primary:
     "bg-brand text-white hover:bg-brand-hover shadow-sm shadow-brand/20",
   secondary:
-    "border border-border bg-surface text-ink hover:bg-canvas hover:border-ink-muted/30",
-  ghost: "text-ink-muted hover:text-ink hover:bg-canvas",
-  danger: "border border-red-200 bg-red-50/50 text-red-700 hover:bg-red-50",
-};
-
-const darkVariantClasses: Record<ButtonVariant, string> = {
-  primary:
-    "bg-brand text-white hover:bg-brand-hover shadow-sm shadow-brand/30",
-  secondary:
-    "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white",
-  ghost: "text-white/50 hover:text-white/80 hover:bg-white/5",
+    "border border-border bg-surface text-ink hover:bg-panel hover:border-border-strong",
+  ghost: "text-ink-muted hover:text-ink hover:bg-panel",
   danger:
-    "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
+    "border border-danger/30 bg-danger/10 text-danger hover:bg-danger/15",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: "px-3 py-1.5 text-xs rounded-lg gap-1.5",
-  md: "px-4 py-2 text-sm rounded-lg gap-2",
-  lg: "px-6 py-3 text-base rounded-xl gap-2.5",
+  sm: "px-3.5 py-2 text-xs rounded-lg gap-1.5 min-h-8",
+  md: "px-4 py-2 text-sm rounded-lg gap-2 min-h-9",
+  lg: "px-6 py-3 text-base rounded-xl gap-2.5 min-h-11",
+  toolbar: "px-2.5 py-1.5 text-xs rounded-lg gap-1.5 min-h-8 min-w-8",
 };
 
 function ButtonContent({
@@ -90,15 +83,13 @@ export default function Button(props: ButtonProps) {
   const {
     variant = "primary",
     size = "md",
-    tone = "light",
     loading,
     icon,
     className = "",
     children,
     ...rest
   } = props;
-  const palette = tone === "dark" ? darkVariantClasses : lightVariantClasses;
-  const classes = `inline-flex items-center justify-center font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${palette[variant]} ${sizeClasses[size]} ${className}`;
+  const classes = `inline-flex items-center justify-center font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
   if (props.as === "link") {
     return (

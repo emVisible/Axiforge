@@ -19,15 +19,15 @@ function StoryNode({
   const hasScript = Boolean(data.has_script);
   const stageTitle = (data.stage_title as string) || "";
   const stageBorder = (data.stage_border as string) || "border-border";
-  const stageHeader = (data.stage_header as string) || "bg-canvas";
+  const stageHeader = (data.stage_header as string) || "bg-panel";
 
   return (
     <div
       className={cn(
-        "relative min-w-[220px] max-w-[280px] rounded-xl border-2 shadow-sm transition-all duration-200",
+        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-xl border-2 bg-surface shadow-sm transition-all duration-200",
         selected
-          ? "border-brand bg-surface shadow-lg shadow-brand/10"
-          : cn(stageBorder, "bg-surface hover:border-ink-muted/30"),
+          ? "border-brand shadow-lg shadow-brand/15"
+          : cn(stageBorder, "hover:border-border-strong"),
       )}
     >
       <Handle
@@ -37,13 +37,13 @@ function StoryNode({
       />
       <div
         className={cn(
-          "flex items-center gap-2 rounded-t-[10px] px-4 py-2.5",
-          isAnchor ? "bg-amber-50" : stageHeader,
+          "flex items-center gap-2 border-b border-border/60 px-3 py-2",
+          isAnchor ? "bg-amber-500/15" : stageHeader,
         )}
       >
         <span className="flex h-5 w-5 items-center justify-center">
           {isAnchor ? (
-            <Anchor className="h-3.5 w-3.5 text-amber-600" strokeWidth={1.75} />
+            <Anchor className="h-3.5 w-3.5 text-amber-500" strokeWidth={1.75} />
           ) : (
             <MessageSquare
               className="h-3.5 w-3.5 text-ink-muted"
@@ -51,55 +51,55 @@ function StoryNode({
             />
           )}
         </span>
-        <span className="flex-1 truncate text-sm font-medium text-ink">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
           {title}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {hasScript && (
-            <span className="rounded bg-sky-100 px-1 py-0.5 text-[9px] text-sky-600">
+            <span className="rounded bg-sky-500/15 px-1 py-0.5 text-[9px] text-sky-400">
               演出
             </span>
           )}
           {hasConditions && (
-            <span className="rounded bg-purple-100 px-1 py-0.5 text-[9px] text-purple-600">
+            <span className="rounded bg-violet-500/15 px-1 py-0.5 text-[9px] text-violet-400">
               条件
             </span>
           )}
           {hasEffects && (
-            <span className="rounded bg-emerald-100 px-1 py-0.5 text-[9px] text-emerald-600">
+            <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] text-emerald-400">
               效果
             </span>
           )}
           {isAnchor && (
-            <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-600">
+            <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[9px] text-amber-500">
               锚点
             </span>
           )}
           {speaker && (
-            <span className="rounded bg-brand/10 px-1 py-0.5 text-[9px] text-brand">
+            <span className="rounded bg-brand-muted px-1 py-0.5 text-[9px] text-brand">
               {speaker}
             </span>
           )}
           {stageTitle && (
-            <span className="max-w-[72px] truncate rounded bg-black/5 px-1 py-0.5 text-[9px] text-ink-muted">
+            <span className="max-w-[72px] truncate rounded bg-panel px-1 py-0.5 text-[9px] text-ink-faint">
               {stageTitle}
             </span>
           )}
         </div>
       </div>
       {description && (
-        <div className="line-clamp-2 border-t border-border/60 px-4 py-2 text-[11px] leading-relaxed text-ink-muted">
+        <div className="line-clamp-2 border-b border-border/60 bg-surface px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
           {description}
         </div>
       )}
-      <div className="flex items-center justify-center border-t border-border px-3 py-1.5">
+      <div className="flex items-center justify-center bg-panel px-3 py-1.5">
         <Handle
           type="source"
           position={Position.Bottom}
           id="output"
           className="!relative !bottom-auto !left-auto !right-auto !top-auto !h-3 !w-3 !translate-none !border-2 !border-surface !bg-brand"
         />
-        <span className="ml-1 text-[10px] text-ink-muted">输出</span>
+        <span className="ml-1 text-[10px] text-ink-faint">输出</span>
       </div>
     </div>
   );

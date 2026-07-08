@@ -744,7 +744,7 @@ export default function PlayerPage() {
   if (status === "loading") {
     return (
       <div className={`${playerScreenClass} flex items-center justify-center`}>
-        <LoadingSpinner variant="dark" />
+        <LoadingSpinner />
       </div>
     );
   }

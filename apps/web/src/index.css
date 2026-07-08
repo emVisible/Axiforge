@@ -94,17 +94,17 @@ ruby rt {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--ax-scrollbar);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: var(--ax-scrollbar-hover);
 }
 
 ::selection {
-  background-color: color-mix(in srgb, var(--color-brand) 18%, white);
-  color: var(--color-brand);
+  background-color: color-mix(in srgb, var(--ax-brand) 18%, transparent);
+  color: var(--ax-ink);
 }
 
 /* ============================================================

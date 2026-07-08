@@ -94,7 +94,7 @@ export default function SpriteEditor() {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Input
             value={newKey}
@@ -110,21 +110,24 @@ export default function SpriteEditor() {
           <button
             type="button"
             onClick={() => addKey(newKey)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand/10 px-3 py-2 text-xs font-medium text-brand hover:bg-brand/20"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-brand-muted px-3.5 py-2.5 text-xs font-medium text-brand hover:bg-brand/20"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
             添加
           </button>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {EXPRESSION_PRESETS.filter((p) => sprites[p] === undefined).map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => addKey(p)}
-              className="rounded-full border border-border px-2.5 py-0.5 text-[11px] text-ink-muted hover:border-brand hover:text-brand"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[11px] text-ink-muted transition-colors hover:border-brand hover:text-brand"
             >
-              + {p}
+              <span className="flex h-5 w-5 items-center justify-center rounded bg-panel text-[10px] font-semibold uppercase text-ink-faint">
+                {p.slice(0, 1)}
+              </span>
+              {p}
             </button>
           ))}
         </div>

@@ -47,7 +47,12 @@ export const EMPTY_STAGE: Stage = {
   bgm: null,
 };
 
-export function foldStage(prev: Stage, directives: Instruction[]): Stage {
+export function foldStage(
+  prev: Stage,
+  directives: Instruction[],
+  opts?: { animate?: boolean },
+): Stage {
+  const animate = opts?.animate !== false;
   let background = prev.background;
   const sprites = { ...prev.sprites };
   let camera = { ...prev.camera };
@@ -87,15 +92,25 @@ export function foldStage(prev: Stage, directives: Instruction[]): Stage {
         else if (d.action === "pan")
           camera = { ...camera, x: d.x ?? 0, y: d.y ?? 0 };
         else if (d.action === "shake") {
-          shakeSeq += 1;
-          shakeIntensity = d.intensity ?? 8;
+          if (animate) {
+            shakeSeq += 1;
+            shakeIntensity = d.intensity ?? 8;
+          } else {
+            shakeIntensity = d.intensity ?? 8;
+          }
         }
         break;
       case "fx":
-        fx = { effect: d.effect, seq: fx.seq + 1, ms: d.ms ?? 600 };
+        if (animate) {
+          fx = { effect: d.effect, seq: fx.seq + 1, ms: d.ms ?? 600 };
+        } else {
+          fx = { effect: d.effect, seq: fx.seq, ms: d.ms ?? 600 };
+        }
         break;
       case "transition":
-        transitionSeq += 1;
+        if (animate) {
+          transitionSeq += 1;
+        }
         transitionKind = d.kind;
         transitionMs = d.ms ?? 400;
         break;

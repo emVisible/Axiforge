@@ -55,37 +55,37 @@ const layerTabs: {
     key: "anchor",
     label: "锚点",
     Icon: Anchor,
-    color: "bg-purple-50 text-purple-700 border-purple-200",
+    color: "bg-brand-muted text-brand border-border",
   },
   {
     key: "psyche",
     label: "内心",
     Icon: Brain,
-    color: "bg-rose-50 text-rose-700 border-rose-200",
+    color: "bg-danger/10 text-danger border-danger/25",
   },
   {
     key: "contour",
     label: "轮廓",
     Icon: UserRound,
-    color: "bg-blue-50 text-blue-700 border-blue-200",
+    color: "bg-panel text-ink border-border",
   },
   {
     key: "demeanor",
     label: "举止",
     Icon: Drama,
-    color: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    color: "bg-accent-soft/10 text-accent-soft border-accent-soft/25",
   },
   {
     key: "trace",
     label: "轨迹",
     Icon: ScrollText,
-    color: "bg-amber-50 text-amber-700 border-amber-200",
+    color: "bg-accent/10 text-accent border-accent/25",
   },
   {
     key: "bond",
     label: "羁绊",
     Icon: Link2,
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    color: "bg-surface-raised text-ink-muted border-border-strong",
   },
 ];
 
@@ -278,7 +278,7 @@ export default function CharacterDetailPage() {
                 {data.key_events.map((e: string, i: number) => (
                   <span
                     key={i}
-                    className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs rounded-full border border-amber-200"
+                    className="px-2.5 py-1 bg-accent/10 text-accent text-xs rounded-full border border-accent/25"
                   >
                     {e}
                   </span>

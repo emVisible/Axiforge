@@ -1,10 +1,13 @@
 import { type ReactNode } from "react";
 
+import { cn } from "./formStyles";
+
 interface PageHeaderProps {
   title: string;
   description?: string;
   action?: ReactNode;
   meta?: ReactNode;
+  dense?: boolean;
 }
 
 export default function PageHeader({
@@ -12,9 +15,15 @@ export default function PageHeader({
   description,
   action,
   meta,
+  dense = false,
 }: PageHeaderProps) {
   return (
-    <div className="mb-8 flex items-end justify-between gap-4">
+    <div
+      className={cn(
+        "flex items-end justify-between gap-4",
+        dense ? "mb-5" : "mb-8",
+      )}
+    >
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">{title}</h1>
         {(description || meta) && (

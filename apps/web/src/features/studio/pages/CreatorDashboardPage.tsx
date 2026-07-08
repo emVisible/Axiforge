@@ -14,8 +14,8 @@ import {
   Button,
   EmptyState,
   PageHeader,
-  StatCard,
-  StatCardGrid,
+  StatStrip,
+  StatStripItem,
 } from "@/shared/components/ui";
 import { useCreatorDashboard } from "@/shared/hooks/useCreatorDashboard";
 import { getCreatorId } from "@/shared/lib/creatorId";
@@ -37,7 +37,7 @@ function TrendChart({ trend }: { trend: CreatorDashboard["trend"] }) {
     .join(" ");
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+    <div className="rounded-xl border border-border bg-surface p-3">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-medium text-ink">近 7 日播放趋势</p>
         <p className="text-xs text-ink-muted">按日 story_play 事件</p>
@@ -125,47 +125,47 @@ export default function CreatorDashboardPage() {
         </EmptyState>
       ) : (
         <>
-          <StatCardGrid className="mb-6">
-            <StatCard
+          <StatStrip className="mb-4">
+            <StatStripItem
               label="剧本"
               value={data.counts.projects}
               icon={ScrollText}
               hint="侧栏进入剧本管理"
             />
-            <StatCard
+            <StatStripItem
               label="角色"
               value={data.counts.characters}
               icon={User}
-              hint="侧栏进入角色库"
+              hint="侧栏进入角色"
             />
-            <StatCard
+            <StatStripItem
               label="道具"
               value={data.counts.items}
               icon={Package}
               hint="侧栏进入道具库"
             />
-            <StatCard
+            <StatStripItem
               label="场景"
               value={data.counts.scenes}
               icon={MapPin}
-              hint="侧栏进入场景模板"
+              hint="侧栏进入场景"
             />
-            <StatCard label="7 日浏览" value={data.views_7d} icon={Eye} />
-            <StatCard label="7 日播放" value={data.plays_7d} icon={Play} />
-            <StatCard label="7 日 Fork" value={data.forks_7d} icon={GitFork} />
-            <StatCard
+            <StatStripItem label="7 日浏览" value={data.views_7d} icon={Eye} />
+            <StatStripItem label="7 日播放" value={data.plays_7d} icon={Play} />
+            <StatStripItem label="7 日 Fork" value={data.forks_7d} icon={GitFork} />
+            <StatStripItem
               label="公开 / 私有"
               value={`${data.public_ratio.public} / ${data.public_ratio.private}`}
             />
             {data.pending_reports > 0 && (
-              <StatCard
+              <StatStripItem
                 label="待处理举报"
                 value={data.pending_reports}
                 icon={AlertTriangle}
                 hint="请检查被举报的公开内容"
               />
             )}
-          </StatCardGrid>
+          </StatStrip>
 
           <TrendChart trend={data.trend} />
         </>

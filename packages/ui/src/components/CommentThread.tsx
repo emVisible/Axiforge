@@ -4,9 +4,8 @@ import { Flag, MessageSquare, Trash2 } from "lucide-react";
 import Button from "./Button";
 import SegmentedControl from "./SegmentedControl";
 import Textarea from "./Textarea";
-import type { SurfaceTheme } from "./cardTheme";
-import { cardTheme } from "./cardTheme";
 import { cn } from "./formStyles";
+import { useCardTheme } from "../hooks/useSurfaceTheme";
 
 export interface CommentNode {
   id: string;
@@ -27,7 +26,6 @@ interface CommentThreadProps {
   onDelete?: (id: string) => void | Promise<void>;
   onReport?: (id: string) => void | Promise<void>;
   currentAuthorId?: string;
-  theme?: SurfaceTheme;
   loading?: boolean;
   submitting?: boolean;
   className?: string;
@@ -47,12 +45,10 @@ function formatTime(iso: string) {
 }
 
 function CommentComposer({
-  theme,
   placeholder,
   onSubmit,
   submitting,
 }: {
-  theme: SurfaceTheme;
   placeholder: string;
   onSubmit: (body: string) => void | Promise<void>;
   submitting?: boolean;
@@ -73,15 +69,9 @@ function CommentComposer({
         onChange={(e) => setBody(e.target.value)}
         placeholder={placeholder}
         rows={3}
-        className={theme === "dark" ? "border-white/10 bg-white/5 text-white/90" : ""}
       />
       <div className="flex justify-end">
-        <Button
-          size="sm"
-          tone={theme}
-          loading={submitting}
-          onClick={() => void handleSubmit()}
-        >
+        <Button size="sm" loading={submitting} onClick={() => void handleSubmit()}>
           发表
         </Button>
       </div>
@@ -91,7 +81,6 @@ function CommentComposer({
 
 function CommentRow({
   comment,
-  theme,
   currentAuthorId,
   onReply,
   onDelete,
@@ -99,7 +88,6 @@ function CommentRow({
   nested = false,
 }: {
   comment: CommentNode;
-  theme: SurfaceTheme;
   currentAuthorId?: string;
   onReply: (parentId: string, body: string) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
@@ -107,7 +95,7 @@ function CommentRow({
   nested?: boolean;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
-  const t = cardTheme[theme];
+  const t = useCardTheme();
   const isOwner = currentAuthorId && comment.author_id === currentAuthorId;
 
   return (
@@ -128,7 +116,6 @@ function CommentRow({
             <Button
               size="sm"
               variant="ghost"
-              tone={theme}
               onClick={() => setReplyOpen((v) => !v)}
             >
               回复
@@ -138,7 +125,6 @@ function CommentRow({
             <Button
               size="sm"
               variant="ghost"
-              tone={theme}
               icon={<Trash2 className="h-3.5 w-3.5" />}
               onClick={() => void onDelete(comment.id)}
               aria-label="删除评论"
@@ -150,7 +136,6 @@ function CommentRow({
             <Button
               size="sm"
               variant="ghost"
-              tone={theme}
               icon={<Flag className="h-3.5 w-3.5" />}
               onClick={() => void onReport(comment.id)}
               aria-label="举报评论"
@@ -163,7 +148,6 @@ function CommentRow({
       {replyOpen && (
         <div className="mt-3 border-t border-border/60 pt-3">
           <CommentComposer
-            theme={theme}
             placeholder="写下回复…"
             onSubmit={(body) => onReply(comment.id, body)}
           />
@@ -173,7 +157,6 @@ function CommentRow({
         <CommentRow
           key={reply.id}
           comment={reply}
-          theme={theme}
           currentAuthorId={currentAuthorId}
           onReply={onReply}
           onDelete={onDelete}
@@ -193,12 +176,11 @@ export default function CommentThread({
   onDelete,
   onReport,
   currentAuthorId,
-  theme = "light",
   loading = false,
   submitting = false,
   className = "",
 }: CommentThreadProps) {
-  const t = cardTheme[theme];
+  const t = useCardTheme();
 
   const handleReply = async (parentId: string, body: string) => {
     await onSubmit(body, parentId);
@@ -212,7 +194,6 @@ export default function CommentThread({
           <h2 className={cn("text-base font-semibold", t.title)}>讨论</h2>
         </div>
         <SegmentedControl
-          variant={theme}
           value={sort}
           onChange={(v) => onSortChange(v as CommentSort)}
           options={[
@@ -223,7 +204,6 @@ export default function CommentThread({
       </div>
 
       <CommentComposer
-        theme={theme}
         placeholder="发表你的看法…"
         onSubmit={(body) => onSubmit(body)}
         submitting={submitting}
@@ -239,7 +219,6 @@ export default function CommentThread({
             <CommentRow
               key={item.id}
               comment={item}
-              theme={theme}
               currentAuthorId={currentAuthorId}
               onReply={handleReply}
               onDelete={onDelete}

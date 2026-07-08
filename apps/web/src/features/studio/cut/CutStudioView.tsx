@@ -1,0 +1,432 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Node } from "reactflow";
+import type { Instruction } from "@axiforge/core";
+import type { ProjectResponse, ProjectUpdate } from "@/shared/types/project";
+import { Copy, Trash2 } from "lucide-react";
+import PreviewMonitor from "../components/PreviewMonitor";
+import NodeInspectorPanel, { type PanelTab } from "../flow/NodeInspectorPanel";
+import type {
+  ConditionItem,
+  EffectItem,
+  NodeFormState,
+  ProjectRoleOption,
+} from "../flow/types";
+import type { ProjectSceneResponse, ProjectRoleResponse } from "@/shared/types/project";
+import type { SimTarget } from "../components/ConditionSimulator";
+import CutStudioLayout from "./CutStudioLayout";
+import TimelineShell, { type TimelineShellHandle } from "./TimelineShell";
+import TransportBar from "./TransportBar";
+import OutlinerPanel from "./outliner/OutlinerPanel";
+import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
+import { clipLabel, reorderScript, totalDurationMs } from "./timelineUtils";
+import { useCutPlayback } from "./useCutPlayback";
+import { useCutLayout } from "@/shared/components/workstation/useCutLayout";
+import { useStudioChrome } from "../layouts/StudioChromeContext";
+import type { CutPanelLayout } from "@/shared/components/workstation/layoutStore";
+
+export interface CutStudioViewProps {
+  project: ProjectResponse;
+  nodes: Node[];
+  selectedNode: Node | null;
+  onSelectBeat: (node: Node) => void;
+  sceneFilterId: string | null;
+  onSceneFilterChange: (sceneId: string | null) => void;
+  script: Instruction[];
+  projectRoles: ProjectRoleOption[];
+  projectRolesRaw: ProjectRoleResponse[];
+  itemRefs: { id: string; asset_id: string; name: string }[];
+  activePanel: PanelTab;
+  onActivePanelChange: (tab: PanelTab) => void;
+  nodeForm: NodeFormState;
+  onNodeFormChange: (data: Partial<NodeFormState>) => void;
+  conditions: ConditionItem[];
+  onConditionsChange: (c: ConditionItem[]) => void;
+  effects: EffectItem[];
+  onEffectsChange: (e: EffectItem[]) => void;
+  nodeProps: string[];
+  onPropsChange: (ids: string[]) => void;
+  itemOptions: { id: string; name: string }[];
+  onScriptChange: (s: Instruction[]) => void;
+  scenes: ProjectSceneResponse[];
+  onStageChange: (stageId: string) => void;
+  allNodes: Node[];
+  simTargets: SimTarget[];
+  onPreviewScript: () => void;
+  onDeleteNode: () => void;
+  onAddScene: (title: string) => void | Promise<void>;
+  onImportScene: (assetId: string) => void | Promise<void>;
+  onDeleteScene: (sceneId: string) => void | Promise<void>;
+  onAddRole: (characterId: string, name: string) => void | Promise<void>;
+  onRemoveRole: (roleId: string) => void | Promise<void>;
+  onAddItem: (itemId: string) => void | Promise<void>;
+  onRemoveItemRef: (refId: string) => void | Promise<void>;
+  onOpenFlow: () => void;
+  onOpenWriter: () => void;
+  onExportMarkdown?: () => void;
+  onDeleteProject?: () => void;
+  onBeatRename?: (nodeId: string, title: string) => void;
+  onProjectPatch?: (patch: Pick<ProjectUpdate, "title" | "description" | "world_setting" | "rules">) => void | Promise<void>;
+  selectedEdge: null;
+  onEdgeLabelChange: (edgeId: string, label: string) => void;
+  onDeleteEdge: (edgeId: string) => void;
+  layoutApiRef?: React.MutableRefObject<CutLayoutApi | null>;
+}
+
+export type CutLayoutApi = {
+  layout: CutPanelLayout;
+  patch: (partial: Partial<CutPanelLayout>) => void;
+  reset: () => void;
+  toggleOutliner: () => void;
+  toggleInspector: () => void;
+  toggleTimeline: () => void;
+  toggleFocus: () => void;
+  toggleShortcuts: () => void;
+};
+
+export default function CutStudioView({
+  project,
+  nodes,
+  selectedNode,
+  onSelectBeat,
+  sceneFilterId,
+  onSceneFilterChange,
+  script,
+  projectRoles,
+  projectRolesRaw,
+  itemRefs,
+  activePanel,
+  onActivePanelChange,
+  nodeForm,
+  onNodeFormChange,
+  conditions,
+  onConditionsChange,
+  effects,
+  onEffectsChange,
+  nodeProps,
+  onPropsChange,
+  itemOptions,
+  onScriptChange,
+  scenes,
+  onStageChange,
+  allNodes,
+  simTargets,
+  onPreviewScript,
+  onDeleteNode,
+  onAddScene,
+  onImportScene,
+  onDeleteScene,
+  onAddRole,
+  onRemoveRole,
+  onAddItem,
+  onRemoveItemRef,
+  onOpenFlow,
+  onOpenWriter,
+  onExportMarkdown,
+  onDeleteProject,
+  onBeatRename,
+  onProjectPatch,
+  onEdgeLabelChange,
+  onDeleteEdge,
+  layoutApiRef,
+}: CutStudioViewProps) {
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const toggleShortcuts = useCallback(
+    () => setShortcutsOpen((open) => !open),
+    [],
+  );
+
+  const {
+    selectedIndex,
+    cursorIndex,
+    isPlaying,
+    zoom,
+    setZoom,
+    currentTimeMs,
+    selectClip,
+    scrubTo,
+    setCursorIndex,
+    stepPrev,
+    stepNext,
+    goToStart,
+    goToEnd,
+    togglePlay,
+    seekIndex,
+  } = useCutPlayback(script);
+
+  const timelineRef = useRef<TimelineShellHandle>(null);
+  const beatIdRef = useRef<string | null>(null);
+
+  const handleReorder = useCallback(
+    (from: number, to: number) => {
+      const next = reorderScript(script, from, to);
+      onScriptChange(next);
+      selectClip(to);
+    },
+    [script, onScriptChange, selectClip],
+  );
+
+  const duplicateClip = useCallback(() => {
+    const inst = script[selectedIndex];
+    if (!inst) return;
+    const copy = JSON.parse(JSON.stringify(inst)) as Instruction;
+    const next = [...script];
+    next.splice(selectedIndex + 1, 0, copy);
+    onScriptChange(next);
+    selectClip(selectedIndex + 1);
+  }, [script, selectedIndex, onScriptChange, selectClip]);
+
+  const deleteClip = useCallback(() => {
+    if (!script.length) return;
+    const next = script.filter((_, i) => i !== selectedIndex);
+    onScriptChange(next);
+    selectClip(Math.max(0, Math.min(selectedIndex, next.length - 1)));
+  }, [script, selectedIndex, onScriptChange, selectClip]);
+
+  useEffect(() => {
+    const beatId = selectedNode?.id ?? null;
+    if (beatIdRef.current === beatId) return;
+    beatIdRef.current = beatId;
+    if (!beatId) return;
+    goToStart();
+    requestAnimationFrame(() => timelineRef.current?.scrollToClip(0));
+  }, [selectedNode?.id, goToStart]);
+
+  const {
+    layout,
+    patch,
+    reset,
+    toggleOutliner,
+    toggleInspector,
+    toggleTimeline,
+    toggleFocus,
+  } = useCutLayout();
+
+  const { setSidebarRail } = useStudioChrome();
+
+  useEffect(() => {
+    setSidebarRail(layout.sidebarRail || layout.focusMode);
+  }, [layout.sidebarRail, layout.focusMode, setSidebarRail]);
+
+  useEffect(() => {
+    if (layoutApiRef) {
+      layoutApiRef.current = {
+        layout,
+        patch,
+        reset,
+        toggleOutliner,
+        toggleInspector,
+        toggleTimeline,
+        toggleFocus,
+        toggleShortcuts,
+      };
+    }
+  }, [
+    layoutApiRef,
+    layout,
+    patch,
+    reset,
+    toggleOutliner,
+    toggleInspector,
+    toggleTimeline,
+    toggleFocus,
+    toggleShortcuts,
+  ]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        toggleShortcuts();
+        return;
+      }
+      if (shortcutsOpen) return;
+      if (e.key === "\\" && !e.shiftKey) {
+        e.preventDefault();
+        toggleOutliner();
+      } else if (e.key === "|" || (e.key === "\\" && e.shiftKey)) {
+        e.preventDefault();
+        toggleTimeline();
+      } else if (e.key === "]") {
+        e.preventDefault();
+        toggleInspector();
+      } else if (e.key === "f" || e.key === "F" || (e.key === "." && (e.metaKey || e.ctrlKey))) {
+        if (e.key === "." || e.key === "f" || e.key === "F") {
+          e.preventDefault();
+          toggleFocus();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleOutliner, toggleInspector, toggleTimeline, toggleFocus, toggleShortcuts, shortcutsOpen]);
+
+  useEffect(() => {
+    if (selectedNode && activePanel !== "script" && script.length > 0) {
+      onActivePanelChange("script");
+    }
+  }, [selectedNode?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const beatTitle = selectedNode
+    ? (selectedNode.data.title as string) || "未命名"
+    : undefined;
+
+  const selectedClip = script[selectedIndex];
+
+  return (
+    <>
+    <CutStudioLayout
+      layout={layout}
+      onLayoutPatch={patch}
+      assetBin={
+        <OutlinerPanel
+          project={project}
+          beats={nodes}
+          selectedBeatId={selectedNode?.id ?? null}
+          onSelectBeat={(id) => {
+            const node = nodes.find((n) => n.id === id);
+            if (node) onSelectBeat(node);
+          }}
+          sceneFilterId={sceneFilterId}
+          onSceneFilterChange={onSceneFilterChange}
+          roles={projectRoles}
+          projectRoles={projectRolesRaw}
+          itemRefs={itemRefs}
+          onAddScene={onAddScene}
+          onImportScene={onImportScene}
+          onDeleteScene={onDeleteScene}
+          onAddRole={onAddRole}
+          onRemoveRole={onRemoveRole}
+          onAddItem={onAddItem}
+          onRemoveItemRef={onRemoveItemRef}
+          onOpenFlow={onOpenFlow}
+          onOpenWriter={onOpenWriter}
+          onExportMarkdown={onExportMarkdown}
+          onDeleteProject={onDeleteProject}
+          onBeatRename={onBeatRename}
+          onProjectPatch={onProjectPatch}
+        />
+      }
+      monitor={
+        <PreviewMonitor
+          script={script}
+          roles={projectRoles}
+          seekIndex={seekIndex}
+          embedded
+          showFooter={false}
+          monitorLabel="演出预览"
+          className="h-full min-h-0"
+          onCursorChange={setCursorIndex}
+        />
+      }
+      transport={
+        <TransportBar
+          isPlaying={isPlaying}
+          currentTimeMs={currentTimeMs}
+          totalTimeMs={totalDurationMs(script)}
+          clipIndex={cursorIndex}
+          clipCount={script.length}
+          onTogglePlay={togglePlay}
+          onStepPrev={stepPrev}
+          onStepNext={stepNext}
+          onGoToStart={goToStart}
+          onGoToEnd={goToEnd}
+          beatTitle={beatTitle}
+        />
+      }
+      timeline={
+        <TimelineShell
+          ref={timelineRef}
+          script={script}
+          selectedIndex={selectedIndex}
+          cursorIndex={cursorIndex}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          onSelectClip={(index) => {
+            selectClip(index);
+            onActivePanelChange("script");
+          }}
+          onScrub={(index) => {
+            scrubTo(index);
+          }}
+          onReorder={handleReorder}
+        />
+      }
+      inspector={
+        <div className="flex h-full min-h-0 flex-col">
+          {selectedClip && (
+            <div className="shrink-0 border-b border-border bg-surface-raised px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-medium uppercase tracking-wider text-ink-faint">
+                    当前片段
+                  </p>
+                  <p className="truncate text-[11px] text-ink">
+                    #{selectedIndex + 1} · {selectedClip.op} · {clipLabel(selectedClip)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={duplicateClip}
+                    className="flex h-7 w-7 items-center justify-center rounded text-ink-muted hover:bg-panel hover:text-ink"
+                    title="复制片段"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={deleteClip}
+                    className="flex h-7 w-7 items-center justify-center rounded text-ink-muted hover:bg-danger/10 hover:text-danger"
+                    title="删除片段"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <NodeInspectorPanel
+              selectedNode={selectedNode}
+              selectedEdge={null}
+              activePanel={activePanel}
+              onActivePanelChange={onActivePanelChange}
+              nodeForm={nodeForm}
+              onNodeFormChange={onNodeFormChange}
+              conditions={conditions}
+              onConditionsChange={onConditionsChange}
+              effects={effects}
+              onEffectsChange={onEffectsChange}
+              nodeProps={nodeProps}
+              onPropsChange={onPropsChange}
+              itemOptions={itemOptions}
+              script={script}
+              onScriptChange={onScriptChange}
+              projectRoles={projectRoles}
+              scenes={scenes}
+              nodeStageId={(selectedNode?.data.stage_id as string) || null}
+              onStageChange={onStageChange}
+              nodes={allNodes}
+              simTargets={simTargets}
+              onPreviewScript={onPreviewScript}
+              onDeleteNode={onDeleteNode}
+              highlightScriptIndex={selectedIndex}
+              onEdgeLabelChange={onEdgeLabelChange}
+              onDeleteEdge={onDeleteEdge}
+              variant="nle"
+            />
+          </div>
+        </div>
+      }
+    />
+    <KeyboardShortcutsModal
+      open={shortcutsOpen}
+      onClose={() => setShortcutsOpen(false)}
+    />
+    </>
+  );
+}

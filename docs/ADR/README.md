@@ -9,6 +9,11 @@
 | [ADR-016](./016-axs-narrative-language.md) | AXS 叙事文本语言（文本为真相源） | 已采纳 |
 | [ADR-017](./017-node-independence-and-stage.md) | 节点独立于场景，场景降级为舞台 | 已采纳 |
 | [ADR-018](./018-content-governance.md) | 内容治理状态机与轻量风控 | 已采纳 |
+| [ADR-019](./019-studio-sidebar-and-workspace-templates.md) | Studio 侧栏与工作区模板 | 已采纳 |
+| [ADR-020](./020-llm-multi-provider-local-first.md) | LLM 多供应商本地优先 | 已采纳 |
+| [ADR-021](./021-comment-system.md) | 评论系统 | 已采纳 |
+| [ADR-022](./022-cut-studio-three-track-projection.md) | 剪辑工作台与三轨投影 | 已采纳 |
+| [ADR-023](./023-theme-and-workstation-shell.md) | 全局日夜主题与剪辑台 Panel Shell | 已采纳 |
 
 ## 待落文档（最终建议已定于 [`../ROADMAP_FINAL.md`](../ROADMAP_FINAL.md) §7，逐个正式落 ADR）
 

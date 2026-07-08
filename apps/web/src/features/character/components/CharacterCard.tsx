@@ -1,13 +1,12 @@
 import { Eye } from "lucide-react";
 
-import { Badge, CardLink, cardTheme, cn, type SurfaceTheme } from "@/shared/components/ui";
+import { Badge, CardLink, cn, useCardTheme } from "@/shared/components/ui";
 import { routes } from "@/shared/lib/routes";
 import type { Character } from "@/shared/types/character";
 
 interface CharacterCardProps {
   character: Character;
   showStatus?: boolean;
-  theme?: SurfaceTheme;
 }
 
 function formatViews(n: number): string {
@@ -19,24 +18,18 @@ function formatViews(n: number): string {
 export default function CharacterCard({
   character,
   showStatus = false,
-  theme = "light",
 }: CharacterCardProps) {
   const { anchor, demeanor, contour } = character.character_data;
   const displayName = character.name || anchor?.name || "未命名角色";
-  const t = cardTheme[theme];
+  const t = useCardTheme();
 
   return (
-    <CardLink
-      to={routes.characters.detail(character.id)}
-      theme={theme}
-      className="relative"
-    >
+    <CardLink to={routes.characters.detail(character.id)} className="relative">
       {showStatus && (
         <span className="absolute right-4 top-4">
           <Badge
             variant={character.is_public ? "emerald" : "default"}
             size="sm"
-            tone={theme}
           >
             {character.is_public ? "公开" : "私有"}
           </Badge>
@@ -79,7 +72,7 @@ export default function CharacterCard({
 
       <div className="flex flex-wrap gap-1">
         {(character.view_count ?? 0) > 0 && (
-          <Badge variant="default" size="sm" tone={theme}>
+          <Badge variant="default" size="sm">
             <Eye className="mr-0.5 h-3 w-3" strokeWidth={1.75} />
             {formatViews(character.view_count ?? 0)}
           </Badge>
@@ -98,7 +91,7 @@ export default function CharacterCard({
           </span>
         ))}
         {character.tags.length > 3 && (
-          <Badge variant="default" size="sm" tone={theme}>
+          <Badge variant="default" size="sm">
             +{character.tags.length - 3}
           </Badge>
         )}

@@ -1,5 +1,6 @@
 export type SurfaceTheme = "light" | "dark";
 
+/** Semantic card surfaces — theme via CSS tokens, not parallel hex palettes. */
 export const cardTheme = {
   light: {
     surface:
@@ -9,26 +10,24 @@ export const cardTheme = {
     title: "text-ink group-hover:text-brand",
     subtitle: "text-ink-muted",
     description: "text-ink-muted",
-    meta: "text-ink-muted/60",
+    meta: "text-ink-faint",
     iconBox: "bg-brand-muted text-brand",
-    cover: "bg-gradient-to-br from-canvas to-border/40",
-    coverPlaceholder: "text-ink-muted/30",
-    deleteBtn:
-      "text-ink-muted/30 hover:bg-red-50 hover:text-red-500",
+    cover: "bg-gradient-to-br from-canvas to-border",
+    coverPlaceholder: "text-ink-faint/50",
+    deleteBtn: "text-ink-faint hover:bg-danger/10 hover:text-danger",
   },
   dark: {
     surface:
-      "border-white/5 bg-white/[0.03] shadow-none hover:border-white/15 hover:bg-white/[0.06]",
-    surfaceStatic: "border-white/5 bg-white/[0.03]",
-    muted: "border-white/5 bg-white/[0.02]",
-    title: "text-white/85 group-hover:text-white",
-    subtitle: "text-white/40",
-    description: "text-white/40",
-    meta: "text-white/25",
-    iconBox: "bg-white/5 text-white/30",
-    cover: "bg-gradient-to-br from-white/5 to-white/[0.02]",
-    coverPlaceholder: "text-white/10",
-    deleteBtn:
-      "text-white/20 hover:bg-white/10 hover:text-red-400",
+      "border-border bg-surface-raised shadow-none hover:border-border-strong hover:bg-panel-raised",
+    surfaceStatic: "border-border bg-surface-raised",
+    muted: "border-border bg-panel",
+    title: "text-ink group-hover:text-brand",
+    subtitle: "text-ink-muted",
+    description: "text-ink-muted",
+    meta: "text-ink-faint",
+    iconBox: "bg-brand-muted text-brand",
+    cover: "bg-gradient-to-br from-panel to-surface",
+    coverPlaceholder: "text-ink-faint/40",
+    deleteBtn: "text-ink-faint hover:bg-danger/10 hover:text-danger",
   },
 } as const;

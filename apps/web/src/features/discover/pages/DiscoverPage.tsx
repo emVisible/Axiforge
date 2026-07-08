@@ -6,7 +6,7 @@ import DiscoverCharactersTab from "@/features/discover/components/DiscoverCharac
 import DiscoverItemsTab from "@/features/discover/components/DiscoverItemsTab";
 import DiscoverScenesTab from "@/features/discover/components/DiscoverScenesTab";
 import DiscoverStatsBar from "@/features/discover/components/DiscoverStatsBar";
-import { SearchInput, SegmentedControl } from "@/shared/components/ui";
+import { PageHeader, SearchInput, SegmentedControl } from "@/shared/components/ui";
 
 type DiscoverTab = "projects" | "characters" | "items" | "scenes";
 
@@ -14,14 +14,14 @@ const TABS: { value: DiscoverTab; label: string }[] = [
   { value: "projects", label: "剧本" },
   { value: "characters", label: "角色" },
   { value: "items", label: "道具" },
-  { value: "scenes", label: "场景模板" },
+  { value: "scenes", label: "场景" },
 ];
 
 const SEARCH_PLACEHOLDERS: Record<DiscoverTab, string> = {
   projects: "搜索作品标题或描述...",
   characters: "搜索角色名称或概括...",
   items: "搜索道具名称...",
-  scenes: "搜索场景模板名称...",
+  scenes: "搜索场景名称...",
 };
 
 function parseTab(raw: string | null): DiscoverTab {
@@ -44,20 +44,27 @@ export default function DiscoverPage() {
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-white/90">发现</h1>
-        <p className="mt-1 text-sm text-white/40">
-          浏览社区公开的剧本、角色、道具与场景模板
-        </p>
+      <PageHeader
+        dense
+        title="发现"
+        description="浏览社区公开的剧本、角色、道具与场景"
+        action={
+          <div className="hidden sm:block">
+            <DiscoverStatsBar variant="inline" collapsible />
+          </div>
+        }
+      />
+
+      <div className="mb-3 sm:hidden">
+        <DiscoverStatsBar variant="inline" />
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:gap-4">
+      <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
         <SegmentedControl
           value={tab}
           onChange={setTab}
           options={TABS}
           size="md"
-          variant="dark"
         />
         <div className="w-full sm:ml-auto sm:max-w-xs">
           <SearchInput
@@ -65,14 +72,11 @@ export default function DiscoverPage() {
             onChange={(e) => setSearch(e.target.value)}
             onClear={() => setSearch("")}
             placeholder={SEARCH_PLACEHOLDERS[tab]}
-            variant="dark"
             size="md"
             width="full"
           />
         </div>
       </div>
-
-      <DiscoverStatsBar />
 
       {tab === "projects" && <DiscoverProjectsTab search={search} />}
       {tab === "characters" && <DiscoverCharactersTab search={search} />}

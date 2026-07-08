@@ -12,6 +12,8 @@ export {
 } from "./SidebarNav";
 export type { SidebarNavItem } from "./SidebarNav";
 export { default as WorkspaceHeader } from "./WorkspaceHeader";
+export type { WorkspaceHeaderVariant } from "./WorkspaceHeader";
+export { default as WorkspaceToolbar } from "./WorkspaceToolbar";
 export { default as WorkflowGuide } from "./WorkflowGuide";
 export type { WorkflowStep } from "./WorkflowGuide";
 export { Card, CardLink, CardGrid } from "./Card";
@@ -21,6 +23,11 @@ export { default as CardOverflowMenu } from "./CardOverflowMenu";
 export type { CardMenuItem } from "./CardOverflowMenu";
 export type { SurfaceTheme } from "./cardTheme";
 export { cardTheme } from "./cardTheme";
+export {
+  useSurfaceTheme,
+  useResolvedSurfaceTheme,
+  useCardTheme,
+} from "../hooks/useSurfaceTheme";
 export { default as Modal, ModalActions } from "./Modal";
 export { default as FilterToolbar } from "./FilterToolbar";
 export { default as SegmentedControl } from "./SegmentedControl";
@@ -47,6 +54,7 @@ export { default as DataTable } from "./DataTable";
 export type { DataTableColumn } from "./DataTable";
 export { default as Pagination } from "./Pagination";
 export { default as StatCard, StatCardGrid } from "./StatCard";
+export { StatStrip, StatStripItem } from "./StatStrip";
 export { default as CommentThread } from "./CommentThread";
 export type { CommentNode, CommentSort } from "./CommentThread";
 export { default as ConfirmDialog } from "./ConfirmDialog";

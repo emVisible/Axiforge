@@ -228,7 +228,7 @@ export default function StoryEditPage() {
       {/* 双列 */}
       <div className="flex flex-col lg:flex-row gap-4">
         {/* 预览区 — 左侧 */}
-        <div className="flex-1 bg-[#fafaf8] rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="flex-1 bg-canvas rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="px-5 py-2.5 border-b border-border">
             <span className="text-xs text-ink-muted font-medium">预览</span>
           </div>
@@ -268,12 +268,12 @@ export default function StoryEditPage() {
                     <del className="line-through text-ink-muted">{children}</del>
                   ),
                   blockquote: ({ children }) => (
-                    <blockquote className="border-l-[3px] border-amber-300 pl-5 py-1 my-4 italic text-ink-muted bg-amber-50/40 rounded-r-lg">
+                    <blockquote className="border-l-[3px] border-accent/40 pl-5 py-1 my-4 italic text-ink-muted bg-accent/5 rounded-r-lg">
                       {children}
                     </blockquote>
                   ),
                   hr: () => (
-                    <div className="my-8 text-center text-amber-300 text-lg">
+                    <div className="my-8 text-center text-accent/60 text-lg">
                       ❧
                     </div>
                   ),

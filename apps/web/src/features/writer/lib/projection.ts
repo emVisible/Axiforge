@@ -6,6 +6,7 @@ import type {
   ProjectEdgeResponse,
   ProjectNodeResponse,
   ProjectSceneResponse,
+  NarrativeNodeData,
 } from "@/shared/types/project";
 
 const UUID_RE =
@@ -255,3 +256,140 @@ export function nodeIdForBeat(
 }
 
 export { parseAxs };
+
+// ---------------------------------------------------------------------------
+// Canvas → AXS 投影（剪辑/结构 → 剧本轨，ADR-022）
+// ---------------------------------------------------------------------------
+
+export type CanvasNodeSnapshot = {
+  id: string;
+  position: { x: number; y: number };
+  data: Record<string, unknown>;
+};
+
+export type CanvasEdgeSnapshot = {
+  source: string;
+  target: string;
+  label?: string | null;
+};
+
+function canvasNodeToProjectNode(
+  node: CanvasNodeSnapshot,
+  base?: ProjectNodeResponse,
+): ProjectNodeResponse {
+  const d = node.data;
+  const now = new Date().toISOString();
+  return {
+    id: base ? String(base.id) : node.id,
+    stage_id: (d.stage_id as string) ?? base?.stage_id ?? base?.scene_id ?? null,
+    scene_id: base?.scene_id ?? null,
+    editor_data: { position: node.position },
+    narrative_data: {
+      title: (d.title as string) || "未命名",
+      description: (d.description as string) || "",
+      is_anchor: Boolean(d.is_anchor),
+      is_ending: Boolean(d.is_ending),
+      ending_label: (d.ending_label as string) || null,
+      speaker: (d.speaker as string) || null,
+      dialogue: (d.dialogue as string) || null,
+      narration: (d.narration as string) || null,
+      script: (d.script as Instruction[]) || [],
+      trigger_condition: d.trigger_condition,
+      effects: d.effects,
+      props: (d.props as string[]) || [],
+    } as NarrativeNodeData,
+    sort_order: base?.sort_order ?? 0,
+    created_at: base?.created_at ?? now,
+    updated_at: base?.updated_at ?? now,
+  };
+}
+
+/** 将画布节点合并进项目节点列表（单舞台模式会剔除该舞台已删节点）。 */
+export function mergeCanvasIntoProjectNodes(
+  canvasNodes: CanvasNodeSnapshot[],
+  allNodes: ProjectNodeResponse[],
+  options?: { scopeStageId?: string | null },
+): ProjectNodeResponse[] {
+  const canvasById = new Map(canvasNodes.map((n) => [n.id, n]));
+  const knownIds = new Set(allNodes.map((n) => String(n.id)));
+  const out: ProjectNodeResponse[] = [];
+
+  for (const proj of allNodes) {
+    const id = String(proj.id);
+    const sid = proj.stage_id ?? proj.scene_id;
+    const canvas = canvasById.get(id);
+
+    if (options?.scopeStageId && sid === options.scopeStageId) {
+      if (!canvas) continue;
+      out.push(canvasNodeToProjectNode(canvas, proj));
+      continue;
+    }
+
+    if (canvas) {
+      out.push(canvasNodeToProjectNode(canvas, proj));
+    } else {
+      out.push(proj);
+    }
+  }
+
+  for (const canvas of canvasNodes) {
+    if (!knownIds.has(canvas.id)) {
+      out.push(canvasNodeToProjectNode(canvas));
+    }
+  }
+
+  return out;
+}
+
+function canvasEdgeToProjectEdge(e: CanvasEdgeSnapshot): ProjectEdgeResponse {
+  return {
+    id: `${e.source}-${e.target}`,
+    project_id: "",
+    source_node_id: e.source,
+    target_node_id: e.target,
+    source_port: "output",
+    label: e.label ?? null,
+    condition: null,
+    created_at: "",
+  };
+}
+
+export function canvasEdgesForProjection(
+  canvasEdges: CanvasEdgeSnapshot[],
+  projectEdges: ProjectEdgeResponse[],
+  scopeNodeIds: Set<string> | null,
+): ProjectEdgeResponse[] {
+  if (!scopeNodeIds) {
+    return canvasEdges.map(canvasEdgeToProjectEdge);
+  }
+
+  const preserved = projectEdges.filter((e) => {
+    const src = String(e.source_node_id);
+    const tgt = String(e.target_node_id);
+    return !(scopeNodeIds.has(src) && scopeNodeIds.has(tgt));
+  });
+
+  return [...preserved, ...canvasEdges.map(canvasEdgeToProjectEdge)];
+}
+
+/** 从当前画布状态生成 AXS 文本（未保存的剪辑/结构编辑也可预览到剧本轨）。 */
+export function projectAxsFromCanvas(
+  canvasNodes: CanvasNodeSnapshot[],
+  canvasEdges: CanvasEdgeSnapshot[],
+  allNodes: ProjectNodeResponse[],
+  projectEdges: ProjectEdgeResponse[],
+  scenes: ProjectSceneResponse[],
+  roles: Record<string, string>,
+  options?: { scopeStageId?: string | null },
+): string {
+  const merged = mergeCanvasIntoProjectNodes(canvasNodes, allNodes, options);
+  const scopeNodeIds = options?.scopeStageId
+    ? new Set(canvasNodes.map((n) => n.id))
+    : null;
+  const edges = canvasEdgesForProjection(
+    canvasEdges,
+    projectEdges,
+    scopeNodeIds,
+  );
+  return projectToAxs(merged, edges, scenes, roles);
+}

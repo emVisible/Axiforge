@@ -161,14 +161,14 @@ function resolveSpeaker(
 
 function buildChoices(
   state: RuntimeState,
-  options: ChoiceOption[],
+  options: ChoiceOption[] | undefined | null,
 ): ViewChoice[] {
   const completed = completedSet(state);
-  return options.map((opt, index) => {
+  return (options ?? []).map((opt, index) => {
     const ok = evaluateCondition(opt.condition, state.vars, completed, state.codex);
     return {
       index,
-      label: opt.label,
+      label: opt.label || `选项 ${index + 1}`,
       to: opt.to ?? null,
       disabled: !ok,
       disabledReason: ok ? null : "条件未满足",

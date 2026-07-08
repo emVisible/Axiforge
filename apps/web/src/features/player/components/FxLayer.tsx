@@ -24,7 +24,10 @@ export default function FxLayer({ stage }: { stage: Stage }) {
   useEffect(() => {
     if (stage.transitionSeq > lastSeq.current) {
       lastSeq.current = stage.transitionSeq;
-      setActiveTransition({ seq: stage.transitionSeq, ms: stage.transitionMs });
+      const ms = Number.isFinite(stage.transitionMs) && stage.transitionMs > 0
+        ? stage.transitionMs
+        : 400;
+      setActiveTransition({ seq: stage.transitionSeq, ms });
     }
   }, [stage.transitionSeq, stage.transitionMs]);
 

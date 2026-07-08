@@ -1,6 +1,7 @@
 # --- from services/project.py ---
 
 import copy
+from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -628,6 +629,7 @@ class ProjectService:
         self.db.add(node)
         await self.db.commit()
         await self.db.refresh(node)
+        await self._bump_project_play_cache(project_id)
         return ProjectNodeResponse.model_validate(node)
 
     async def add_node_to_stage(
@@ -649,14 +651,17 @@ class ProjectService:
             setattr(node, key, value)
         await self.db.commit()
         await self.db.refresh(node)
+        await self._bump_project_play_cache(node.project_id)
         return ProjectNodeResponse.model_validate(node)
 
     async def delete_node(self, node_id: UUID) -> bool:
         node = await self.db.get(ProjectNode, node_id)
         if not node:
             return False
+        project_id = node.project_id
         await self.db.delete(node)
         await self.db.commit()
+        await self._bump_project_play_cache(project_id)
         return True
 
     async def get_node(self, node_id: UUID) -> Optional[ProjectNodeResponse]:
@@ -816,11 +821,21 @@ class ProjectService:
         await self.db.commit()
         for e in new_edges:
             await self.db.refresh(e)
+        await self._bump_project_play_cache(project_id)
         return [ProjectEdgeResponse.model_validate(e) for e in new_edges]
 
     # ================================================================
     # 内部
     # ================================================================
+
+    async def _bump_project_play_cache(self, project_id: UUID) -> None:
+        """节点/边变更后刷新 project.updated_at，使试玩 ETag 与 StoryPackage 缓存失效。"""
+        project = await self.db.get(Project, project_id)
+        if not project:
+            return
+        project.updated_at = datetime.utcnow()
+        await self.db.commit()
+        story_cache.invalidate(str(project_id))
 
     def _nodes_for_stage(self, project: Project, stage_id: UUID) -> list:
         return [n for n in (project.nodes or []) if n.stage_id == stage_id]

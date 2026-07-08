@@ -2,9 +2,7 @@ import {
   LayoutDashboard,
   MapPin,
   Package,
-  Plus,
   ScrollText,
-  User,
   Users,
 } from "lucide-react";
 
@@ -15,7 +13,9 @@ import {
   type SidebarNavItem,
 } from "@/shared/components/ui";
 import { routes } from "@/shared/lib/routes";
+import { cn } from "@/shared/components/ui";
 
+/** Cursor-style flat groups; all primary labels are two characters. */
 const OVERVIEW_ITEM: SidebarNavItem = {
   key: "dashboard",
   label: "概览",
@@ -24,55 +24,44 @@ const OVERVIEW_ITEM: SidebarNavItem = {
   end: true,
 };
 
-const PRIMARY_ITEMS: SidebarNavItem[] = [
+const CREATION_ITEMS: SidebarNavItem[] = [
   { key: "projects", label: "剧本", href: routes.projects, icon: ScrollText },
   { key: "items", label: "道具", href: routes.items, icon: Package },
-  { key: "scenes", label: "场景模板", href: routes.scenes, icon: MapPin },
-];
-
-const CHARACTER_ITEMS: SidebarNavItem[] = [
-  {
-    key: "characters-mine",
-    label: "我的角色",
-    href: routes.characters.mine,
-    icon: User,
-    end: true,
-  },
-  {
-    key: "characters-create",
-    label: "创建角色",
-    href: routes.characters.create,
-    icon: Plus,
-  },
+  { key: "scenes", label: "场景", href: routes.scenes, icon: MapPin },
+  { key: "characters", label: "角色", href: routes.characters.mine, icon: Users },
 ];
 
 interface StudioNavContentProps {
   className?: string;
+  rail?: boolean;
 }
 
-export default function StudioNavContent({ className = "" }: StudioNavContentProps) {
+export default function StudioNavContent({
+  className = "",
+  rail = false,
+}: StudioNavContentProps) {
+  if (rail) {
+    const items = [OVERVIEW_ITEM, ...CREATION_ITEMS];
+    return (
+      <nav
+        className={cn("flex flex-col items-center gap-0.5 py-2", className)}
+        aria-label="侧栏导航（精简）"
+      >
+        {items.map((item) => (
+          <SidebarNavLink key={item.key} item={item} iconOnly title={item.label} />
+        ))}
+      </nav>
+    );
+  }
+
   return (
-    <SidebarNav className={className}>
+    <SidebarNav className={cn("gap-5", className)}>
       <SidebarNavGroup label="工作室">
         <SidebarNavLink item={OVERVIEW_ITEM} />
       </SidebarNavGroup>
       <SidebarNavGroup label="创作">
-        {PRIMARY_ITEMS.map((item) => (
+        {CREATION_ITEMS.map((item) => (
           <SidebarNavLink key={item.key} item={item} />
-        ))}
-      </SidebarNavGroup>
-
-      <SidebarNavGroup label="角色">
-        <SidebarNavLink
-          item={{
-            key: "characters",
-            label: "角色库",
-            href: routes.characters.mine,
-            icon: Users,
-          }}
-        />
-        {CHARACTER_ITEMS.map((item) => (
-          <SidebarNavLink key={item.key} item={item} nested />
         ))}
       </SidebarNavGroup>
     </SidebarNav>

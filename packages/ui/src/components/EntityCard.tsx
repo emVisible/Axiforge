@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { CardLink } from "./Card";
 import { cardTheme, type SurfaceTheme } from "./cardTheme";
 import { cn } from "./formStyles";
+import { useResolvedSurfaceTheme } from "../hooks/useSurfaceTheme";
 
 interface EntityCardProps {
   to: string;
@@ -21,14 +22,15 @@ interface EntityCardProps {
 
 export function EntityIcon({
   children,
-  theme = "light",
+  theme,
   className = "",
 }: {
   children: ReactNode;
   theme?: SurfaceTheme;
   className?: string;
 }) {
-  const t = cardTheme[theme];
+  const resolvedTheme = useResolvedSurfaceTheme(theme);
+  const t = cardTheme[resolvedTheme];
   return (
     <div
       className={cn(
@@ -52,10 +54,11 @@ export default function EntityCard({
   leading,
   footer,
   onDelete,
-  theme = "light",
+  theme,
   className = "",
 }: EntityCardProps) {
-  const t = cardTheme[theme];
+  const resolvedTheme = useResolvedSurfaceTheme(theme);
+  const t = cardTheme[resolvedTheme];
 
   const handleDelete = (e: MouseEvent) => {
     e.preventDefault();
@@ -64,7 +67,7 @@ export default function EntityCard({
   };
 
   return (
-    <CardLink to={to} theme={theme} className={cn("relative", className)}>
+    <CardLink to={to} theme={resolvedTheme} className={cn("relative", className)}>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           {leading}

@@ -1,6 +1,6 @@
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useNodesState,
@@ -9,19 +9,16 @@ import {
   type Edge,
   type Connection,
 } from "reactflow";
-import "reactflow/dist/style.css";
 import { CanvasWorkspace } from "@/shared/components/Shell";
 import Toast from "@/shared/components/Toast";
-import { BackLink, Button, SegmentedControl, WorkspaceHeader } from "@/shared/components/ui";
+import { BackLink, Button, SegmentedControl, WorkspaceHeader, WorkspaceToolbar } from "@/shared/components/ui";
 import type { Instruction, Condition } from "@axiforge/core";
 import { projectApi, itemApi } from "@/shared/api/editor";
 import { characterApi } from "@/shared/api/characters";
-import { useProject, PROJECT_KEYS } from "@/shared/hooks/useProjects";
+import { useDeleteProject, useProject, PROJECT_KEYS } from "@/shared/hooks/useProjects";
 import ScriptPreview from "../components/ScriptPreview";
 import type { SimTarget } from "../components/ConditionSimulator";
-import FlowCanvas, { addEdge, MarkerType } from "../flow/FlowCanvas";
-import FlowNodePalette from "../flow/FlowNodePalette";
-import StageLegend from "../flow/StageLegend";
+import { addEdge, MarkerType } from "../flow/FlowCanvas";
 import {
   computeStageLanes,
   layoutNodesByStage,
@@ -29,7 +26,7 @@ import {
   stageNodeCounts,
 } from "../flow/stageLayout";
 import { STAGE_PALETTE, stageColorIndex } from "../flow/stageColors";
-import NodeInspectorPanel, {
+import {
   type PanelTab,
 } from "../flow/NodeInspectorPanel";
 import {
@@ -43,8 +40,15 @@ import type {
   ProjectResponse,
   ProjectSceneResponse,
   ProjectNodeResponse,
+  ProjectUpdate,
 } from "@/shared/types/project";
-import WriterPanel from "@/features/writer/components/WriterPanel";
+import CutStudioView, { type CutLayoutApi } from "../cut/CutStudioView";
+import CutLayoutToolbar from "../cut/CutLayoutToolbar";
+import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
+import { exportProjectMarkdown } from "../lib/exportProjectMarkdown";
+import StudioModeFallback from "../components/StudioModeFallback";
+import { routes } from "@/shared/lib/routes";
+import { Play } from "lucide-react";
 import {
   axsToSyncPayload,
   beatLineForNode,
@@ -52,17 +56,31 @@ import {
   nodeIdForBeat,
   parseAxs,
   projectToAxs,
+  projectAxsFromCanvas,
 } from "@/features/writer/lib/projection";
 
-type EditorMode = "flow" | "writer";
+const LazyFlowStudioView = lazy(() => import("../flow/FlowStudioView"));
+const LazyWriterStudioView = lazy(
+  () => import("@/features/writer/components/WriterStudioView"),
+);
+
+function prefetchStudioModes() {
+  void import("../flow/FlowStudioView");
+  void import("@/features/writer/components/WriterStudioView");
+}
+
+type EditorMode = "cut" | "flow" | "writer";
 type CanvasViewMode = "full" | "stage";
 
 export default function ProjectFlowPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sceneId = searchParams.get("scene");
   const qc = useQueryClient();
   const { data: project, isLoading: projectLoading } = useProject(id!);
+  const outliner = useProjectOutliner(id!);
+  const deleteProjectMutation = useDeleteProject();
 
   const [projectRoles, setProjectRoles] = useState<ProjectRoleOption[]>([]);
   const [itemOptions, setItemOptions] = useState<{ id: string; name: string }[]>(
@@ -100,7 +118,7 @@ export default function ProjectFlowPage() {
   const [nodeProps, setNodeProps] = useState<string[]>([]);
   const [script, setScript] = useState<Instruction[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [editorMode, setEditorMode] = useState<EditorMode>("flow");
+  const [editorMode, setEditorMode] = useState<EditorMode>("cut");
   const [axsSource, setAxsSource] = useState("");
   const [axsDirty, setAxsDirty] = useState(false);
   const [allProjectNodes, setAllProjectNodes] = useState<ProjectNodeResponse[]>([]);
@@ -113,10 +131,54 @@ export default function ProjectFlowPage() {
   const [fitViewTrigger, setFitViewTrigger] = useState(0);
   const [focusStageId, setFocusStageId] = useState<string | null>(null);
   const [stageFocusTrigger, setStageFocusTrigger] = useState(0);
+  const cutLayoutApiRef = useRef<CutLayoutApi | null>(null);
+  const [cutSceneFilter, setCutSceneFilter] = useState<string | null>(sceneId);
+
+  useEffect(() => {
+    if (sceneId) setCutSceneFilter(sceneId);
+  }, [sceneId]);
 
   const rolesMap = useMemo(
     () => Object.fromEntries(projectRoles.map((r) => [r.name, r.characterRefId])),
     [projectRoles],
+  );
+
+  const projectAxsFromCanvasState = useCallback(() => {
+    if (!project) return axsSource;
+    return projectAxsFromCanvas(
+      nodes.map((n) => ({ id: n.id, position: n.position, data: n.data })),
+      edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        label: (e.label as string) || null,
+      })),
+      allProjectNodes,
+      project.edges || [],
+      project.scenes || [],
+      rolesMap,
+      viewMode === "stage" && currentScene
+        ? { scopeStageId: currentScene.id }
+        : undefined,
+    );
+  }, [
+    project,
+    nodes,
+    edges,
+    allProjectNodes,
+    rolesMap,
+    viewMode,
+    currentScene,
+    axsSource,
+  ]);
+
+  const persistAxsProjection = useCallback(
+    async (source: string) => {
+      if (!id) return;
+      await projectApi.update(id, { axs_source: source });
+      setAxsSource(source);
+      setAxsDirty(false);
+    },
+    [id],
   );
 
   const selectFlowNode = useCallback((node: Node) => {
@@ -141,9 +203,12 @@ export default function ProjectFlowPage() {
   }, []);
 
   const openWriterAtSelection = useCallback(() => {
+    const projected = projectAxsFromCanvasState();
+    setAxsSource(projected);
+    setAxsDirty(false);
     if (selectedNode) {
       const line = beatLineForNode(
-        axsSource,
+        projected,
         rolesMap,
         selectedNode.id,
         (selectedNode.data.title as string) || undefined,
@@ -151,7 +216,7 @@ export default function ProjectFlowPage() {
       if (line) setWriterScrollLine(line);
     }
     setEditorMode("writer");
-  }, [axsSource, rolesMap, selectedNode]);
+  }, [projectAxsFromCanvasState, rolesMap, selectedNode]);
 
   const showToast = (m: string, t: "success" | "error" = "success") => {
     setToast({ message: m, type: t });
@@ -627,6 +692,37 @@ export default function ProjectFlowPage() {
     [selectedNode, setNodes],
   );
 
+  const renameBeat = useCallback(
+    (nodeId: string, title: string) => {
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === nodeId ? { ...n, data: { ...n.data, title } } : n,
+        ),
+      );
+      if (selectedNode?.id === nodeId) {
+        setNodeForm((f) => ({ ...f, title }));
+        setSelectedNode((n) =>
+          n ? { ...n, data: { ...n.data, title } } : n,
+        );
+      }
+    },
+    [selectedNode?.id, setNodes],
+  );
+
+  const patchProjectMeta = useCallback(
+    async (patch: Pick<ProjectUpdate, "title" | "description" | "world_setting" | "rules">) => {
+      if (!id) return;
+      try {
+        await projectApi.update(id, patch);
+        await outliner.refresh();
+        showToast("已保存项目信息");
+      } catch {
+        showToast("保存失败", "error");
+      }
+    },
+    [id, outliner],
+  );
+
   const updateNodeProps = useCallback(
     (newProps: string[]) => {
       setNodeProps(newProps);
@@ -648,6 +744,11 @@ export default function ProjectFlowPage() {
     },
     [selectedNode, setNodes],
   );
+
+  useEffect(() => {
+    if (editorMode !== "cut" || selectedNode || nodes.length === 0) return;
+    selectFlowNode(nodes[0]);
+  }, [editorMode, nodes, selectedNode, selectFlowNode]);
 
   const deleteSelectedNode = () => {
     if (!selectedNode || !confirm("删除此节点？")) return;
@@ -885,6 +986,19 @@ export default function ProjectFlowPage() {
         const rs = project.scenes?.find((s) => s.id === currentScene.id);
         if (rs) setCurrentScene(rs);
       }
+
+      if (id) {
+        const fresh = await projectApi.get(id);
+        const freshNodes = collectProjectNodes(fresh.nodes, fresh.scenes || []);
+        const projected = projectToAxs(
+          freshNodes,
+          fresh.edges || [],
+          fresh.scenes || [],
+          rolesMap,
+        );
+        await persistAxsProjection(projected);
+      }
+
       showToast("已保存");
     } catch {
       showToast("保存失败", "error");
@@ -909,6 +1023,36 @@ export default function ProjectFlowPage() {
     : [];
 
   const roleNames = projectRoles.map((r) => r.name);
+
+  const outlinerItemRefs = useMemo(() => {
+    const refs = (project?.asset_refs || []).filter((r) => r.asset_type === "item");
+    return refs.map((ref) => ({
+      id: ref.id,
+      asset_id: ref.asset_id,
+      name:
+        itemOptions.find((i) => i.id === ref.asset_id)?.name ||
+        ref.asset_id.slice(0, 8),
+    }));
+  }, [project?.asset_refs, itemOptions]);
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!project) return;
+    const roleNameMap = Object.fromEntries(
+      projectRoles.map((r) => [r.characterRefId, r.name]),
+    );
+    exportProjectMarkdown(project, roleNameMap);
+    showToast("已导出 Markdown");
+  }, [project, projectRoles]);
+
+  const handleDeleteProject = useCallback(async () => {
+    if (!id || !confirm("确定删除此剧本？此操作不可恢复。")) return;
+    try {
+      await deleteProjectMutation.mutateAsync(id);
+      navigate(routes.projects);
+    } catch {
+      showToast("删除失败", "error");
+    }
+  }, [id, deleteProjectMutation, navigate]);
 
   const stageCounts = useMemo(
     () => stageNodeCounts(nodes, project?.scenes || []),
@@ -1007,7 +1151,7 @@ export default function ProjectFlowPage() {
   };
 
   return (
-    <CanvasWorkspace>
+    <CanvasWorkspace immersive className={editorMode === "cut" ? "bg-canvas" : ""}>
       {projectLoading && !project && (
         <p className="py-20 text-center text-sm text-ink-muted">加载中...</p>
       )}
@@ -1026,16 +1170,16 @@ export default function ProjectFlowPage() {
         />
       )}
       <WorkspaceHeader
-        className="shrink-0 py-2.5"
+        variant="dense"
         leading={
-          <BackLink to={`/studio/projects/${id}`}>返回剧本</BackLink>
+          <BackLink to={routes.projects}>剧本列表</BackLink>
         }
         title={
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="max-w-[200px] truncate text-sm font-medium text-ink">
               {project?.title || "加载中..."}
             </span>
-            {viewMode === "stage" && project?.scenes && project.scenes.length > 0 && (
+            {editorMode !== "cut" && viewMode === "stage" && project?.scenes && project.scenes.length > 0 && (
               <>
                 <select
                   value={currentScene?.id ?? project.scenes[0]?.id ?? ""}
@@ -1054,11 +1198,12 @@ export default function ProjectFlowPage() {
                 <span className="text-[10px] text-ink-muted/60">{nodes.length} 节点</span>
               </>
             )}
-            {viewMode === "full" && (
+            {editorMode !== "cut" && viewMode === "full" && (
               <span className="text-[10px] text-ink-muted/60">
                 全剧本 · {nodes.length} 节点
               </span>
             )}
+            {editorMode !== "cut" && (
             <SegmentedControl
               size="sm"
               value={viewMode}
@@ -1068,109 +1213,101 @@ export default function ProjectFlowPage() {
                 { value: "stage", label: "单舞台" },
               ]}
             />
+            )}
+            <div onMouseEnter={prefetchStudioModes}>
             <SegmentedControl
               size="sm"
               value={editorMode}
               onChange={(mode) => {
                 if (mode === "writer") openWriterAtSelection();
-                else setEditorMode("flow");
+                else setEditorMode(mode as EditorMode);
               }}
               options={[
-                { value: "flow", label: "画布" },
+                { value: "cut", label: "剪辑" },
                 { value: "writer", label: "剧本" },
+                { value: "flow", label: "结构" },
               ]}
             />
+            </div>
           </div>
         }
         actions={
-          <>
+          <WorkspaceToolbar>
+            {editorMode === "cut" && (
+              <CutLayoutToolbar layoutApiRef={cutLayoutApiRef} />
+            )}
             {editorMode === "flow" && viewMode === "full" && (
-              <Button variant="ghost" size="sm" onClick={autoLayoutByStage}>
+              <Button variant="ghost" size="toolbar" onClick={autoLayoutByStage}>
                 整理布局
               </Button>
             )}
             {editorMode === "flow" && selectedNode && (
-              <Button variant="ghost" size="sm" onClick={openWriterAtSelection}>
+              <Button variant="ghost" size="toolbar" onClick={openWriterAtSelection}>
                 剧本定位
               </Button>
             )}
             {editorMode === "flow" && (
-              <Button variant="ghost" size="sm" onClick={undo}>
+              <Button variant="ghost" size="toolbar" onClick={undo}>
                 ↩ 撤销
               </Button>
             )}
-            {editorMode === "flow" ? (
-              <Button size="md" onClick={saveAll} loading={saving} disabled={saving}>
+            {id && (
+              <Button
+                as="link"
+                to={routes.play(id)}
+                variant="secondary"
+                size="toolbar"
+                icon={<Play className="h-3.5 w-3.5" />}
+              >
+                试玩
+              </Button>
+            )}
+            {(editorMode === "flow" || editorMode === "cut") && (
+              <Button size="sm" onClick={saveAll} loading={saving} disabled={saving}>
                 {saving ? "保存中..." : "保存"}
               </Button>
-            ) : null}
-          </>
+            )}
+          </WorkspaceToolbar>
         }
       />
 
       {editorMode === "writer" ? (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <WriterPanel
-            source={axsSource}
-            roles={Object.fromEntries(
-              projectRoles.map((r) => [r.name, r.characterRefId]),
-            )}
-            roleNames={roleNames}
-            onChange={(next) => {
-              setAxsSource(next);
-              setAxsDirty(true);
-            }}
-            onSave={saveWriter}
-            saving={saving}
-            dirty={axsDirty}
-            scrollToLine={writerScrollLine}
-            onBeatSelect={(beat) => setWriterScrollLine(beat.line)}
-            onOpenInFlow={openBeatInFlow}
-          />
-        </div>
-      ) : (
-      <div className="flex min-h-0 flex-1 gap-4 p-4">
-        <div className="flex w-44 shrink-0 flex-col gap-3">
-          <FlowNodePalette />
-          {viewMode === "full" && project?.scenes && (
-            <StageLegend
-              scenes={project.scenes}
-              activeStageId={activeStageId}
-              filteredStageId={filteredStageId}
-              nodeCounts={stageCounts}
-              onSelectStage={setActiveStageId}
-              onFocusStage={handleFocusStage}
-              onToggleFilter={handleToggleStageFilter}
-            />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <Suspense fallback={<StudioModeFallback />}>
+        <LazyWriterStudioView
+          source={axsSource}
+          roles={Object.fromEntries(
+            projectRoles.map((r) => [r.name, r.characterRefId]),
           )}
-        </div>
-
-        <FlowCanvas
-          wrapperRef={wrapperRef}
-          nodes={displayNodes}
-          edges={edges}
-          hoveredEdge={hoveredEdge}
-          focusNodeId={selectedNode?.id}
-          focusStageBounds={stageFocusBounds}
-          focusStageTrigger={stageFocusTrigger}
-          showSwimlanes={viewMode === "full"}
-          stageLanes={stageLanes}
-          highlightedStageId={filteredStageId}
-          fitViewTrigger={fitViewTrigger}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          onEdgeClick={onEdgeClick}
-          onPaneClick={onPaneClick}
-          onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
-          onEdgeMouseLeave={() => setHoveredEdge(null)}
-          onDrop={onDrop}
+          roleNames={roleNames}
+          onChange={(next) => {
+            setAxsSource(next);
+            setAxsDirty(true);
+          }}
+          onSave={saveWriter}
+          saving={saving}
+          dirty={axsDirty}
+          scrollToLine={writerScrollLine}
+          onBeatSelect={(beat) => setWriterScrollLine(beat.line)}
+          onOpenInFlow={openBeatInFlow}
         />
-
-        <NodeInspectorPanel
+        </Suspense>
+        </div>
+      ) : editorMode === "cut" ? (
+        project && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CutStudioView
+          layoutApiRef={cutLayoutApiRef}
+          project={project}
+          nodes={displayNodes}
           selectedNode={selectedNode}
-          selectedEdge={selectedEdge}
+          onSelectBeat={selectFlowNode}
+          sceneFilterId={cutSceneFilter}
+          onSceneFilterChange={setCutSceneFilter}
+          script={script}
+          projectRoles={projectRoles}
+          projectRolesRaw={project?.roles || []}
+          itemRefs={outlinerItemRefs}
           activePanel={activePanel}
           onActivePanelChange={setActivePanel}
           nodeForm={nodeForm}
@@ -1182,20 +1319,144 @@ export default function ProjectFlowPage() {
           nodeProps={nodeProps}
           onPropsChange={updateNodeProps}
           itemOptions={itemOptions}
-          script={script}
           onScriptChange={updateScript}
-          projectRoles={projectRoles}
           scenes={project?.scenes || []}
-          nodeStageId={(selectedNode?.data.stage_id as string) || null}
           onStageChange={assignNodeStage}
+          allNodes={nodes}
+          simTargets={simTargets}
+          onPreviewScript={() => setShowPreview(true)}
+          onDeleteNode={deleteSelectedNode}
+          onAddScene={async (title) => {
+            try {
+              await outliner.addScene(title);
+              showToast("已添加舞台");
+            } catch {
+              showToast("添加失败", "error");
+            }
+          }}
+          onImportScene={async (assetId) => {
+            try {
+              await outliner.importSceneAsset(assetId);
+              showToast("已导入舞台");
+            } catch {
+              showToast("导入失败", "error");
+            }
+          }}
+          onDeleteScene={async (sceneIdToDelete) => {
+            try {
+              await outliner.deleteScene(sceneIdToDelete);
+              if (cutSceneFilter === sceneIdToDelete) setCutSceneFilter(null);
+              showToast("已删除舞台");
+            } catch {
+              showToast("删除失败", "error");
+            }
+          }}
+          onAddRole={async (characterId, name) => {
+            try {
+              await outliner.addRole(characterId, name);
+              showToast(`已添加角色「${name}」`);
+            } catch {
+              showToast("添加失败", "error");
+            }
+          }}
+          onRemoveRole={async (roleId) => {
+            try {
+              await outliner.removeRole(roleId);
+              showToast("已移除角色");
+            } catch {
+              showToast("移除失败", "error");
+            }
+          }}
+          onAddItem={async (itemId) => {
+            try {
+              await outliner.addItemRef(itemId);
+              showToast("已添加道具引用");
+            } catch {
+              showToast("添加失败", "error");
+            }
+          }}
+          onRemoveItemRef={async (refId) => {
+            try {
+              await outliner.removeItemRef(refId);
+              showToast("已移除道具");
+            } catch {
+              showToast("移除失败", "error");
+            }
+          }}
+          onOpenFlow={() => {
+            if (cutSceneFilter) {
+              setFilteredStageId(cutSceneFilter);
+              setFocusStageId(cutSceneFilter);
+              setStageFocusTrigger((t) => t + 1);
+            }
+            setEditorMode("flow");
+          }}
+          onOpenWriter={openWriterAtSelection}
+          onExportMarkdown={handleExportMarkdown}
+          onDeleteProject={handleDeleteProject}
+          onBeatRename={renameBeat}
+          onProjectPatch={patchProjectMeta}
+          selectedEdge={null}
+          onEdgeLabelChange={handleEdgeLabelChange}
+          onDeleteEdge={handleDeleteEdge}
+        />
+        </div>
+        )
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <Suspense fallback={<StudioModeFallback />}>
+        <LazyFlowStudioView
+          wrapperRef={wrapperRef}
+          viewMode={viewMode}
+          projectScenes={project?.scenes}
+          displayNodes={displayNodes}
+          edges={edges}
+          hoveredEdge={hoveredEdge}
+          selectedNode={selectedNode}
+          selectedEdge={selectedEdge}
+          activeStageId={activeStageId}
+          filteredStageId={filteredStageId}
+          stageCounts={stageCounts}
+          stageLanes={stageLanes}
+          stageFocusBounds={stageFocusBounds}
+          stageFocusTrigger={stageFocusTrigger}
+          fitViewTrigger={fitViewTrigger}
+          activePanel={activePanel}
+          nodeForm={nodeForm}
+          conditions={conditions}
+          effects={effects}
+          nodeProps={nodeProps}
+          script={script}
+          itemOptions={itemOptions}
+          projectRoles={projectRoles}
           nodes={nodes}
           simTargets={simTargets}
+          onActivePanelChange={setActivePanel}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          onPaneClick={onPaneClick}
+          onEdgeMouseEnter={(_, e) => setHoveredEdge(e.id)}
+          onEdgeMouseLeave={() => setHoveredEdge(null)}
+          onDrop={onDrop}
+          onNodeFormChange={updateSelectedNode}
+          onConditionsChange={updateConditions}
+          onEffectsChange={updateEffects}
+          onPropsChange={updateNodeProps}
+          onScriptChange={updateScript}
+          onStageChange={assignNodeStage}
           onPreviewScript={() => setShowPreview(true)}
           onDeleteNode={deleteSelectedNode}
           onEdgeLabelChange={handleEdgeLabelChange}
           onDeleteEdge={handleDeleteEdge}
+          onSelectStage={setActiveStageId}
+          onFocusStage={handleFocusStage}
+          onToggleStageFilter={handleToggleStageFilter}
         />
-      </div>
+        </Suspense>
+        </div>
       )}
     </CanvasWorkspace>
   );

@@ -1,26 +1,25 @@
 import type { Character } from "@/shared/types";
-import { CardGrid, type SurfaceTheme } from "@/shared/components/ui";
+import { CardGrid } from "@/shared/components/ui";
 import CharacterCard from "./CharacterCard";
 
 interface CharacterGridProps {
   characters: Character[];
   showStatus?: boolean;
-  theme?: SurfaceTheme;
+  density?: "default" | "compact";
 }
 
 export default function CharacterGrid({
   characters,
   showStatus,
-  theme = "light",
+  density = "default",
 }: CharacterGridProps) {
   return (
-    <CardGrid>
+    <CardGrid density={density}>
       {characters.map((c) => (
         <CharacterCard
           key={c.id}
           character={c}
           showStatus={showStatus}
-          theme={theme}
         />
       ))}
     </CardGrid>

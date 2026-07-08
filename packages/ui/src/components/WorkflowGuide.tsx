@@ -1,4 +1,3 @@
-import type { SurfaceTheme } from "./cardTheme";
 import { cn } from "./formStyles";
 
 export interface WorkflowStep {
@@ -8,19 +7,15 @@ export interface WorkflowStep {
 
 interface WorkflowGuideProps {
   steps: WorkflowStep[];
-  theme?: SurfaceTheme;
   compact?: boolean;
   className?: string;
 }
 
 export default function WorkflowGuide({
   steps,
-  theme = "light",
   compact = false,
   className = "",
 }: WorkflowGuideProps) {
-  const isDark = theme === "dark";
-
   return (
     <div
       className={cn(
@@ -32,35 +27,13 @@ export default function WorkflowGuide({
       {steps.map((step, index) => (
         <div
           key={step.title}
-          className={cn(
-            "rounded-xl border p-4 text-left",
-            isDark
-              ? "border-white/10 bg-white/[0.03]"
-              : "border-border bg-canvas/60",
-          )}
+          className="rounded-xl border border-border bg-canvas/60 p-4 text-left"
         >
-          <p
-            className={cn(
-              "mb-2 font-mono text-[10px] font-medium tracking-widest",
-              isDark ? "text-white/30" : "text-ink-muted",
-            )}
-          >
+          <p className="mb-2 font-mono text-[10px] font-medium tracking-widest text-ink-muted">
             {String(index + 1).padStart(2, "0")}
           </p>
-          <p
-            className={cn(
-              "text-sm font-medium",
-              isDark ? "text-white/85" : "text-ink",
-            )}
-          >
-            {step.title}
-          </p>
-          <p
-            className={cn(
-              "mt-1 text-xs leading-relaxed",
-              isDark ? "text-white/40" : "text-ink-muted",
-            )}
-          >
+          <p className="text-sm font-medium text-ink">{step.title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-muted">
             {step.description}
           </p>
         </div>

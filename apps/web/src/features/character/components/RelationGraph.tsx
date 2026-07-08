@@ -516,7 +516,7 @@ export default function RelationGraph({ characterId }: RelationGraphProps) {
             </button>
             <button
               onClick={() => setIsFullscreen(false)}
-              className="px-4 py-2 text-sm bg-[#3b3325] text-[#f3ecd8] rounded-xl shadow-sm hover:bg-[#5c5240] transition-colors"
+              className="rounded-xl bg-panel px-4 py-2 text-sm text-ink shadow-sm transition-colors hover:bg-panel-raised"
             >
               ✕ 退出全屏
             </button>

@@ -3,6 +3,7 @@ import { Link } from "react-router";
 
 import { cardTheme, type SurfaceTheme } from "./cardTheme";
 import { cn } from "./formStyles";
+import { useResolvedSurfaceTheme } from "../hooks/useSurfaceTheme";
 
 type CardVariant = "default" | "interactive" | "muted";
 
@@ -32,17 +33,19 @@ function cardVariantClasses(
 
 export function Card({
   variant = "default",
-  theme = "light",
+  theme,
   padding = "md",
   className = "",
   children,
   ...props
 }: CardBaseProps) {
+  const resolvedTheme = useResolvedSurfaceTheme(theme);
+
   return (
     <div
       className={cn(
         "rounded-2xl border",
-        cardVariantClasses(variant, theme),
+        cardVariantClasses(variant, resolvedTheme),
         paddingClasses[padding],
         className,
       )}
@@ -62,11 +65,12 @@ interface CardLinkProps {
 
 export function CardLink({
   to,
-  theme = "light",
+  theme,
   className = "",
   children,
 }: CardLinkProps) {
-  const t = cardTheme[theme];
+  const resolvedTheme = useResolvedSurfaceTheme(theme);
+  const t = cardTheme[resolvedTheme];
   return (
     <Link
       to={to}
@@ -85,15 +89,19 @@ export function CardGrid({
   children,
   className = "",
   stagger = false,
+  density = "default",
 }: {
   children: ReactNode;
   className?: string;
   stagger?: boolean;
+  density?: "default" | "compact";
 }) {
   return (
     <div
       className={cn(
-        "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
+        density === "compact"
+          ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          : "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
         className,
       )}
     >

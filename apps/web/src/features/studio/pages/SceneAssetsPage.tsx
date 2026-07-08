@@ -126,7 +126,7 @@ export default function SceneAssetsPage() {
   return (
     <Shell>
       <PageHeader
-        title="场景模板"
+        title="场景"
         description="世界观、地理与舞台设定"
         action={
           <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export default function SceneAssetsPage() {
               icon={<Plus className="h-4 w-4" strokeWidth={1.75} />}
               onClick={() => setShowCreate(true)}
             >
-              新建场景模板
+              新建场景
             </Button>
           </div>
         }
@@ -145,7 +145,7 @@ export default function SceneAssetsPage() {
       <Modal
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        title="新建场景模板"
+        title="新建场景"
         size="lg"
         footer={
           <ModalActions
@@ -210,7 +210,7 @@ export default function SceneAssetsPage() {
             <label className="mb-1.5 block text-xs font-medium text-ink-muted">
               标签
             </label>
-            <div className="mb-2 flex gap-2">
+            <div className="mb-2 flex items-center gap-2">
               <Input
                 value={form.tagInput}
                 onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
@@ -219,7 +219,7 @@ export default function SceneAssetsPage() {
                 }
                 placeholder="添加标签"
               />
-              <Button type="button" variant="secondary" size="sm" onClick={addTag}>
+              <Button type="button" variant="secondary" size="sm" className="shrink-0 px-4" onClick={addTag}>
                 添加
               </Button>
             </div>
@@ -261,8 +261,8 @@ export default function SceneAssetsPage() {
       {!isLoading && !scenes?.length && (
         <EmptyState
           icon={MapPin}
-          title="还没有场景模板"
-          description="创建第一个场景模板"
+          title="还没有场景"
+          description="创建第一个场景"
         >
           <WorkflowGuide steps={SCENE_WORKFLOW} compact className="max-w-2xl" />
         </EmptyState>

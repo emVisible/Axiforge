@@ -15,7 +15,7 @@ import {
   EmptyState,
   LoadingSpinner,
   WorkflowGuide,
-  cardTheme,
+  useCardTheme,
 } from "@/shared/components/ui";
 import { DISCOVER_WORKFLOW } from "@/shared/lib/workflowSteps";
 
@@ -27,6 +27,7 @@ interface DiscoverProjectsTabProps {
 
 export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps) {
   const navigate = useNavigate();
+  const t = useCardTheme();
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<ProjectResponse[]>([]);
@@ -36,8 +37,8 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
   const [reportingId, setReportingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
   }, [search]);
 
   useEffect(() => {
@@ -91,19 +92,17 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
   };
 
   const hasMore = items.length < total;
-  const t = cardTheme.dark;
 
   return (
     <div>
       {loading && page === 0 && (
         <div className="flex justify-center py-20">
-          <LoadingSpinner variant="dark" />
+          <LoadingSpinner />
         </div>
       )}
 
       {!loading && items.length === 0 && (
         <EmptyState
-          theme="dark"
           framed
           title={debouncedSearch ? "没有匹配的作品" : "还没有公开作品"}
           description={
@@ -113,7 +112,6 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
           {!debouncedSearch && (
             <WorkflowGuide
               steps={DISCOVER_WORKFLOW}
-              theme="dark"
               compact
               className="max-w-2xl text-left"
             />
@@ -123,18 +121,17 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
 
       {items.length > 0 && (
         <>
-          <p className="mb-4 text-xs text-white/30">共 {total} 部作品</p>
-          <CardGrid stagger>
+          <p className="mb-3 text-xs text-ink-faint">共 {total} 部作品</p>
+          <CardGrid stagger density="compact">
             {items.map((p) => (
               <CoverCard
                 key={p.id}
-                theme="dark"
+                density="compact"
                 title={p.title}
                 description={p.description || "暂无描述"}
                 onClick={() => openProject(p.id)}
                 menu={
                   <CardOverflowMenu
-                    theme="dark"
                     items={[
                       {
                         label: reportingId === p.id ? "提交中..." : "举报",
@@ -179,15 +176,15 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
               />
             ))}
           </CardGrid>
-          <div className="mt-8 text-center">
-            {loadingMore && <LoadingSpinner variant="dark" />}
+          <div className="mt-6 text-center">
+            {loadingMore && <LoadingSpinner />}
             {hasMore && !loadingMore && (
-              <Button tone="dark" variant="secondary" onClick={() => setPage((p) => p + 1)}>
+              <Button variant="secondary" onClick={() => setPage((p) => p + 1)}>
                 加载更多（{total - items.length} 个剩余）
               </Button>
             )}
             {!hasMore && items.length > 0 && (
-              <p className="text-sm text-white/25">已显示全部 {total} 部作品</p>
+              <p className="text-sm text-ink-faint">已显示全部 {total} 部作品</p>
             )}
           </div>
         </>

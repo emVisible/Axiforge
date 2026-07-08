@@ -32,22 +32,25 @@ export default function TemplateSelector() {
       <p className="mb-3 text-sm text-ink-muted">
         从模板开始，快速填充六层设定。之后可以逐层调整。
       </p>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {characterTemplates.map((t) => (
           <button
             key={t.id}
+            type="button"
             onClick={() => applyTemplate(t)}
-            className="group rounded-xl border border-border p-3 text-left transition-all hover:border-brand/30 hover:bg-brand-muted/40"
+            className="group flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left transition-all hover:border-brand/30 hover:bg-brand-muted/40"
           >
-            <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-brand-muted text-xs font-semibold text-brand">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-muted text-xs font-semibold text-brand">
               {t.name.slice(0, 1)}
             </div>
-            <h4 className="text-sm font-medium text-ink group-hover:text-brand">
-              {t.name}
-            </h4>
-            <p className="mt-0.5 line-clamp-2 text-[11px] text-ink-muted">
-              {t.summary}
-            </p>
+            <div className="min-w-0 flex-1">
+              <h4 className="truncate text-sm font-medium text-ink group-hover:text-brand">
+                {t.name}
+              </h4>
+              <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-muted">
+                {t.summary}
+              </p>
+            </div>
           </button>
         ))}
       </div>

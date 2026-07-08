@@ -3,7 +3,7 @@
 import pytest
 from httpx import AsyncClient
 
-from app.services.ai_draft import prose_to_script, suggest_character_layers
+from app.domains.narrative.ai_draft import prose_to_script, suggest_character_layers
 
 
 def test_prose_to_script_rules():

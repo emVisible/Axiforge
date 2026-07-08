@@ -10,6 +10,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
       "@axiforge/ui": path.resolve(__dirname, "../../packages/ui"),
       "@axiforge/core": path.resolve(__dirname, "../../packages/core/src"),
+      "@axiforge/axs": path.resolve(__dirname, "../../packages/axs/src"),
     },
   },
   server: {

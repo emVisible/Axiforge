@@ -2,7 +2,7 @@
 
 > **文档性质**：最终版产品与技术路线，**取代** `ROADMAP_vNEXT.md` §5 的里程碑排序，整合 `VISION_AND_BRIDGES.md` 的桥梁架构与 2026 市场现实。
 > **最后更新**：2026-07-07
-> **文档关系**：本文是执行基准；`VISION_AND_BRIDGES.md` 保留为架构诊断与愿景论证；`REFACTOR_PLAN.md` 为已完成的 v1.0 历史；偏离记入 `docs/ADR/`。
+> **文档关系**：本文是 v1.x 执行基准；**v2 阶段（结构重组 / 叙事核心 / 中台 / 治理）的执行基准已移交 [`REFACTOR_V2.md`](./REFACTOR_V2.md)**；`VISION_AND_BRIDGES.md` 保留为架构诊断与愿景论证；`REFACTOR_PLAN.md` 为已完成的 v1.0 历史；偏离记入 `docs/ADR/`。
 
 ---
 

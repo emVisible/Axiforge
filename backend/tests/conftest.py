@@ -10,7 +10,7 @@ from httpx import ASGITransport, AsyncClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import init_db  # noqa: E402
-from src.main import app  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)

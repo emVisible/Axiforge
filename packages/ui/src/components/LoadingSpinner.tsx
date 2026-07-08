@@ -1,7 +1,18 @@
-export default function LoadingSpinner() {
+interface LoadingSpinnerProps {
+  variant?: "light" | "dark";
+}
+
+export default function LoadingSpinner({ variant = "light" }: LoadingSpinnerProps) {
+  const isDark = variant === "dark";
   return (
-    <div className="flex justify-center items-center py-12">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+    <div className="flex items-center justify-center py-12">
+      <div
+        className={`h-7 w-7 animate-spin rounded-full border-2 ${
+          isDark
+            ? "border-white/20 border-t-white/60"
+            : "border-border border-t-brand"
+        }`}
+      />
     </div>
   );
 }

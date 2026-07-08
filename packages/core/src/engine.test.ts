@@ -211,6 +211,7 @@ describe("engine — restore 存档续玩（v1.2 桥4）", () => {
       currentBeatId: null,
       cursor: 0,
       vars: { memory: {}, flags: { met_alice: true }, characters: { c1: { affection: 30 } } },
+      codex: {},
       completedBeats: ["intro", "good"],
       status: "ended" as const,
       pendingChoiceLabel: null,

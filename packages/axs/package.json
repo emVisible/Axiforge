@@ -1,0 +1,21 @@
+{
+  "name": "@axiforge/axs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@axiforge/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^3.2.0"
+  }
+}

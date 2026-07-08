@@ -88,6 +88,7 @@ interface ModalActionsProps {
   onConfirm: () => void;
   cancelLabel?: string;
   confirmLabel?: string;
+  confirmVariant?: "primary" | "danger";
   loading?: boolean;
   disabled?: boolean;
 }
@@ -97,6 +98,7 @@ export function ModalActions({
   onConfirm,
   cancelLabel = "取消",
   confirmLabel = "确认",
+  confirmVariant = "primary",
   loading,
   disabled,
 }: ModalActionsProps) {
@@ -105,7 +107,13 @@ export function ModalActions({
       <Button variant="ghost" size="sm" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button size="sm" onClick={onConfirm} loading={loading} disabled={disabled}>
+      <Button
+        variant={confirmVariant}
+        size="sm"
+        onClick={onConfirm}
+        loading={loading}
+        disabled={disabled}
+      >
         {confirmLabel}
       </Button>
     </div>

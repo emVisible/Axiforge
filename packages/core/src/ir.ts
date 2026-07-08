@@ -237,11 +237,17 @@ export interface Transition {
   label?: string | null;
 }
 
-/** 桥段：Flow 图的一个节点，内含演出脚本 */
+/** 桥段：Flow 图的一个节点，内含演出脚本（Beat = 关键帧 = 回合，ADR-017） */
 export interface Beat {
   id: string;
+  /** 舞台 id（原 scene；场景降级为舞台演出属性） */
   sceneId?: string | null;
   sceneTitle?: string | null;
+  stage?: string | null;
+  /** 本回合参与角色（characterRefId 列表） */
+  actors?: string[];
+  /** 本回合道具引用 */
+  props?: string[];
   /** 进入该 Beat 的触发条件（沿转场推进时评估） */
   trigger?: Condition | null;
   /** 演出脚本序列 */
@@ -293,6 +299,13 @@ export interface SceneRef {
   backgroundImage?: string | null;
 }
 
+export interface ItemRef {
+  id: string;
+  name: string;
+  category?: string | null;
+  imagePath?: string | null;
+}
+
 // ============================================================
 // StoryPackage — 编译产物
 // ============================================================
@@ -308,6 +321,8 @@ export interface StoryPackage {
   transitions: Transition[];
   characters: CharacterRef[];
   scenes: SceneRef[];
+  /** 项目引用的道具清单 */
+  items?: ItemRef[];
   /** 世界观概述（v1.4） */
   worldSetting?: string | null;
   /** 术语库（v1.4） */

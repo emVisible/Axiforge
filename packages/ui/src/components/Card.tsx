@@ -1,22 +1,17 @@
-import { type HTMLAttributes, type ReactNode } from "react";
+import { Children, isValidElement, type HTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import { cardTheme, type SurfaceTheme } from "./cardTheme";
 import { cn } from "./formStyles";
 
 type CardVariant = "default" | "interactive" | "muted";
 
 interface CardBaseProps extends HTMLAttributes<HTMLDivElement> {
   variant?: CardVariant;
+  theme?: SurfaceTheme;
   padding?: "none" | "sm" | "md" | "lg";
   children: ReactNode;
 }
-
-const variantClasses: Record<CardVariant, string> = {
-  default: "border-border bg-surface shadow-sm",
-  interactive:
-    "border-border bg-surface shadow-sm hover:border-gray-300 hover:shadow-md transition-all duration-200",
-  muted: "border-border/80 bg-canvas",
-};
 
 const paddingClasses = {
   none: "",
@@ -25,8 +20,19 @@ const paddingClasses = {
   lg: "p-6",
 };
 
+function cardVariantClasses(
+  variant: CardVariant,
+  theme: SurfaceTheme,
+): string {
+  const t = cardTheme[theme];
+  if (variant === "muted") return t.muted;
+  if (variant === "interactive") return cn("transition-all duration-200", t.surface);
+  return t.surfaceStatic;
+}
+
 export function Card({
   variant = "default",
+  theme = "light",
   padding = "md",
   className = "",
   children,
@@ -36,7 +42,7 @@ export function Card({
     <div
       className={cn(
         "rounded-2xl border",
-        variantClasses[variant],
+        cardVariantClasses(variant, theme),
         paddingClasses[padding],
         className,
       )}
@@ -49,17 +55,24 @@ export function Card({
 
 interface CardLinkProps {
   to: string;
+  theme?: SurfaceTheme;
   className?: string;
   children: ReactNode;
 }
 
-export function CardLink({ to, className = "", children }: CardLinkProps) {
+export function CardLink({
+  to,
+  theme = "light",
+  className = "",
+  children,
+}: CardLinkProps) {
+  const t = cardTheme[theme];
   return (
     <Link
       to={to}
       className={cn(
-        "group block rounded-2xl border border-border bg-surface p-5 shadow-sm",
-        "transition-all duration-200 hover:border-gray-300 hover:shadow-md",
+        "group block rounded-2xl border p-5 transition-all duration-200",
+        t.surface,
         className,
       )}
     >
@@ -71,18 +84,34 @@ export function CardLink({ to, className = "", children }: CardLinkProps) {
 export function CardGrid({
   children,
   className = "",
+  stagger = false,
 }: {
   children: ReactNode;
   className?: string;
+  stagger?: boolean;
 }) {
   return (
     <div
       className={cn(
-        "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3",
+        "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
         className,
       )}
     >
-      {children}
+      {stagger
+        ? Children.map(children, (child, index) => {
+            if (!isValidElement(child)) return child;
+            if (index >= 6) return child;
+            return (
+              <div
+                key={child.key ?? index}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 60}ms` }}
+              >
+                {child}
+              </div>
+            );
+          })
+        : children}
     </div>
   );
 }

@@ -3,8 +3,24 @@ export { default as Input } from "./Input";
 export { default as Textarea } from "./Textarea";
 export { default as Select } from "./Select";
 export { default as SearchInput } from "./SearchInput";
+export type { SearchSize, SearchWidth } from "./searchTheme";
+export { searchTheme, searchWidthClasses } from "./searchTheme";
+export {
+  SidebarNav,
+  SidebarNavGroup,
+  SidebarNavLink,
+} from "./SidebarNav";
+export type { SidebarNavItem } from "./SidebarNav";
+export { default as WorkspaceHeader } from "./WorkspaceHeader";
+export { default as WorkflowGuide } from "./WorkflowGuide";
+export type { WorkflowStep } from "./WorkflowGuide";
 export { Card, CardLink, CardGrid } from "./Card";
-export { default as EntityCard } from "./EntityCard";
+export { default as EntityCard, EntityIcon } from "./EntityCard";
+export { default as CoverCard } from "./CoverCard";
+export { default as CardOverflowMenu } from "./CardOverflowMenu";
+export type { CardMenuItem } from "./CardOverflowMenu";
+export type { SurfaceTheme } from "./cardTheme";
+export { cardTheme } from "./cardTheme";
 export { default as Modal, ModalActions } from "./Modal";
 export { default as FilterToolbar } from "./FilterToolbar";
 export { default as SegmentedControl } from "./SegmentedControl";
@@ -27,4 +43,12 @@ export { default as SearchSelect } from "./SearchSelect";
 export { default as ToggleInput } from "./ToggleInput";
 export { default as TabBar } from "./TabBar";
 export type { TabItem } from "./TabBar";
+export { default as DataTable } from "./DataTable";
+export type { DataTableColumn } from "./DataTable";
+export { default as Pagination } from "./Pagination";
+export { default as StatCard, StatCardGrid } from "./StatCard";
+export { default as CommentThread } from "./CommentThread";
+export type { CommentNode, CommentSort } from "./CommentThread";
+export { default as ConfirmDialog } from "./ConfirmDialog";
+export { ToastProvider, useToast } from "./Toast";
 export * from "./formStyles";

@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "es2023",
+    "target": "ES2022",
     "lib": [
-      "ES2023",
+      "ES2022",
       "DOM"
     ],
     "module": "esnext",
@@ -24,7 +23,6 @@
     },
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
   "include": [

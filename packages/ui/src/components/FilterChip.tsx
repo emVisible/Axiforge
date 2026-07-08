@@ -7,6 +7,7 @@ interface FilterChipProps {
   count?: number;
   color?: string;
   className?: string;
+  variant?: "light" | "dark";
 }
 
 export default function FilterChip({
@@ -16,7 +17,10 @@ export default function FilterChip({
   count,
   color,
   className = "",
+  variant = "light",
 }: FilterChipProps) {
+  const isDark = variant === "dark";
+
   if (color) {
     return (
       <button
@@ -47,9 +51,13 @@ export default function FilterChip({
       onClick={onClick}
       className={cn(
         "rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-200",
-        active
-          ? "border-brand bg-brand text-white shadow-sm shadow-brand/20"
-          : "border-border bg-surface text-ink-muted hover:border-gray-300 hover:text-ink",
+        isDark
+          ? active
+            ? "border-white/30 bg-white/15 text-white shadow-sm"
+            : "border-white/10 bg-white/5 text-white/50 hover:border-white/20 hover:text-white/75"
+          : active
+            ? "border-brand bg-brand text-white shadow-sm shadow-brand/20"
+            : "border-border bg-surface text-ink-muted hover:border-gray-300 hover:text-ink",
         className,
       )}
     >

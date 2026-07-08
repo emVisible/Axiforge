@@ -54,3 +54,51 @@ async def test_global_search_includes_characters(client: AsyncClient):
     results = response.json()["results"]
     types = {item["type"] for item in results}
     assert "角色" in types
+
+
+@pytest.mark.asyncio
+async def test_sync_narrative_from_axs(client: AsyncClient):
+    created = await client.post(
+        "/api/v1/editor/projects/",
+        json={"title": "AXS同步测试", "author_id": "pytest"},
+    )
+    assert created.status_code == 201
+    project_id = created.json()["id"]
+
+    axs_source = """# 开场
+旁白：雨夜。
+
+# 结局 [ending: 完]
+旁白：故事结束。
+"""
+    synced = await client.put(
+        f"/api/v1/editor/projects/{project_id}/narrative",
+        json={
+            "axs_source": axs_source,
+            "nodes": [
+                {
+                    "editor_data": {"position": {"x": 100, "y": 80}},
+                    "narrative_data": {
+                        "title": "开场",
+                        "script": [{"op": "narration", "text": "雨夜。"}],
+                    },
+                    "sort_order": 0,
+                },
+                {
+                    "editor_data": {"position": {"x": 320, "y": 80}},
+                    "narrative_data": {
+                        "title": "结局",
+                        "is_ending": True,
+                        "ending_label": "完",
+                        "script": [{"op": "narration", "text": "故事结束。"}],
+                    },
+                    "sort_order": 1,
+                },
+            ],
+            "edges": [],
+        },
+    )
+    assert synced.status_code == 200
+    body = synced.json()
+    assert body.get("axs_source", "").startswith("# 开场")
+    assert len(body.get("nodes") or []) == 2

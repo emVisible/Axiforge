@@ -6,6 +6,9 @@
 | [ADR-008](./008-narrative-ir-and-compiler.md) | Narrative IR + Story Compiler（桥1·脊椎） | 已采纳 |
 | [ADR-009](./009-flow-script-two-layer.md) | Flow / Script 两层分离（桥2·演出本体） | 已采纳 |
 | [ADR-015](./015-ai-assisted-creation.md) | AI 辅助创作供应商与成本（规则优先 + 可选 LLM） | 已采纳 |
+| [ADR-016](./016-axs-narrative-language.md) | AXS 叙事文本语言（文本为真相源） | 已采纳 |
+| [ADR-017](./017-node-independence-and-stage.md) | 节点独立于场景，场景降级为舞台 | 已采纳 |
+| [ADR-018](./018-content-governance.md) | 内容治理状态机与轻量风控 | 已采纳 |
 
 ## 待落文档（最终建议已定于 [`../ROADMAP_FINAL.md`](../ROADMAP_FINAL.md) §7，逐个正式落 ADR）
 

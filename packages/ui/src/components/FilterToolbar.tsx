@@ -1,17 +1,19 @@
 import { type ReactNode } from "react";
 
 import SearchInput from "./SearchInput";
-import { Card } from "./Card";
 import { cn } from "./formStyles";
+import type { SearchWidth } from "./searchTheme";
 
 interface FilterToolbarProps {
   search?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
   onSearchClear?: () => void;
+  searchWidth?: SearchWidth;
   children?: ReactNode;
   expanded?: ReactNode;
   className?: string;
+  variant?: "light" | "dark";
 }
 
 export default function FilterToolbar({
@@ -19,12 +21,16 @@ export default function FilterToolbar({
   onSearchChange,
   searchPlaceholder = "搜索...",
   onSearchClear,
+  searchWidth = "md",
   children,
   expanded,
   className = "",
+  variant = "light",
 }: FilterToolbarProps) {
+  const isDark = variant === "dark";
+
   return (
-    <Card padding="sm" className={cn("mb-4", className)}>
+    <div className={cn("mb-6 space-y-4", className)}>
       <div className="flex flex-wrap items-center gap-3">
         {onSearchChange !== undefined && (
           <SearchInput
@@ -32,14 +38,27 @@ export default function FilterToolbar({
             onChange={(e) => onSearchChange(e.target.value)}
             onClear={onSearchClear ?? (() => onSearchChange(""))}
             placeholder={searchPlaceholder}
-            containerClassName="min-w-[200px] flex-1"
+            variant={variant}
+            size="md"
+            width={searchWidth}
           />
         )}
-        {children}
+        {children && (
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            {children}
+          </div>
+        )}
       </div>
       {expanded && (
-        <div className="mt-4 border-t border-border pt-4">{expanded}</div>
+        <div
+          className={cn(
+            "border-t pt-4",
+            isDark ? "border-white/10" : "border-border",
+          )}
+        >
+          {expanded}
+        </div>
       )}
-    </Card>
+    </div>
   );
 }

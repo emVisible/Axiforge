@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
+import SearchInput from "./SearchInput";
 import { cn, inputSm } from "./formStyles";
 
 interface SearchSelectProps {
@@ -70,21 +71,16 @@ export default function SearchSelect({
         <div className="absolute top-full z-50 mt-1 flex max-h-48 w-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
           {options.length > 8 && (
             <div className="border-b border-border p-2">
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-muted/50"
-                  strokeWidth={1.75}
-                />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="搜索..."
-                  className={cn(inputSm, "pl-8")}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
+              <SearchInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClear={() => setSearch("")}
+                placeholder="搜索..."
+                size="sm"
+                width="full"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           )}
           <div className="overflow-y-auto">

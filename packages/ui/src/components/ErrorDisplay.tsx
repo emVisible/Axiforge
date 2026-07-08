@@ -1,20 +1,43 @@
+import Button from "./Button";
+import { Card } from "./Card";
+import type { SurfaceTheme } from "./cardTheme";
+import { cn } from "./formStyles";
+
 interface ErrorDisplayProps {
   message: string;
   onRetry?: () => void;
+  theme?: SurfaceTheme;
 }
 
-export default function ErrorDisplay({ message, onRetry }: ErrorDisplayProps) {
+export default function ErrorDisplay({
+  message,
+  onRetry,
+  theme = "light",
+}: ErrorDisplayProps) {
+  const isDark = theme === "dark";
+
   return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-      <p className="text-red-800">{message}</p>
+    <Card
+      theme={theme}
+      padding="sm"
+      className={cn(
+        isDark
+          ? "border-red-500/20 bg-red-500/10"
+          : "border-red-200 bg-red-50",
+      )}
+    >
+      <p className={isDark ? "text-red-300" : "text-red-800"}>{message}</p>
       {onRetry && (
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          tone={theme}
           onClick={onRetry}
-          className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+          className={cn("mt-2", isDark ? "text-red-300 hover:text-red-200" : "text-red-600")}
         >
           重试
-        </button>
+        </Button>
       )}
-    </div>
+    </Card>
   );
 }

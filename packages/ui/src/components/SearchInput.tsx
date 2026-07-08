@@ -1,34 +1,71 @@
 import { type InputHTMLAttributes, forwardRef } from "react";
 import { Search, X } from "lucide-react";
 
-import { cn, inputBase } from "./formStyles";
+import {
+  searchSizeClasses,
+  searchTheme,
+  searchWidthClasses,
+  type SearchSize,
+  type SearchWidth,
+  type SurfaceTheme,
+} from "./searchTheme";
+import { cn } from "./formStyles";
 
 interface SearchInputProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size"> {
   onClear?: () => void;
+  className?: string;
   containerClassName?: string;
+  variant?: SurfaceTheme;
+  size?: SearchSize;
+  width?: SearchWidth;
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
   (
-    { value, onClear, className = "", containerClassName = "", ...props },
+    {
+      value,
+      onClear,
+      className = "",
+      containerClassName = "",
+      variant = "light",
+      size = "md",
+      width = "full",
+      disabled,
+      ...props
+    },
     ref,
   ) => {
     const hasValue = value !== undefined && String(value).length > 0;
+    const theme = searchTheme[variant];
+    const sizing = searchSizeClasses[size];
 
     return (
-      <div className={cn("relative", containerClassName)}>
+      <div
+        className={cn(
+          "inline-flex max-w-full items-center rounded-full border transition-all duration-200",
+          searchWidthClasses[width],
+          sizing.shell,
+          theme.shell,
+          disabled && "cursor-not-allowed opacity-50",
+          containerClassName,
+        )}
+      >
         <Search
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted/50"
+          className={cn("shrink-0", sizing.icon, theme.icon)}
           strokeWidth={1.75}
+          aria-hidden
         />
         <input
           ref={ref}
-          type="search"
+          type="text"
+          role="searchbox"
           value={value}
+          disabled={disabled}
           className={cn(
-            inputBase,
-            "py-2.5 !pl-10 !pr-9 [appearance:textfield] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
+            "min-w-0 flex-1 bg-transparent outline-none",
+            sizing.input,
+            theme.input,
             className,
           )}
           {...props}
@@ -37,10 +74,15 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <button
             type="button"
             onClick={onClear}
-            className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted/50 transition-colors hover:bg-gray-100 hover:text-ink"
+            disabled={disabled}
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-full transition-colors",
+              sizing.clear,
+              theme.clear,
+            )}
             aria-label="清除搜索"
           >
-            <X className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <X className="h-3 w-3" strokeWidth={2} />
           </button>
         )}
       </div>

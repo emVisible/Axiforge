@@ -36,7 +36,39 @@ async def test_create_and_get_character(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_list_public_characters(client: AsyncClient):
+async def test_list_user_characters_by_author_id(client: AsyncClient):
+    author_id = "creator-test-001"
+    created = await client.post(
+        "/api/v1/characters/",
+        json={
+            "character_data": {
+                "anchor": {
+                    "name": "私有角色",
+                    "essence": "仅作者可见",
+                    "tags": [],
+                },
+                "contour": {},
+                "demeanor": {},
+                "psyche": {},
+                "trace": {},
+                "bond": {},
+            },
+            "is_public": False,
+            "author_id": author_id,
+        },
+    )
+    assert created.status_code == 201
+    assert created.json()["author_id"] == author_id
+
+    listed = await client.get(f"/api/v1/characters/user/{author_id}")
+    assert listed.status_code == 200
+    items = listed.json()
+    assert any(c["name"] == "私有角色" for c in items)
+
+    other = await client.get("/api/v1/characters/user/other-creator")
+    assert other.status_code == 200
+    assert all(c["author_id"] != author_id for c in other.json())
+
     await client.post(
         "/api/v1/characters/",
         json={

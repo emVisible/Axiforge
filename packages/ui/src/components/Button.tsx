@@ -1,12 +1,15 @@
 import { type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import type { SurfaceTheme } from "./cardTheme";
+
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonBaseProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  tone?: SurfaceTheme;
   loading?: boolean;
   icon?: ReactNode;
   className?: string;
@@ -18,13 +21,23 @@ type ButtonAsButton = ButtonBaseProps &
 type ButtonAsLink = ButtonBaseProps & { as: "link"; to: string };
 type ButtonProps = ButtonAsButton | ButtonAsLink;
 
-const variantClasses: Record<ButtonVariant, string> = {
+const lightVariantClasses: Record<ButtonVariant, string> = {
   primary:
     "bg-brand text-white hover:bg-brand-hover shadow-sm shadow-brand/20",
   secondary:
-    "border border-border bg-surface text-ink hover:bg-canvas hover:border-gray-300",
-  ghost: "text-ink-muted hover:text-ink hover:bg-gray-100/80",
+    "border border-border bg-surface text-ink hover:bg-canvas hover:border-ink-muted/30",
+  ghost: "text-ink-muted hover:text-ink hover:bg-canvas",
   danger: "border border-red-200 bg-red-50/50 text-red-700 hover:bg-red-50",
+};
+
+const darkVariantClasses: Record<ButtonVariant, string> = {
+  primary:
+    "bg-brand text-white hover:bg-brand-hover shadow-sm shadow-brand/30",
+  secondary:
+    "border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white",
+  ghost: "text-white/50 hover:text-white/80 hover:bg-white/5",
+  danger:
+    "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -45,7 +58,7 @@ function ButtonContent({
   if (loading) {
     return (
       <>
-        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
           <circle
             className="opacity-25"
             cx="12"
@@ -77,13 +90,15 @@ export default function Button(props: ButtonProps) {
   const {
     variant = "primary",
     size = "md",
+    tone = "light",
     loading,
     icon,
     className = "",
     children,
     ...rest
   } = props;
-  const classes = `inline-flex items-center justify-center font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
+  const palette = tone === "dark" ? darkVariantClasses : lightVariantClasses;
+  const classes = `inline-flex items-center justify-center font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${palette[variant]} ${sizeClasses[size]} ${className}`;
 
   if (props.as === "link") {
     return (

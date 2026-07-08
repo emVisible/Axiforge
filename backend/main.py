@@ -1,5 +1,2 @@
-"""Production entry shim — implementation lives in src/main.py."""
-
-from src.main import app, create_app
-
-__all__ = ["app", "create_app"]
+"""Compatibility shim — use app.main:app."""
+from app.main import app, create_app

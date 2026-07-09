@@ -330,4 +330,12 @@
 
 ---
 
-*本文为唯一执行基准。里程碑完成后回写勾选；任何偏离先落 ADR。*
+---
+
+## 11. v2 平台阶段（Grove 收敛）
+
+v1.x 执行基准仍适用至 v1.6 收尾；**v2 大版本（Canopy 社群 → Ginkgo 成就 → RN 关系 → Nexus Electron）的执行基准见 [`AXIFORGE_V2.md`](./AXIFORGE_V2.md)**，v1.x 非远期遗留见 [`BACKLOG_V1.md`](./BACKLOG_V1.md)。
+
+---
+
+*本文为 v1.x 执行基准。里程碑完成后回写勾选；任何偏离先落 ADR。v2 阶段见 AXIFORGE_V2.md。*

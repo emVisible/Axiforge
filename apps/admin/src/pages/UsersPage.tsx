@@ -1,17 +1,19 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import {
   Badge,
   Button,
   ConfirmDialog,
   DataTable,
   ErrorDisplay,
+  Input,
   PageHeader,
   Pagination,
   useToast,
   type DataTableColumn,
 } from "@axiforge/ui";
 import { adminApi, type AdminUser, type PaginatedResponse } from "@/api/adminClient";
+import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 
 const PAGE_SIZE = 20;
@@ -21,10 +23,29 @@ type PendingAction =
   | { type: "reset_strikes"; user: AdminUser };
 
 export default function UsersPage() {
+  const [searchParams] = useSearchParams();
+  const creatorFilter = searchParams.get("creator_id");
   const [page, setPage] = useState(0);
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setQ(qInput.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
+
   const { data, loading, error, setError, reload } = useAdminList<PaginatedResponse<AdminUser>>({
-    fetcher: () => adminApi.users({ limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
-    deps: [page],
+    queryKey: adminQueryKeys.users(page, creatorFilter || undefined, q || undefined),
+    fetcher: () =>
+      adminApi.users({
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+        creator_id: creatorFilter || undefined,
+        q: q || undefined,
+      }),
   });
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,7 +122,23 @@ export default function UsersPage() {
 
   return (
     <div>
-      <PageHeader title="用户管理" description="查看用户档案，处理封禁与 strike" />
+      <PageHeader
+        title="用户管理"
+        description={
+          creatorFilter
+            ? `筛选 creator_id：${creatorFilter}`
+            : "查看用户档案，处理封禁与 strike"
+        }
+      />
+      {!creatorFilter && (
+        <div className="mb-3 max-w-xs">
+          <Input
+            placeholder="搜索邮箱 / 显示名 / creator_id…"
+            value={qInput}
+            onChange={(e) => setQInput(e.target.value)}
+          />
+        </div>
+      )}
       {error && <ErrorDisplay message={error} onRetry={reload} />}
       <DataTable
         columns={columns}

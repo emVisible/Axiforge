@@ -17,6 +17,7 @@ import {
   cloneCodex,
   emptyCodex,
   emptyVariables,
+  type AchievementDefinition,
   type Beat,
   type ChoiceOption,
   type CodexLedger,
@@ -42,6 +43,8 @@ export interface RuntimeState {
   pendingChoiceLabel: string | null;
   /** 上次选择的显式目标 Beat（ChoiceOption.to） */
   pendingChoiceTarget: string | null;
+  /** 已解锁成就 key 列表（v2 Ginkgo） */
+  unlockedAchievements: string[];
 }
 
 // ============================================================
@@ -76,6 +79,8 @@ export interface StoryView {
   choices?: ViewChoice[];
   waitMs?: number;
   isEnding: boolean;
+  /** 本帧新解锁的成就（供 Player toast） */
+  newlyUnlockedAchievements?: AchievementDefinition[];
 }
 
 // ============================================================
@@ -159,19 +164,72 @@ function resolveSpeaker(
   return null;
 }
 
+function achievementSet(state: RuntimeState): Set<string> {
+  return new Set(state.unlockedAchievements ?? []);
+}
+
+function evaluateBeatAchievements(
+  pkg: StoryPackage,
+  state: RuntimeState,
+): AchievementDefinition[] {
+  const defs = pkg.achievements ?? [];
+  if (!defs.length) return [];
+  const unlocked = achievementSet(state);
+  const completed = completedSet(state);
+  const newly: AchievementDefinition[] = [];
+  for (const def of defs) {
+    if (unlocked.has(def.key)) continue;
+    if (!def.condition) continue;
+    if (
+      evaluateCondition(
+        def.condition,
+        state.vars,
+        completed,
+        state.codex,
+        unlocked,
+      )
+    ) {
+      newly.push(def);
+    }
+  }
+  return newly;
+}
+
+function withNewAchievements(
+  view: StoryView,
+  unlocked: AchievementDefinition[],
+): StoryView {
+  if (!unlocked.length) return view;
+  return { ...view, newlyUnlockedAchievements: unlocked };
+}
+
 function buildChoices(
   state: RuntimeState,
   options: ChoiceOption[] | undefined | null,
 ): ViewChoice[] {
   const completed = completedSet(state);
+  const achievements = achievementSet(state);
   return (options ?? []).map((opt, index) => {
-    const ok = evaluateCondition(opt.condition, state.vars, completed, state.codex);
+    const okCond = evaluateCondition(
+      opt.condition,
+      state.vars,
+      completed,
+      state.codex,
+      achievements,
+    );
+    const okAch =
+      !opt.requiresAchievement || achievements.has(opt.requiresAchievement);
+    const ok = okCond && okAch;
     return {
       index,
       label: opt.label || `选项 ${index + 1}`,
       to: opt.to ?? null,
       disabled: !ok,
-      disabledReason: ok ? null : "条件未满足",
+      disabledReason: ok
+        ? null
+        : opt.requiresAchievement
+          ? "需要成就解锁"
+          : "条件未满足",
     };
   });
 }
@@ -206,8 +264,10 @@ export function resume(
     vars: cloneVariables(input.vars),
     codex: cloneCodex(input.codex ?? {}),
     completedBeats: [...input.completedBeats],
+    unlockedAchievements: [...(input.unlockedAchievements ?? [])],
   };
   const directives: Instruction[] = [];
+  let newlyUnlocked: AchievementDefinition[] = [];
 
   // 防御性上限，避免作者构造的死循环卡死渲染器
   let guard = 0;
@@ -231,6 +291,18 @@ export function resume(
       state.vars = applyEffects(state.vars, beat.effects);
       state.codex = applyCodexWrites(state.codex, beat.effects);
 
+      const unlockedNow = evaluateBeatAchievements(pkg, state);
+      if (unlockedNow.length) {
+        const keys = new Set(state.unlockedAchievements);
+        for (const a of unlockedNow) {
+          if (!keys.has(a.key)) {
+            keys.add(a.key);
+            newlyUnlocked.push(a);
+          }
+        }
+        state.unlockedAchievements = [...keys];
+      }
+
       const next = resolveNextBeat(pkg, state, beat.id);
       state.pendingChoiceLabel = null;
       state.pendingChoiceTarget = null;
@@ -239,12 +311,15 @@ export function resume(
         state.status = "ended";
         return {
           state,
-          view: {
-            beatId: beat.id,
-            directives,
-            waiting: "end",
-            isEnding: beat.isEnding ?? true,
-          },
+          view: withNewAchievements(
+            {
+              beatId: beat.id,
+              directives,
+              waiting: "end",
+              isEnding: beat.isEnding ?? true,
+            },
+            newlyUnlocked,
+          ),
         };
       }
       state.currentBeatId = next;
@@ -263,64 +338,76 @@ export function resume(
     if (inst.op === "wait") {
       return {
         state,
-        view: {
-          beatId: beat.id,
-          directives,
-          waiting: "wait",
-          waitMs: inst.ms,
-          isEnding: false,
-        },
+        view: withNewAchievements(
+          {
+            beatId: beat.id,
+            directives,
+            waiting: "wait",
+            waitMs: inst.ms,
+            isEnding: false,
+          },
+          newlyUnlocked,
+        ),
       };
     }
 
     if (inst.op === "say") {
       return {
         state,
-        view: {
-          beatId: beat.id,
-          directives,
-          waiting: "say",
-          line: {
-            characterId: inst.characterId ?? null,
-            speaker: resolveSpeaker(pkg, inst.characterId, inst.speaker),
-            text: inst.text,
-            voice: inst.voice ?? null,
-            rich: inst.rich ?? false,
+        view: withNewAchievements(
+          {
+            beatId: beat.id,
+            directives,
+            waiting: "say",
+            line: {
+              characterId: inst.characterId ?? null,
+              speaker: resolveSpeaker(pkg, inst.characterId, inst.speaker),
+              text: inst.text,
+              voice: inst.voice ?? null,
+              rich: inst.rich ?? false,
+            },
+            isEnding: false,
           },
-          isEnding: false,
-        },
+          newlyUnlocked,
+        ),
       };
     }
 
     if (inst.op === "narration") {
       return {
         state,
-        view: {
-          beatId: beat.id,
-          directives,
-          waiting: "say",
-          line: {
-            characterId: null,
-            speaker: null,
-            text: inst.text,
-            voice: inst.voice ?? null,
-            rich: inst.rich ?? false,
+        view: withNewAchievements(
+          {
+            beatId: beat.id,
+            directives,
+            waiting: "say",
+            line: {
+              characterId: null,
+              speaker: null,
+              text: inst.text,
+              voice: inst.voice ?? null,
+              rich: inst.rich ?? false,
+            },
+            isEnding: false,
           },
-          isEnding: false,
-        },
+          newlyUnlocked,
+        ),
       };
     }
 
     if (inst.op === "choice") {
       return {
         state,
-        view: {
-          beatId: beat.id,
-          directives,
-          waiting: "choice",
-          choices: buildChoices(state, inst.options),
-          isEnding: false,
-        },
+        view: withNewAchievements(
+          {
+            beatId: beat.id,
+            directives,
+            waiting: "choice",
+            choices: buildChoices(state, inst.options),
+            isEnding: false,
+          },
+          newlyUnlocked,
+        ),
       };
     }
 
@@ -361,6 +448,7 @@ export function start(
     status: "active",
     pendingChoiceLabel: null,
     pendingChoiceTarget: null,
+    unlockedAchievements: [],
   };
   return resume(pkg, state);
 }
@@ -379,6 +467,7 @@ export function restore(
   const normalized: RuntimeState = {
     ...saved,
     codex: saved.codex ? cloneCodex(saved.codex) : emptyCodex(),
+    unlockedAchievements: saved.unlockedAchievements ?? [],
   };
   if (normalized.status === "ended" || !getBeat(pkg, normalized.currentBeatId)) {
     return start(pkg, { vars: normalized.vars, codex: normalized.codex });

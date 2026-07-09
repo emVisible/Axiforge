@@ -100,7 +100,7 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
             {items.map((scene) => (
               <EntityCard
                 key={scene.id}
-                to={routes.scene(scene.id)}
+                to={routes.discoverScene(scene.id)}
                 title={scene.name}
                 description={scene.description || scene.world_setting || "暂无描述"}
                 leading={

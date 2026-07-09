@@ -292,7 +292,13 @@ export default function PreviewMonitor({
             className="absolute inset-x-0 bottom-16 z-50 flex flex-wrap justify-center gap-2 px-4"
             onClick={(e) => e.stopPropagation()}
           >
-            {choiceButtons}
+            {choiceButtons && choiceButtons.length > 0 ? (
+              choiceButtons
+            ) : (
+              <span className="rounded-lg border border-border bg-panel/90 px-3 py-1.5 text-xs text-ink-muted">
+                分支无选项 — 请在检查器中添加
+              </span>
+            )}
           </div>
         )}
 

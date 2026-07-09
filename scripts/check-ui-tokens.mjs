@@ -13,6 +13,7 @@ const SCAN_ROOTS = [
   "apps/web/src/features/studio",
   "apps/web/src/features/discover",
   "apps/web/src/features/character",
+  "apps/admin/src",
 ];
 
 const PATTERNS = [

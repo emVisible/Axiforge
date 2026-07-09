@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Node } from "reactflow";
 import type { Instruction } from "@axiforge/core";
 import type { ProjectResponse, ProjectUpdate } from "@/shared/types/project";
@@ -15,10 +15,17 @@ import type { ProjectSceneResponse, ProjectRoleResponse } from "@/shared/types/p
 import type { SimTarget } from "../components/ConditionSimulator";
 import CutStudioLayout from "./CutStudioLayout";
 import TimelineShell, { type TimelineShellHandle } from "./TimelineShell";
+import MasterTimelineBar from "./MasterTimelineBar";
 import TransportBar from "./TransportBar";
 import OutlinerPanel from "./outliner/OutlinerPanel";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
-import { clipLabel, reorderScript, totalDurationMs } from "./timelineUtils";
+import { clipLabel, patchClipDuration, reorderScriptWithinTrack, totalDurationMs, indicesOnTrack, type CutTrackId } from "./timelineUtils";
+import {
+  buildMasterTimeline,
+  locateMasterPosition,
+  masterGlobalMs,
+  nextBeatId,
+} from "./masterTimelineUtils";
 import { useCutPlayback } from "./useCutPlayback";
 import { useCutLayout } from "@/shared/components/workstation/useCutLayout";
 import { useStudioChrome } from "../layouts/StudioChromeContext";
@@ -135,6 +142,25 @@ export default function CutStudioView({
     [],
   );
 
+  const master = useMemo(() => buildMasterTimeline(nodes), [nodes]);
+  const showMasterRail = master.beats.length > 1;
+
+  const resumePlayRef = useRef(false);
+  const pendingClipRef = useRef<number | null>(null);
+  const skipBeatResetRef = useRef(false);
+
+  const handleBeatEnd = useCallback(() => {
+    if (!showMasterRail) return false;
+    const nextId = nextBeatId(master, selectedNode?.id);
+    if (!nextId) return false;
+    const node = nodes.find((n) => n.id === nextId);
+    if (!node) return false;
+    resumePlayRef.current = true;
+    skipBeatResetRef.current = true;
+    onSelectBeat(node);
+    return true;
+  }, [showMasterRail, master, selectedNode?.id, nodes, onSelectBeat]);
+
   const {
     selectedIndex,
     cursorIndex,
@@ -151,18 +177,31 @@ export default function CutStudioView({
     goToEnd,
     togglePlay,
     seekIndex,
-  } = useCutPlayback(script);
+  } = useCutPlayback(script, { onBeatEnd: handleBeatEnd });
 
   const timelineRef = useRef<TimelineShellHandle>(null);
   const beatIdRef = useRef<string | null>(null);
 
-  const handleReorder = useCallback(
-    (from: number, to: number) => {
-      const next = reorderScript(script, from, to);
+  const handleReorderTrack = useCallback(
+    (trackId: CutTrackId, fromLocal: number, toLocal: number) => {
+      const next = reorderScriptWithinTrack(script, trackId, fromLocal, toLocal);
       onScriptChange(next);
-      selectClip(to);
+      const indices = indicesOnTrack(next, trackId);
+      selectClip(indices[toLocal] ?? 0);
     },
     [script, onScriptChange, selectClip],
+  );
+
+  const handleDurationChange = useCallback(
+    (index: number, ms: number) => {
+      const inst = script[index];
+      if (!inst) return;
+      const next = script.map((s, i) =>
+        i === index ? patchClipDuration(s, ms) : s,
+      );
+      onScriptChange(next);
+    },
+    [script, onScriptChange],
   );
 
   const duplicateClip = useCallback(() => {
@@ -175,21 +214,87 @@ export default function CutStudioView({
     selectClip(selectedIndex + 1);
   }, [script, selectedIndex, onScriptChange, selectClip]);
 
+  const deleteClipAt = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= script.length) return;
+      const inst = script[index];
+      if (!inst) return;
+      const name = clipLabel(inst);
+      if (
+        !confirm(
+          `删除片段「${name}」？\n仅移除此条演出指令，不会删除整个 Beat。`,
+        )
+      ) {
+        return;
+      }
+      const next = script.filter((_, i) => i !== index);
+      onScriptChange(next);
+      if (next.length === 0) {
+        selectClip(0);
+        return;
+      }
+      selectClip(Math.min(index, next.length - 1));
+    },
+    [script, onScriptChange, selectClip],
+  );
+
   const deleteClip = useCallback(() => {
-    if (!script.length) return;
-    const next = script.filter((_, i) => i !== selectedIndex);
-    onScriptChange(next);
-    selectClip(Math.max(0, Math.min(selectedIndex, next.length - 1)));
-  }, [script, selectedIndex, onScriptChange, selectClip]);
+    deleteClipAt(selectedIndex);
+  }, [deleteClipAt, selectedIndex]);
 
   useEffect(() => {
     const beatId = selectedNode?.id ?? null;
     if (beatIdRef.current === beatId) return;
     beatIdRef.current = beatId;
     if (!beatId) return;
-    goToStart();
+
+    if (skipBeatResetRef.current) {
+      skipBeatResetRef.current = false;
+      goToStart(resumePlayRef.current);
+      resumePlayRef.current = false;
+    } else {
+      goToStart();
+    }
     requestAnimationFrame(() => timelineRef.current?.scrollToClip(0));
   }, [selectedNode?.id, goToStart]);
+
+  useEffect(() => {
+    if (pendingClipRef.current == null || !selectedNode) return;
+    const idx = pendingClipRef.current;
+    pendingClipRef.current = null;
+    selectClip(idx);
+  }, [selectedNode?.id, script, selectClip]);
+
+  const globalMs = masterGlobalMs(
+    master,
+    selectedNode?.id,
+    Math.min(cursorIndex, Math.max(0, script.length - 1)),
+  );
+
+  const scrubMaster = useCallback(
+    (ms: number) => {
+      const { beatId, localClipIndex } = locateMasterPosition(master, ms);
+      if (!beatId) return;
+      if (beatId !== selectedNode?.id) {
+        pendingClipRef.current = localClipIndex;
+        const node = nodes.find((n) => n.id === beatId);
+        if (node) onSelectBeat(node);
+        return;
+      }
+      scrubTo(localClipIndex);
+      selectClip(localClipIndex);
+    },
+    [master, selectedNode?.id, nodes, onSelectBeat, scrubTo, selectClip],
+  );
+
+  const selectMasterBeat = useCallback(
+    (beatId: string) => {
+      if (beatId === selectedNode?.id) return;
+      const node = nodes.find((n) => n.id === beatId);
+      if (node) onSelectBeat(node);
+    },
+    [selectedNode?.id, nodes, onSelectBeat],
+  );
 
   const {
     layout,
@@ -244,6 +349,14 @@ export default function CutStudioView({
         return;
       }
       if (shortcutsOpen) return;
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        script.length > 0
+      ) {
+        e.preventDefault();
+        deleteClipAt(selectedIndex);
+        return;
+      }
       if (e.key === "\\" && !e.shiftKey) {
         e.preventDefault();
         toggleOutliner();
@@ -262,7 +375,17 @@ export default function CutStudioView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggleOutliner, toggleInspector, toggleTimeline, toggleFocus, toggleShortcuts, shortcutsOpen]);
+  }, [
+    toggleOutliner,
+    toggleInspector,
+    toggleTimeline,
+    toggleFocus,
+    toggleShortcuts,
+    shortcutsOpen,
+    script.length,
+    selectedIndex,
+    deleteClipAt,
+  ]);
 
   useEffect(() => {
     if (selectedNode && activePanel !== "script" && script.length > 0) {
@@ -325,8 +448,8 @@ export default function CutStudioView({
       transport={
         <TransportBar
           isPlaying={isPlaying}
-          currentTimeMs={currentTimeMs}
-          totalTimeMs={totalDurationMs(script)}
+          currentTimeMs={showMasterRail ? globalMs : currentTimeMs}
+          totalTimeMs={showMasterRail ? master.totalMs : totalDurationMs(script)}
           clipIndex={cursorIndex}
           clipCount={script.length}
           onTogglePlay={togglePlay}
@@ -335,10 +458,22 @@ export default function CutStudioView({
           onGoToStart={goToStart}
           onGoToEnd={goToEnd}
           beatTitle={beatTitle}
+          masterBeatCount={showMasterRail ? master.beats.length : undefined}
         />
       }
       timeline={
-        <TimelineShell
+        <div className="flex h-full min-h-0 flex-col">
+          {showMasterRail && (
+            <MasterTimelineBar
+              master={master}
+              activeBeatId={selectedNode?.id ?? null}
+              globalMs={globalMs}
+              onSelectBeat={selectMasterBeat}
+              onScrubGlobal={scrubMaster}
+            />
+          )}
+          <div className="min-h-0 flex-1">
+            <TimelineShell
           ref={timelineRef}
           script={script}
           selectedIndex={selectedIndex}
@@ -352,8 +487,15 @@ export default function CutStudioView({
           onScrub={(index) => {
             scrubTo(index);
           }}
-          onReorder={handleReorder}
-        />
+          onReorderTrack={handleReorderTrack}
+          onDeleteClip={(index) => {
+            selectClip(index);
+            deleteClipAt(index);
+          }}
+          onDurationChange={handleDurationChange}
+            />
+          </div>
+        </div>
       }
       inspector={
         <div className="flex h-full min-h-0 flex-col">

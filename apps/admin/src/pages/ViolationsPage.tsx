@@ -8,6 +8,7 @@ import {
   type DataTableColumn,
 } from "@axiforge/ui";
 import { adminApi, type AdminViolation, type PaginatedResponse } from "@/api/adminClient";
+import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 
 const PAGE_SIZE = 30;
@@ -18,12 +19,12 @@ export default function ViolationsPage() {
   const [page, setPage] = useState(0);
 
   const { data, loading, error, reload } = useAdminList<PaginatedResponse<AdminViolation>>({
+    queryKey: adminQueryKeys.violations(page, creatorFilter || undefined),
     fetcher: () =>
       adminApi.violations(creatorFilter || undefined, {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       }),
-    deps: [creatorFilter, page],
   });
 
   const columns: DataTableColumn<AdminViolation>[] = [
@@ -47,7 +48,17 @@ export default function ViolationsPage() {
       key: "author",
       header: "作者",
       className: "font-mono text-xs text-ink-muted",
-      render: (v) => v.author_id || "—",
+      render: (v) =>
+        v.author_id ? (
+          <Link
+            to={`/users?creator_id=${encodeURIComponent(v.author_id)}`}
+            className="hover:text-brand"
+          >
+            {v.author_id}
+          </Link>
+        ) : (
+          "—"
+        ),
     },
     { key: "clause", header: "条款", render: (v) => v.clause },
     { key: "actor", header: "处理人", className: "text-ink-muted", render: (v) => v.actor },

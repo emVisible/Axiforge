@@ -9,8 +9,9 @@ Narrative simulation platform — character studio, script editor, lite player.
 ### 方式 A：本机 PostgreSQL
 
 ```bash
-pnpm setup    # 建库 + 建表
-pnpm dev
+pnpm setup    # 建库 + 建表（首次）
+pnpm dev      # 并行启动 API + Web + Admin + Nexus
+# 或 tmux 分 session：./dev.bash
 ```
 
 ### 方式 B：Docker 数据库
@@ -23,15 +24,25 @@ pnpm setup
 pnpm dev
 ```
 
-- Web: http://localhost:5174
-- API: http://localhost:8000
-- Health: http://localhost:8000/health
+| 服务 | 地址 |
+|------|------|
+| Web | http://localhost:5174 |
+| Admin | http://localhost:5175 |
+| Nexus | http://localhost:5274 |
+| API | http://localhost:8000 |
+| Health | http://localhost:8000/health |
+
+端口定义见 `scripts/ports.mjs`。
+
+用户文档（AXS 语法等）：开发时访问 http://localhost:5174/docs ，源码在 `docs/user/`。
 
 ## Scripts
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm dev` | 并行启动 Web + API |
+| `pnpm dev` | 并行启动 API + Web + Admin + Nexus |
+| `./dev.bash` | tmux：每个应用独立 session（`./dev.bash stop` 停止） |
+| `pnpm dev:web` / `dev:admin` / `dev:nexus` / `dev:api` | 单独启动某一服务 |
 | `pnpm build` | 构建前端 |
 | `pnpm test:api` | 运行后端集成测试 |
 | `pnpm setup` | 初始化 PostgreSQL 数据库与表 |

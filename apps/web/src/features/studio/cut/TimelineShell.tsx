@@ -7,11 +7,12 @@ import {
   useState,
 } from "react";
 import type { Instruction } from "@axiforge/core";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, X } from "lucide-react";
 import { cn } from "@/shared/components/ui";
 import {
   CUT_TRACKS,
   TIMELINE_PAD,
+  canResizeClipDuration,
   clipColor,
   clipDurationMs,
   clipLabel,
@@ -20,10 +21,13 @@ import {
   clipWidth,
   formatNarrativeTime,
   indexAtPixel,
+  msFromClipWidth,
   totalDurationMs,
   totalTimelineWidth,
   trackForOp,
   type CutTrackId,
+  indicesOnTrack,
+  localIndexAtPixel,
 } from "./timelineUtils";
 
 export type TimelineShellHandle = {
@@ -39,6 +43,13 @@ interface TimelineShellProps {
   onSelectClip: (index: number) => void;
   onScrub: (index: number) => void;
   onReorder?: (from: number, to: number) => void;
+  onReorderTrack?: (
+    trackId: CutTrackId,
+    fromLocal: number,
+    toLocal: number,
+  ) => void;
+  onDeleteClip?: (index: number) => void;
+  onDurationChange?: (index: number, ms: number) => void;
 }
 
 const TRACK_H = 36;
@@ -56,6 +67,9 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       onSelectClip,
       onScrub,
       onReorder,
+      onReorderTrack,
+      onDeleteClip,
+      onDurationChange,
     },
     ref,
   ) {
@@ -72,13 +86,20 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         ? Math.max(0, Math.min(selectedIndex, script.length - 1))
         : 0;
 
-    const [dragFrom, setDragFrom] = useState<number | null>(null);
-    const [dropIndex, setDropIndex] = useState<number | null>(null);
-    const dragFromRef = useRef<number | null>(null);
-    const dropIndexRef = useRef<number | null>(null);
+    const [dragFrom, setDragFrom] = useState<{
+      trackId: CutTrackId;
+      localIndex: number;
+      globalIndex: number;
+    } | null>(null);
+    const [dropTarget, setDropTarget] = useState<{
+      trackId: CutTrackId;
+      localIndex: number;
+    } | null>(null);
+    const dragFromRef = useRef<typeof dragFrom>(null);
+    const dropTargetRef = useRef<typeof dropTarget>(null);
 
     dragFromRef.current = dragFrom;
-    dropIndexRef.current = dropIndex;
+    dropTargetRef.current = dropTarget;
 
     const scrollToClip = useCallback(
       (index: number) => {
@@ -97,26 +118,39 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
 
     const finishDrag = useCallback(() => {
       const from = dragFromRef.current;
-      const to = dropIndexRef.current ?? from;
+      const to = dropTargetRef.current;
       setDragFrom(null);
-      setDropIndex(null);
-      if (from != null && to != null && from !== to && onReorder) {
-        onReorder(from, to);
+      setDropTarget(null);
+      if (!from || !to || from.trackId !== to.trackId) return;
+      if (from.localIndex === to.localIndex) return;
+      if (onReorderTrack) {
+        onReorderTrack(from.trackId, from.localIndex, to.localIndex);
+        return;
       }
-    }, [onReorder]);
+      if (onReorder) {
+        const indices = indicesOnTrack(script, from.trackId);
+        const fromGlobal = indices[from.localIndex];
+        const toGlobal = indices[to.localIndex];
+        if (fromGlobal != null && toGlobal != null) {
+          onReorder(fromGlobal, toGlobal);
+        }
+      }
+    }, [onReorder, onReorderTrack, script]);
 
     useEffect(() => {
       if (dragFrom == null) return;
 
       const onMove = (e: PointerEvent) => {
         const el = scrollRef.current;
-        if (!el || !script.length) return;
+        if (!el || !script.length || !dragFrom) return;
         const rect = el.getBoundingClientRect();
         const x = e.clientX - rect.left + el.scrollLeft - TIMELINE_PAD;
-        const idx = indexAtPixel(script, x, zoom);
-        dropIndexRef.current = idx;
-        setDropIndex(idx);
-        onScrub(idx);
+        const local = localIndexAtPixel(script, dragFrom.trackId, x, zoom);
+        const target = { trackId: dragFrom.trackId, localIndex: local };
+        dropTargetRef.current = target;
+        setDropTarget(target);
+        const globalIdx = indicesOnTrack(script, dragFrom.trackId)[local];
+        if (globalIdx != null) onScrub(globalIdx);
       };
 
       const onUp = () => finishDrag();
@@ -137,10 +171,19 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         : TIMELINE_PAD;
 
     const dropMarkerLeft =
-      dropIndex != null && script[dropIndex]
-        ? TIMELINE_PAD +
-          positions[dropIndex] +
-          clipWidth(script[dropIndex], zoom) / 2
+      dropTarget != null &&
+      dragFrom != null &&
+      dropTarget.trackId === dragFrom.trackId
+        ? (() => {
+            const indices = indicesOnTrack(script, dropTarget.trackId);
+            const globalIdx = indices[dropTarget.localIndex];
+            if (globalIdx == null) return null;
+            return (
+              TIMELINE_PAD +
+              (positions[globalIdx] ?? 0) +
+              clipWidth(script[globalIdx], zoom) / 2
+            );
+          })()
         : null;
 
     const handleTrackClick = useCallback(
@@ -199,9 +242,14 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         <div className="flex h-8 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-3">
           <span className="text-[11px] font-medium tracking-wide text-ink-muted">
             指令轨 · 当前 Beat
-            {onReorder && (
+            {onReorderTrack && (
               <span className="ml-2 text-[9px] font-normal text-ink-faint">
-                拖拽片段排序
+                分轨内拖拽排序 · 右缘拖拽改时长
+              </span>
+            )}
+            {!onReorderTrack && onReorder && (
+              <span className="ml-2 text-[9px] font-normal text-ink-faint">
+                拖拽片段排序 · 右缘拖拽改时长
               </span>
             )}
           </span>
@@ -296,10 +344,24 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                       positions={positions}
                       zoom={zoom}
                       selectedIndex={safeSelected}
-                      dragFrom={dragFrom}
+                      dragFrom={
+                        dragFrom?.trackId === track.id ? dragFrom.localIndex : null
+                      }
                       clipIndices={track.clips.map((c) => c.i)}
                       onSelectClip={onSelectClip}
-                      onDragStart={onReorder ? setDragFrom : undefined}
+                      onDragStartLocal={
+                        onReorderTrack || onReorder
+                          ? (localIndex, globalIndex) =>
+                              setDragFrom({
+                                trackId: track.id,
+                                localIndex,
+                                globalIndex,
+                              })
+                          : undefined
+                      }
+                      onDeleteClip={onDeleteClip}
+                      onDurationChange={onDurationChange}
+                      zoomLevel={zoom}
                     />
                   ))}
 
@@ -333,62 +395,139 @@ function TrackRow({
   script,
   positions,
   zoom,
+  zoomLevel,
   selectedIndex,
   dragFrom,
   clipIndices,
   onSelectClip,
-  onDragStart,
+  onDragStartLocal,
+  onDeleteClip,
+  onDurationChange,
 }: {
   trackId: CutTrackId;
   script: Instruction[];
   positions: number[];
   zoom: number;
+  zoomLevel: number;
   selectedIndex: number;
   dragFrom: number | null;
   clipIndices: number[];
   onSelectClip: (index: number) => void;
-  onDragStart?: (index: number) => void;
+  onDragStartLocal?: (localIndex: number, globalIndex: number) => void;
+  onDeleteClip?: (index: number) => void;
+  onDurationChange?: (index: number, ms: number) => void;
 }) {
-  const indexSet = new Set(clipIndices);
+  const localIndexByGlobal = new Map(
+    clipIndices.map((globalIdx, localIdx) => [globalIdx, localIdx]),
+  );
+  const [resizeFrom, setResizeFrom] = useState<{
+    index: number;
+    startX: number;
+    startW: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!resizeFrom || !onDurationChange) return;
+    const inst = script[resizeFrom.index];
+    if (!inst || !canResizeClipDuration(inst)) return;
+
+    const onMove = (e: PointerEvent) => {
+      const delta = e.clientX - resizeFrom.startX;
+      const nextW = Math.max(32, resizeFrom.startW + delta);
+      const ms = msFromClipWidth(inst, nextW, zoomLevel);
+      onDurationChange(resizeFrom.index, ms);
+    };
+    const onUp = () => setResizeFrom(null);
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [resizeFrom, script, zoomLevel, onDurationChange]);
 
   return (
     <div
       className="relative border-b border-border"
       style={{ height: TRACK_H }}
     >
-      {script.map((inst, i) => {
-        if (!indexSet.has(i)) return null;
+      {clipIndices.map((globalIdx) => {
+        const inst = script[globalIdx];
+        if (!inst) return null;
+        const localIdx = localIndexByGlobal.get(globalIdx) ?? 0;
         const w = clipWidth(inst, zoom);
-        const active = i === selectedIndex;
-        const dragging = dragFrom === i;
+        const active = globalIdx === selectedIndex;
+        const dragging = dragFrom === localIdx;
         return (
-          <button
-            key={`${trackId}-${i}`}
-            type="button"
-            onPointerDown={(e) => {
-              if (!onDragStart || e.button !== 0) return;
-              e.stopPropagation();
-              onDragStart(i);
-              onSelectClip(i);
+          <div
+            key={`${trackId}-${globalIdx}`}
+            style={{
+              left: TIMELINE_PAD + positions[globalIdx],
+              width: w,
+              height: TRACK_H - 6,
             }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (dragFrom != null) return;
-              onSelectClip(i);
-            }}
-            style={{ left: TIMELINE_PAD + positions[i], width: w, height: TRACK_H - 6 }}
             className={cn(
-              "absolute top-[3px] cursor-grab overflow-hidden rounded-sm border px-1.5 text-left transition-shadow active:cursor-grabbing",
-              clipColor(inst),
-              active && "z-10 ring-2 ring-accent-soft ring-offset-1 ring-offset-panel",
-              dragging && "z-20 opacity-60",
+              "absolute top-[3px]",
+              active && "z-10",
+              dragging && "z-20",
             )}
-            title={clipLabel(inst)}
           >
-            <span className="block truncate text-[9px] font-medium leading-tight opacity-90">
-              {clipLabel(inst)}
-            </span>
-          </button>
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                if (!onDragStartLocal || e.button !== 0) return;
+                e.stopPropagation();
+                onDragStartLocal(localIdx, globalIdx);
+                onSelectClip(globalIdx);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (dragFrom != null) return;
+                onSelectClip(globalIdx);
+              }}
+              style={{ width: w, height: TRACK_H - 6 }}
+              className={cn(
+                "cursor-grab overflow-hidden rounded-sm border px-1.5 text-left transition-shadow active:cursor-grabbing",
+                clipColor(inst),
+                active && "ring-2 ring-accent-soft ring-offset-1 ring-offset-panel",
+                dragging && "opacity-60",
+              )}
+              title={clipLabel(inst)}
+            >
+              <span className="block truncate text-[9px] font-medium leading-tight opacity-90">
+                {clipLabel(inst)}
+              </span>
+            </button>
+            {active && onDeleteClip && (
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteClip(globalIdx);
+                }}
+                className="absolute right-0.5 top-0.5 z-20 flex h-4 w-4 items-center justify-center rounded bg-black/50 text-ink hover:bg-danger hover:text-ink"
+                title="删除此片段"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+            {active && onDurationChange && canResizeClipDuration(inst) && (
+              <div
+                role="separator"
+                aria-label="调整片段时长"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setResizeFrom({ index: globalIdx, startX: e.clientX, startW: w });
+                }}
+                className="absolute bottom-0 right-0 top-0 z-30 w-2 cursor-ew-resize rounded-r-sm bg-accent-soft/40 hover:bg-accent-soft/70"
+                title="拖拽调整时长"
+              />
+            )}
+          </div>
         );
       })}
     </div>

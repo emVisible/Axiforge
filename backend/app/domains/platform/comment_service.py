@@ -12,6 +12,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.content_validate import validate_comment_body
+from app.domains.narrative.models import Project
 from app.domains.platform.comment_schemas import (
     CommentCreate,
     CommentListResponse,
@@ -114,6 +115,19 @@ class CommentService:
         return CommentListResponse(items=items, total=total)
 
     async def create(self, data: CommentCreate) -> CommentResponse:
+        if data.content_type == "project":
+            try:
+                project_uuid = UUID(data.content_id)
+            except ValueError:
+                project_uuid = None
+            if project_uuid is not None:
+                project = (
+                    await self.db.execute(
+                        select(Project).where(Project.id == project_uuid)
+                    )
+                ).scalar_one_or_none()
+                if project and project.allow_comments is False:
+                    raise ValueError("该作品已关闭评论")
         _check_rate_limit(data.author_id)
         errors = validate_comment_body(data.body)
         if errors:

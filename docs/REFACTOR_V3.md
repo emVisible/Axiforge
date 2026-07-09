@@ -147,14 +147,14 @@ Player 与角色创作路径仍使用散落色值、重复页面壳，且 `HallP
 | E 品牌图标 | 无文字 AppIcon + favicon | ✅ |
 | F Discover 氛围 | 背景纹理 + Hero + 统计条 + 空状态引导 | ✅ |
 
-详见 [REFACTOR_V4.md](./REFACTOR_V4.md)（v4 进行中）。
+详见 [REFACTOR_V4.md](./REFACTOR_V4.md)（v4 已完成）。v2 执行基准见 [AXIFORGE_V2.md](./AXIFORGE_V2.md)。
 
 | 阶段 | 核心验收 | 状态 |
 |------|----------|------|
-| L LLM 层 | Xinference/Ollama/Rules fallback + `/editor/ai` 迁移 | 🚧 |
-| A 创作者面板 | `/creator/dashboard` + Studio 概览页 | 🚧 |
-| C 评论 | 楼中楼 + 最新/最热 + Discover 详情讨论区 | 🚧 |
-| I 整合 | LLM 状态 UI + E2E + 文档勾选 | 🚧 |
+| L LLM 层 | Xinference/Ollama/Rules fallback + `/editor/ai` 迁移 | ✅ |
+| A 创作者面板 | `/creator/dashboard` + Studio 概览页 | ✅ |
+| C 评论 | 楼中楼 + 最新/最热 + Discover 详情讨论区 | ✅ |
+| I 整合 | LLM 状态 UI + E2E + 文档勾选 | ✅ |
 
 ## v5 / Cut Studio（ADR-022）
 

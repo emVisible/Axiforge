@@ -7,6 +7,7 @@ import type { Character } from "@/shared/types/character";
 interface CharacterCardProps {
   character: Character;
   showStatus?: boolean;
+  detailTo?: string;
 }
 
 function formatViews(n: number): string {
@@ -18,13 +19,14 @@ function formatViews(n: number): string {
 export default function CharacterCard({
   character,
   showStatus = false,
+  detailTo,
 }: CharacterCardProps) {
   const { anchor, demeanor, contour } = character.character_data;
   const displayName = character.name || anchor?.name || "未命名角色";
   const t = useCardTheme();
 
   return (
-    <CardLink to={routes.characters.detail(character.id)} className="relative">
+    <CardLink to={detailTo ?? routes.characters.detail(character.id)} className="relative">
       {showStatus && (
         <span className="absolute right-4 top-4">
           <Badge

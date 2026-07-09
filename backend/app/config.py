@@ -17,8 +17,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = [
         "http://localhost:5174",
         "http://localhost:5175",
+        "http://localhost:5274",
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",
+        "http://127.0.0.1:5274",
     ]
     # LLM（ADR-020）
     llm_provider: str = "auto"  # auto | xinference | ollama | rules

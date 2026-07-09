@@ -88,6 +88,8 @@ export interface ProjectUpdate {
   axs_source?: string;
   is_public?: boolean;
   is_meta?: boolean;
+  allow_comments?: boolean;
+  topic_slug?: string | null;
 }
 
 export interface ProjectResponse {
@@ -108,6 +110,8 @@ export interface ProjectResponse {
   play_count?: number;
   author_id: string;
   fork_from?: string | null;
+  allow_comments?: boolean;
+  topic_slug?: string | null;
   scenes: ProjectSceneResponse[];
   roles: ProjectRoleResponse[];
   asset_refs: ProjectAssetRefResponse[];

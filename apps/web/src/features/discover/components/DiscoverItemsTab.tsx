@@ -123,7 +123,7 @@ export default function DiscoverItemsTab({ search }: DiscoverItemsTabProps) {
             {items.map((item) => (
               <EntityCard
                 key={item.id}
-                to={routes.item(item.id)}
+                to={routes.discoverItem(item.id)}
                 title={item.name}
                 description={item.description || "暂无描述"}
                 leading={

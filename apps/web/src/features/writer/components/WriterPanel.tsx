@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { parseAxs } from "@axiforge/axs";
 import { Button } from "@/shared/components/ui";
+import { routes } from "@/shared/lib/routes";
 import AxsCodeEditor from "./AxsCodeEditor";
 
 interface WriterPanelProps {
@@ -97,6 +99,14 @@ export default function WriterPanel({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            to={routes.doc("writing/axs-syntax")}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg px-2 py-1 text-xs text-brand hover:bg-canvas hover:underline"
+          >
+            AXS 语法
+          </Link>
           <Button size="sm" variant="ghost" onClick={() => insertSnippet("# 新桥段\n旁白：")}>
             + Beat
           </Button>

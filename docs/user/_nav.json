@@ -1,0 +1,12 @@
+[
+  {
+    "section": "写作",
+    "items": [
+      {
+        "slug": "writing/axs-syntax",
+        "title": "AXS 语法参考",
+        "order": 1
+      }
+    ]
+  }
+]

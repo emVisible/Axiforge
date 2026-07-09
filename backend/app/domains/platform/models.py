@@ -27,6 +27,7 @@ class UserAccount(Base):
     email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True, index=True)
     display_name: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     avatar_emoji: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    creator_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
     is_banned: Mapped[bool] = mapped_column(default=False)
     strike_count: Mapped[int] = mapped_column(default=0)

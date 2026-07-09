@@ -114,6 +114,43 @@ async def test_list_saves_multi_slot(client: AsyncClient):
     assert slots == {0, 1, 2}
     thumb = next(s for s in body if s["slot"] == 1)
     assert thumb["thumb_path"] == "/uploads/thumb1.png"
+
+
+@pytest.mark.asyncio
+async def test_save_thumb_resolved_server_side(client: AsyncClient):
+    """未传 thumb_path 时由服务端根据 Beat 演出脚本推导。"""
+    proj_id = await _create_project(client)
+    scene = await client.post(
+        f"/api/v1/editor/projects/{proj_id}/scenes",
+        json={"title": "雨夜", "description": ""},
+    )
+    scene.raise_for_status()
+    scene_body = scene.json()
+    scene_id = scene_body["id"]
+    beat_id = scene_body["nodes"][0]["id"]
+
+    upd = await client.put(
+        f"/api/v1/editor/projects/{proj_id}/scenes/{scene_id}/nodes/{beat_id}",
+        json={
+            "narrative_data": {
+                "title": "开场",
+                "script": [{"op": "bg", "image": "/uploads/scenes/rain-night.png"}],
+            }
+        },
+    )
+    upd.raise_for_status()
+
+    put = await client.put(
+        f"/api/v1/play/save/{proj_id}",
+        json={
+            "player_token": "player-thumb-server",
+            "state": _sample_state(3),
+            "beat_id": beat_id,
+        },
+    )
+    put.raise_for_status()
+    assert put.json()["thumb_path"] == "/uploads/scenes/rain-night.png"
+
     resp = await client.put(
         "/api/v1/play/save/00000000-0000-0000-0000-000000000000",
         json={"player_token": "t", "state": _sample_state(1)},

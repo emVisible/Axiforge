@@ -48,7 +48,8 @@ import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
 import { exportProjectMarkdown } from "../lib/exportProjectMarkdown";
 import StudioModeFallback from "../components/StudioModeFallback";
 import { routes } from "@/shared/lib/routes";
-import { Play } from "lucide-react";
+import { Play, Star } from "lucide-react";
+import AchievementPanel from "../components/AchievementPanel";
 import {
   axsToSyncPayload,
   beatLineForNode,
@@ -58,6 +59,7 @@ import {
   projectToAxs,
   projectAxsFromCanvas,
 } from "@/features/writer/lib/projection";
+import { sanitizeScript } from "@/features/studio/cut/timelineUtils";
 
 const LazyFlowStudioView = lazy(() => import("../flow/FlowStudioView"));
 const LazyWriterStudioView = lazy(
@@ -119,6 +121,7 @@ export default function ProjectFlowPage() {
   const [script, setScript] = useState<Instruction[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("cut");
+  const [showAchievements, setShowAchievements] = useState(false);
   const [axsSource, setAxsSource] = useState("");
   const [axsDirty, setAxsDirty] = useState(false);
   const [allProjectNodes, setAllProjectNodes] = useState<ProjectNodeResponse[]>([]);
@@ -672,7 +675,8 @@ export default function ProjectFlowPage() {
 
   const updateScript = useCallback(
     (newS: Instruction[]) => {
-      setScript(newS);
+      const cleaned = sanitizeScript(newS);
+      setScript(cleaned);
       if (!selectedNode) return;
       setNodes((nds) =>
         nds.map((n) =>
@@ -681,8 +685,8 @@ export default function ProjectFlowPage() {
                 ...n,
                 data: {
                   ...n.data,
-                  script: newS,
-                  has_script: newS.length > 0,
+                  script: cleaned,
+                  has_script: cleaned.length > 0,
                 },
               }
             : n,
@@ -751,7 +755,15 @@ export default function ProjectFlowPage() {
   }, [editorMode, nodes, selectedNode, selectFlowNode]);
 
   const deleteSelectedNode = () => {
-    if (!selectedNode || !confirm("删除此节点？")) return;
+    if (!selectedNode) return;
+    const title = (selectedNode.data.title as string) || "未命名";
+    if (
+      !confirm(
+        `删除整个 Beat「${title}」？\n其演出脚本、条件与效果将一并移除（不是只删一条指令）。`,
+      )
+    ) {
+      return;
+    }
     setNodes((nds) => {
       const n = nds.filter((x) => x.id !== selectedNode.id);
       pushHistory(n, edges);
@@ -810,6 +822,8 @@ export default function ProjectFlowPage() {
         target.tagName === "SELECT" ||
         target.isContentEditable;
       if (!typing && (e.key === "Delete" || e.key === "Backspace")) {
+        // 剪辑台由 CutStudioView 删除当前片段，避免误删整个 Beat
+        if (editorMode === "cut") return;
         if (selectedEdge) {
           e.preventDefault();
           handleDeleteEdge(selectedEdge.id);
@@ -821,7 +835,7 @@ export default function ProjectFlowPage() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [undo, selectedNode, selectedEdge, nodes, edges, setNodes]);
+  }, [undo, selectedNode, selectedEdge, nodes, edges, setNodes, editorMode]);
 
   const saveWriter = async () => {
     if (!id || !project) return;
@@ -1253,6 +1267,16 @@ export default function ProjectFlowPage() {
             )}
             {id && (
               <Button
+                variant="ghost"
+                size="toolbar"
+                icon={<Star className="h-3.5 w-3.5" />}
+                onClick={() => setShowAchievements(true)}
+              >
+                成就
+              </Button>
+            )}
+            {id && (
+              <Button
                 as="link"
                 to={routes.play(id)}
                 variant="secondary"
@@ -1456,6 +1480,26 @@ export default function ProjectFlowPage() {
           onToggleStageFilter={handleToggleStageFilter}
         />
         </Suspense>
+        </div>
+      )}
+
+      {showAchievements && id && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowAchievements(false)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-panel shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-ink">项目成就</h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowAchievements(false)}>
+                关闭
+              </Button>
+            </div>
+            <AchievementPanel projectId={id} />
+          </div>
         </div>
       )}
     </CanvasWorkspace>

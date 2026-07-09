@@ -2,6 +2,7 @@
 from typing import List, Optional
 
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.platform.models import UserAccount
@@ -32,20 +33,13 @@ class UserService:
     async def get_or_create_session(
         self, data: UserSessionRequest
     ) -> UserProfileResponse:
-        row = (
+        by_creator = (
             await self.db.execute(
                 select(UserAccount).where(
                     UserAccount.creator_id == data.creator_id,
                 )
             )
         ).scalar_one_or_none()
-
-        if row:
-            if row.player_token != data.player_token:
-                row.player_token = data.player_token
-                await self.db.commit()
-                await self.db.refresh(row)
-            return self._to_response(row)
 
         by_player = (
             await self.db.execute(
@@ -54,7 +48,46 @@ class UserService:
                 )
             )
         ).scalar_one_or_none()
+
+        # 本地 creator_id / player_token 曾分属两行时合并，避免 unique 冲突 → 500
+        if by_creator and by_player and by_creator.id != by_player.id:
+            await self.db.delete(by_player)
+            await self.db.flush()
+            by_creator.player_token = data.player_token
+            await self.db.commit()
+            await self.db.refresh(by_creator)
+            return self._to_response(by_creator)
+
+        if by_creator:
+            if by_creator.player_token != data.player_token:
+                conflict = (
+                    await self.db.execute(
+                        select(UserAccount).where(
+                            UserAccount.player_token == data.player_token,
+                            UserAccount.id != by_creator.id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if conflict:
+                    await self.db.delete(conflict)
+                    await self.db.flush()
+                by_creator.player_token = data.player_token
+                await self.db.commit()
+                await self.db.refresh(by_creator)
+            return self._to_response(by_creator)
+
         if by_player:
+            conflict = (
+                await self.db.execute(
+                    select(UserAccount).where(
+                        UserAccount.creator_id == data.creator_id,
+                        UserAccount.id != by_player.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if conflict:
+                await self.db.delete(conflict)
+                await self.db.flush()
             by_player.creator_id = data.creator_id
             await self.db.commit()
             await self.db.refresh(by_player)
@@ -65,8 +98,24 @@ class UserService:
             player_token=data.player_token,
         )
         self.db.add(row)
-        await self.db.commit()
-        await self.db.refresh(row)
+        try:
+            await self.db.commit()
+            await self.db.refresh(row)
+        except IntegrityError:
+            await self.db.rollback()
+            existing = (
+                await self.db.execute(
+                    select(UserAccount).where(
+                        or_(
+                            UserAccount.creator_id == data.creator_id,
+                            UserAccount.player_token == data.player_token,
+                        )
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing:
+                return self._to_response(existing)
+            raise
         return self._to_response(row)
 
     async def update_profile(self, data: UserProfileUpdate) -> UserProfileResponse:

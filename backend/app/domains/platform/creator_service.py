@@ -17,7 +17,7 @@ from app.domains.platform.creator_schemas import (
     PublicPrivateRatio,
     TrendPoint,
 )
-from app.domains.platform.models import ContentReport, PlatformEvent
+from app.domains.platform.models import ContentReport, PlatformEvent, Comment
 
 
 class CreatorDashboardService:
@@ -46,6 +46,8 @@ class CreatorDashboardService:
         forks_7d = await self._event_count_7d(
             "project_fork", project_ids, since
         )
+        comments_7d = await self._comment_count_7d(project_ids, since)
+        total_comments = await self._total_comments(project_ids)
         pending_reports = await self._pending_reports(
             project_ids, character_ids, item_ids, scene_ids
         )
@@ -58,6 +60,8 @@ class CreatorDashboardService:
             views_7d=views_7d,
             plays_7d=plays_7d,
             forks_7d=forks_7d,
+            comments_7d=comments_7d,
+            total_comments=total_comments,
             pending_reports=pending_reports,
             trend=trend,
         )
@@ -199,6 +203,39 @@ class CreatorDashboardService:
                     PlatformEvent.event_type == event_type,
                     PlatformEvent.subject_id.in_(subject_ids),
                     PlatformEvent.created_at >= since,
+                )
+            )
+        ).scalar_one()
+
+    async def _comment_count_7d(
+        self, project_ids: List[str], since: datetime
+    ) -> int:
+        if not project_ids:
+            return 0
+        return (
+            await self.db.execute(
+                select(func.count())
+                .select_from(Comment)
+                .where(
+                    Comment.content_type == "project",
+                    Comment.content_id.in_(project_ids),
+                    Comment.created_at >= since,
+                    Comment.status == "visible",
+                )
+            )
+        ).scalar_one()
+
+    async def _total_comments(self, project_ids: List[str]) -> int:
+        if not project_ids:
+            return 0
+        return (
+            await self.db.execute(
+                select(func.count())
+                .select_from(Comment)
+                .where(
+                    Comment.content_type == "project",
+                    Comment.content_id.in_(project_ids),
+                    Comment.status == "visible",
                 )
             )
         ).scalar_one()

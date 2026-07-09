@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import {
   Card,
   ErrorDisplay,
@@ -7,6 +8,7 @@ import {
   StatCardGrid,
 } from "@axiforge/ui";
 import { adminApi, type DashboardStats } from "@/api/adminClient";
+import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 
 function formatBytes(bytes: number): string {
@@ -16,8 +18,31 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+function StatLink({
+  to,
+  label,
+  value,
+  highlight,
+}: {
+  to: string;
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  return (
+    <Link to={to} className="block transition-opacity hover:opacity-90">
+      <StatCard
+        label={label}
+        value={value}
+        className={highlight && value > 0 ? "ring-2 ring-rose-500/30" : undefined}
+      />
+    </Link>
+  );
+}
+
 export default function DashboardPage() {
   const { data: stats, loading, error, reload } = useAdminList<DashboardStats>({
+    queryKey: adminQueryKeys.stats,
     fetcher: () => adminApi.stats(),
   });
 
@@ -29,19 +54,35 @@ export default function DashboardPage() {
       {stats && (
         <div className="space-y-8">
           <StatCardGrid>
-            <StatCard label="待审举报" value={stats.pending_reports} />
-            <StatCard label="用户总数" value={stats.total_users} />
-            <StatCard label="作品总数" value={stats.total_projects} />
+            <StatLink
+              to="/reports"
+              label="待审举报"
+              value={stats.pending_reports}
+              highlight
+            />
+            <StatLink to="/users" label="用户总数" value={stats.total_users} />
+            <StatLink to="/content" label="作品总数" value={stats.total_projects} />
             <StatCard label="公开作品" value={stats.public_projects} />
             <StatCard label="公开角色" value={stats.public_characters} />
             <StatCard label="7日播放" value={stats.story_plays_7d} />
             <StatCard label="7日 Fork" value={stats.project_forks_7d} />
-            <StatCard label="7日违规" value={stats.violations_7d} />
+            <StatLink to="/violations" label="7日违规" value={stats.violations_7d} />
             <StatCard label="已下架作品" value={stats.taken_down_projects} />
             <StatCard label="封禁用户" value={stats.banned_users} />
             <StatCard label="上传文件" value={stats.upload_files} />
             <StatCard label="存储用量" value={formatBytes(stats.upload_bytes)} />
           </StatCardGrid>
+
+          {stats.pending_reports > 0 && (
+            <Card className="border-rose-500/20 bg-rose-500/5" padding="md">
+              <p className="text-sm text-ink">
+                有 <strong>{stats.pending_reports}</strong> 条举报待处理。
+                <Link to="/reports" className="ml-2 text-brand hover:underline">
+                  前往审核工作台 →
+                </Link>
+              </p>
+            </Card>
+          )}
 
           <section>
             <h2 className="text-sm font-semibold text-ink">创作漏斗</h2>
@@ -57,7 +98,7 @@ export default function DashboardPage() {
                 return (
                   <div key={step.label} className="flex items-center gap-3">
                     <span className="w-24 shrink-0 text-xs text-ink-muted">{step.label}</span>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-canvas">
                       <div
                         className="h-full rounded-full bg-brand/70"
                         style={{ width: `${Math.max(4, (step.value / max) * 100)}%` }}

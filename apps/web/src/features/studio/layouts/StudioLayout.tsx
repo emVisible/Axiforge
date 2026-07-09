@@ -29,6 +29,7 @@ function StudioLayoutInner() {
         variant="auto"
         zone="Studio"
         showDiscoverLink
+        showDocsLink
         showSearch
         showVersion
         dense={isImmersiveWorkspace}

@@ -25,7 +25,7 @@ function parseValue(raw: string): unknown {
 }
 
 function buildVars(list: FakeVar[]): RuntimeVariables {
-  const vars: RuntimeVariables = { memory: {}, flags: {}, characters: {} };
+  const vars: RuntimeVariables = { memory: {}, flags: {}, characters: {}, relationships: {} };
   for (const v of list) {
     if (!v.key) continue;
     const val = parseValue(v.value);

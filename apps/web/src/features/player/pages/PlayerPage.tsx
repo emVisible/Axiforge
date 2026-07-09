@@ -25,10 +25,11 @@ import {
   type RuntimeState,
   type StoryView,
 } from "@axiforge/core";
+import { ginkgoApi } from "@/shared/api/ginkgo";
 import { playerApi, type SaveSlotResponse, stateForSave } from "@/shared/api/player";
+import { getPlayerToken } from "@/shared/lib/playerToken";
 import { projectApi } from "@/shared/api/editor";
 import type { CodexLedger } from "@axiforge/core";
-import { getPlayerToken } from "@/shared/lib/playerToken";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import {
   loadPlayerSettings,
@@ -143,6 +144,10 @@ export default function PlayerPage() {
   const [unlocks, setUnlocks] = useState<PlayerUnlocks>(() =>
     projectId ? loadUnlocks(projectId) : { cgs: [], bgms: [] },
   );
+  const [achievementToast, setAchievementToast] = useState<{
+    title: string;
+    description?: string;
+  } | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [galleryTab, setGalleryTab] = useState<"cg" | "music">("cg");
   const [saveSlots, setSaveSlots] = useState<SaveSlotResponse[]>([]);
@@ -279,6 +284,21 @@ export default function PlayerPage() {
     [projectId],
   );
 
+  const showAchievementUnlocks = useCallback((v: StoryView, pid: string) => {
+    const list = v.newlyUnlockedAchievements;
+    if (!list?.length) return;
+    const first = list[0];
+    setAchievementToast({
+      title: first.title,
+      description: first.description,
+    });
+    const token = getPlayerToken();
+    for (const a of list) {
+      ginkgoApi.unlock(pid, token, a.key).catch(() => {});
+    }
+    window.setTimeout(() => setAchievementToast(null), 4000);
+  }, []);
+
   // 应用一帧：折叠演出指令进舞台 + 触发音频
   const applyView = useCallback(
     (v: StoryView) => {
@@ -288,8 +308,9 @@ export default function PlayerPage() {
       syncBgm(next.bgm);
       playOneShotsFromDirectives(v);
       setView(v);
+      if (projectId) showAchievementUnlocks(v, projectId);
     },
-    [syncBgm, playOneShotsFromDirectives, trackUnlocks],
+    [syncBgm, playOneShotsFromDirectives, trackUnlocks, projectId, showAchievementUnlocks],
   );
 
   const codexSyncRef = useRef<string>("{}");
@@ -726,6 +747,7 @@ export default function PlayerPage() {
   const isDialogue = !!line && !!line.speaker;
   const showChoices = view?.waiting === "choice";
   const isEnd = view?.waiting === "end";
+  const isWaiting = view?.waiting === "wait";
 
   const speakerId = line?.characterId ?? null;
   const speakerExpression = speakerId ? stage.sprites[speakerId]?.expression : undefined;
@@ -820,7 +842,7 @@ export default function PlayerPage() {
   }
 
   // 空剧本
-  if (!view || (!line && !showChoices && !isEnd)) {
+  if (!view || (!line && !showChoices && !isEnd && !isWaiting)) {
     return (
       <div className={`${playerScreenClass} flex items-center justify-center`}>
         <div className="text-center space-y-6">
@@ -1306,19 +1328,35 @@ export default function PlayerPage() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="space-y-2">
-            {view.choices!.map((choice) => (
-              <button
-                key={choice.index}
-                onClick={() => doChoose(choice.index)}
-                disabled={choice.disabled}
-                className={`w-full text-left px-5 py-3.5 rounded-xl border transition-all duration-300 ${choice.disabled ? "bg-white/[0.02] border-white/5 text-white/10 cursor-not-allowed" : "bg-white/[0.03] border-white/5 text-white/60 hover:bg-white/[0.06] hover:border-white/10 hover:text-white/80"}`}
-              >
-                <span className="text-white/15 text-xs font-mono mr-3">
-                  {choice.index + 1}.
-                </span>
-                <span className="text-sm">{choice.label}</span>
-              </button>
-            ))}
+            {(view.choices ?? []).length === 0 ? (
+              <p className="text-center text-sm text-white/40">分支无选项</p>
+            ) : (
+              view.choices!.map((choice) => (
+                <button
+                  key={choice.index}
+                  onClick={() => doChoose(choice.index)}
+                  disabled={choice.disabled}
+                  className={`w-full text-left px-5 py-3.5 rounded-xl border transition-all duration-300 ${choice.disabled ? "bg-white/[0.02] border-white/5 text-white/10 cursor-not-allowed" : "bg-white/[0.03] border-white/5 text-white/60 hover:bg-white/[0.06] hover:border-white/10 hover:text-white/80"}`}
+                >
+                  <span className="text-white/15 text-xs font-mono mr-3">
+                    {choice.index + 1}.
+                  </span>
+                  <span className="text-sm">{choice.label}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {achievementToast && (
+        <div className="pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 animate-fade-in">
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-400/30 bg-black/80 px-5 py-3 shadow-lg backdrop-blur-md">
+            <Sparkles className="h-5 w-5 text-amber-300" />
+            <div>
+              <p className="text-sm font-medium text-white">成就解锁</p>
+              <p className="text-xs text-white/70">{achievementToast.title}</p>
+            </div>
           </div>
         </div>
       )}

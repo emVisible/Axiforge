@@ -30,6 +30,8 @@ build/
 
 # --- Build & cache ---
 apps/web/dist/
+apps/nexus/.dev-port
+
 *.tsbuildinfo
 .vite/
 .turbo/

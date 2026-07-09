@@ -208,7 +208,7 @@ export default function NodeInspectorPanel({
                   checked={nodeForm.is_anchor}
                   onChange={(checked) => onNodeFormChange({ is_anchor: checked })}
                   label="锚点事件（剧情关键转折点）"
-                  className="rounded-xl border border-amber-100 bg-amber-50/50 px-3 py-2.5"
+                  className="rounded-xl border border-accent-soft/30 bg-accent-soft/10 px-3 py-2.5"
                 />
                 <CheckboxField
                   checked={nodeForm.is_ending}
@@ -322,7 +322,7 @@ export default function NodeInspectorPanel({
               className="w-full"
               onClick={onDeleteNode}
             >
-              删除节点
+              删除整个 Beat
             </Button>
           </div>
         </div>

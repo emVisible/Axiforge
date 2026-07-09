@@ -17,6 +17,7 @@ from app.domains.platform.admin_schemas import (
     AuditLogResponse,
     ContentStatusUpdate,
     DashboardStatsResponse,
+    ModerationContextResponse,
     PaginatedResponse,
     ReportResolveRequest,
     UserBanUpdate,
@@ -57,13 +58,38 @@ async def admin_resolve_report(
     return result
 
 
+@admin_router.get("/moderation/context", response_model=ModerationContextResponse)
+async def admin_moderation_context(
+    target_type: str = Query(..., min_length=1),
+    target_id: str = Query(..., min_length=1),
+    db: AsyncSession = Depends(get_db),
+):
+    return await AdminService(db).get_moderation_context(
+        target_type=target_type, target_id=target_id
+    )
+
+
+@admin_router.post("/comments/{comment_id}/hide", status_code=204)
+async def admin_hide_comment(
+    comment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    if not await AdminService(db).hide_comment(comment_id):
+        raise HTTPException(404, "Comment not found")
+    return None
+
+
 @admin_router.get("/users", response_model=PaginatedResponse[AdminUserResponse])
 async def admin_list_users(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    creator_id: Optional[str] = Query(None),
+    q: Optional[str] = Query(None, min_length=1, max_length=100),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AdminService(db).list_users(limit=limit, offset=offset)
+    return await AdminService(db).list_users(
+        limit=limit, offset=offset, creator_id=creator_id, q=q
+    )
 
 
 @admin_router.patch("/users/{user_id}/ban", response_model=AdminUserResponse)
@@ -98,9 +124,13 @@ async def admin_set_user_strikes(
 async def admin_list_projects(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None, min_length=1, max_length=100),
+    content_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AdminService(db).list_projects(limit=limit, offset=offset)
+    return await AdminService(db).list_projects(
+        limit=limit, offset=offset, q=q, content_status=content_status
+    )
 
 
 @admin_router.patch("/projects/{project_id}/status", response_model=AdminProjectResponse)
@@ -121,9 +151,29 @@ async def admin_update_project_status(
 async def admin_list_characters(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    q: Optional[str] = Query(None, min_length=1, max_length=100),
+    content_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AdminService(db).list_characters(limit=limit, offset=offset)
+    return await AdminService(db).list_characters(
+        limit=limit, offset=offset, q=q, content_status=content_status
+    )
+
+
+@admin_router.patch(
+    "/characters/{character_id}/status", response_model=AdminCharacterResponse
+)
+async def admin_update_character_status(
+    character_id: UUID,
+    data: ContentStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await AdminService(db).update_character_status(
+        character_id, data.content_status
+    )
+    if not result:
+        raise HTTPException(404, "Character not found")
+    return result
 
 
 @admin_router.get("/violations", response_model=PaginatedResponse[AdminViolationResponse])
@@ -142,6 +192,7 @@ async def admin_list_violations(
 async def admin_list_audit_logs(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    action: Optional[str] = Query(None, min_length=1, max_length=80),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AdminService(db).list_audit_logs(limit=limit, offset=offset)
+    return await AdminService(db).list_audit_logs(limit=limit, offset=offset, action=action)

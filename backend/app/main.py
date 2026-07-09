@@ -20,6 +20,8 @@ from app.domains.llm.router import router as llm_router
 from app.domains.platform.admin_router import admin_router
 from app.domains.platform.router import routers as platform_routers
 from app.domains.platform.search_router import router as search_router
+from app.domains.ginkgo.router import ginkgo_router
+from app.domains.nexus.router import nexus_router
 from app.domains.runtime.router import routers as runtime_routers
 
 
@@ -73,6 +75,8 @@ def create_app() -> FastAPI:
         application.include_router(r)
     application.include_router(admin_router)
     application.include_router(llm_router)
+    application.include_router(ginkgo_router)
+    application.include_router(nexus_router)
 
     @application.get("/")
     async def root():

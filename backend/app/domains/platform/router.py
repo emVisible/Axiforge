@@ -21,7 +21,15 @@ user_router = APIRouter(prefix="/api/v1/users", tags=["users"])
 @user_router.post("/session", response_model=UserProfileResponse)
 async def user_session(data: UserSessionRequest, db: AsyncSession = Depends(get_db)):
     """客户端启动时上报 creator_id + player_token，获取/创建统一用户档案。"""
-    return await UserService(db).get_or_create_session(data)
+    try:
+        return await UserService(db).get_or_create_session(data)
+    except Exception as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=503,
+            detail="用户会话服务暂不可用，请确认数据库已启动（pnpm setup / docker compose up）",
+        ) from exc
 
 
 @user_router.get("/session", response_model=UserProfileResponse)
@@ -132,3 +140,7 @@ from app.domains.platform.comment_router import comment_router  # noqa: E402
 
 routers.append(creator_router)
 routers.append(comment_router)
+
+from app.domains.platform.topic_router import topic_router  # noqa: E402
+
+routers.append(topic_router)

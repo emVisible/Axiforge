@@ -3,20 +3,19 @@ import { useNavigate, useParams } from "react-router";
 import { Eye, Play } from "lucide-react";
 
 import { projectApi } from "@/shared/api/editor";
-import { getCreatorId } from "@/shared/lib/creatorId";
 import { getImageUrl } from "@/shared/lib/imageUrl";
 import { getPlayerToken } from "@/shared/lib/playerToken";
 import { routes } from "@/shared/lib/routes";
 import type { ProjectResponse } from "@/shared/types/project";
-import { useCommentThread } from "@/shared/hooks/useCommentThread";
+import DiscoverCommentSection from "@/features/discover/components/DiscoverCommentSection";
+import PageMeta from "@/shared/components/PageMeta";
+import ShareActions from "@/shared/components/ShareActions";
 import {
   BackLink,
   Button,
-  CommentThread,
   LoadingSpinner,
   cn,
   useCardTheme,
-  type CommentSort,
 } from "@/shared/components/ui";
 
 export default function DiscoverProjectDetailPage() {
@@ -25,10 +24,8 @@ export default function DiscoverProjectDetailPage() {
   const t = useCardTheme();
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [sort, setSort] = useState<CommentSort>("recent");
-  const authorId = getCreatorId();
-  const { items, loading, submitting, create, remove, report } =
-    useCommentThread("project", id, sort);
+  const shareUrl = `${window.location.origin}/discover/projects/${id}`;
+  const playUrl = `${window.location.origin}${routes.play(id)}`;
 
   useEffect(() => {
     (async () => {
@@ -70,8 +67,16 @@ export default function DiscoverProjectDetailPage() {
     );
   }
 
+  const allowComments = (project as ProjectResponse & { allow_comments?: boolean }).allow_comments !== false;
+
   return (
     <div className="mx-auto max-w-3xl px-4 pb-16">
+      <PageMeta
+        title={project.title}
+        description={project.description || "公开互动叙事作品"}
+        image={getImageUrl(project.cover_image ?? undefined) ?? undefined}
+        url={shareUrl}
+      />
       <BackLink to={routes.discover}>发现</BackLink>
 
       <div className={cn("overflow-hidden rounded-2xl border", t.surfaceStatic)}>
@@ -109,35 +114,22 @@ export default function DiscoverProjectDetailPage() {
               开始游玩
             </Button>
           </div>
+          <ShareActions url={shareUrl} title={project.title} />
+          <p className="text-[10px] text-ink-faint">
+            试玩直达：
+            <a href={playUrl} className="ml-1 text-brand hover:underline">
+              {playUrl.replace(/^https?:\/\//, "")}
+            </a>
+          </p>
         </div>
       </div>
 
-      <div className={cn("mt-10 rounded-2xl border p-6", t.muted)}>
-        <CommentThread
-          items={items}
-          sort={sort}
-          onSortChange={setSort}
-          loading={loading}
-          submitting={submitting}
-          currentAuthorId={authorId}
-          onSubmit={async (body, parentId) => {
-            await create(authorId, body, parentId);
-          }}
-          onDelete={async (commentId) => {
-            await remove(commentId, authorId);
-          }}
-          onReport={async (commentId) => {
-            const reason = window.prompt("举报原因（简要说明）");
-            if (!reason?.trim()) return;
-            try {
-              await report(commentId, reason.trim(), getPlayerToken());
-              window.alert("已收到举报，感谢反馈");
-            } catch {
-              window.alert("举报提交失败");
-            }
-          }}
-        />
-      </div>
+      <DiscoverCommentSection
+        contentType="project"
+        contentId={id}
+        disabled={!allowComments}
+        className="mt-10"
+      />
     </div>
   );
 }

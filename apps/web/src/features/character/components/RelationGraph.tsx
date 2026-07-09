@@ -71,6 +71,8 @@ export default function RelationGraph({ characterId }: RelationGraphProps) {
   const { data, isLoading } = useRelationGraph(characterId);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showAllNodes, setShowAllNodes] = useState(false);
+  const NODE_CAP = 50;
 
   const renderGraph = useCallback(() => {
     if (!data || !containerRef.current) return;
@@ -80,6 +82,29 @@ export default function RelationGraph({ characterId }: RelationGraphProps) {
     const height = isFullscreen ? window.innerHeight : 440;
 
     d3.select(container).selectAll("svg").remove();
+
+    let graphNodes: GraphNode[] = data.nodes.map((n) => ({ ...n }));
+    let graphLinks: GraphLink[] = data.links.map((l) => ({ ...l }));
+
+    if (!showAllNodes && graphNodes.length > NODE_CAP) {
+      const center = graphNodes.find((n) => n.is_center)?.id;
+      const keep = new Set<string>();
+      if (center) keep.add(center);
+      for (const l of graphLinks) {
+        const s = typeof l.source === "string" ? l.source : (l.source as GraphNode).id;
+        const t = typeof l.target === "string" ? l.target : (l.target as GraphNode).id;
+        if (keep.has(s)) keep.add(t);
+        if (keep.has(t)) keep.add(s);
+        if (keep.size >= NODE_CAP) break;
+      }
+      graphNodes = graphNodes.filter((n) => keep.has(n.id));
+      const ids = new Set(graphNodes.map((n) => n.id));
+      graphLinks = graphLinks.filter((l) => {
+        const s = typeof l.source === "string" ? l.source : (l.source as GraphNode).id;
+        const t = typeof l.target === "string" ? l.target : (l.target as GraphNode).id;
+        return ids.has(s) && ids.has(t);
+      });
+    }
 
     const svg = d3
       .select(container)
@@ -129,8 +154,8 @@ export default function RelationGraph({ characterId }: RelationGraphProps) {
     }
 
     // 数据
-    const nodes: GraphNode[] = data.nodes.map((n) => ({ ...n }));
-    const links: GraphLink[] = data.links.map((l) => ({ ...l }));
+    const nodes: GraphNode[] = graphNodes;
+    const links: GraphLink[] = graphLinks;
 
     const linkCountMap = new Map<string, number>();
     links.forEach((l) => {
@@ -403,7 +428,7 @@ export default function RelationGraph({ characterId }: RelationGraphProps) {
     return () => {
       simulation.stop();
     };
-  }, [data, isFullscreen]);
+  }, [data, isFullscreen, showAllNodes]);
 
   useEffect(() => {
     renderGraph();
@@ -486,6 +511,24 @@ export default function RelationGraph({ characterId }: RelationGraphProps) {
                 </>
               )}
             </button>
+            {data.nodes.length > NODE_CAP && !showAllNodes && (
+              <button
+                type="button"
+                onClick={() => setShowAllNodes(true)}
+                className="px-3 py-1.5 text-xs border border-brand/40 text-brand rounded-lg hover:bg-brand/10"
+              >
+                显示全部 {data.nodes.length} 节点
+              </button>
+            )}
+            {showAllNodes && data.nodes.length > NODE_CAP && (
+              <button
+                type="button"
+                onClick={() => setShowAllNodes(false)}
+                className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-canvas"
+              >
+                折叠至 {NODE_CAP} 邻域
+              </button>
+            )}
             <span className="text-xs text-ink-muted">
               {data.nodes.length} 节点 · {data.links.length} 连线
             </span>

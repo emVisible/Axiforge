@@ -5,13 +5,16 @@
     "setup": "bash scripts/setup-db.sh",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "dev": "pnpm setup && concurrently -n web,api -c cyan,magenta \"pnpm dev:web\" \"pnpm dev:api\"",
-    "dev:web": "pnpm --filter @axiforge/web dev",
-    "dev:admin": "pnpm --filter @axiforge/admin dev",
-    "dev:api": "cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev": "bash scripts/run-dev.sh all",
+    "dev:web": "bash scripts/run-dev.sh web",
+    "dev:admin": "bash scripts/run-dev.sh admin",
+    "dev:nexus": "bash scripts/run-dev.sh nexus",
+    "dev:api": "bash scripts/run-dev.sh api",
+    "dev:tmux": "bash dev.bash",
+    "dev:kill": "bash scripts/kill-dev-ports.sh",
     "build": "pnpm --filter @axiforge/web build && pnpm --filter @axiforge/admin build",
     "test:api": "cd backend && uv run pytest tests/ -v",
-    "lint": "pnpm --filter @axiforge/web lint"
+    "lint": "pnpm --filter @axiforge/web lint && pnpm --filter @axiforge/admin lint:colors"
   },
   "devDependencies": {
     "concurrently": "^9.2.0"

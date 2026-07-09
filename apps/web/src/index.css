@@ -46,8 +46,9 @@
   100% { opacity: 0; }
 }
 .fx-flash {
-  animation: fxFlash 0.6s ease-out;
   background: #fff;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 画面转场（黑场淡入淡出） */
@@ -56,10 +57,26 @@
   45% { opacity: 1; }
   100% { opacity: 0; }
 }
+@keyframes fxTransitionSoft {
+  0% { opacity: 0; }
+  35% { opacity: 0.75; }
+  100% { opacity: 0; }
+}
+@keyframes fxTransitionWipe {
+  0% { clip-path: inset(0 100% 0 0); opacity: 1; }
+  45% { clip-path: inset(0 0 0 0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 100%); opacity: 0; }
+}
 .fx-transition {
   background: #05050a;
   opacity: 0;
   pointer-events: none;
+}
+.fx-transition-dissolve {
+  background: #05050a;
+}
+.fx-transition-wipe {
+  background: #05050a;
 }
 
 /* 落下的粒子（雨/雪/樱花共用，靠时长与字符区分） */

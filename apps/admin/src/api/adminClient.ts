@@ -30,7 +30,7 @@ async function requestWithToken<T>(
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { detail?: string }).detail || res.statusText);
+    throw new Error(formatApiError(body, res.statusText || "请求失败"));
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -88,14 +88,59 @@ export interface DashboardStats {
   top_projects: DashboardTopProject[];
 }
 
+export interface ModerationTargetPreview {
+  title: string;
+  excerpt: string;
+  author_id?: string | null;
+  author_display?: string | null;
+  author_strike_count: number;
+  author_is_banned: boolean;
+  content_status?: string | null;
+  is_public?: boolean | null;
+  cover_image?: string | null;
+  discover_path?: string | null;
+  parent_title?: string | null;
+  parent_path?: string | null;
+  exists: boolean;
+  violation_count: number;
+}
+
+export interface ModerationContext {
+  target_preview: ModerationTargetPreview;
+  related_comments: AdminCommentSnippet[];
+  author_profile: AuthorModerationProfile | null;
+}
+
+export interface AdminCommentSnippet {
+  id: string;
+  author_id: string;
+  body: string;
+  status: string;
+  created_at: string;
+}
+
+export interface AuthorModerationProfile {
+  user_id?: string | null;
+  creator_id: string;
+  display_name?: string | null;
+  email?: string | null;
+  strike_count: number;
+  is_banned: boolean;
+  project_count: number;
+  character_count: number;
+  violation_count: number;
+}
+
 export interface AdminReport {
   id: string;
   target_type: string;
   target_id: string;
   reason: string;
   status: string;
+  reporter_token?: string | null;
   resolution_note?: string | null;
   created_at: string;
+  target_preview: ModerationTargetPreview;
 }
 
 export interface AdminUser {
@@ -154,6 +199,28 @@ export interface AdminViolation {
 export interface PageParams {
   limit?: number;
   offset?: number;
+  q?: string;
+  content_status?: string;
+  creator_id?: string;
+}
+
+function formatApiError(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (item && typeof item === "object" && "msg" in item) {
+          const loc = "loc" in item && Array.isArray(item.loc) ? item.loc.join(".") : "";
+          return loc ? `${loc}: ${String(item.msg)}` : String(item.msg);
+        }
+        return typeof item === "string" ? item : JSON.stringify(item);
+      })
+      .join("；");
+  }
+  if (detail && typeof detail === "object") return JSON.stringify(detail);
+  return fallback;
 }
 
 function qs(params: Record<string, string | number | undefined>): string {
@@ -168,13 +235,24 @@ export const adminApi = {
   stats: () => request<DashboardStats>("/dashboard/stats"),
   reports: (status = "pending") =>
     request<AdminReport[]>(`/reports?status=${encodeURIComponent(status)}`),
-  resolveReport: (id: string, action: "dismiss" | "take_down", note?: string) =>
+  resolveReport: (
+    id: string,
+    action: "dismiss" | "take_down",
+    note?: string,
+    resolveSiblings = true,
+  ) =>
     request<AdminReport>(`/reports/${id}/resolve`, {
       method: "POST",
-      body: JSON.stringify({ action, note }),
+      body: JSON.stringify({ action, note, resolve_siblings: resolveSiblings }),
     }),
-  users: ({ limit = 50, offset = 0 }: PageParams = {}) =>
-    request<PaginatedResponse<AdminUser>>(`/users${qs({ limit, offset })}`),
+  moderationContext: (targetType: string, targetId: string) =>
+    request<ModerationContext>(
+      `/moderation/context${qs({ target_type: targetType, target_id: targetId })}`,
+    ),
+  hideComment: (id: string) =>
+    request<void>(`/comments/${id}/hide`, { method: "POST" }),
+  users: ({ limit = 50, offset = 0, creator_id, q }: PageParams = {}) =>
+    request<PaginatedResponse<AdminUser>>(`/users${qs({ limit, offset, creator_id, q })}`),
   banUser: (id: string, is_banned: boolean, note?: string) =>
     request<AdminUser>(`/users/${id}/ban`, {
       method: "PATCH",
@@ -185,19 +263,28 @@ export const adminApi = {
       method: "PATCH",
       body: JSON.stringify({ strike_count, note }),
     }),
-  projects: ({ limit = 50, offset = 0 }: PageParams = {}) =>
-    request<PaginatedResponse<AdminProject>>(`/projects${qs({ limit, offset })}`),
+  projects: ({ limit = 50, offset = 0, q, content_status }: PageParams = {}) =>
+    request<PaginatedResponse<AdminProject>>(
+      `/projects${qs({ limit, offset, q, content_status })}`,
+    ),
   setProjectStatus: (id: string, content_status: string) =>
     request<AdminProject>(`/projects/${id}/status`, {
       method: "PATCH",
       body: JSON.stringify({ content_status }),
     }),
-  characters: ({ limit = 50, offset = 0 }: PageParams = {}) =>
-    request<PaginatedResponse<AdminCharacter>>(`/characters${qs({ limit, offset })}`),
+  setCharacterStatus: (id: string, content_status: string) =>
+    request<AdminCharacter>(`/characters/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ content_status }),
+    }),
+  characters: ({ limit = 50, offset = 0, q, content_status }: PageParams = {}) =>
+    request<PaginatedResponse<AdminCharacter>>(
+      `/characters${qs({ limit, offset, q, content_status })}`,
+    ),
   violations: (creatorId?: string, { limit = 50, offset = 0 }: PageParams = {}) =>
     request<PaginatedResponse<AdminViolation>>(
       `/violations${qs({ limit, offset, creator_id: creatorId })}`,
     ),
-  auditLogs: ({ limit = 50, offset = 0 }: PageParams = {}) =>
-    request<PaginatedResponse<AuditLog>>(`/audit-logs${qs({ limit, offset })}`),
+  auditLogs: ({ limit = 50, offset = 0, action }: PageParams & { action?: string } = {}) =>
+    request<PaginatedResponse<AuditLog>>(`/audit-logs${qs({ limit, offset, action })}`),
 };

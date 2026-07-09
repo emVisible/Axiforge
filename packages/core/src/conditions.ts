@@ -97,6 +97,7 @@ function matchAtom(
   vars: RuntimeVariables,
   completedBeats: ReadonlySet<string>,
   codex: CodexLedger,
+  unlockedAchievements: ReadonlySet<string> = new Set(),
 ): boolean {
   const operator = cond.operator ?? "eq";
   const key = cond.key;
@@ -121,6 +122,18 @@ function matchAtom(
       if (!state || !(field in state)) return operator === "ne";
       return compare(state[field], operator, cond.value);
     }
+    case "relationship": {
+      // key 格式: "charA.charB.field"
+      if (!key) return operator === "ne";
+      const parts = key.split(".");
+      if (parts.length < 3) return operator === "ne";
+      const [charA, charB, field] = parts;
+      const bucket = vars.relationships?.[charA]?.[charB];
+      if (!bucket || !(field in bucket)) return operator === "ne";
+      return compare(bucket[field], operator, cond.value);
+    }
+    case "achievement":
+      return key ? unlockedAchievements.has(key) : false;
     case "codex": {
       // key 格式: "characterRefId.memoryKey"（跨作品 IP 账本，v1.6）
       if (!key) return operator === "ne";
@@ -142,18 +155,20 @@ function matchAtom(
 /**
  * 评估条件。空条件视为满足（true）。
  * @param completedBeats 已完成 Beat id 集合（用于 node_completed）
+ * @param unlockedAchievements 已解锁成就 key 集合（v2 Ginkgo）
  */
 export function evaluateCondition(
   condition: Condition | null | undefined,
   vars: RuntimeVariables,
   completedBeats: ReadonlySet<string> = new Set(),
   codex: CodexLedger = {},
+  unlockedAchievements: ReadonlySet<string> = new Set(),
 ): boolean {
   if (!condition) return true;
 
   if (isGroup(condition)) {
     const results = condition.conditions.map((c) =>
-      matchAtom(c, vars, completedBeats, codex),
+      matchAtom(c, vars, completedBeats, codex, unlockedAchievements),
     );
     switch (condition.type) {
       case "all":
@@ -167,16 +182,31 @@ export function evaluateCondition(
     }
   }
 
-  return matchAtom(condition as AtomCondition, vars, completedBeats, codex);
+  return matchAtom(
+    condition as AtomCondition,
+    vars,
+    completedBeats,
+    codex,
+    unlockedAchievements,
+  );
 }
 
 /** 深拷贝运行时变量（保证纯函数不可变） */
 export function cloneVariables(vars: RuntimeVariables): RuntimeVariables {
+  const relationships = vars.relationships ?? {};
   return {
     memory: { ...vars.memory },
     flags: { ...vars.flags },
     characters: Object.fromEntries(
       Object.entries(vars.characters).map(([k, v]) => [k, { ...v }]),
+    ),
+    relationships: Object.fromEntries(
+      Object.entries(relationships).map(([a, targets]) => [
+        a,
+        Object.fromEntries(
+          Object.entries(targets).map(([b, fields]) => [b, { ...fields }]),
+        ),
+      ]),
     ),
   };
 }
@@ -203,6 +233,14 @@ export function applyEffects(
       const field = key.slice(dot + 1);
       if (!next.characters[charId]) next.characters[charId] = {};
       next.characters[charId][field] = value;
+    } else if (type === "relationship") {
+      const parts = key.split(".");
+      if (parts.length < 3) continue;
+      const [charA, charB, field] = parts;
+      if (!next.relationships) next.relationships = {};
+      if (!next.relationships[charA]) next.relationships[charA] = {};
+      if (!next.relationships[charA][charB]) next.relationships[charA][charB] = {};
+      next.relationships[charA][charB][field] = value;
     }
   }
 

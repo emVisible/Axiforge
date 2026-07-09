@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
+import DiscoverGrovePanel from "@/features/discover/components/DiscoverGrovePanel";
 import DiscoverProjectsTab from "@/features/discover/components/DiscoverProjectsTab";
 import DiscoverCharactersTab from "@/features/discover/components/DiscoverCharactersTab";
 import DiscoverItemsTab from "@/features/discover/components/DiscoverItemsTab";
 import DiscoverScenesTab from "@/features/discover/components/DiscoverScenesTab";
-import DiscoverStatsBar from "@/features/discover/components/DiscoverStatsBar";
+import DiscoverTopicsBar from "@/features/discover/components/DiscoverTopicsBar";
 import { PageHeader, SearchInput, SegmentedControl } from "@/shared/components/ui";
 
 type DiscoverTab = "projects" | "characters" | "items" | "scenes";
@@ -48,16 +49,11 @@ export default function DiscoverPage() {
         dense
         title="发现"
         description="浏览社区公开的剧本、角色、道具与场景"
-        action={
-          <div className="hidden sm:block">
-            <DiscoverStatsBar variant="inline" collapsible />
-          </div>
-        }
       />
 
-      <div className="mb-3 sm:hidden">
-        <DiscoverStatsBar variant="inline" />
-      </div>
+      <DiscoverGrovePanel />
+
+      <DiscoverTopicsBar />
 
       <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
         <SegmentedControl

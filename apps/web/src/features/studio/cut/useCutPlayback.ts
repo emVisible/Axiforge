@@ -2,7 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Instruction } from "@axiforge/core";
 import { clipDurationMs, cursorTimeMs } from "./timelineUtils";
 
-export function useCutPlayback(script: Instruction[]) {
+export interface CutPlaybackOptions {
+  /** 当前 Beat 播放到末尾时调用；返回 true 表示已切换到下一 Beat */
+  onBeatEnd?: () => boolean;
+}
+
+export function useCutPlayback(
+  script: Instruction[],
+  options?: CutPlaybackOptions,
+) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [cursorIndex, setCursorIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -64,10 +72,10 @@ export function useCutPlayback(script: Instruction[]) {
     });
   }, [scriptLength]);
 
-  const goToStart = useCallback(() => {
-    setIsPlaying(false);
+  const goToStart = useCallback((keepPlaying = false) => {
     setSelectedIndex(0);
     setCursorIndex(0);
+    setIsPlaying(keepPlaying);
   }, []);
 
   const goToEnd = useCallback(() => {
@@ -89,10 +97,18 @@ export function useCutPlayback(script: Instruction[]) {
     }
 
     const inst = script[cursorIndex];
+    if (inst?.op === "choice") {
+      setIsPlaying(false);
+      return;
+    }
+
     const duration = inst ? clipDurationMs(inst) : 800;
 
     playTimerRef.current = setTimeout(() => {
       if (cursorIndex >= scriptLength - 1) {
+        if (options?.onBeatEnd?.()) {
+          return;
+        }
         setIsPlaying(false);
         return;
       }
@@ -102,7 +118,7 @@ export function useCutPlayback(script: Instruction[]) {
     }, duration);
 
     return clearPlayTimer;
-  }, [isPlaying, cursorIndex, script, scriptLength, clearPlayTimer]);
+  }, [isPlaying, cursorIndex, script, scriptLength, clearPlayTimer, options]);
 
   useEffect(() => () => clearPlayTimer(), [clearPlayTimer]);
 

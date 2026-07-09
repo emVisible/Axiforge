@@ -31,6 +31,18 @@ const DiscoverPage = lazy(() => import("@/features/discover/pages/DiscoverPage")
 const DiscoverProjectDetailPage = lazy(
   () => import("@/features/discover/pages/DiscoverProjectDetailPage"),
 );
+const DiscoverCharacterDetailPage = lazy(
+  () => import("@/features/discover/pages/DiscoverCharacterDetailPage"),
+);
+const DiscoverItemDetailPage = lazy(
+  () => import("@/features/discover/pages/DiscoverItemDetailPage"),
+);
+const DiscoverSceneDetailPage = lazy(
+  () => import("@/features/discover/pages/DiscoverSceneDetailPage"),
+);
+const DiscoverTopicPage = lazy(
+  () => import("@/features/discover/pages/DiscoverTopicPage"),
+);
 const AuthorPage = lazy(() => import("@/features/discover/pages/AuthorPage"));
 const ProfilePage = lazy(() => import("@/features/profile/pages/ProfilePage"));
 
@@ -40,6 +52,9 @@ const CharacterDetailPage = lazy(() => import("@/features/character/pages/Charac
 const EditCharacterPage = lazy(() => import("@/features/character/pages/EditCharacterPage"));
 const StoryReadPage = lazy(() => import("@/features/character/pages/StoryReadPage"));
 const StoryEditPage = lazy(() => import("@/features/character/pages/StoryEditPage"));
+const DocsLayout = lazy(() => import("@/features/docs/layouts/DocsLayout"));
+const DocsIndexPage = lazy(() => import("@/features/docs/pages/DocsIndexPage"));
+const DocArticlePage = lazy(() => import("@/features/docs/pages/DocArticlePage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,11 +116,20 @@ export default function App() {
             <Route element={<DiscoverLayout />}>
               <Route path="/discover" element={<DiscoverPage />} />
               <Route path="/discover/projects/:id" element={<DiscoverProjectDetailPage />} />
+              <Route path="/discover/characters/:id" element={<DiscoverCharacterDetailPage />} />
+              <Route path="/discover/items/:id" element={<DiscoverItemDetailPage />} />
+              <Route path="/discover/scenes/:id" element={<DiscoverSceneDetailPage />} />
+              <Route path="/discover/topics/:slug" element={<DiscoverTopicPage />} />
               <Route path="/author/:authorId" element={<AuthorPage />} />
             </Route>
 
             <Route element={<AccountLayout />}>
               <Route path="/profile" element={<ProfilePage />} />
+            </Route>
+
+            <Route element={<DocsLayout />}>
+              <Route path="/docs" element={<DocsIndexPage />} />
+              <Route path="/docs/*" element={<DocArticlePage />} />
             </Route>
 
             <Route path="/" element={<Navigate to="/discover" replace />} />

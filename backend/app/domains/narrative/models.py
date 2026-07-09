@@ -51,6 +51,8 @@ class Project(Base):
     play_count = Column(Integer, default=0)
     author_id = Column(String(255), default="anonymous")
     fork_from = Column(UUID(as_uuid=True), nullable=True)
+    allow_comments = Column(Boolean, default=True)
+    topic_slug = Column(String(100), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

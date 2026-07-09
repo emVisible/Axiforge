@@ -14,15 +14,60 @@ class PaginatedResponse(BaseModel, Generic[ItemT]):
     total: int
 
 
+class ModerationTargetPreview(BaseModel):
+    title: str
+    excerpt: str = ""
+    author_id: Optional[str] = None
+    author_display: Optional[str] = None
+    author_strike_count: int = 0
+    author_is_banned: bool = False
+    content_status: Optional[str] = None
+    is_public: Optional[bool] = None
+    cover_image: Optional[str] = None
+    discover_path: Optional[str] = None
+    parent_title: Optional[str] = None
+    parent_path: Optional[str] = None
+    exists: bool = False
+    violation_count: int = 0
+
+
+class AdminCommentSnippet(BaseModel):
+    id: str
+    author_id: str
+    body: str
+    status: str
+    created_at: datetime
+
+
+class AuthorModerationProfile(BaseModel):
+    user_id: Optional[str] = None
+    creator_id: str
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+    strike_count: int = 0
+    is_banned: bool = False
+    project_count: int = 0
+    character_count: int = 0
+    violation_count: int = 0
+
+
+class ModerationContextResponse(BaseModel):
+    target_preview: ModerationTargetPreview
+    related_comments: List[AdminCommentSnippet] = Field(default_factory=list)
+    author_profile: Optional[AuthorModerationProfile] = None
+
+
 class AdminReportResponse(BaseModel):
     id: UUID
     target_type: str
     target_id: str
     reason: str
     status: str
+    reporter_token: Optional[str] = None
     resolution_note: Optional[str] = None
     resolved_at: Optional[datetime] = None
     created_at: datetime
+    target_preview: ModerationTargetPreview
 
     class Config:
         from_attributes = True
@@ -31,6 +76,7 @@ class AdminReportResponse(BaseModel):
 class ReportResolveRequest(BaseModel):
     action: Literal["dismiss", "take_down"]
     note: Optional[str] = Field(None, max_length=2000)
+    resolve_siblings: bool = True
 
 
 class AdminUserResponse(BaseModel):

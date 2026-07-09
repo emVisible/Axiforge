@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.narrative.models import Project
 from app.domains.runtime.models import SaveSlot
 from app.domains.runtime.schemas import SaveSlotUpsert
+from app.domains.runtime.save_thumb import resolve_save_thumb_path
 
 
 class SaveService:
@@ -45,7 +46,12 @@ class SaveService:
         slot.state = data.state
         slot.summary = data.summary
         slot.beat_id = data.beat_id
-        slot.thumb_path = data.thumb_path
+        slot.thumb_path = await resolve_save_thumb_path(
+            self.db,
+            project_id=project_id,
+            beat_id=data.beat_id,
+            client_thumb=data.thumb_path,
+        )
         await self.db.commit()
         await self.db.refresh(slot)
         return slot

@@ -62,7 +62,7 @@ Axiforge/
 
 ### 已验证能力
 
-- `pnpm dev` → Web :5174 + API :8000
+- `pnpm dev` → Web :5174 + Admin :5175 + Nexus :5274 + API :8000（见 `scripts/ports.mjs`）
 - `pnpm test:api` → 5 个集成测试全绿
 - Alembic：`20260706_000` baseline → `20260706_001` drop legacy
 - UI：Studio 纸感（brand `#3b3473` + canvas `#f8f7f4`）；Player 暗色 VN

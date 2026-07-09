@@ -14,6 +14,7 @@ interface AppHeaderProps {
   zone?: string;
   showDiscoverLink?: boolean;
   showStudioLink?: boolean;
+  showDocsLink?: boolean;
   showSearch?: boolean;
   showVersion?: boolean;
   showThemeToggle?: boolean;
@@ -27,6 +28,7 @@ export default function AppHeader({
   zone,
   showDiscoverLink = false,
   showStudioLink = false,
+  showDocsLink = false,
   showSearch = false,
   showVersion = false,
   showThemeToggle = true,
@@ -71,6 +73,11 @@ export default function AppHeader({
           {showStudioLink && (
             <Link to={routes.studio} className={navLinkClass}>
               工作台
+            </Link>
+          )}
+          {showDocsLink && (
+            <Link to={routes.docs} className={`hidden sm:inline ${navLinkClass}`}>
+              文档
             </Link>
           )}
           {showSearch && <GlobalSearch />}

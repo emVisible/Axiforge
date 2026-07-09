@@ -51,6 +51,14 @@ export function trackForOp(op: string): CutTrackId {
   }
 }
 
+/** 过滤无效条目，避免删除/重排后时间轴读到 undefined */
+export function sanitizeScript(script: Instruction[]): Instruction[] {
+  return script.filter(
+    (inst): inst is Instruction =>
+      Boolean(inst && typeof inst === "object" && "op" in inst && inst.op),
+  );
+}
+
 export function clipLabel(inst: Instruction | null | undefined): string {
   if (!inst) return "—";
   switch (inst.op) {
@@ -99,6 +107,36 @@ export function clipDurationMs(inst: Instruction | null | undefined): number {
   }
 }
 
+const RESIZABLE_OPS = new Set(["wait", "move", "transition", "camera", "fx"]);
+
+export function canResizeClipDuration(inst: Instruction | null | undefined): boolean {
+  return Boolean(inst && RESIZABLE_OPS.has(inst.op));
+}
+
+function durationWidthMs(inst: Instruction, ms: number): number {
+  if (inst.op === "wait") {
+    return Math.max(40, Math.min(180, ms / 12));
+  }
+  return Math.max(40, Math.min(240, ms / 8));
+}
+
+export function msFromClipWidth(
+  inst: Instruction,
+  widthPx: number,
+  zoom = 1,
+): number {
+  const innerW = widthPx / Math.max(zoom, 0.01);
+  if (inst.op === "wait") {
+    return Math.round(Math.max(100, Math.min(2000, innerW * 12)));
+  }
+  return Math.round(Math.max(50, Math.min(3000, innerW * 8)));
+}
+
+export function patchClipDuration(inst: Instruction, ms: number): Instruction {
+  if (!canResizeClipDuration(inst)) return inst;
+  return { ...inst, ms } as Instruction;
+}
+
 export function clipWidth(inst: Instruction | null | undefined, zoom = 1): number {
   if (!inst) return Math.round(48 * zoom);
   const base = 48;
@@ -109,7 +147,13 @@ export function clipWidth(inst: Instruction | null | undefined, zoom = 1): numbe
       w = Math.min(240, base + (inst.text?.length || 0) * 3.2);
       break;
     case "wait":
-      w = Math.max(40, Math.min(180, (inst.ms || 500) / 12));
+      w = durationWidthMs(inst, inst.ms || 500);
+      break;
+    case "move":
+    case "transition":
+    case "camera":
+    case "fx":
+      w = durationWidthMs(inst, inst.ms ?? clipDurationMs(inst));
       break;
     case "choice":
       w = 64 + (inst.options?.length || 1) * 32;
@@ -194,6 +238,60 @@ export function indexAtPixel(
   const positions = clipPositions(script, zoom);
   for (let i = script.length - 1; i >= 0; i--) {
     if (pixelX >= positions[i]) return i;
+  }
+  return 0;
+}
+
+/** 某轨在 script[] 中的全局下标（按执行顺序） */
+export function indicesOnTrack(
+  script: Instruction[],
+  trackId: CutTrackId,
+): number[] {
+  return script
+    .map((inst, i) => ({ inst, i }))
+    .filter(({ inst }) => trackForOp(inst.op) === trackId)
+    .map(({ i }) => i);
+}
+
+/** 分轨内重排：只交换同轨片段在 script[] 中的槽位，其它轨不动 */
+export function reorderScriptWithinTrack(
+  script: Instruction[],
+  trackId: CutTrackId,
+  fromLocal: number,
+  toLocal: number,
+): Instruction[] {
+  const indices = indicesOnTrack(script, trackId);
+  if (
+    fromLocal === toLocal ||
+    fromLocal < 0 ||
+    toLocal < 0 ||
+    fromLocal >= indices.length ||
+    toLocal >= indices.length
+  ) {
+    return script;
+  }
+  const trackItems = indices.map((i) => script[i]);
+  const [item] = trackItems.splice(fromLocal, 1);
+  trackItems.splice(toLocal, 0, item);
+  const next = [...script];
+  indices.forEach((globalIdx, localIdx) => {
+    next[globalIdx] = trackItems[localIdx];
+  });
+  return next;
+}
+
+/** 分轨内点击/拖拽落点 → 轨内局部下标 */
+export function localIndexAtPixel(
+  script: Instruction[],
+  trackId: CutTrackId,
+  pixelX: number,
+  zoom: number,
+): number {
+  const indices = indicesOnTrack(script, trackId);
+  if (!indices.length) return 0;
+  const positions = clipPositions(script, zoom);
+  for (let local = indices.length - 1; local >= 0; local--) {
+    if (pixelX >= positions[indices[local]]) return local;
   }
   return 0;
 }

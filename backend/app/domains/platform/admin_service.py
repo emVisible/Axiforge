@@ -16,15 +16,23 @@ from app.core.audit import write_audit_log
 from app.core.strike_policy import STRIKE_PUBLISH_BLOCK
 from app.domains.character.models import Character
 from app.domains.narrative.models import Project
+from app.domains.platform.admin_moderation import (
+    build_moderation_preview,
+    resolve_moderation_context,
+)
 from app.domains.platform.admin_schemas import (
     AdminCharacterResponse,
+    AdminCommentSnippet,
     AdminProjectResponse,
     AdminReportResponse,
     AdminUserResponse,
     AdminViolationResponse,
     AuditLogResponse,
+    AuthorModerationProfile,
     DashboardStatsResponse,
     DashboardTopProject,
+    ModerationContextResponse,
+    ModerationTargetPreview,
     PaginatedResponse,
     ReportResolveRequest,
 )
@@ -173,6 +181,25 @@ class AdminService:
                     continue
         return total_bytes, file_count
 
+    async def _report_response(self, report: ContentReport) -> AdminReportResponse:
+        preview = await build_moderation_preview(
+            self.db,
+            target_type=report.target_type,
+            target_id=report.target_id,
+        )
+        return AdminReportResponse(
+            id=report.id,
+            target_type=report.target_type,
+            target_id=report.target_id,
+            reason=report.reason,
+            status=report.status,
+            reporter_token=report.reporter_token,
+            resolution_note=report.resolution_note,
+            resolved_at=report.resolved_at,
+            created_at=report.created_at,
+            target_preview=ModerationTargetPreview.model_validate(preview),
+        )
+
     async def list_reports(
         self, *, status: str = "pending", limit: int = 50
     ) -> List[AdminReportResponse]:
@@ -182,7 +209,55 @@ class AdminService:
             .order_by(ContentReport.created_at.desc())
             .limit(limit)
         )
-        return [AdminReportResponse.model_validate(r) for r in result.scalars().all()]
+        rows = list(result.scalars().all())
+        out: List[AdminReportResponse] = []
+        for r in rows:
+            out.append(await self._report_response(r))
+        return out
+
+    async def get_moderation_context(
+        self, *, target_type: str, target_id: str
+    ) -> ModerationContextResponse:
+        preview = await build_moderation_preview(
+            self.db, target_type=target_type, target_id=target_id
+        )
+        raw = await resolve_moderation_context(
+            self.db, target_type=target_type, target_id=target_id
+        )
+        profile = raw.get("author_profile")
+        return ModerationContextResponse(
+            target_preview=ModerationTargetPreview.model_validate(preview),
+            related_comments=[
+                AdminCommentSnippet.model_validate(c) for c in raw.get("related_comments", [])
+            ],
+            author_profile=(
+                AuthorModerationProfile.model_validate(profile) if profile else None
+            ),
+        )
+
+    async def hide_comment(self, comment_id: UUID, *, note: Optional[str] = None) -> bool:
+        from app.domains.platform.comment_service import CommentService
+
+        ok = await CommentService(self.db).hide(comment_id)
+        if not ok:
+            return False
+        self.db.add(
+            Violation(
+                subject_type="comment",
+                subject_id=str(comment_id),
+                clause="content_takedown",
+                note=note or "admin hide comment",
+            )
+        )
+        await write_audit_log(
+            self.db,
+            action="comment.hide",
+            target_type="comment",
+            target_id=str(comment_id),
+            detail={"note": note},
+        )
+        await self.db.commit()
+        return True
 
     async def resolve_report(
         self, report_id: UUID, data: ReportResolveRequest
@@ -191,23 +266,45 @@ class AdminService:
         if not report:
             return None
 
-        report.status = "dismissed" if data.action == "dismiss" else "resolved"
-        report.resolution_note = data.note
-        report.resolved_at = datetime.now(timezone.utc)
+        siblings: List[ContentReport] = []
+        if data.resolve_siblings:
+            siblings = list(
+                (
+                    await self.db.execute(
+                        select(ContentReport).where(
+                            ContentReport.status == "pending",
+                            ContentReport.target_type == report.target_type,
+                            ContentReport.target_id == report.target_id,
+                            ContentReport.id != report_id,
+                        )
+                    )
+                ).scalars().all()
+            )
 
         if data.action == "take_down":
             await self._take_down_target(report.target_type, report.target_id, data.note)
+
+        resolved_status = "dismissed" if data.action == "dismiss" else "resolved"
+        now = datetime.now(timezone.utc)
+        for r in [report, *siblings]:
+            r.status = resolved_status
+            r.resolution_note = data.note
+            r.resolved_at = now
 
         await write_audit_log(
             self.db,
             action=f"report.{data.action}",
             target_type="report",
             target_id=str(report_id),
-            detail={"target_type": report.target_type, "target_id": report.target_id},
+            detail={
+                "target_type": report.target_type,
+                "target_id": report.target_id,
+                "siblings_resolved": len(siblings),
+            },
         )
         await self.db.commit()
         await self.db.refresh(report)
-        return AdminReportResponse.model_validate(report)
+        return await self._report_response(report)
 
     async def _take_down_target(
         self, target_type: str, target_id: str, note: Optional[str]
@@ -270,16 +367,30 @@ class AdminService:
         )
 
     async def list_users(
-        self, *, limit: int = 50, offset: int = 0
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        creator_id: Optional[str] = None,
+        q: Optional[str] = None,
     ) -> PaginatedResponse[AdminUserResponse]:
-        total = (
-            await self.db.execute(select(func.count()).select_from(UserAccount))
-        ).scalar_one()
+        base = select(UserAccount)
+        count_q = select(func.count()).select_from(UserAccount)
+        if creator_id:
+            base = base.where(UserAccount.creator_id == creator_id)
+            count_q = count_q.where(UserAccount.creator_id == creator_id)
+        if q:
+            like = f"%{q.strip()}%"
+            text_filter = sa_or(
+                UserAccount.creator_id.ilike(like),
+                UserAccount.email.ilike(like),
+                UserAccount.display_name.ilike(like),
+            )
+            base = base.where(text_filter)
+            count_q = count_q.where(text_filter)
+        total = (await self.db.execute(count_q)).scalar_one()
         result = await self.db.execute(
-            select(UserAccount)
-            .order_by(UserAccount.created_at.desc())
-            .offset(offset)
-            .limit(limit)
+            base.order_by(UserAccount.created_at.desc()).offset(offset).limit(limit)
         )
         items = [
             AdminUserResponse(
@@ -354,13 +465,25 @@ class AdminService:
         )
 
     async def list_projects(
-        self, *, limit: int = 50, offset: int = 0
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        q: Optional[str] = None,
+        content_status: Optional[str] = None,
     ) -> PaginatedResponse[AdminProjectResponse]:
-        total = (
-            await self.db.execute(select(func.count()).select_from(Project))
-        ).scalar_one()
+        base = select(Project)
+        count_q = select(func.count()).select_from(Project)
+        if q:
+            like = f"%{q.strip()}%"
+            base = base.where(Project.title.ilike(like))
+            count_q = count_q.where(Project.title.ilike(like))
+        if content_status:
+            base = base.where(Project.content_status == content_status)
+            count_q = count_q.where(Project.content_status == content_status)
+        total = (await self.db.execute(count_q)).scalar_one()
         result = await self.db.execute(
-            select(Project).order_by(Project.updated_at.desc()).offset(offset).limit(limit)
+            base.order_by(Project.updated_at.desc()).offset(offset).limit(limit)
         )
         items = [
             AdminProjectResponse(
@@ -386,6 +509,15 @@ class AdminService:
         project.content_status = content_status
         if content_status == "taken_down":
             project.is_public = False
+            await self._strike_author(project.author_id, "admin project takedown")
+            self.db.add(
+                Violation(
+                    subject_type="project",
+                    subject_id=str(project_id),
+                    clause="content_takedown",
+                    note="admin content page",
+                )
+            )
         elif content_status == "published":
             project.is_public = True
         await write_audit_log(
@@ -409,13 +541,25 @@ class AdminService:
         )
 
     async def list_characters(
-        self, *, limit: int = 50, offset: int = 0
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        q: Optional[str] = None,
+        content_status: Optional[str] = None,
     ) -> PaginatedResponse[AdminCharacterResponse]:
-        total = (
-            await self.db.execute(select(func.count()).select_from(Character))
-        ).scalar_one()
+        base = select(Character)
+        count_q = select(func.count()).select_from(Character)
+        if q:
+            like = f"%{q.strip()}%"
+            base = base.where(Character.name.ilike(like))
+            count_q = count_q.where(Character.name.ilike(like))
+        if content_status:
+            base = base.where(Character.content_status == content_status)
+            count_q = count_q.where(Character.content_status == content_status)
+        total = (await self.db.execute(count_q)).scalar_one()
         result = await self.db.execute(
-            select(Character).order_by(Character.updated_at.desc()).offset(offset).limit(limit)
+            base.order_by(Character.updated_at.desc()).offset(offset).limit(limit)
         )
         items = [
             AdminCharacterResponse(
@@ -430,6 +574,45 @@ class AdminService:
             for c in result.scalars().all()
         ]
         return PaginatedResponse(items=items, total=total)
+
+    async def update_character_status(
+        self, character_id: UUID, content_status: str
+    ) -> Optional[AdminCharacterResponse]:
+        character = await self.db.get(Character, character_id)
+        if not character:
+            return None
+        character.content_status = content_status
+        if content_status == "taken_down":
+            character.is_public = False
+            await self._strike_author(character.author_id, "admin character takedown")
+            self.db.add(
+                Violation(
+                    subject_type="character",
+                    subject_id=str(character_id),
+                    clause="content_takedown",
+                    note="admin content page",
+                )
+            )
+        elif content_status == "published":
+            character.is_public = True
+        await write_audit_log(
+            self.db,
+            action="character.status",
+            target_type="character",
+            target_id=str(character_id),
+            detail={"content_status": content_status},
+        )
+        await self.db.commit()
+        await self.db.refresh(character)
+        return AdminCharacterResponse(
+            id=str(character.id),
+            name=character.name,
+            author_id=character.author_id,
+            is_public=character.is_public,
+            content_status=character.content_status,
+            view_count=character.view_count,
+            created_at=character.created_at,
+        )
 
     async def list_violations(
         self,
@@ -518,13 +701,19 @@ class AdminService:
         return author_id
 
     async def list_audit_logs(
-        self, *, limit: int = 100, offset: int = 0
+        self, *, limit: int = 100, offset: int = 0, action: Optional[str] = None
     ) -> PaginatedResponse[AuditLogResponse]:
-        total = (
-            await self.db.execute(select(func.count()).select_from(AuditLog))
-        ).scalar_one()
+        filters = []
+        if action:
+            filters.append(AuditLog.action == action)
+        count_stmt = select(func.count()).select_from(AuditLog)
+        list_stmt = select(AuditLog)
+        if filters:
+            count_stmt = count_stmt.where(*filters)
+            list_stmt = list_stmt.where(*filters)
+        total = (await self.db.execute(count_stmt)).scalar_one()
         result = await self.db.execute(
-            select(AuditLog).order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)
+            list_stmt.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)
         )
         items = [AuditLogResponse.model_validate(r) for r in result.scalars().all()]
         return PaginatedResponse(items=items, total=total)

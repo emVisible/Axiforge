@@ -5,7 +5,7 @@ import DiscoverAtmosphere from "@/shared/components/DiscoverAtmosphere";
 import { useTheme } from "@/app/providers/ThemeProvider";
 
 export function DiscoverLayout() {
-  return <PublicLayout zone="Discover" atmosphere />;
+  return <PublicLayout zone="Discover" atmosphere showDocsLink />;
 }
 
 export function AccountLayout() {
@@ -15,9 +15,11 @@ export function AccountLayout() {
 function PublicLayout({
   zone,
   atmosphere = false,
+  showDocsLink = false,
 }: {
   zone?: string;
   atmosphere?: boolean;
+  showDocsLink?: boolean;
 }) {
   const { theme } = useTheme();
   const showAtmosphere = atmosphere && theme === "dark";
@@ -32,6 +34,7 @@ function PublicLayout({
           zone={zone}
           showDiscoverLink={false}
           showStudioLink
+          showDocsLink={showDocsLink}
           showVersion
         />
 

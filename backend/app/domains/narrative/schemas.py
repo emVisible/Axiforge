@@ -52,6 +52,8 @@ class ProjectUpdate(BaseModel):
     axs_source: Optional[str] = None
     is_public: Optional[bool] = None
     is_meta: Optional[bool] = None
+    allow_comments: Optional[bool] = None
+    topic_slug: Optional[str] = Field(None, max_length=100)
 
 
 class ProjectResponse(BaseModel):
@@ -72,6 +74,8 @@ class ProjectResponse(BaseModel):
     play_count: int = 0
     author_id: str
     fork_from: Optional[UUID] = None
+    allow_comments: bool = True
+    topic_slug: Optional[str] = None
     scenes: List["ProjectSceneResponse"] = []
     roles: List["ProjectRoleResponse"] = []
     asset_refs: List["ProjectAssetRefResponse"] = []

@@ -20,6 +20,8 @@ export const useProject = (id: string) =>
     queryKey: PROJECT_KEYS.detail(id),
     queryFn: () => projectApi.get(id),
     enabled: !!id,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
 export const useCreateProject = () => {

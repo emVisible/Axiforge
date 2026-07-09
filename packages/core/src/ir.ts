@@ -16,9 +16,18 @@ export type ConditionSourceType =
   | "flag"
   | "character_state"
   | "node_completed"
-  | "codex";
+  | "codex"
+  | "achievement"
+  | "relationship";
 
 export type ComparisonOperator = "eq" | "ne" | "gt" | "lt" | "contains";
+
+export type EffectType =
+  | "memory"
+  | "flag"
+  | "character_state"
+  | "codex_write"
+  | "relationship";
 
 /** 跨作品 IP 账本（桥4 第三层）：characterRefId → { key: value } */
 export type CodexLedger = Record<string, Record<string, unknown>>;
@@ -54,8 +63,6 @@ export interface GroupCondition {
 
 /** 条件既可以是单条原子，也可以是一组（兼容 v1.0 两种格式） */
 export type Condition = AtomCondition | GroupCondition;
-
-export type EffectType = "memory" | "flag" | "character_state" | "codex_write";
 
 /** 完成一个 Beat 时应用的效果 */
 export interface Effect {
@@ -192,6 +199,8 @@ export interface ChoiceOption {
   to?: string | null;
   /** 选项可见/可选条件；不满足则禁用 */
   condition?: Condition | null;
+  /** 需要已解锁的成就 key（v2 Ginkgo） */
+  requiresAchievement?: string | null;
 }
 
 export interface ChoiceInstruction {
@@ -306,6 +315,17 @@ export interface ItemRef {
   imagePath?: string | null;
 }
 
+/** 成就定义（v2 Ginkgo） */
+export interface AchievementDefinition {
+  id: string;
+  key: string;
+  title: string;
+  description?: string;
+  icon?: string;
+  condition?: Condition | null;
+  isPublic?: boolean;
+}
+
 // ============================================================
 // StoryPackage — 编译产物
 // ============================================================
@@ -331,6 +351,8 @@ export interface StoryPackage {
   characterProfiles?: CharacterProfile[];
   /** 参与跨作品 Codex 的角色 ref id 列表（v1.6） */
   codexScope?: string[];
+  /** 项目成就定义（v2 Ginkgo） */
+  achievements?: AchievementDefinition[];
 }
 
 /** 初始运行时变量（存档记忆在 v1.2 接入） */
@@ -339,8 +361,10 @@ export interface RuntimeVariables {
   flags: Record<string, unknown>;
   /** characterId → { field: value }（mood/affection/relationship_tags 等逻辑状态） */
   characters: Record<string, Record<string, unknown>>;
+  /** charA → charB → { affection, trust, ... }（v2 关系网运行时） */
+  relationships: Record<string, Record<string, Record<string, unknown>>>;
 }
 
 export function emptyVariables(): RuntimeVariables {
-  return { memory: {}, flags: {}, characters: {} };
+  return { memory: {}, flags: {}, characters: {}, relationships: {} };
 }

@@ -3,8 +3,15 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
+const repoRoot = path.resolve(__dirname, "../..");
+const webPort = Number(process.env.AXIFORGE_WEB_PORT) || 5174;
+const apiOrigin = process.env.AXIFORGE_API_ORIGIN ?? "http://localhost:8000";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  optimizeDeps: {
+    include: ["react-markdown", "remark-gfm"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -31,14 +38,18 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5174,
+    port: webPort,
+    strictPort: true,
+    fs: {
+      allow: [repoRoot],
+    },
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: apiOrigin,
         changeOrigin: true,
       },
       "/uploads": {
-        target: "http://localhost:8000",
+        target: apiOrigin,
         changeOrigin: true,
       },
     },

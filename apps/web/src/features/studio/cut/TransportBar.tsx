@@ -21,6 +21,7 @@ interface TransportBarProps {
   onGoToStart: () => void;
   onGoToEnd: () => void;
   beatTitle?: string;
+  masterBeatCount?: number;
 }
 
 export default function TransportBar({
@@ -35,6 +36,7 @@ export default function TransportBar({
   onGoToStart,
   onGoToEnd,
   beatTitle,
+  masterBeatCount,
 }: TransportBarProps) {
   return (
     <div className="flex h-10 shrink-0 items-center gap-3 border-b border-border bg-surface-raised px-3">
@@ -86,6 +88,11 @@ export default function TransportBar({
           <>
             <span className="text-ink-muted">Beat · </span>
             {beatTitle}
+            {masterBeatCount != null && masterBeatCount > 1 && (
+              <span className="ml-1.5 text-ink-faint">
+                （全片 {masterBeatCount} Beat）
+              </span>
+            )}
           </>
         ) : (
           "从左侧选择 Beat"

@@ -170,7 +170,11 @@ export default function DiscoverCharactersTab({ search }: DiscoverCharactersTabP
 
       {allCharacters.length > 0 && (
         <>
-          <CharacterGrid characters={allCharacters} density="compact" />
+          <CharacterGrid
+            characters={allCharacters}
+            density="compact"
+            detailTo={(c) => routes.discoverCharacter(c.id)}
+          />
           <div className="mt-6 text-center">
             {isLoading && page > 0 && <LoadingSpinner />}
             {hasMore && !isLoading && (

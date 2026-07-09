@@ -56,6 +56,11 @@ def register_models() -> None:
         SessionFlag,
         SessionMemory,
     )
+    from app.domains.ginkgo.models import (  # noqa: F401
+        AchievementDefinition,
+        PlayerAchievement,
+    )
+    from app.domains.nexus.models import NexusNote  # noqa: F401
 
 
 async def init_db():
@@ -193,5 +198,92 @@ async def init_db():
         await conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS ix_platform_events_created_at ON platform_events (created_at)"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS allow_comments BOOLEAN DEFAULT true"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE projects ADD COLUMN IF NOT EXISTS topic_slug VARCHAR(100)"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS creator_meta JSONB DEFAULT '{}'::jsonb"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS email VARCHAR(320)"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS display_name VARCHAR(64)"
+            )
+        )
+        await conn.execute(
+            text(
+                "ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS avatar_emoji VARCHAR(16)"
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS achievement_definitions (
+                    id UUID PRIMARY KEY,
+                    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                    key VARCHAR(128) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT DEFAULT '',
+                    icon VARCHAR(64) DEFAULT 'star',
+                    condition JSONB DEFAULT '{}',
+                    is_public BOOLEAN DEFAULT false,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(project_id, key)
+                )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS player_achievements (
+                    id UUID PRIMARY KEY,
+                    player_token VARCHAR(128) NOT NULL,
+                    achievement_id UUID NOT NULL REFERENCES achievement_definitions(id) ON DELETE CASCADE,
+                    project_id UUID NOT NULL,
+                    unlocked_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(player_token, achievement_id)
+                )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS nexus_notes (
+                    id UUID PRIMARY KEY,
+                    author_id VARCHAR(128) NOT NULL,
+                    title VARCHAR(255) NOT NULL DEFAULT '',
+                    body TEXT DEFAULT '',
+                    tags JSONB DEFAULT '[]',
+                    links JSONB DEFAULT '[]',
+                    status VARCHAR(32) DEFAULT 'inbox',
+                    related_characters JSONB DEFAULT '[]',
+                    related_projects JSONB DEFAULT '[]',
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_nexus_notes_author ON nexus_notes (author_id)"
             )
         )

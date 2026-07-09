@@ -4,6 +4,7 @@ import type { Node } from "reactflow";
 import {
   Clapperboard,
   Film,
+  Inbox,
   Link2,
   Network,
   Package,
@@ -23,6 +24,8 @@ import type {
   ProjectUpdate,
 } from "@/shared/types/project";
 import type { ProjectRoleOption } from "../../flow/types";
+import { nexusApi } from "@/shared/api/nexus";
+import { getCreatorId } from "@/shared/lib/creatorId";
 import OutlinerSection, { OutlinerRow } from "./OutlinerSection";
 import { routes } from "@/shared/lib/routes";
 
@@ -90,6 +93,27 @@ export default function OutlinerPanel({
   const [newSceneTitle, setNewSceneTitle] = useState("");
   const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
   const [editBeatTitle, setEditBeatTitle] = useState("");
+  const [nexusBusy, setNexusBusy] = useState(false);
+  const [nexusHint, setNexusHint] = useState<string | null>(null);
+
+  const sendToNexus = async () => {
+    setNexusBusy(true);
+    setNexusHint(null);
+    try {
+      const excerpt = (project.description || project.world_setting || "").slice(0, 500);
+      await nexusApi.sendToInbox({
+        author_id: getCreatorId(),
+        title: project.title,
+        body: `# ${project.title}\n\n[[project:${project.id}]]\n\n${excerpt}`,
+        related_projects: [project.id],
+      });
+      setNexusHint("已发送到 Nexus 收件箱");
+    } catch {
+      setNexusHint("发送失败，请确认后端已启动");
+    } finally {
+      setNexusBusy(false);
+    }
+  };
 
   const toggle = (key: SectionKey) =>
     setOpen((s) => ({ ...s, [key]: !s[key] }));
@@ -108,6 +132,21 @@ export default function OutlinerPanel({
 
   const scenes = project.scenes || [];
   const filterScene = scenes.find((s) => s.id === sceneFilterId);
+
+  const nexusNotes = useMemo(() => {
+    const meta = project.play_meta;
+    if (!meta || typeof meta !== "object") return [];
+    const raw = (meta as Record<string, unknown>).nexus_notes;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter(
+        (e): e is { text: string; created_at?: string } =>
+          typeof e === "object" &&
+          e !== null &&
+          typeof (e as { text?: unknown }).text === "string",
+      )
+      .slice(-5);
+  }, [project.play_meta]);
 
   const commitBeatRename = (nodeId: string) => {
     const title = editBeatTitle.trim() || "未命名";
@@ -435,12 +474,46 @@ export default function OutlinerPanel({
                 )}
               </>
             )}
+            {nexusNotes.length > 0 && (
+              <div>
+                <p className="mb-1 text-[9px] uppercase tracking-wider text-ink-faint">
+                  Nexus 策划备忘
+                </p>
+                <ul className="space-y-1.5">
+                  {nexusNotes.map((entry, i) => (
+                    <li
+                      key={i}
+                      className="rounded border border-border/60 bg-surface-raised/80 px-2 py-1.5 leading-relaxed text-ink-muted"
+                    >
+                      <p className="line-clamp-4 whitespace-pre-wrap">{entry.text}</p>
+                      {entry.created_at && (
+                        <p className="mt-0.5 text-[8px] text-ink-faint">
+                          {new Date(entry.created_at).toLocaleString("zh-CN")}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {project.mechanism && <p>机制 · {project.mechanism}</p>}
             {project.genre && <p>题材 · {project.genre}</p>}
             {project.style_reference && <p>风格 · {project.style_reference}</p>}
             <p>{project.is_public ? "公开" : "私有"}</p>
           </div>
           <div className="mt-1 flex flex-col gap-0.5 px-1">
+            <button
+              type="button"
+              disabled={nexusBusy}
+              onClick={() => void sendToNexus()}
+              className="rounded py-1 text-left text-[10px] text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
+            >
+              <Inbox className="mr-1 inline h-3 w-3" />
+              {nexusBusy ? "发送中…" : "发送到 Nexus"}
+            </button>
+            {nexusHint && (
+              <p className="px-1 text-[9px] text-brand">{nexusHint}</p>
+            )}
             {onExportMarkdown && (
               <button
                 type="button"

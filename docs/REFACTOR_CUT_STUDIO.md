@@ -70,9 +70,11 @@
 
 - 下一阶段 UI/剪辑深化见 [`LAYOUT_V4.md`](./LAYOUT_V4.md)
 
-## 后置（非本版）
+## 后置（v2.1+）
 
-- 指令拖拽排序、跨 Beat 主轨、演出节奏曲线
+- [x] 跨 Beat 连续主时间轴（`MasterTimelineBar` + 跨 Beat 连续预览）
+- [x] 分轨独立排序（`reorderScriptWithinTrack`，各轨内独立拖拽）
+- 演出节奏曲线 / 关键帧
 
 ### Phase 8 — UI 体验收口（见 LAYOUT_V4）
 

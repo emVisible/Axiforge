@@ -5,6 +5,10 @@ export const routes = {
   dashboard: `${STUDIO}/dashboard`,
   discover: "/discover",
   discoverProject: (id: string) => `/discover/projects/${id}`,
+  discoverCharacter: (id: string) => `/discover/characters/${id}`,
+  discoverItem: (id: string) => `/discover/items/${id}`,
+  discoverScene: (id: string) => `/discover/scenes/${id}`,
+  discoverTopic: (slug: string) => `/discover/topics/${encodeURIComponent(slug)}`,
   author: (id: string) => `/author/${id}`,
   projects: `${STUDIO}/projects`,
   projectNew: `${STUDIO}/projects/new`,
@@ -28,4 +32,6 @@ export const routes = {
   },
   play: (projectId: string) => `/play/${projectId}`,
   profile: "/profile",
+  docs: "/docs",
+  doc: (slug: string) => `/docs/${slug.replace(/^\/+|\/+$/g, "")}`,
 } as const;

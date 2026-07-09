@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface UseAdminListOptions<T> {
   fetcher: () => Promise<T>;
+  /** @deprecated 使用 queryKey */
   deps?: unknown[];
+  queryKey?: readonly unknown[];
+  enabled?: boolean;
 }
 
 interface UseAdminListResult<T> {
@@ -11,30 +15,61 @@ interface UseAdminListResult<T> {
   error: string;
   setError: (error: string) => void;
   reload: () => void;
+  invalidate: () => void;
 }
 
-/** 消除各 Admin 页面重复的 fetch + loading/error state 样板。 */
+/** Admin 列表/详情数据加载（React Query）。 */
 export function useAdminList<T>({
   fetcher,
   deps = [],
+  queryKey,
+  enabled = true,
 }: UseAdminListOptions<T>): UseAdminListResult<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const queryClient = useQueryClient();
+  const resolvedKey = queryKey ?? ["admin", ...deps];
+
+  const query = useQuery({
+    queryKey: resolvedKey,
+    queryFn: fetcher,
+    enabled,
+  });
 
   const reload = useCallback(() => {
-    setLoading(true);
-    setError("");
-    fetcher()
-      .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : "加载失败"))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+    setActionError("");
+    void query.refetch();
+  }, [query]);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
+  const invalidate = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: resolvedKey });
+  }, [queryClient, resolvedKey]);
 
-  return { data, loading, error, setError, reload };
+  const fetchError =
+    query.error instanceof Error
+      ? query.error.message
+      : query.error
+        ? "加载失败"
+        : "";
+
+  return {
+    data: query.data ?? null,
+    loading: query.isLoading,
+    error: actionError || fetchError,
+    setError: setActionError,
+    reload,
+    invalidate,
+  };
+}
+
+export function useAdminInvalidation() {
+  const queryClient = useQueryClient();
+  return {
+    invalidateStats: () =>
+      void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] }),
+    invalidateReports: () =>
+      void queryClient.invalidateQueries({ queryKey: ["admin", "reports"] }),
+    invalidateModeration: () =>
+      void queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] }),
+    invalidateAll: () => void queryClient.invalidateQueries({ queryKey: ["admin"] }),
+  };
 }

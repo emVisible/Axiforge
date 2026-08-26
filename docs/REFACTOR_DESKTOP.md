@@ -104,6 +104,9 @@
   - 55 例单测全绿；行覆盖 99.3%、分支覆盖 95.4%（G2 达标）；web 侧 18 例基线在适配器化后原样通过（行为等价证明）
 - [ ] `ProjectFlowPage.tsx` 降级为薄视图宿主，cut/writer/flow 各自成页；原巨石文件删除（G1 清零点）
 - [ ] Draft/Transaction/Journal 接入 ProjectFlowPage 状态层（一切编辑经 `apply`，单一写入口落地）
+  - [x] 接缝落地：`useDraftJournal`（sync + dispatch 单一写入口）接入 `updateScript`（cut 轨）与 `saveWriter`（writer 记序）；未保存节点被 apply 拒绝时保持旧路径语义，零行为变更（绞杀者过渡态，E2E 6/6 + 基线 18/18 原样通过）
+  - [ ] 其余写路径收敛：conditions / effects / props / rename / 边操作 / 节点增删
+  - [ ] Draft 升级为图的唯一持有者，React Flow nodes 降级为投影（解决拖拽位置高频写入的分层）
 - [ ] rolesMap 构建的逐角色 N+1 fetch（`ProjectFlowPage.tsx:422-444`）收敛为批量获取（内部优化，外部行为不变）
 - [ ] 验收：G1–G5 全绿；E2E 基线 6 条全绿；Q7 术语表落 `packages/editor-core/README.md`（已完成 ✅）
 

@@ -9,11 +9,11 @@ import type { StoredNode } from "./types";
 
 export function runStorageContractSuite(
   name: string,
-  makeProvider: () => StorageProvider,
+  makeProvider: () => StorageProvider | Promise<StorageProvider>,
 ): void {
   describe(`存储契约 · ${name}`, () => {
     it("create → list → load：引导默认舞台与节点", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const created = await p.createProject({ title: "契约工程" });
       expect(created.ok).toBe(true);
 
@@ -31,7 +31,7 @@ export function runStorageContractSuite(
     });
 
     it("load 不存在 → not_found（空值五义：不存在≠空集合）", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const r = await p.loadProject("ghost");
       expect(r).toEqual({
         ok: false,
@@ -40,7 +40,7 @@ export function runStorageContractSuite(
     });
 
     it("saveNarrative 原子覆写 + updateProjectMeta 写 axs_source", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const created = await p.createProject({ title: "叙事" });
       if (!created.ok) throw new Error("create failed");
       const id = created.data.id;
@@ -77,14 +77,14 @@ export function runStorageContractSuite(
     });
 
     it("saveNarrative 不存在 → not_found", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const r = await p.saveNarrative("ghost", { axsSource: null, nodes: [], edges: [] });
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error.code).toBe("not_found");
     });
 
     it("角色：add → load 可见 → 重复拒绝 → remove 消失", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const created = await p.createProject({ title: "角色工程" });
       if (!created.ok) throw new Error("create failed");
       const id = created.data.id;
@@ -105,13 +105,13 @@ export function runStorageContractSuite(
     });
 
     it("角色：工程不存在 → not_found", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const r = await p.addRole("ghost", { characterRefId: "c" });
       expect(r.ok).toBe(false);
     });
 
     it("角色库：save（空 id 创建并返回服务端 id）→ upsert 覆盖 → list/get", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const created = await p.saveCharacter({
         id: "",
         name: "凛",
@@ -142,7 +142,7 @@ export function runStorageContractSuite(
     });
 
     it("deleteProject：删除后 list/load 均消失，重复删除 not_found", async () => {
-      const p = makeProvider();
+      const p = await makeProvider();
       const created = await p.createProject({ title: "将删" });
       if (!created.ok) throw new Error("create failed");
       const id = created.data.id;

@@ -86,3 +86,38 @@ describe(".axsp 容器 v0", () => {
     }
   });
 });
+
+describe(".axsp 边界分支", () => {
+  it("packAxsp 拒绝错误 format；unpack 拒绝非对象根", () => {
+    const bad = packAxsp({
+      manifest: { format: "other" as never, version: 1, name: "x", exportedAt: "", assets: [] },
+      project: bundle,
+    });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.error.detail).toContain("format");
+
+    const r = unpackAxsp("42");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect((r.error as { detail: string }).detail).toContain("根不是对象");
+  });
+
+  it("collectAssetRefs：se 收集；无素材脚本返回空", () => {
+    const withSe: ProjectBundle = {
+      ...bundle,
+      nodes: [
+        {
+          ...bundle.nodes[0]!,
+          narrativeData: {
+            title: "x",
+            script: [
+              { op: "se", sound: "assets/se/knock.wav" },
+              { op: "say", speaker: "甲", text: "无素材" },
+            ],
+          },
+        },
+      ],
+    };
+    expect(collectAssetRefs(withSe)).toEqual(["assets/se/knock.wav"]);
+    expect(collectAssetRefs({ ...bundle, nodes: [] })).toEqual([]);
+  });
+});

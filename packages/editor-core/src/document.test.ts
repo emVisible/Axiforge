@@ -110,6 +110,8 @@ describe("script 事务", () => {
     expect(bad.ok).toBe(false);
     const neg = apply(baseDraft(), env({ kind: "script.reorder", nodeId: "a", from: -1, to: 0 }));
     expect(neg.ok).toBe(false);
+    const negTo = apply(baseDraft(), env({ kind: "script.reorder", nodeId: "a", from: 0, to: -1 }));
+    expect(negTo.ok).toBe(false);
     const same = apply(baseDraft(), env({ kind: "script.reorder", nodeId: "a", from: 1, to: 1 }));
     expect(same.ok).toBe(false);
   });

@@ -26,3 +26,31 @@ describe("Memory 实现的附加语义", () => {
     expect(node?.editorData).toMatchObject({ position: { x: 0, y: 0 } });
   });
 });
+
+describe("Memory 附加分支", () => {
+  it("updateProjectMeta 仅写 axsSource 时标题不变；仅写标题时 axs 不变", async () => {
+    const p = new MemoryStorageProvider();
+    const created = await p.createProject({ title: "原题" });
+    if (!created.ok) throw new Error("create");
+    const id = created.data.id;
+
+    await p.updateProjectMeta(id, { axsSource: "# 投影\n" });
+    let load = await p.loadProject(id);
+    if (!load.ok) throw new Error("load");
+    expect(load.data.meta.title).toBe("原题");
+    expect(load.data.axsSource).toBe("# 投影\n");
+
+    await p.updateProjectMeta(id, { title: "新题" });
+    load = await p.loadProject(id);
+    if (!load.ok) throw new Error("load");
+    expect(load.data.meta.title).toBe("新题");
+    expect(load.data.axsSource).toBe("# 投影\n");
+  });
+
+  it("saveCharacter 空 id 走创建臂（服务端分配）", async () => {
+    const p = new MemoryStorageProvider();
+    const r = await p.saveCharacter({ id: "", name: "新角色", characterData: {}, imagePath: null });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.id).toMatch(/^char-/);
+  });
+});

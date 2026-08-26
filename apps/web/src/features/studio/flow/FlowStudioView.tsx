@@ -44,6 +44,7 @@ export interface FlowStudioViewProps {
   highlightScriptIndex?: number | null;
   onActivePanelChange: (tab: PanelTab) => void;
   onNodesChange: ReturnType<typeof import("reactflow").useNodesState>[2];
+  onNodeDragStop?: import("reactflow").NodeMouseHandler;
   onEdgesChange: ReturnType<typeof import("reactflow").useEdgesState>[2];
   onConnect: (params: Connection) => void;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
@@ -96,6 +97,7 @@ export default function FlowStudioView({
   highlightScriptIndex,
   onActivePanelChange,
   onNodesChange,
+  onNodeDragStop,
   onEdgesChange,
   onConnect,
   onNodeClick,
@@ -148,6 +150,7 @@ export default function FlowStudioView({
         highlightedStageId={filteredStageId}
         fitViewTrigger={fitViewTrigger}
         onNodesChange={onNodesChange}
+        onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}

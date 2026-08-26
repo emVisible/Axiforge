@@ -154,6 +154,17 @@ export default function ProjectFlowPage() {
     target: e.target,
     label: (e.label as string) ?? null,
   });
+  // 拖拽落点记序：拖拽过程由 React Flow 内部状态承载（高频），松手才入事务
+  const handleNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      draftJournal.dispatch(
+        { kind: "node.move", nodeId: node.id, position: node.position },
+        "flow",
+      );
+    },
+    [draftJournal],
+  );
+
   const flowNodeToKernelNode = (n: Node): KernelNode => ({
     id: n.id,
     stageId: (n.data.stage_id as string) ?? null,
@@ -1546,6 +1557,7 @@ export default function ProjectFlowPage() {
           simTargets={simTargets}
           onActivePanelChange={setActivePanel}
           onNodesChange={onNodesChange}
+          onNodeDragStop={handleNodeDragStop}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}

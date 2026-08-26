@@ -84,15 +84,19 @@
 
 #### 1a 测试栈落地与行为基线
 
-- [ ] Vitest workspace 配置覆盖 `packages/*` 与 apps/web 纯逻辑层（projection、timelineUtils 等）
-- [ ] Playwright 落地，跑通本地 dev 栈（docker-compose PG + FastAPI + Vite）
-- [ ] 录制 6 条关键路径基线并在重构前存档全绿：
-  - E1 三轨切换往返（cut ↔ writer ↔ flow）不丢 script
-  - E2 剪辑台编辑指令并保存（重排片段 / 删除片段 / wait 时长修改）
-  - E3 剧本轨 AXS 编辑保存 → nodes/edges 同步覆写
-  - E4 工程添加角色 + 台词引用该角色
-  - E5 试玩链路：保存 → 编译 → 播放推进至分支
-  - E6 加载兜底：无 `axs_source` 的工程打开时自动投影生成文本
+- [x] Vitest 接入 apps/web 纯逻辑层：`projection.ts` 行为基线 18 例全绿
+- [ ] `timelineUtils` 纯函数单测（随 1b 迁移补齐）
+- [x] Playwright 落地：独立 e2e 库 `axiforge_e2e`（本机 PG 直连，alembic 全新链验证；开发库零接触），`pnpm e2e` 一键自包含闭环
+- [x] 录制 6 条关键路径基线并全绿（确定性复跑通过，~8s）：
+  - [x] E1 三轨切换往返（cut ↔ writer ↔ flow）不丢 script
+  - [x] E2 剪辑台编辑指令并保存（重排片段 / 删除片段 / wait 时长修改）
+  - [x] E3 剧本轨 AXS 编辑保存 → nodes/edges 同步覆写
+  - [x] E4 工程添加角色 + 台词引用该角色
+  - [x] E5 试玩链路：保存 → 编译 → 播放推进至分支
+  - [x] E6 加载兜底：无 `axs_source` 的工程打开时自动投影生成文本
+
+> 落地记录（2026-08-26）：E2E 揪出并修复迁移链真实缺陷（`002` 迁移在全新库与
+> create_all 基线列冲突，已幂等化）——紧致闭环「能红」价值的首次兑现。
 
 #### 1b editor-core 抽取（拆 ProjectFlowPage.tsx）
 

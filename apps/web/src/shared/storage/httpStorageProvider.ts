@@ -1,0 +1,227 @@
+/**
+ * HttpStorageProvider —— L4 契约的 HTTP 实现（包装既有 api 层）。
+ *
+ * 语义映射：
+ * - loadProject = GET project → ProjectBundle（nodes 取 project.nodes，回退 scenes 展开）
+ * - saveNarrative = PUT /narrative（后端原子覆写 nodes/edges/axs_source）
+ * - saveCharacter = id 命中→PUT 更新；否则 POST 创建（返回服务端 id）
+ * 失败语义：404 → not_found；其余网络/服务端错误 → io（detail 携带状态码）。
+ */
+import { projectApi } from "@/shared/api/editor";
+import { characterApi } from "@/shared/api/characters";
+import { collectProjectNodes } from "@/features/writer/lib/projection";
+import type {
+  CreateProjectInput,
+  NarrativePayload,
+  ProjectBundle,
+  ProjectMeta,
+  ProjectMetaPatch,
+  StorageProvider,
+  StorageResult,
+  StoredCharacter,
+} from "@axiforge/editor-core";
+import { err, ok } from "@axiforge/editor-core";
+import type {
+  ProjectNodeResponse,
+  ProjectResponse,
+  ProjectUpdate,
+} from "@/shared/types/project";
+
+function fail<T>(e: unknown, entity: string, id: string): StorageResult<T> {
+  const status = (e as { status?: number })?.status;
+  if (status === 404) return err({ code: "not_found", entity, id });
+  return err({
+    code: "io",
+    detail: `${entity} 请求失败${status ? ` (HTTP ${status})` : ""}`,
+    cause: e,
+  });
+}
+
+function toBundle(p: ProjectResponse): ProjectBundle {
+  const nodes = collectProjectNodes(p.nodes, p.scenes || []);
+  return {
+    meta: { id: String(p.id), title: p.title, updatedAt: p.updated_at },
+    axsSource: p.axs_source ?? null,
+    nodes: nodes.map((n: ProjectNodeResponse) => ({
+      id: String(n.id),
+      stageId: n.stage_id ?? n.scene_id ?? null,
+      editorData: (n.editor_data ?? {}) as Record<string, unknown>,
+      narrativeData: (n.narrative_data ?? {}) as Record<string, unknown>,
+      sortOrder: n.sort_order ?? 0,
+    })),
+    edges: (p.edges || []).map((e) => ({
+      id: e.id,
+      source: String(e.source_node_id),
+      target: String(e.target_node_id),
+      label: e.label,
+    })),
+    scenes: (p.scenes || []).map((s) => ({ id: s.id, title: s.title })),
+    roles: (p.roles || []).map((r) => ({
+      id: r.id,
+      characterRefId: r.character_ref_id,
+    })),
+  };
+}
+
+export class HttpStorageProvider implements StorageProvider {
+  constructor(private readonly creatorId: string) {}
+
+  async listProjects(): Promise<StorageResult<ProjectMeta[]>> {
+    try {
+      const list = await projectApi.list({ author_id: this.creatorId });
+      return ok(
+        list.map((p) => ({
+          id: String(p.id),
+          title: p.title,
+          updatedAt: p.updated_at,
+        })),
+      );
+    } catch (e) {
+      return fail(e, "projects", this.creatorId);
+    }
+  }
+
+  async createProject(input: CreateProjectInput): Promise<StorageResult<ProjectMeta>> {
+    try {
+      const p = await projectApi.create({
+        title: input.title,
+        is_public: input.isPublic ?? false,
+      });
+      return ok({ id: String(p.id), title: p.title, updatedAt: p.updated_at });
+    } catch (e) {
+      return fail(e, "project", input.title);
+    }
+  }
+
+  async loadProject(id: string): Promise<StorageResult<ProjectBundle>> {
+    try {
+      return ok(toBundle(await projectApi.get(id)));
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async deleteProject(id: string): Promise<StorageResult<void>> {
+    try {
+      await projectApi.delete(id);
+      return ok(undefined);
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async updateProjectMeta(
+    id: string,
+    patch: ProjectMetaPatch,
+  ): Promise<StorageResult<void>> {
+    try {
+      await projectApi.update(id, {
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.axsSource !== undefined ? { axs_source: patch.axsSource } : {}),
+      } as ProjectUpdate);
+      return ok(undefined);
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async saveNarrative(
+    id: string,
+    payload: NarrativePayload,
+  ): Promise<StorageResult<void>> {
+    try {
+      await projectApi.syncNarrative(id, {
+        axs_source: payload.axsSource ?? "",
+        nodes: payload.nodes.map((n) => ({
+          id: n.id,
+          stage_id: n.stageId,
+          editor_data: n.editorData as Record<string, unknown>,
+          narrative_data: n.narrativeData as Record<string, unknown>,
+          sort_order: n.sortOrder,
+        })),
+        edges: payload.edges.map((e) => ({
+          source_node_id: e.source,
+          target_node_id: e.target,
+          source_port: "output",
+          label: e.label,
+        })),
+      });
+      return ok(undefined);
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async addRole(
+    id: string,
+    role: { characterRefId: string },
+  ): Promise<StorageResult<void>> {
+    try {
+      await projectApi.addRole(id, { character_ref_id: role.characterRefId });
+      return ok(undefined);
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
+    try {
+      await projectApi.removeRole(id, roleId);
+      return ok(undefined);
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async listCharacters(): Promise<StorageResult<StoredCharacter[]>> {
+    try {
+      const list = await characterApi.listUser(this.creatorId);
+      return ok(
+        list.map((c) => ({
+          id: String(c.id),
+          name: c.name,
+          characterData: (c.character_data ?? {}) as unknown as Record<string, unknown>,
+          imagePath: c.image_path ?? null,
+        })),
+      );
+    } catch (e) {
+      return fail(e, "characters", this.creatorId);
+    }
+  }
+
+  async getCharacter(id: string): Promise<StorageResult<StoredCharacter>> {
+    try {
+      const c = await characterApi.get(id);
+      return ok({
+        id: String(c.id),
+        name: c.name,
+        characterData: (c.character_data ?? {}) as unknown as Record<string, unknown>,
+        imagePath: c.image_path ?? null,
+      });
+    } catch (e) {
+      return fail(e, "character", id);
+    }
+  }
+
+  async saveCharacter(
+    character: StoredCharacter,
+  ): Promise<StorageResult<{ id: string }>> {
+    try {
+      if (character.id) {
+        await characterApi.update(character.id, {
+          character_data: character.characterData as never,
+          image_path: character.imagePath === null ? undefined : character.imagePath,
+        } as never);
+        return ok({ id: character.id });
+      }
+      const created = await characterApi.create({
+        character_data: character.characterData as never,
+        image_path: character.imagePath ?? undefined,
+        author_id: this.creatorId,
+      } as never);
+      return ok({ id: String(created.id) });
+    } catch (e) {
+      return fail(e, "character", character.id || "(new)");
+    }
+  }
+}

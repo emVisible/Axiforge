@@ -6,8 +6,9 @@
  * 云同步/协作服务后期以装饰器形态叠加，不改变本工厂签名。
  */
 import { compileStory, type CompilerProjectInput, type StoryPackage } from "@axiforge/core";
+import { bundleToAxsp, collectAssetRefs, packAxsp, unpackAxsp } from "@axiforge/editor-core";
 import type { ProjectBundle } from "@axiforge/editor-core";
-import { SqliteStorageProvider, type StorageProvider } from "@axiforge/editor-core";
+import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
 import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
 import { getCreatorId } from "@/shared/lib/creatorId";
@@ -152,4 +153,105 @@ export async function createStorageProvider(): Promise<StorageProvider> {
     return provider;
   }
   return new HttpStorageProvider(getCreatorId());
+}
+
+// ============================================================
+// .axsp 导出 / 导入（容器 v0；导入 = 现有契约的组合，不新增接口方法）
+// ============================================================
+
+/** 导出：工程束 → .axsp 文本（素材引用清单自动收集） */
+export async function exportProjectAsAxsp(
+  provider: StorageProvider,
+  projectId: string,
+): Promise<StorageResult<string>> {
+  const bundle = await provider.loadProject(projectId);
+  if (!bundle.ok) return bundle;
+  return packAxsp(
+    bundleToAxsp(bundle.data, collectAssetRefs(bundle.data)),
+  );
+}
+
+/** 导入：.axsp 文本 → 新工程（分配新 id；角色引用重建） */
+export async function importProjectFromAxsp(
+  provider: StorageProvider,
+  text: string,
+): Promise<StorageResult<ProjectMeta>> {
+  const unpacked = unpackAxsp(text);
+  if (!unpacked.ok) return unpacked;
+  const bundle = unpacked.data.project;
+
+  const created = await provider.createProject({ title: bundle.meta.title });
+  if (!created.ok) return created;
+  const newId = created.data.id;
+
+  const saved = await provider.saveNarrative(newId, {
+    axsSource: bundle.axsSource,
+    nodes: bundle.nodes,
+    edges: bundle.edges,
+  });
+  if (!saved.ok) {
+    await provider.deleteProject(newId);
+    return saved;
+  }
+  for (const role of bundle.roles) {
+    const r = await provider.addRole(newId, {
+      characterRefId: role.characterRefId,
+    });
+    if (!r.ok) {
+      await provider.deleteProject(newId);
+      return r;
+    }
+  }
+  return created;
+}
+
+/** 平台文件保存：桌面 dialog+fs；浏览器 blob 下载 */
+export async function saveTextFile(
+  defaultName: string,
+  text: string,
+): Promise<boolean> {
+  if (isTauriEnvironment()) {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const fs = await import("@tauri-apps/plugin-fs");
+    const path = await save({ defaultPath: defaultName });
+    if (!path) return false;
+    await fs.writeTextFile(path, text);
+    return true;
+  }
+  const blob = new Blob([text], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = defaultName;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
+}
+
+/** 平台文件读取：桌面 dialog+fs；浏览器 file input（返回 null=用户取消） */
+export async function openTextFile(accept: string): Promise<string | null> {
+  if (isTauriEnvironment()) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const fs = await import("@tauri-apps/plugin-fs");
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "Axiforge 工程", extensions: ["axsp", "json"] }],
+    });
+    if (typeof path !== "string") return null;
+    return await fs.readTextFile(path);
+  }
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => resolve(null);
+      reader.readAsText(file);
+    };
+    input.click();
+  });
 }

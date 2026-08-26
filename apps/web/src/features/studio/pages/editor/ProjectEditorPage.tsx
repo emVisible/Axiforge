@@ -6,7 +6,7 @@ import ScriptPreview from "../../components/ScriptPreview";
 import AchievementPanel from "../../components/AchievementPanel";
 import CutLayoutToolbar from "../../cut/CutLayoutToolbar";
 import { routes } from "@/shared/lib/routes";
-import { Play, Star } from "lucide-react";
+import { Download, Play, Star } from "lucide-react";
 import { useProjectEditor, type EditorMode } from "../../hooks/useProjectEditor";
 import CutWorkspace from "./CutWorkspace";
 import WriterWorkspace from "./WriterWorkspace";
@@ -46,6 +46,7 @@ export default function ProjectEditorPage() {
     undo,
     saving,
     saveAll,
+    exportProjectAxsp,
   } = editor;
 
   return (
@@ -170,6 +171,14 @@ export default function ProjectEditorPage() {
                 试玩
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="toolbar"
+              icon={<Download className="h-3.5 w-3.5" />}
+              onClick={exportProjectAxsp}
+            >
+              导出
+            </Button>
             {(editorMode === "flow" || editorMode === "cut") && (
               <Button size="sm" onClick={saveAll} loading={saving} disabled={saving}>
                 {saving ? "保存中..." : "保存"}

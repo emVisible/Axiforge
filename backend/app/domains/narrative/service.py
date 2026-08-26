@@ -2,7 +2,8 @@
 
 import copy
 from datetime import datetime
-from typing import Optional, List
+from typing import Dict, List, Optional
+import uuid
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, or_, select, delete
@@ -685,9 +686,22 @@ class ProjectService:
             if node.id not in incoming_ids:
                 await self.db.delete(node)
 
+        # 跨工程 id 碰撞防御（.axsp 导入场景）：payload id 若已被「其他工程」的
+        # 节点占用（PK 全表唯一），为本工程重映射新 id，边引用随动。
+        id_map: Dict[UUID, UUID] = {}
         for n_sync in data.nodes:
             if n_sync.id:
                 existing = await self.db.get(ProjectNode, n_sync.id)
+                if existing and existing.project_id != project_id:
+                    id_map[n_sync.id] = UUID(str(uuid.uuid4()))
+
+        def mapped(nid: Optional[UUID]) -> Optional[UUID]:
+            return id_map.get(nid, nid) if nid else nid
+
+        for n_sync in data.nodes:
+            final_id = mapped(n_sync.id) if n_sync.id else None
+            if final_id:
+                existing = await self.db.get(ProjectNode, final_id)
                 if existing and existing.project_id == project_id:
                     existing.stage_id = n_sync.stage_id
                     existing.editor_data = n_sync.editor_data
@@ -696,7 +710,7 @@ class ProjectService:
                     continue
             self.db.add(
                 ProjectNode(
-                    id=n_sync.id,
+                    id=final_id,
                     project_id=project_id,
                     stage_id=n_sync.stage_id,
                     editor_data=n_sync.editor_data,
@@ -712,8 +726,8 @@ class ProjectService:
             self.db.add(
                 ProjectEdge(
                     project_id=project_id,
-                    source_node_id=edge.source_node_id,
-                    target_node_id=edge.target_node_id,
+                    source_node_id=mapped(edge.source_node_id) or edge.source_node_id,
+                    target_node_id=mapped(edge.target_node_id) or edge.target_node_id,
                     source_port=edge.source_port,
                     label=edge.label,
                     condition=edge.condition,

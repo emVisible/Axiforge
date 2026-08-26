@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Plus, ScrollText } from "lucide-react";
+import { FileUp, Plus, ScrollText } from "lucide-react";
 
 import {
   useProjects,
@@ -27,6 +27,7 @@ import {
 } from "@/shared/components/ui";
 import type { ProjectResponse } from "@/shared/types/project";
 import { getCreatorId } from "@/shared/lib/creatorId";
+import { createStorageProvider, importProjectFromAxsp, openTextFile } from "@/shared/storage";
 import { PROJECT_WORKFLOW } from "@/shared/lib/workflowSteps";
 import { projectApi } from "@/shared/api/editor";
 
@@ -189,6 +190,28 @@ export default function ProjectListPage() {
         action={
           <div className="flex items-center gap-2">
             <DiscoverBrowseLink tab="projects" />
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<FileUp className="h-4 w-4" strokeWidth={1.75} />}
+              onClick={async () => {
+                const text = await openTextFile(".axsp,application/json");
+                if (!text) return;
+                try {
+                  const provider = await createStorageProvider();
+                  const res = await importProjectFromAxsp(provider, text);
+                  if (res.ok) {
+                    navigate(`/studio/projects/${res.data.id}`);
+                  } else {
+                    alert(`导入失败：${res.error.code === "corrupted" ? "文件格式不正确" : (res.error.code + " — " + ((res.error as {detail?: string}).detail ?? ""))}`);
+                  }
+                } catch {
+                  alert("导入失败：文件无法读取");
+                }
+              }}
+            >
+              导入 .axsp
+            </Button>
             <Button
               size="sm"
               icon={<Plus className="h-4 w-4" strokeWidth={1.75} />}

@@ -35,6 +35,7 @@ export default function CutWorkspace({ editor }: { editor: ProjectEditor }) {
     handleDeleteProject,
     renameBeat,
     patchProjectMeta,
+    refreshProject,
     handleEdgeLabelChange,
     handleDeleteEdge,
     outlinerItemRefs,
@@ -80,6 +81,7 @@ project && (
   onAddScene={async (title) => {
     try {
       await outliner.addScene(title);
+      await refreshProject();
       showToast("已添加舞台");
     } catch {
       showToast("添加失败", "error");
@@ -88,6 +90,7 @@ project && (
   onImportScene={async (assetId) => {
     try {
       await outliner.importSceneAsset(assetId);
+      await refreshProject();
       showToast("已导入舞台");
     } catch {
       showToast("导入失败", "error");
@@ -97,6 +100,7 @@ project && (
     try {
       await outliner.deleteScene(sceneIdToDelete);
       if (cutSceneFilter === sceneIdToDelete) setCutSceneFilter(null);
+      await refreshProject();
       showToast("已删除舞台");
     } catch {
       showToast("删除失败", "error");
@@ -105,6 +109,7 @@ project && (
   onAddRole={async (characterId, name) => {
     try {
       await outliner.addRole(characterId, name);
+      await refreshProject();
       showToast(`已添加角色「${name}」`);
     } catch {
       showToast("添加失败", "error");
@@ -113,6 +118,7 @@ project && (
   onRemoveRole={async (roleId) => {
     try {
       await outliner.removeRole(roleId);
+      await refreshProject();
       showToast("已移除角色");
     } catch {
       showToast("移除失败", "error");
@@ -121,6 +127,7 @@ project && (
   onAddItem={async (itemId) => {
     try {
       await outliner.addItemRef(itemId);
+      await refreshProject();
       showToast("已添加道具引用");
     } catch {
       showToast("添加失败", "error");
@@ -129,6 +136,7 @@ project && (
   onRemoveItemRef={async (refId) => {
     try {
       await outliner.removeItemRef(refId);
+      await refreshProject();
       showToast("已移除道具");
     } catch {
       showToast("移除失败", "error");

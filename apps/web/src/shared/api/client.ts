@@ -17,7 +17,9 @@ class ApiClient {
     if (res.status === 204) return undefined as T;
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(text || `Request failed: ${res.status}`);
+      const err = new Error(text || `Request failed: ${res.status}`);
+      (err as { status?: number }).status = res.status;
+      throw err;
     }
     return res.json();
   }

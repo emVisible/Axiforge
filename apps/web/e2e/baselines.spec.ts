@@ -339,3 +339,53 @@ test("E6 加载兜底：空 axs_source 工程投影生成剧本文本", async ({
   await expect(page.locator(".cm-content")).toContainText("# E6节点");
   await expect(page.locator(".cm-content")).toContainText("自动投影验证。");
 });
+
+// ---------------------------------------------------------------------------
+// E8 .axsp 容器：导出 → 导入 → 数据等价
+// ---------------------------------------------------------------------------
+
+test("E8 .axsp 导出导入：新工程数据与原工程等价", async ({ page, request }) => {
+  const project = await createProject(request, "E8 容器");
+  await addNode(request, project.id, project.scenes[0].id, {
+    title: "E8拍",
+    script: [{ op: "narration", text: "容器验证。" }],
+  });
+
+  await openStudio(page, project.id);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "导出" }).click(),
+  ]);
+  const exportPath = await download.path();
+  expect(exportPath).toBeTruthy();
+
+  // 回列表页导入
+  await page.goto("/studio/projects");
+  page.on("dialog", (d) => console.log("[E8-dialog]", d.type(), d.message()));
+  page.on("console", (m) => {
+    if (m.text().includes("导入")) console.log("[E8-console]", m.text());
+  });
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByRole("button", { name: /导入 \.axsp/ }).click(),
+  ]);
+  await chooser.setFiles(exportPath!);
+  await page.waitForURL(/\/studio\/projects\/[0-9a-f-]{36}/, { timeout: 15_000 });
+
+  const newId = page.url().split("/").pop()!;
+  expect(newId).not.toBe(project.id);
+
+  // API 权威断言：数据等价
+  const [orig, fresh] = await Promise.all([
+    getProject(request, project.id),
+    getProject(request, newId),
+  ]);
+  expect(fresh.title).toBe(project.title);
+  const origTitles = orig.nodes.map((n: any) => n.narrative_data?.title);
+  const freshTitles = fresh.nodes.map((n: any) => n.narrative_data?.title);
+  expect(freshTitles).toEqual(origTitles);
+  const freshNode = fresh.nodes.find(
+    (n: any) => n.narrative_data?.title === "E8拍",
+  );
+  expect(freshNode?.narrative_data?.script?.[0]?.text).toBe("容器验证。");
+});

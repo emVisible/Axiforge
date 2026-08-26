@@ -61,6 +61,11 @@ import {
 } from "@/features/writer/lib/projection";
 import { sanitizeScript } from "@/features/studio/cut/timelineUtils";
 import { useDraftJournal } from "@/features/studio/hooks/useDraftJournal";
+import type {
+  Edge as KernelEdge,
+  NarrativeNode as KernelNode,
+  Origin,
+} from "@axiforge/editor-core";
 import { draftFromProject } from "@/features/writer/lib/projection";
 
 const LazyFlowStudioView = lazy(() => import("../flow/FlowStudioView"));
@@ -106,8 +111,6 @@ export default function ProjectFlowPage() {
   const [activePanel, setActivePanel] = useState<PanelTab>("content");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
-  // L2 内核接缝：脚本编辑的事务校验与记序（单一写入口，Phase 1b 过渡态）
-  const draftJournal = useDraftJournal();
 
   const [nodeForm, setNodeForm] = useState<NodeFormState>({
     title: "",
@@ -140,6 +143,24 @@ export default function ProjectFlowPage() {
   const [stageFocusTrigger, setStageFocusTrigger] = useState(0);
   const cutLayoutApiRef = useRef<CutLayoutApi | null>(null);
   const [cutSceneFilter, setCutSceneFilter] = useState<string | null>(sceneId);
+
+  // L2 内核接缝：一切编辑经 dispatch 单一写入口（Phase 1b 过渡态：
+  // Draft 为校验+记序层，React state 为渲染镜像；未保存节点被拒绝时保持旧语义）
+  const draftJournal = useDraftJournal();
+  const editOrigin: Origin = editorMode === "flow" ? "flow" : "cut";
+  const toKernelEdge = (e: Edge): KernelEdge => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    label: (e.label as string) ?? null,
+  });
+  const flowNodeToKernelNode = (n: Node): KernelNode => ({
+    id: n.id,
+    stageId: (n.data.stage_id as string) ?? null,
+    position: n.position,
+    narrative: n.data as Record<string, unknown>,
+    sortOrder: nodes.length,
+  });
 
   useEffect(() => {
     if (sceneId) setCutSceneFilter(sceneId);
@@ -569,13 +590,14 @@ export default function ProjectFlowPage() {
           stage_dot: palette.dot,
         },
       };
+      draftJournal.dispatch({ kind: "node.add", node: flowNodeToKernelNode(newNode) }, "flow");
       setNodes((nds) => {
         const n = [...nds, newNode];
         pushHistory(n, edges);
         return n;
       });
     },
-    [nodes, edges, setNodes, project, viewMode, activeStageId, currentScene],
+    [nodes, edges, setNodes, project, viewMode, activeStageId, currentScene, draftJournal],
   );
 
   const onConnect = useCallback(
@@ -591,13 +613,17 @@ export default function ProjectFlowPage() {
         style: { stroke: flowEdgeStroke, strokeWidth: 2 },
         label: "",
       };
+      draftJournal.dispatch(
+        { kind: "edges.replaceAll", edges: addEdge(newEdge, edges).map(toKernelEdge) },
+        "flow",
+      );
       setEdges((eds) => {
         const e = addEdge(newEdge, eds);
         pushHistory(nodes, e);
         return e;
       });
     },
-    [nodes, edges, setEdges],
+    [nodes, edges, setEdges, draftJournal],
   );
 
   const onNodeClick = useCallback(
@@ -621,6 +647,18 @@ export default function ProjectFlowPage() {
     if (!selectedNode) return;
     const nd = { ...nodeForm, ...data };
     setNodeForm(nd);
+    draftJournal.dispatch(
+      {
+        kind: "node.patch",
+        nodeId: selectedNode.id,
+        patch: {
+          ...nd,
+          is_anchor: Boolean(nd.is_anchor),
+          is_ending: Boolean(nd.is_ending),
+        },
+      },
+      editOrigin,
+    );
     setNodes((nds) =>
       nds.map((n) =>
         n.id === selectedNode.id
@@ -644,6 +682,10 @@ export default function ProjectFlowPage() {
       if (!selectedNode) return;
       const hc = newC.length > 0;
       const tc = hc ? { type: "all", conditions: newC } : null;
+      draftJournal.dispatch(
+        { kind: "node.patch", nodeId: selectedNode.id, patch: { trigger_condition: tc as Condition | null } },
+        editOrigin,
+      );
       setNodes((nds) =>
         nds.map((n) =>
           n.id === selectedNode.id
@@ -662,6 +704,10 @@ export default function ProjectFlowPage() {
     (newE: EffectItem[]) => {
       setEffects(newE);
       if (!selectedNode) return;
+      draftJournal.dispatch(
+        { kind: "node.patch", nodeId: selectedNode.id, patch: { effects: newE } },
+        editOrigin,
+      );
       setNodes((nds) =>
         nds.map((n) =>
           n.id === selectedNode.id
@@ -689,7 +735,7 @@ export default function ProjectFlowPage() {
       // 此时保持旧路径语义（仅视图更新）——绞杀者过渡态，零行为变更。
       draftJournal.dispatch(
         { kind: "script.replace", nodeId: selectedNode.id, script: cleaned },
-        "cut",
+        editOrigin,
       );
       setNodes((nds) =>
         nds.map((n) =>
@@ -711,6 +757,10 @@ export default function ProjectFlowPage() {
 
   const renameBeat = useCallback(
     (nodeId: string, title: string) => {
+      draftJournal.dispatch(
+        { kind: "node.patch", nodeId, patch: { title } },
+        editOrigin,
+      );
       setNodes((nds) =>
         nds.map((n) =>
           n.id === nodeId ? { ...n, data: { ...n.data, title } } : n,
@@ -744,6 +794,10 @@ export default function ProjectFlowPage() {
     (newProps: string[]) => {
       setNodeProps(newProps);
       if (!selectedNode) return;
+      draftJournal.dispatch(
+        { kind: "node.patch", nodeId: selectedNode.id, patch: { props: newProps } },
+        editOrigin,
+      );
       setNodes((nds) =>
         nds.map((n) =>
           n.id === selectedNode.id
@@ -777,6 +831,7 @@ export default function ProjectFlowPage() {
     ) {
       return;
     }
+    draftJournal.dispatch({ kind: "node.remove", nodeId: selectedNode.id }, "flow");
     setNodes((nds) => {
       const n = nds.filter((x) => x.id !== selectedNode.id);
       pushHistory(n, edges);
@@ -791,6 +846,15 @@ export default function ProjectFlowPage() {
   };
 
   const handleEdgeLabelChange = (edgeId: string, label: string) => {
+    draftJournal.dispatch(
+      {
+        kind: "edges.replaceAll",
+        edges: edges.map((e) =>
+          e.id === edgeId ? { ...toKernelEdge(e), label } : toKernelEdge(e),
+        ),
+      },
+      "flow",
+    );
     setEdges((eds) =>
       eds.map((e) => (e.id === edgeId ? { ...e, label } : e)),
     );
@@ -800,6 +864,13 @@ export default function ProjectFlowPage() {
   };
 
   const handleDeleteEdge = (edgeId: string) => {
+    draftJournal.dispatch(
+      {
+        kind: "edges.replaceAll",
+        edges: edges.filter((e) => e.id !== edgeId).map(toKernelEdge),
+      },
+      "flow",
+    );
     setEdges((eds) => eds.filter((e) => e.id !== edgeId));
     setSelectedEdge(null);
   };
@@ -821,6 +892,7 @@ export default function ProjectFlowPage() {
           },
           selected: false,
         };
+        draftJournal.dispatch({ kind: "node.add", node: flowNodeToKernelNode(copied) }, "flow");
         setNodes((nds) => {
           const n = [...nds, copied];
           pushHistory(n, edges);

@@ -255,6 +255,18 @@ export function apply(
       });
     }
 
+    case "node.move": {
+      const node = draft.nodes.get(tx.nodeId);
+      if (!node) return fail({ code: "node_not_found", nodeId: tx.nodeId });
+      const nodes = new Map(draft.nodes);
+      nodes.set(tx.nodeId, { ...node, position: tx.position });
+      return done({ ...draft, rev: draft.rev + 1, nodes }, {
+        nodes: new Set([tx.nodeId]),
+        edges: false,
+        roles: false,
+      });
+    }
+
     case "node.add": {
       if (draft.nodes.has(tx.node.id)) {
         return fail({ code: "duplicate_node", nodeId: tx.node.id });

@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { MarkerType, type Node, type Edge, type Connection, type NodeChange, type EdgeChange, type NodeMouseHandler } from "reactflow";
 import type { Instruction, Condition } from "@axiforge/core";
-import { projectApi } from "@/shared/api/editor";
-import { useDeleteProject, useProject, PROJECT_KEYS } from "@/shared/hooks/useProjects";
+import type { NarrativeSyncRequest } from "@/shared/api/editor";
+import { useDeleteProject } from "@/shared/hooks/useProjects";
 import type { SimTarget } from "../components/ConditionSimulator";
 import { addEdge } from "../flow/FlowCanvas";
 import {
@@ -49,6 +48,8 @@ import type {
   Origin,
 } from "@axiforge/editor-core";
 import { draftFromProject } from "@/features/writer/lib/projection";
+import { bundleToResponse, createStorageProvider } from "@/shared/storage";
+import type { StorageProvider } from "@axiforge/editor-core";
 
 
 /** Draft 节点 → React Flow 节点投影（data 形状与旧 nodeResponseToFlowNode 逐字段一致） */
@@ -107,8 +108,9 @@ export function useProjectEditor(id: string) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sceneId = searchParams.get("scene");
-  const qc = useQueryClient();
-  const { data: project, isLoading: projectLoading } = useProject(id!);
+  const providerRef = useRef<StorageProvider | null>(null);
+  const [project, setProject] = useState<ProjectResponse | null>(null);
+  const [projectLoading, setProjectLoading] = useState(true);
   const outliner = useProjectOutliner(id!);
   const deleteProjectMutation = useDeleteProject();
 
@@ -272,10 +274,13 @@ export function useProjectEditor(id: string) {
 
   const persistAxsProjection = useCallback(
     async (source: string) => {
-      if (!id) return;
-      await projectApi.update(id, { axs_source: source });
-      setAxsSource(source);
-      setAxsDirty(false);
+      const p = providerRef.current;
+      if (!p || !id) return;
+      const res = await p.updateProjectMeta(id, { axsSource: source });
+      if (res.ok) {
+        setAxsSource(source);
+        setAxsDirty(false);
+      }
     },
     [id],
   );
@@ -374,9 +379,37 @@ export function useProjectEditor(id: string) {
   }, [project, syncCanvasFromProject]);
 
   const refreshProject = useCallback(async () => {
-    if (!id) return;
-    await qc.invalidateQueries({ queryKey: PROJECT_KEYS.detail(id) });
-  }, [id, qc]);
+    const p = providerRef.current;
+    if (!p || !id) return;
+    const res = await p.loadProject(id);
+    if (res.ok) setProject(bundleToResponse(res.data));
+  }, [id]);
+
+  // Provider 初始化 + 工程装载（浏览器=HTTP 实现；桌面=SQLite 实现，断网可用）
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const p = await createStorageProvider();
+      if (cancelled) {
+        return;
+      }
+      providerRef.current = p;
+      const res = await p.loadProject(id);
+      if (cancelled) return;
+      setProjectLoading(false);
+      if (res.ok) {
+        setProject(bundleToResponse(res.data));
+      } else if (res.error.code === "not_found") {
+        showToast(`工程不存在或已删除`, "error");
+      } else {
+        showToast(`工程载入失败：${res.error.code}`, "error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const openBeatInFlow = useCallback(
     (nodeId: string) => {
@@ -613,7 +646,10 @@ export function useProjectEditor(id: string) {
     async (patch: Pick<ProjectUpdate, "title" | "description" | "world_setting" | "rules">) => {
       if (!id) return;
       try {
-        await projectApi.update(id, patch);
+        const p = providerRef.current;
+        if (!p) throw new Error("provider 未就绪");
+        const res = await p.updateProjectMeta(id, patch);
+        if (!res.ok) throw new Error(res.error.code);
         await outliner.refresh();
         showToast("已保存项目信息");
       } catch {
@@ -722,6 +758,31 @@ export function useProjectEditor(id: string) {
     return () => window.removeEventListener("keydown", h);
   }, [undo, selectedNode, selectedEdge, handleDeleteEdge, editorMode]);
 
+  /** 传输态载荷 → L4 原子保存（HTTP/SQLite 实现共用） */
+  const dispatchSaveNarrative = useCallback(
+    async (payload: NarrativeSyncRequest, axsSourceOverride?: string | null) => {
+      const p = providerRef.current;
+      if (!p || !id) return;
+      await p.saveNarrative(id, {
+        axsSource: axsSourceOverride ?? payload.axs_source ?? null,
+        nodes: payload.nodes.map((n) => ({
+          id: String(n.id),
+          stageId: n.stage_id ?? null,
+          editorData: (n.editor_data ?? {}) as Record<string, unknown>,
+          narrativeData: (n.narrative_data ?? {}) as Record<string, unknown>,
+          sortOrder: n.sort_order ?? 0,
+        })),
+        edges: payload.edges.map((e) => ({
+          id: `${e.source_node_id}-${e.target_node_id}`,
+          source: String(e.source_node_id),
+          target: String(e.target_node_id),
+          label: e.label ?? null,
+        })),
+      });
+    },
+    [id],
+  );
+
   const saveWriter = async () => {
     if (!id || !project) return;
     setSaving(true);
@@ -735,7 +796,7 @@ export function useProjectEditor(id: string) {
         project.scenes || [],
         allProjectNodes,
       );
-      await projectApi.syncNarrative(id, payload);
+      await dispatchSaveNarrative(payload);
       dispatch(
         { kind: "axs.import", source: axsSource, roles: rolesMap },
         "writer",
@@ -755,110 +816,103 @@ export function useProjectEditor(id: string) {
     setSaving(true);
     try {
       const draftNodes = [...draft.nodes.values()];
-      const currentIds = new Set(draftNodes.map((n) => n.id));
-      const scopeNodes =
-        viewMode === "full"
-          ? draftNodes
-          : draftNodes.filter((n) => n.stageId === currentScene!.id);
+      const uuid = () =>
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-      const resolveStageId = (n: { stageId: string | null }) =>
-        n.stageId || currentScene?.id || project.scenes?.[0]?.id;
-
-      // 删除服务端存在、画布已消失的节点（作用域内，旧语义等价）
-      for (const node of allProjectNodes) {
-        const sid = node.stage_id ?? node.scene_id ?? currentScene?.id;
-        if (viewMode !== "full" && sid !== currentScene?.id) continue;
-        if (!currentIds.has(String(node.id))) {
-          if (!sid) continue;
-          try {
-            await projectApi.deleteNode(id, sid, node.id);
-          } catch {
-            /* 已删除则忽略 */
-          }
-        }
-      }
-
+      // 临时 id（new-/copy-）客户端重映射为正式 UUID
       const nodeMap = new Map<string, string>();
       for (const n of draftNodes) {
-        const sid = resolveStageId(n);
-        if (!sid) continue;
-        if (n.id.startsWith("new-") || n.id.startsWith("copy-")) {
-          const created = await projectApi.addNode(id, sid, {
-            stage_id: sid,
-            editor_data: { position: n.position },
-            narrative_data: n.narrative as Record<string, unknown>,
-          });
-          nodeMap.set(n.id, created.id);
-        } else {
-          nodeMap.set(n.id, n.id);
-        }
-      }
-      for (const n of draftNodes) {
-        if (n.id.startsWith("new-") || n.id.startsWith("copy-")) continue;
-        const sid = resolveStageId(n);
-        if (!sid) continue;
-        await projectApi.updateNode(id, sid, nodeMap.get(n.id) || n.id, {
-          stage_id: sid,
-          editor_data: { position: n.position },
-          narrative_data: n.narrative as Record<string, unknown>,
-        });
+        nodeMap.set(n.id, n.id.startsWith("new-") || n.id.startsWith("copy-") ? uuid() : n.id);
       }
 
-      if (viewMode === "full") {
-        const allEdges = draft.edges.map((e) => ({
-          source_node_id: nodeMap.get(e.source) || e.source,
-          target_node_id: nodeMap.get(e.target) || e.target,
-          source_port: "output",
-          label: e.label || null,
+      // 作用域外节点：沿用最近一次服务端真值（原子覆写不可丢其他舞台）
+      const preservedNodes = (allProjectNodes || [])
+        .filter((n) => {
+          const sid = n.stage_id ?? n.scene_id;
+          return viewMode === "stage" && currentScene ? sid !== currentScene.id : false;
+        })
+        .map((n) => ({
+          id: String(n.id),
+          stageId: n.stage_id ?? n.scene_id ?? null,
+          editorData: (n.editor_data ?? {}) as Record<string, unknown>,
+          narrativeData: (n.narrative_data ?? {}) as Record<string, unknown>,
+          sortOrder: n.sort_order ?? 0,
         }));
-        await projectApi.saveEdges(id, allEdges);
-      } else {
-        const sceneNodeIds = new Set<string>();
-        for (const n of draftNodes) {
-          sceneNodeIds.add(nodeMap.get(n.id) || n.id);
-        }
-        for (const n of scopeNodes) {
-          sceneNodeIds.add(n.id);
-        }
 
-        const preservedEdges = (project?.edges || [])
-          .filter((e) => {
-            const src = String(e.source_node_id);
-            const tgt = String(e.target_node_id);
-            return !(sceneNodeIds.has(src) && sceneNodeIds.has(tgt));
-          })
-          .map((e) => ({
-            source_node_id: e.source_node_id,
-            target_node_id: e.target_node_id,
-            source_port: e.source_port || "output",
-            label: e.label || null,
-          }));
+      const payloadNodes = [
+        ...preservedNodes,
+        ...draftNodes.map((n) => ({
+          id: nodeMap.get(n.id)!,
+          stageId: n.stageId ?? currentScene?.id ?? project.scenes?.[0]?.id ?? null,
+          editorData: { position: n.position },
+          narrativeData: n.narrative as Record<string, unknown>,
+          sortOrder: n.sortOrder,
+        })),
+      ];
 
-        const currentSceneEdges = draft.edges.map((e) => ({
-          source_node_id: nodeMap.get(e.source) || e.source,
-          target_node_id: nodeMap.get(e.target) || e.target,
-          source_port: "output",
-          label: e.label || null,
+      // 边：全部按重映射后的 id 提交；舞台模式保留跨舞台既有边
+      const inScope = new Set(payloadNodes.map((n) => n.id));
+      const draftEdges = draft.edges.map((e) => ({
+        id: `${nodeMap.get(e.source) || e.source}-${nodeMap.get(e.target) || e.target}`,
+        source: nodeMap.get(e.source) || e.source,
+        target: nodeMap.get(e.target) || e.target,
+        label: e.label ?? null,
+      }));
+      const preservedEdges = (project?.edges || [])
+        .filter((e) => {
+          const src = String(e.source_node_id);
+          const tgt = String(e.target_node_id);
+          const bothOutside = !inScope.has(src) && !inScope.has(tgt);
+          return viewMode === "stage" && bothOutside;
+        })
+        .map((e) => ({
+          id: e.id,
+          source: String(e.source_node_id),
+          target: String(e.target_node_id),
+          label: e.label,
         }));
-        await projectApi.saveEdges(id, [...preservedEdges, ...currentSceneEdges]);
-      }
+      const payloadEdges = [...preservedEdges, ...draftEdges];
+
+      await dispatchSaveNarrative(
+        {
+          axs_source: project.axs_source ?? "",
+          nodes: payloadNodes.map((n) => ({
+            id: n.id,
+            stage_id: n.stageId,
+            editor_data: n.editorData,
+            narrative_data: n.narrativeData,
+            sort_order: n.sortOrder,
+          })),
+          edges: payloadEdges.map((e) => ({
+            source_node_id: e.source,
+            target_node_id: e.target,
+            source_port: "output",
+            label: e.label,
+          })),
+        },
+        project.axs_source ?? null,
+      );
 
       await refreshProject();
-      if (viewMode === "stage" && currentScene && project) {
-        const rs = project.scenes?.find((s) => s.id === currentScene.id);
+      if (viewMode === "stage" && currentScene) {
+        const rs = project.scenes?.find((sc) => sc.id === currentScene.id);
         if (rs) setCurrentScene(rs);
       }
 
       if (id) {
-        const fresh = await projectApi.get(id);
-        const freshNodes = collectProjectNodes(fresh.nodes, fresh.scenes || []);
-        const projected = projectToAxs(
-          freshNodes,
-          fresh.edges || [],
-          fresh.scenes || [],
-          rolesMap,
-        );
-        await persistAxsProjection(projected);
+        const fresh = await providerRef.current?.loadProject(id);
+        if (fresh?.ok) {
+          const freshResponse = bundleToResponse(fresh.data);
+          const projected = projectToAxs(
+            collectProjectNodes(freshResponse.nodes, freshResponse.scenes || []),
+            freshResponse.edges || [],
+            freshResponse.scenes || [],
+            rolesMap,
+          );
+          await persistAxsProjection(projected);
+        }
       }
 
       showToast("已保存");

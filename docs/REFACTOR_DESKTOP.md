@@ -146,7 +146,8 @@
 - [x] SQLite 实现：`SqliteStorageProvider`（SqlBackend 抽象——生产 tauri-plugin-sql / 测试 sql.js 真引擎）+ schema v1（沿用 PG 关系模型，narrative_data JSON 文本列）+ 事务原子覆写 + **契约套件全绿**（85 测试，分支 93.4%）
 - [x] TauriSqlBackend + Provider 工厂：`?`→`$n` 占位符翻译（sqlx 语法）+ 串行队列；**原子性下沉**——sqlx 池化下 BEGIN/COMMIT 跨连接失效（壳内冒烟实证），新增 Rust 命令 `sql_transaction`（单连接 + FK 级联）承载事务，回滚在真壳内实证 ✓
 - [x] 壳内冒烟（DEV 自动运行，结果落盘 `~/Documents/Axiforge/storage-smoke.txt`）：create→bootstrap→覆写→回滚→角色去重→清理 全链路 PASS
-- [ ] useProjectEditor 数据访问全量切换 Provider（工厂已就绪：`createStorageProvider()`）
+- [x] useProjectEditor 核心链路切换 Provider：装载（loadProject→bundleToResponse）/ 刷新 / saveWriter / **saveAll（逐节点 API 舞蹈 → 单次原子 saveNarrative，临时 id 客户端重映射，舞台模式保留域外节点）** / patchProjectMeta / axs 投影
+  - outliner 场景/道具/角色目录暂留 HTTP（变更后经 refreshProject 汇合到 Provider 工程态）——断网场景的选角目录与舞台管理随角色域 Provider 化补齐
   - 语义裁决：saveNarrative/addRole/removeRole 先验工程存在（not_found）；损坏 JSON → corrupted 不静默兜底；io 错误路径全臂覆盖（ThrowingBackend）
 
 - [x] `apps/desktop`：Tauri v2 壳落地（cargo check ✓ + dev 冒烟 ✓：窗口进程 + WebView 加载前端）

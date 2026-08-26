@@ -50,7 +50,7 @@ function toEdge(e: ProjectEdgeResponse): Edge {
   };
 }
 
-function draftFromProject(
+export function draftFromProject(
   nodes: ProjectNodeResponse[],
   edges: ProjectEdgeResponse[],
   scenes: ProjectSceneResponse[],

@@ -60,6 +60,8 @@ import {
   projectAxsFromCanvas,
 } from "@/features/writer/lib/projection";
 import { sanitizeScript } from "@/features/studio/cut/timelineUtils";
+import { useDraftJournal } from "@/features/studio/hooks/useDraftJournal";
+import { draftFromProject } from "@/features/writer/lib/projection";
 
 const LazyFlowStudioView = lazy(() => import("../flow/FlowStudioView"));
 const LazyWriterStudioView = lazy(
@@ -104,6 +106,8 @@ export default function ProjectFlowPage() {
   const [activePanel, setActivePanel] = useState<PanelTab>("content");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
+  // L2 内核接缝：脚本编辑的事务校验与记序（单一写入口，Phase 1b 过渡态）
+  const draftJournal = useDraftJournal();
 
   const [nodeForm, setNodeForm] = useState<NodeFormState>({
     title: "",
@@ -460,6 +464,9 @@ export default function ProjectFlowPage() {
 
       const projectNodes = collectProjectNodes(p.nodes, p.scenes || []);
       setAllProjectNodes(projectNodes);
+      draftJournal.sync(
+        draftFromProject(projectNodes, p.edges || [], p.scenes || []),
+      );
       const scenes = p.scenes || [];
       if (activeStageId === null && scenes[0]) {
         setActiveStageId(scenes[0].id);
@@ -678,6 +685,12 @@ export default function ProjectFlowPage() {
       const cleaned = sanitizeScript(newS);
       setScript(cleaned);
       if (!selectedNode) return;
+      // 单一写入口：先经内核事务校验并入日志；未保存节点会被拒绝，
+      // 此时保持旧路径语义（仅视图更新）——绞杀者过渡态，零行为变更。
+      draftJournal.dispatch(
+        { kind: "script.replace", nodeId: selectedNode.id, script: cleaned },
+        "cut",
+      );
       setNodes((nds) =>
         nds.map((n) =>
           n.id === selectedNode.id
@@ -851,6 +864,10 @@ export default function ProjectFlowPage() {
         allProjectNodes,
       );
       await projectApi.syncNarrative(id, payload);
+      draftJournal.dispatch(
+        { kind: "axs.import", source: axsSource, roles: rolesMap },
+        "writer",
+      );
       await refreshProject();
       showToast("剧本已保存");
     } catch {

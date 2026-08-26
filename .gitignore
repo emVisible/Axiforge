@@ -86,6 +86,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# --- Desktop (Tauri/Rust) ---
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/schemas/
+
 # --- Deploy ---
 .vercel/
 

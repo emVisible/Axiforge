@@ -145,7 +145,9 @@
 - [x] `.axsp` 容器 v0：manifest（版本/素材引用清单）+ 工程束；pack/unpack 逐字段等价测试 + corrupted 语义
 - [ ] SQLite 实现（依赖 Tauri 壳；需先安装 Rust 工具链）
 
-- [ ] `apps/desktop`：Tauri v2 包装现有前端；全局快捷键；本地素材目录访问
+- [x] `apps/desktop`：Tauri v2 壳落地（cargo check ✓ + dev 冒烟 ✓：窗口进程 + WebView 加载前端）
+      插件：global-shortcut / fs（素材目录作用域 `$HOME/Documents/Axiforge`）/ dialog / opener；
+      `pnpm dev:desktop` 一键起（beforeDevCommand 自动拉 web dev server）
 - [ ] StorageProvider 的 SQLite 实现（schema 沿用 PG 关系模型；`narrative_data` 保持 JSON 列）；素材落工程目录 + DB 存相对路径
 - [ ] `.axsp` 打包/打开（叙事 JSON + 素材引用清单）；SQLite 为工作缓存
 - [ ] FastAPI 后端转为可选协作/发布服务；云能力缺席时全部创作流可用

@@ -11,6 +11,8 @@
     "dev:nexus": "bash scripts/run-dev.sh nexus",
     "dev:api": "bash scripts/run-dev.sh api",
     "dev:tmux": "bash dev.bash",
+    "dev:desktop": "pnpm --filter @axiforge/desktop dev",
+    "build:desktop": "pnpm --filter @axiforge/desktop build",
     "dev:kill": "bash scripts/kill-dev-ports.sh",
     "build": "pnpm --filter @axiforge/web build && pnpm --filter @axiforge/admin build",
     "test:api": "cd backend && uv run pytest tests/ -v",

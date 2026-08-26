@@ -257,6 +257,69 @@ test("E5 试玩链路：从首拍推进至第二拍", async ({ page, request }) 
 });
 
 // ---------------------------------------------------------------------------
+// E7 拖拽持久化：位置事务（node.move）落库
+// ---------------------------------------------------------------------------
+
+test("E7 拖拽持久化：移动节点 → 保存 → reload 后位置一致", async ({ page, request }) => {
+  const project = await createProject(request, "E7 拖拽");
+  const sceneId = project.scenes[0].id;
+  const nodeId = String(project.nodes[0].id);
+
+  // 画布拖拽对 fitView 时序敏感（并行 worker 下放大），
+  // 以「重置 → 重载 → 拖拽 → 保存 → 验证」为一轮，最多三轮；
+  // 只有 node.move→保存→落库管线被真实证明才通过。
+  let persisted = false;
+  for (let round = 0; round < 3 && !persisted; round++) {
+    // 1) API 重置已知初始流程坐标
+    await updateNode(
+      request,
+      project.id,
+      sceneId,
+      nodeId,
+      { title: "E7起点", script: [] },
+      { position: { x: 500, y: 400 } },
+    );
+    // 2) 重载并进入结构轨
+    await page.goto(`/studio/projects/${project.id}`);
+    await switchMode(page, "结构");
+    const node = page.locator(".react-flow__node").first();
+    await expect(node).toBeVisible();
+    await page.waitForTimeout(1_200);
+
+    // 3) 拖拽（内层重试：mousedown 落在动画窗口期会静默失效）
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const bb = await node.boundingBox();
+      expect(bb).toBeTruthy();
+      const t0 = await node.evaluate((el) => el.style.transform);
+      await page.mouse.move(bb!.x + bb!.width / 2, bb!.y + bb!.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(bb!.x + bb!.width / 2 + 180, bb!.y + bb!.height / 2 + 120, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForTimeout(400);
+      const t1 = await node.evaluate((el) => el.style.transform);
+      if (t0 !== t1) break;
+    }
+
+    // 4) 保存
+    await page.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(page.getByText("已保存")).toBeVisible({ timeout: 15_000 });
+
+    // 5) API 验证：流程坐标向右下位移（缩放 z∈(0.2,1.8] ⇒ 边界放宽）
+    const fresh = await getProject(request, project.id);
+    const pos = fresh.nodes.find((n: any) => String(n.id) === nodeId).editor_data?.position;
+    if (pos && pos.x > 500 && pos.x < 500 + 180 / 0.2 && pos.y > 400 && pos.y < 400 + 120 / 0.2) {
+      persisted = true;
+    }
+  }
+  expect(persisted, "node.move→保存→落库管线应在三轮内被证明").toBe(true);
+
+  // reload 后节点仍渲染（视觉冒烟）
+  await page.reload();
+  await switchMode(page, "结构");
+  await expect(page.locator(".react-flow__node").first()).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
 // E6 加载兜底：无 axs_source 的工程打开时自动投影生成文本
 // ---------------------------------------------------------------------------
 

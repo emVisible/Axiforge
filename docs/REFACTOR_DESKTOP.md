@@ -94,6 +94,7 @@
   - [x] E4 工程添加角色 + 台词引用该角色
   - [x] E5 试玩链路：保存 → 编译 → 播放推进至分支
   - [x] E6 加载兜底：无 `axs_source` 的工程打开时自动投影生成文本
+  - [x] E7 拖拽持久化：node.move → 保存 → 落库（三轮证明式，抗 fitView 时序抖动）
 
 > 落地记录（2026-08-26）：E2E 揪出并修复迁移链真实缺陷（`002` 迁移在全新库与
 > create_all 基线列冲突，已幂等化）——紧致闭环「能红」价值的首次兑现。
@@ -104,7 +105,8 @@
   - 55 例单测全绿；行覆盖 99.3%、分支覆盖 95.4%（G2 达标）；web 侧 18 例基线在适配器化后原样通过（行为等价证明）
 - [ ] `ProjectFlowPage.tsx` 降级为薄视图宿主，cut/writer/flow 各自成页；原巨石文件删除（G1 清零点）
 - [ ] Draft/Transaction/Journal 接入 ProjectFlowPage 状态层（一切编辑经 `apply`，单一写入口落地）
-  - [x] 接缝落地：`useDraftJournal`（sync + dispatch 单一写入口）接入 `updateScript`（cut 轨）与 `saveWriter`（writer 记序）；未保存节点被 apply 拒绝时保持旧路径语义，零行为变更（绞杀者过渡态，E2E 6/6 + 基线 18/18 原样通过）
+  - [x] 接缝落地：`useDraftJournal`（sync + dispatch 单一写入口）接入 `updateScript`（cut 轨）与 `saveWriter`（writer 记序）；未保存节点被 apply 拒绝时保持旧路径语义，零行为变更（绞杀者过渡态，E2E 基线原样通过）
+  - [x] 拖拽记序：`node.move` 事务（内核 + E7 基线）+ `onNodeDragStop` 接线——拖拽过程走 React Flow 内部状态（高频），松手才入事务（分层设计先于 Draft 唯一持有者改造）
   - [x] 其余写路径收敛：表单/条件/效果/道具/重命名/边标签/删边/删节点/复制/onDrop 新建/onConnect 连线共 12 条全部经 `dispatch`（origin 按轨记序：cut/flow/writer）；未保存节点被拒绝时保持旧语义，零行为变更
   - [ ] Draft 升级为图的唯一持有者，React Flow nodes 降级为投影（解决拖拽位置高频写入的分层）
 - [ ] rolesMap 构建的逐角色 N+1 fetch（`ProjectFlowPage.tsx:422-444`）收敛为批量获取（内部优化，外部行为不变）

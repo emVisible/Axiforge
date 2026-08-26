@@ -52,10 +52,11 @@ export async function updateNode(
   sceneId: string,
   nodeId: string,
   narrative: Record<string, unknown>,
+  editorData?: Record<string, unknown>,
 ): Promise<any> {
   const res = await request.put(
     `${API}/editor/projects/${projectId}/scenes/${sceneId}/nodes/${nodeId}`,
-    { data: { narrative_data: narrative } },
+    { data: { narrative_data: narrative, ...(editorData ? { editor_data: editorData } : {}) } },
   );
   if (!res.ok()) throw new Error(`updateNode: ${res.status()} ${await res.text()}`);
   return res.json();

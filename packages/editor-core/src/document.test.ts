@@ -172,6 +172,17 @@ describe("script 事务", () => {
 // ---------------------------------------------------------------------------
 
 describe("node 与图事务", () => {
+  it("node.move 更新位置并拒绝缺失节点（拖拽落点记序）", () => {
+    const ok = apply(baseDraft(), env({ kind: "node.move", nodeId: "a", position: { x: 320, y: 64 } }, "flow"));
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.draft.nodes.get("a")!.position).toEqual({ x: 320, y: 64 });
+      expect(ok.draft.rev).toBe(1);
+    }
+    const miss = apply(baseDraft(), env({ kind: "node.move", nodeId: "zz", position: { x: 0, y: 0 } }, "flow"));
+    expect(miss).toEqual({ ok: false, error: { code: "node_not_found", nodeId: "zz" } });
+  });
+
   it("node.add 拒绝重复 id", () => {
     const r = apply(baseDraft(), env({
       kind: "node.add",

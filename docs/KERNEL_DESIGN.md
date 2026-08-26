@@ -44,6 +44,7 @@ export interface NarrativeNode {
   readonly stageId: string | null;
   readonly position: { x: number; y: number };
   readonly narrative: Readonly<NarrativeData>;   // 含 script: Instruction[]
+  readonly sortOrder: number;                    // 编辑器排序（后端 sort_order 的域形态）
 }
 ```
 

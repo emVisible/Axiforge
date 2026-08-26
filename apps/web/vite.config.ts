@@ -18,6 +18,7 @@ export default defineConfig({
       "@axiforge/ui": path.resolve(__dirname, "../../packages/ui"),
       "@axiforge/core": path.resolve(__dirname, "../../packages/core/src"),
       "@axiforge/axs": path.resolve(__dirname, "../../packages/axs/src"),
+      "@axiforge/editor-core": path.resolve(__dirname, "../../packages/editor-core/src"),
     },
   },
   build: {

@@ -1,0 +1,250 @@
+{
+  "id": "7effbeda-d61e-4c1e-9bcc-69196e737cc9",
+  "title": "【示范】序章·交汇",
+  "isPublic": true,
+  "worldSetting": "近未来移动都市「交汇港」",
+  "playMeta": {},
+  "nodes": [
+    {
+      "id": "7f907d79-ba81-4565-afdf-25267acdcd50",
+      "stageId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "editorData": {
+        "position": {
+          "x": 100,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "开始",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事从这里开始...",
+        "description": "剧本起始节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "3e715e5b-d122-46a3-8d26-6f3f3daab96d",
+      "stageId": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "editorData": {
+        "position": {
+          "x": 100,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "开始",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事从这里开始...",
+        "description": "剧本起始节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "c68ff6a3-b60d-4130-a4de-6e5b4a4dd726",
+      "stageId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "editorData": {
+        "position": {
+          "x": 280,
+          "y": 80
+        }
+      },
+      "narrativeData": {
+        "title": "开场",
+        "script": [
+          {
+            "op": "bg",
+            "image": "deck_sunset"
+          },
+          {
+            "op": "bgm",
+            "loop": true,
+            "track": "theme_calm",
+            "fadeMs": 1200
+          },
+          {
+            "op": "narration",
+            "text": "夕阳把交汇港染成琥珀色。海风带着金属与海盐的气味。"
+          },
+          {
+            "ms": 800,
+            "op": "transition",
+            "kind": "fade"
+          },
+          {
+            "ms": 600,
+            "op": "camera",
+            "scale": 1.08,
+            "action": "zoom"
+          },
+          {
+            "op": "say",
+            "text": "各位旅客，交汇港即将入港。",
+            "speaker": "广播"
+          },
+          {
+            "op": "narration",
+            "text": "你望向远方逐渐靠近的都市轮廓。"
+          },
+          {
+            "op": "choice",
+            "options": [
+              {
+                "to": "76e3e2b2-c24c-4311-86eb-fa7feeaa2af6",
+                "label": "继续眺望"
+              },
+              {
+                "to": "bea259d1-e68a-4ecc-875a-8fc987b434fc",
+                "label": "收回目光"
+              }
+            ]
+          }
+        ]
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "bea259d1-e68a-4ecc-875a-8fc987b434fc",
+      "stageId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "editorData": {
+        "position": {
+          "x": 440,
+          "y": 280
+        }
+      },
+      "narrativeData": {
+        "title": "收回",
+        "script": [
+          {
+            "ms": 500,
+            "op": "transition",
+            "kind": "fade"
+          },
+          {
+            "op": "say",
+            "text": "你转身走向舱门。故事，才刚开始。"
+          }
+        ],
+        "is_ending": true,
+        "ending_label": "入港结局"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "76e3e2b2-c24c-4311-86eb-fa7feeaa2af6",
+      "stageId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "editorData": {
+        "position": {
+          "x": 120,
+          "y": 280
+        }
+      },
+      "narrativeData": {
+        "title": "眺望",
+        "script": [
+          {
+            "ms": 800,
+            "op": "camera",
+            "scale": 1.15,
+            "action": "zoom"
+          },
+          {
+            "ms": 400,
+            "op": "camera",
+            "action": "shake",
+            "intensity": 4
+          },
+          {
+            "op": "narration",
+            "text": "灯火一盏盏亮起，像有人在对你说：欢迎回来。"
+          }
+        ],
+        "is_ending": true,
+        "ending_label": "眺望结局"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "6d7976e0-75cc-4e43-98a9-0fb811abfb3a",
+      "stageId": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "editorData": {
+        "position": {
+          "x": 800,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "结束",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事暂告一段落...",
+        "description": "剧本结束节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 1
+    },
+    {
+      "id": "bc4a9e58-a44b-401e-aa1a-cecc022f3a53",
+      "stageId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "editorData": {
+        "position": {
+          "x": 800,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "结束",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事暂告一段落...",
+        "description": "剧本结束节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 1
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeId": "7f907d79-ba81-4565-afdf-25267acdcd50",
+      "targetNodeId": "c68ff6a3-b60d-4130-a4de-6e5b4a4dd726",
+      "label": "",
+      "condition": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "title": "主场景",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": null,
+      "nodes": []
+    },
+    {
+      "id": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "title": "甲板",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": null,
+      "nodes": []
+    }
+  ],
+  "roles": [],
+  "characters": [],
+  "items": []
+}

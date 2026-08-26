@@ -40,6 +40,7 @@ describe("evaluateCondition", () => {
     memory: { saved_alice: true, coins: 10, wrapped: { _value: "x" } },
     flags: { intro_done: true },
     characters: { c1: { mood: "happy", affection: 50 } },
+    relationships: {},
   };
 
   it("空条件视为满足", () => {
@@ -125,6 +126,7 @@ describe("evaluateCondition — 操作符与边界补全", () => {
     memory: { coins: 10, name: "alice", tags: ["brave", "kind"] },
     flags: { intro_done: true },
     characters: { c1: { mood: "happy", affection: 50 } },
+    relationships: {},
   };
 
   it("ne: 存在且不等为真，相等为假", () => {
@@ -239,7 +241,7 @@ describe("applyEffects", () => {
 
 describe("cloneVariables", () => {
   it("深拷贝 characters 子对象", () => {
-    const vars: RuntimeVariables = { memory: {}, flags: {}, characters: { c1: { mood: "x" } } };
+    const vars: RuntimeVariables = { memory: {}, flags: {}, characters: { c1: { mood: "x" } }, relationships: {} };
     const copy = cloneVariables(vars);
     copy.characters.c1.mood = "y";
     expect(vars.characters.c1.mood).toBe("x");

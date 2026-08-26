@@ -87,8 +87,8 @@ export interface SayInstruction {
   text: string;
   /** 语音资产 id（v1.3 起启用） */
   voice?: string | null;
-  /** 是否按富文本/ruby 语法解析（v1.3） */
-  rich?: boolean;
+  /** 是否按富文本/ruby 语法解析（v1.3；Python 编译器输出 null） */
+  rich?: boolean | null;
 }
 
 /** 旁白——暂停点。语义等同无角色的 say，但独立 op 便于分轨与富文本（v1.3） */
@@ -96,14 +96,14 @@ export interface NarrationInstruction {
   op: "narration";
   text: string;
   voice?: string | null;
-  rich?: boolean;
+  rich?: boolean | null;
 }
 
 /** 立绘进场 */
 export interface ShowInstruction {
   op: "show";
   characterId: string;
-  expression?: string;
+  expression?: string | null;
   position?: Position;
   /** 进场转场（v1.3 扩展；v0 可空） */
   transition?: string | null;
@@ -121,8 +121,8 @@ export interface MoveInstruction {
   op: "move";
   characterId: string;
   position: Position;
-  /** 动画时长（ms），0/缺省为瞬移 */
-  ms?: number;
+  /** 动画时长（ms），0/缺省为瞬移（Python 输出 null） */
+  ms?: number | null;
 }
 
 /** 镜头运动（v1.3）：缩放 / 平移 / 震屏 / 复位 */
@@ -130,13 +130,13 @@ export type CameraAction = "zoom" | "pan" | "shake" | "reset";
 export interface CameraInstruction {
   op: "camera";
   action: CameraAction;
-  /** zoom：缩放倍数（1 = 原始） */
-  scale?: number;
+  /** zoom：缩放倍数（1 = 原始；Python 输出 null） */
+  scale?: number | null;
   /** pan：目标偏移，单位为舞台百分比（-100..100） */
   x?: number;
   y?: number;
   /** shake：震动强度（像素） */
-  intensity?: number;
+  intensity?: number | null;
   ms?: number;
 }
 
@@ -176,8 +176,8 @@ export interface BgmInstruction {
   op: "bgm";
   /** 音轨资产 id 或 URL；null 表示停止 */
   track: string | null;
-  fadeMs?: number;
-  loop?: boolean;
+  fadeMs?: number | null;
+  loop?: boolean | null;
 }
 
 /** 音效 */
@@ -277,8 +277,8 @@ export interface CharacterRef {
   id: string;
   name: string;
   imagePath?: string | null;
-  /** 表情 → 资产路径（v1.3 资产管线填充） */
-  expressions?: Record<string, string>;
+  /** 表情 → 资产路径（v1.3 资产管线填充；Python 编译器输出 null） */
+  expressions?: Record<string, string> | null;
 }
 
 /** 术语库条目（SG 式名词解释，v1.4） */
@@ -351,8 +351,8 @@ export interface StoryPackage {
   characterProfiles?: CharacterProfile[];
   /** 参与跨作品 Codex 的角色 ref id 列表（v1.6） */
   codexScope?: string[];
-  /** 项目成就定义（v2 Ginkgo） */
-  achievements?: AchievementDefinition[];
+  /** 项目成就定义（v2 Ginkgo；Python 编译器输出 null） */
+  achievements?: AchievementDefinition[] | null;
 }
 
 /** 初始运行时变量（存档记忆在 v1.2 接入） */

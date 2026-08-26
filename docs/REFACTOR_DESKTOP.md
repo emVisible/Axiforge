@@ -100,10 +100,12 @@
 
 #### 1b editor-core 抽取（拆 ProjectFlowPage.tsx）
 
-- [ ] 新包 `packages/editor-core`：按 [KERNEL_DESIGN.md](./KERNEL_DESIGN.md) 实现 L2 文档模型（Draft/Transaction/Journal）+ L3 投影（自 `apps/web/src/features/writer/lib/projection.ts` 迁移），零 React/DOM
+- [x] 新包 `packages/editor-core`：按 [KERNEL_DESIGN.md](./KERNEL_DESIGN.md) 实现 L2 文档模型（Draft/Transaction/Journal）+ L3 投影（自 `apps/web/src/features/writer/lib/projection.ts` 迁移），零 React/DOM
+  - 55 例单测全绿；行覆盖 99.3%、分支覆盖 95.4%（G2 达标）；web 侧 18 例基线在适配器化后原样通过（行为等价证明）
 - [ ] `ProjectFlowPage.tsx` 降级为薄视图宿主，cut/writer/flow 各自成页；原巨石文件删除（G1 清零点）
+- [ ] Draft/Transaction/Journal 接入 ProjectFlowPage 状态层（一切编辑经 `apply`，单一写入口落地）
 - [ ] rolesMap 构建的逐角色 N+1 fetch（`ProjectFlowPage.tsx:422-444`）收敛为批量获取（内部优化，外部行为不变）
-- [ ] 验收：G1–G5 全绿；E2E 基线 6 条全绿；Q7 术语表落 `packages/editor-core/README.md`
+- [ ] 验收：G1–G5 全绿；E2E 基线 6 条全绿；Q7 术语表落 `packages/editor-core/README.md`（已完成 ✅）
 
 #### 1c StorageProvider 接口
 

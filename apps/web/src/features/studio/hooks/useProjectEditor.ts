@@ -48,7 +48,12 @@ import type {
   Origin,
 } from "@axiforge/editor-core";
 import { draftFromProject } from "@/features/writer/lib/projection";
-import { bundleToResponse, createStorageProvider } from "@/shared/storage";
+import {
+  bundleToResponse,
+  createStorageProvider,
+  exportProjectAsAxsp,
+  saveTextFile,
+} from "@/shared/storage";
 import type { StorageProvider } from "@axiforge/editor-core";
 
 
@@ -783,6 +788,21 @@ export function useProjectEditor(id: string) {
     [id],
   );
 
+  const exportProjectAxsp = useCallback(async () => {
+    const p = providerRef.current;
+    if (!p || !id) return;
+    const res = await exportProjectAsAxsp(p, id);
+    if (!res.ok) {
+      showToast(`导出失败：${res.error.code}`, "error");
+      return;
+    }
+    const saved = await saveTextFile(
+      `${project?.title || "工程"}.axsp`,
+      res.data,
+    );
+    if (saved) showToast("已导出 .axsp");
+  }, [id, project, showToast]);
+
   const saveWriter = async () => {
     if (!id || !project) return;
     setSaving(true);
@@ -1109,6 +1129,7 @@ export function useProjectEditor(id: string) {
     refreshProject,
     saveWriter,
     saveAll,
+    exportProjectAxsp,
     patchProjectMeta,
     handleExportMarkdown,
     handleNodesChange,

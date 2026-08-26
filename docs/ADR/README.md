@@ -14,6 +14,8 @@
 | [ADR-021](./021-comment-system.md) | 评论系统 | 已采纳 |
 | [ADR-022](./022-cut-studio-three-track-projection.md) | 剪辑工作台与三轨投影 | 已采纳 |
 | [ADR-023](./023-theme-and-workstation-shell.md) | 全局日夜主题与剪辑台 Panel Shell | 已采纳 |
+| [ADR-024](./024-desktop-local-first.md) | 桌面优先战略（Tauri 壳 + Local-First） | 已采纳 |
+| [ADR-025](./025-axs-peer-dual-view.md) | AXS 与剪辑台对等双视图（修订 ADR-016） | 已采纳 |
 
 ## 待落文档（最终建议已定于 [`../ROADMAP_FINAL.md`](../ROADMAP_FINAL.md) §7，逐个正式落 ADR）
 

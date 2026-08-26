@@ -52,6 +52,16 @@ async def list_user_characters(author_id: str, db: AsyncSession = Depends(get_db
     return await service.get_user_characters(author_id)
 
 
+@character_router.get("/batch", response_model=List[CharacterResponse])
+async def get_characters_batch(
+    ids: str = Query("", description="逗号分隔的角色 id"),
+    db: AsyncSession = Depends(get_db),
+):
+    """按 id 集合批量获取（工程目录装载，消除 N+1）。缺失 id 静默跳过。"""
+    id_list = [UUID(x) for x in ids.split(",") if x.strip()]
+    return await CharacterService(db).get_characters_batch(id_list)
+
+
 @character_router.get("/{character_id}", response_model=CharacterResponse)
 async def get_character(
     character_id: UUID,

@@ -22,6 +22,9 @@ export const characterApi = {
 
   get: (id: string, params?: { bump_view?: boolean; viewer_token?: string }) =>
     apiClient.get<Character>(`/characters/${id}`, params),
+  /** 批量获取（工程目录装载，消除 N+1）；缺失 id 静默跳过 */
+  getMany: (ids: string[]) =>
+    apiClient.get<Character[]>(`/characters/batch`, { ids: ids.join(",") }),
 
 
   delete: (id: string) =>

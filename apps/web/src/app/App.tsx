@@ -14,7 +14,7 @@ import { DiscoverLayout, AccountLayout } from "@/shared/layouts/PublicLayout";
 const CreatorDashboardPage = lazy(() => import("@/features/studio/pages/CreatorDashboardPage"));
 const ProjectListPage = lazy(() => import("@/features/studio/pages/ProjectListPage"));
 const ProjectCreatePage = lazy(() => import("@/features/studio/pages/ProjectCreatePage"));
-const ProjectFlowPage = lazy(() => import("@/features/studio/pages/ProjectFlowPage"));
+const ProjectEditorPage = lazy(() => import("@/features/studio/pages/editor/ProjectEditorPage"));
 
 function ProjectFlowLegacyRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -87,7 +87,7 @@ export default function App() {
               <Route path="dashboard" element={<CreatorDashboardPage />} />
               <Route path="projects" element={<ProjectListPage />} />
               <Route path="projects/new" element={<ProjectCreatePage />} />
-              <Route path="projects/:id" element={<ProjectFlowPage />} />
+              <Route path="projects/:id" element={<ProjectEditorPage />} />
               <Route path="projects/:id/flow" element={<ProjectFlowLegacyRedirect />} />
               <Route path="items" element={<ItemsPage />} />
               <Route path="items/:id" element={<ItemDetailPage />} />

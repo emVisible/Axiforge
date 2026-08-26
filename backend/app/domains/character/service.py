@@ -53,6 +53,17 @@ class CharacterService:
         await self.db.commit()
         return db_character
 
+    async def get_characters_batch(self, ids: list[UUID]) -> list[Character]:
+        """按 id 集合批量获取（工程目录装载用，消除 N+1）。缺失 id 静默跳过。"""
+        if not ids:
+            return []
+        result = await self.db.execute(
+            select(Character)
+            .where(Character.id.in_(ids))
+            .options(selectinload(Character.tags))
+        )
+        return list(result.scalars().all())
+
     async def get_character(
         self,
         character_id: UUID,

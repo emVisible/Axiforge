@@ -3,7 +3,8 @@
  * 验证链路：plugin-sql → TauriSqlBackend → SqliteStorageProvider → 契约关键语义。
  * 输出可 grep 标记：AXIFORGE-DESKTOP-STORAGE: PASS / FAIL <步骤>
  */
-import { createStorageProvider } from "./index";
+import { bundleToCompilerInput, createStorageProvider } from "./index";
+import { compileStory } from "@axiforge/core";
 
 async function writeResultFile(text: string): Promise<void> {
   try {
@@ -42,7 +43,7 @@ export async function smokeDesktopStorage(): Promise<boolean> {
     const saved = await p.saveNarrative(id, {
       axsSource: "# 冒烟\n",
       nodes: [
-        { id: "smoke-1", stageId: null, editorData: { position: { x: 1, y: 1 } }, narrativeData: { title: "冒烟拍" }, sortOrder: 0 },
+        { id: "smoke-1", stageId: null, editorData: { position: { x: 1, y: 1 } }, narrativeData: { title: "冒烟拍", script: [{ op: "narration", text: "冒烟拍" }] }, sortOrder: 0 },
       ],
       edges: [],
     });
@@ -75,6 +76,23 @@ export async function smokeDesktopStorage(): Promise<boolean> {
     if (!rolledBack) {
       await writeResultFile(
         `FAIL transaction-rollback: badOk=${bad.ok} nodes=${load3.ok ? load3.data.nodes.length : "err"}`,
+      );
+      return false;
+    }
+
+    // 离线试玩链路：Provider 数据 → 本地编译 → 引擎可启动（不触网）
+    const chars = await p.listCharacters();
+    const pkg = compileStory(
+      bundleToCompilerInput(load3.data, chars.ok ? chars.data : []),
+    );
+    const playable =
+      pkg.beats.length === 1 &&
+      Boolean(pkg.startBeatId) &&
+      (pkg.beats[0]!.script[0] as { text?: string })?.text === "冒烟拍";
+    mark(playable, "offline-play-compile");
+    if (!playable) {
+      await writeResultFile(
+        `FAIL offline-play-compile: beats=${pkg.beats.length} start=${pkg.startBeatId}`,
       );
       return false;
     }

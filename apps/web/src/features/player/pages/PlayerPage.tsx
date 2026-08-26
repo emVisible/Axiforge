@@ -1,5 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
+import { loadStoryOffline } from "@/shared/storage";
 import { useParams, Link } from "react-router";
 import {
   Anchor,
@@ -349,7 +351,10 @@ export default function PlayerPage() {
     try {
       setStatus("loading");
       projectApi.recordView(projectId, playerToken).catch(() => {});
-      const story = await playerApi.getStory(projectId, getCreatorId());
+      // 桌面（Tauri）：Provider 数据本地编译，断网可玩；浏览器：后端编译
+      const story = isTauriEnvironment()
+        ? await loadStoryOffline(projectId)
+        : await playerApi.getStory(projectId, getCreatorId());
       setPkg(story);
       const codex = await fetchCodex(story.codexScope);
       // 有可续玩的存档 → 先给出选择，不自动开播

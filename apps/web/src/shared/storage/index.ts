@@ -5,11 +5,9 @@
  * - 浏览器：HTTP（既有 FastAPI 后端）
  * 云同步/协作服务后期以装饰器形态叠加，不改变本工厂签名。
  */
-import {
-  SqliteStorageProvider,
-  type ProjectBundle,
-  type StorageProvider,
-} from "@axiforge/editor-core";
+import { compileStory, type CompilerProjectInput, type StoryPackage } from "@axiforge/core";
+import type { ProjectBundle } from "@axiforge/editor-core";
+import { SqliteStorageProvider, type StorageProvider } from "@axiforge/editor-core";
 import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
 import { getCreatorId } from "@/shared/lib/creatorId";
@@ -93,6 +91,58 @@ export function bundleToResponse(b: ProjectBundle): ProjectResponse {
     created_at: NOW(),
     updated_at: b.meta.updatedAt,
   };
+}
+
+/** 存储态工程束 + 角色库 → 编译器输入（桌面断网试玩链路） */
+export function bundleToCompilerInput(
+  b: ProjectBundle,
+  characters: {
+    id: string;
+    name: string;
+    characterData: Record<string, unknown>;
+    imagePath?: string | null;
+  }[],
+): CompilerProjectInput {
+  return {
+    id: b.meta.id,
+    title: b.meta.title,
+    worldSetting: null,
+    playMeta: {},
+    nodes: b.nodes.map((n) => ({
+      id: n.id,
+      stageId: n.stageId,
+      editorData: n.editorData,
+      narrativeData: n.narrativeData,
+      sortOrder: n.sortOrder,
+    })),
+    edges: b.edges.map((e) => ({
+      sourceNodeId: e.source,
+      targetNodeId: e.target,
+      label: e.label,
+    })),
+    scenes: b.scenes.map((s) => ({ id: s.id, title: s.title })),
+    roles: b.roles.map((r) => ({ characterRefId: r.characterRefId })),
+    characters: characters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      characterData: c.characterData,
+      imagePath: c.imagePath ?? null,
+    })),
+    items: [],
+  };
+}
+
+/** 离线编译：Provider 数据 → 本地 StoryPackage（不触网） */
+export async function loadStoryOffline(projectId: string): Promise<StoryPackage> {
+  const p = await createStorageProvider();
+  const bundle = await p.loadProject(projectId);
+  if (!bundle.ok) {
+    throw new Error(bundle.error.code === "not_found" ? "404" : bundle.error.detail);
+  }
+  const chars = await p.listCharacters();
+  return compileStory(
+    bundleToCompilerInput(bundle.data, chars.ok ? chars.data : []),
+  );
 }
 
 export async function createStorageProvider(): Promise<StorageProvider> {

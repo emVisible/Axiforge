@@ -1,7 +1,7 @@
 # Axiforge 桌面化重构宪章与阶段计划（REFACTOR_DESKTOP）
 
 > **文档性质**：`desktop` 分支一切工程工作的执行宪法与验收依据。
-> **真相源关系**：上位决策 = [ADR-024](./ADR/024-desktop-local-first.md)（桌面优先战略）、[ADR-025](./ADR/025-axs-peer-dual-view.md)（对等双视图）；本文件回答「做什么」与「怎么算做好」。冲突时以 ADR 为准，本文件随执行进展更新。
+> **真相源关系**：上位决策 = [ADR-024](./ADR/024-desktop-local-first.md)（桌面优先战略）、[ADR-025](./ADR/025-axs-peer-dual-view.md)（对等双视图）；底层契约 = [KERNEL_DESIGN.md](./KERNEL_DESIGN.md)（L2–L4 构建规约）；本文件回答「做什么」与「怎么算做好」。冲突时以 ADR 为准，本文件随执行进展更新。
 > **方法论底色**：axiom 第三部《技术实现宪章》、第四部《应用工程实践原则》。本宪章是其在本仓库的实例化——不重复论证，只落裁决。
 > **日期**：2026-08-26 · **分支**：`desktop`（web 冻结线 `main` 只收 hotfix）
 
@@ -96,7 +96,7 @@
 
 #### 1b editor-core 抽取（拆 ProjectFlowPage.tsx）
 
-- [ ] 新包 `packages/editor-core`：headless Draft 状态机（nodes/edges/script/roles）+ 三轨投影同步逻辑（自 `apps/web/src/features/writer/lib/projection.ts` 迁移），零 React/DOM
+- [ ] 新包 `packages/editor-core`：按 [KERNEL_DESIGN.md](./KERNEL_DESIGN.md) 实现 L2 文档模型（Draft/Transaction/Journal）+ L3 投影（自 `apps/web/src/features/writer/lib/projection.ts` 迁移），零 React/DOM
 - [ ] `ProjectFlowPage.tsx` 降级为薄视图宿主，cut/writer/flow 各自成页；原巨石文件删除（G1 清零点）
 - [ ] rolesMap 构建的逐角色 N+1 fetch（`ProjectFlowPage.tsx:422-444`）收敛为批量获取（内部优化，外部行为不变）
 - [ ] 验收：G1–G5 全绿；E2E 基线 6 条全绿；Q7 术语表落 `packages/editor-core/README.md`
@@ -140,6 +140,7 @@
 - [ ] 素材库面板渲染 `character_data.sprites` 差分图，拖入即生成指令
 - [ ] 角色工作台独立入口（六层模型 + 传记 + 立绘管理），作品 = 选角 + 编排
 - [ ] 验收：一段 ≥2 角色 × ≥3 表情切换的演出纯拖拽产出且键盘可达；四态齐全；日夜主题检验通过
+- [ ] E2E 基线扩至 ≥8 条（新增角色轨编排 ×2）
 
 **非目标**：音频轨扩展、镜头关键帧曲线、Live2D。
 

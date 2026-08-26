@@ -138,6 +138,13 @@
 
 **目标**：Axiforge 成为断网可用的桌面应用；`.axsp` 从远期规划变为工程容器。
 
+**落地进展（2026-08-26）**：
+- [x] L4 契约落地：`StorageProvider`（11 方法，判别联合失败语义，空值五义显式）——`packages/editor-core/src/storage.ts`
+- [x] 契约测试套件 `storage/contract.ts`：一切实现（Memory/HTTP/SQLite）的统一验收标准
+- [x] 双实现：MemoryStorageProvider（基准，含 bootstrap 语义）+ HttpStorageProvider（包装既有 api 层，404→not_found）
+- [x] `.axsp` 容器 v0：manifest（版本/素材引用清单）+ 工程束；pack/unpack 逐字段等价测试 + corrupted 语义
+- [ ] SQLite 实现（依赖 Tauri 壳；需先安装 Rust 工具链）
+
 - [ ] `apps/desktop`：Tauri v2 包装现有前端；全局快捷键；本地素材目录访问
 - [ ] StorageProvider 的 SQLite 实现（schema 沿用 PG 关系模型；`narrative_data` 保持 JSON 列）；素材落工程目录 + DB 存相对路径
 - [ ] `.axsp` 打包/打开（叙事 JSON + 素材引用清单）；SQLite 为工作缓存

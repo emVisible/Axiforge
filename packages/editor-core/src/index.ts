@@ -8,3 +8,6 @@ export * from "./document";
 export * from "./journal";
 export * from "./projection/axs";
 export * from "./projection/canvas";
+export * from "./storage/types";
+export * from "./storage/memory";
+export * from "./axsp";

@@ -136,7 +136,11 @@ export type StorageResult<T> =
 - `loadProject(id)` 失败 → 返回 `{ ok:false, error }`，调用方（L5）负责渲染四态中的错误态并允许重试——Provider 不弹 toast、不重试内部逻辑（重试是策略，归调用方）
 - 空值五义显式区分（axiom 1.4）：工程不存在=`not_found`；字段缺失=领域内 `null`；解析失败=`corrupted`；磁盘/网络故障=`io`
 
-**接口方法**（v0，第二消费者出现前不加）：`listProjects / loadProject / saveNarrative / saveRoles / deleteNode / replaceEdges`。
+**接口方法**（v0，双消费者：HTTP 实现 + Memory 实现）：
+`listProjects / createProject / loadProject / deleteProject / updateProjectMeta / saveNarrative / addRole / removeRole / listCharacters / getCharacter / saveCharacter`。
+
+> 状态（2026-08-26）：契约已落地 `packages/editor-core/src/storage.ts`，
+> 契约测试套件 `storage/contract.test.ts` 是一切实现的验收标准（Memory 实现先行，SQLite 随 Phase 2）。
 
 ## 三、内核原则 → 本项目落地映射
 

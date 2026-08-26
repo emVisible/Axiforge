@@ -21,7 +21,7 @@ import type {
   StoredNode,
 } from "../types";
 import { err, ok } from "../types";
-import { applyMigrations, type SqlBackend } from "./backend";
+import { applyMigrations, type SqlBackend, type SqlStmt } from "./backend";
 
 const nowIso = () => new Date().toISOString();
 const uuid = () =>
@@ -207,36 +207,32 @@ export class SqliteStorageProvider implements StorageProvider {
         `SELECT id FROM projects WHERE id = ?`, [id],
       );
       if (!exists.length) return err({ code: "not_found", entity: "project", id });
-      await this.backend.execute(`BEGIN`);
-      try {
-        await this.backend.execute(`DELETE FROM project_nodes WHERE project_id = ?`, [id]);
-        await this.backend.execute(`DELETE FROM project_edges WHERE project_id = ?`, [id]);
-        for (const n of payload.nodes) {
-          await this.backend.execute(
-            `INSERT INTO project_nodes (id, project_id, stage_id, editor_data, narrative_data, sort_order)
+      const stmts = [
+        { sql: `DELETE FROM project_nodes WHERE project_id = ?`, params: [id] },
+        { sql: `DELETE FROM project_edges WHERE project_id = ?`, params: [id] },
+        ...payload.nodes.map(
+          (n): SqlStmt => ({
+            sql: `INSERT INTO project_nodes (id, project_id, stage_id, editor_data, narrative_data, sort_order)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [n.id, id, n.stageId, JSON.stringify(n.editorData), JSON.stringify(n.narrativeData), n.sortOrder],
-          );
-        }
-        for (const e of payload.edges) {
-          await this.backend.execute(
-            `INSERT INTO project_edges (id, project_id, source_node_id, target_node_id, label)
+            params: [n.id, id, n.stageId, JSON.stringify(n.editorData), JSON.stringify(n.narrativeData), n.sortOrder],
+          }),
+        ),
+        ...payload.edges.map(
+          (e): SqlStmt => ({
+            sql: `INSERT INTO project_edges (id, project_id, source_node_id, target_node_id, label)
              VALUES (?, ?, ?, ?, ?)`,
-            [e.id, id, e.source, e.target, e.label],
-          );
-        }
-        await this.backend.execute(
-          `UPDATE projects SET axs_source = ?, updated_at = ? WHERE id = ?`,
-          [payload.axsSource, nowIso(), id],
-        );
-        await this.backend.execute(`COMMIT`);
-        return ok(undefined);
-      } catch (txErr) {
-        await this.backend.execute(`ROLLBACK`);
-        return err({ code: "io", detail: "saveNarrative 事务失败已回滚", cause: txErr });
-      }
+            params: [e.id, id, e.source, e.target, e.label],
+          }),
+        ),
+        {
+          sql: `UPDATE projects SET axs_source = ?, updated_at = ? WHERE id = ?`,
+          params: [payload.axsSource, nowIso(), id],
+        },
+      ];
+      await this.backend.transactional(stmts);
+      return ok(undefined);
     } catch (cause) {
-      return err({ code: "io", detail: "saveNarrative 失败", cause });
+      return err({ code: "io", detail: "saveNarrative 事务失败已回滚", cause });
     }
   }
 

@@ -18,7 +18,7 @@ import type { Instruction, Condition, Effect } from "@axiforge/core";
 
 export type StorageError =
   | { code: "not_found"; entity: string; id: string }
-  | { code: "corrupted"; entity: string; detail: string; cause?: unknown }
+  | { code: "corrupted"; entity: string; id?: string; detail: string; cause?: unknown }
   | { code: "io"; detail: string; cause?: unknown };
 
 export type StorageResult<T> =

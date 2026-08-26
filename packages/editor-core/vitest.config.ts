@@ -8,7 +8,7 @@ export default defineConfig({
     coverage: {
       reporter: ["text"],
       include: ["src/**"],
-      exclude: ["src/**/*.test.ts"],
+      exclude: ["src/**/*.test.ts", "src/storage/contract.ts"],
       thresholds: { lines: 90, branches: 90 },
     },
   },

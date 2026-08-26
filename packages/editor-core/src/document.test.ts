@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Envelope, Transaction } from "./types";
 import { apply, createDraft, emptyDraft, gridPosition } from "./document";
-import { emptyJournal, record, undo, redo } from "./journal";
+import { emptyJournal, journalUndo, record, redo } from "./journal";
 
 let seq = 0;
 const idGen = () => `gen-${++seq}`;
@@ -180,6 +180,14 @@ describe("node 与图事务", () => {
       expect(ok.draft.rev).toBe(1);
     }
     const miss = apply(baseDraft(), env({ kind: "node.move", nodeId: "zz", position: { x: 0, y: 0 } }, "flow"));
+    expect(miss).toEqual({ ok: false, error: { code: "node_not_found", nodeId: "zz" } });
+  });
+
+  it("node.restage 更新舞台归属并拒绝缺失节点", () => {
+    const ok = apply(baseDraft(), env({ kind: "node.restage", nodeId: "a", stageId: "s9" }, "flow"));
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.draft.nodes.get("a")!.stageId).toBe("s9");
+    const miss = apply(baseDraft(), env({ kind: "node.restage", nodeId: "zz", stageId: null }, "flow"));
     expect(miss).toEqual({ ok: false, error: { code: "node_not_found", nodeId: "zz" } });
   });
 
@@ -423,7 +431,7 @@ describe("journal", () => {
     let j = emptyJournal();
     j = record(j, { envelope: env({ kind: "script.remove", nodeId: "a", index: 0 }), rev: d0.rev, before: d0 });
 
-    const u = undo(d1, j);
+    const u = journalUndo(d1, j);
     expect(u.ok).toBe(true);
     if (!u.ok) return;
     expect(u.draft.rev).toBe(d0.rev);
@@ -439,7 +447,7 @@ describe("journal", () => {
 
   it("新事务入栈清空 future；空栈 undo/redo 返回失败", () => {
     let j = emptyJournal();
-    expect(undo(baseDraft(), j).ok).toBe(false);
+    expect(journalUndo(baseDraft(), j).ok).toBe(false);
     expect(redo(baseDraft(), j, apply).ok).toBe(false);
     j = record(j, { envelope: env({ kind: "node.remove", nodeId: "b" }), rev: 0, before: baseDraft() });
     j = record(j, { envelope: env({ kind: "node.remove", nodeId: "a" }), rev: 1, before: baseDraft() });
@@ -466,7 +474,7 @@ describe("journal", () => {
     const r1 = apply(d0, tx);
     const d1 = (r1 as { ok: true; draft: typeof d0 }).draft;
     const j = record(emptyJournal(), { envelope: tx, rev: d0.rev, before: d0 });
-    const u = undo(d1, j);
+    const u = journalUndo(d1, j);
     if (!u.ok) return fail("undo 应成功");
     // 构造 redo 必败：当前 Draft 已无节点 b（模拟环境漂移）
     const broken = createDraft({ nodes: [] });

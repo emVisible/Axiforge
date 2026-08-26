@@ -108,7 +108,8 @@
   - [x] 接缝落地：`useDraftJournal`（sync + dispatch 单一写入口）接入 `updateScript`（cut 轨）与 `saveWriter`（writer 记序）；未保存节点被 apply 拒绝时保持旧路径语义，零行为变更（绞杀者过渡态，E2E 基线原样通过）
   - [x] 拖拽记序：`node.move` 事务（内核 + E7 基线）+ `onNodeDragStop` 接线——拖拽过程走 React Flow 内部状态（高频），松手才入事务（分层设计先于 Draft 唯一持有者改造）
   - [x] 其余写路径收敛：表单/条件/效果/道具/重命名/边标签/删边/删节点/复制/onDrop 新建/onConnect 连线共 12 条全部经 `dispatch`（origin 按轨记序：cut/flow/writer）；未保存节点被拒绝时保持旧语义，零行为变更
-  - [ ] Draft 升级为图的唯一持有者，React Flow nodes 降级为投影（解决拖拽位置高频写入的分层）
+  - [x] Draft 升级为图的唯一持有者，React Flow nodes 降级为投影（拖拽走临时层，dragStop 经 `node.move` 提交；`historyRef` JSON 快照机制删除，undo 改走 Journal；巨石 1608→1389 行）
+  - [x] 内核配套：`node.restage` 事务 + `journalUndo` 更名导出（KERNEL_DESIGN 同步回写）
 - [ ] rolesMap 构建的逐角色 N+1 fetch（`ProjectFlowPage.tsx:422-444`）收敛为批量获取（内部优化，外部行为不变）
 - [ ] 验收：G1–G5 全绿；E2E 基线 6 条全绿；Q7 术语表落 `packages/editor-core/README.md`（已完成 ✅）
 

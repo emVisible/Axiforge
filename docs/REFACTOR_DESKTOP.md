@@ -124,11 +124,14 @@
 - [ ] 内存版 mock 实现跑通 E2E 子集（证明接口完整、UI 不直连 HTTP）
 - [ ] 失败语义成文：每方法「如果失败，返回什么，调用方会怎样」（铁律 8）
 
-#### 1d StoryCompiler TS 移植
+#### 1d StoryCompiler TS 移植（2026-08-26 完成）
 
-- [ ] `packages/core` 增加 `compile(project) → StoryPackage`，对齐 `backend/app/domains/narrative/compiler.py`
-- [ ] golden tests：≥3 个真实工程样本（须含示范作②③的 codex 场景）TS vs Python 输出指令级一致（G6）
-- [ ] Python 编译器保留原位不动（web 冻结线继续使用），降级标注为对照基准
+- [x] `packages/core/src/compiler.ts`：`compileStory(CompilerProjectInput) → StoryPackage`——输入与 L4 存储态同构（桌面断网链路：Provider.loadProject + listCharacters → compile → 引擎试玩）
+- [x] 金样本 ×3（示范作①②③，含 codex 场景）：TS 与 Python 输出**逐字段一致**（G6）
+  - 过程发现并修正 dump 脚本缺 `by_alias=True`（线上格式实为 `from`，FastAPI 按 alias 序列化）
+  - 新增指令归一化层：对齐 pydantic 语义（按 op 白名单挑字段 + 可选字段补 null + 剥离多余字段）
+  - IR 指令可选字段批量放宽 `| null`（对齐 Python 输出现实）；core 测试类型漂移顺手清偿
+- [x] Python 编译器保留原位（web 冻结线继续使用），降级标注为对照基准；金样本再生成：`backend/scripts/dump_golden.py`
 
 **Phase 1 非目标**：不加新功能、不改 UI 外观、不做 SQLite/Tauri、不动后端行为。
 

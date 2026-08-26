@@ -1,0 +1,268 @@
+{
+  "irVersion": 1,
+  "projectId": "570e6b35-1a7d-4fc6-a4b4-6f89ce09850b",
+  "title": "【示范】缘起·选择",
+  "startBeatId": "4258f749-cc4a-489a-b976-5e96a15b2f54",
+  "beats": [
+    {
+      "id": "cea7ab0c-a398-495c-b31a-3b7d55c91a66",
+      "sceneId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "sceneTitle": "公寓",
+      "stage": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "actors": [
+        "f12c6270-33c1-4cbf-9601-c841c5e55337"
+      ],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": "堰纱",
+          "text": "……谢谢。我会记住今晚。",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [
+        {
+          "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.met_player",
+          "type": "codex_write",
+          "value": true
+        },
+        {
+          "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.trust",
+          "type": "codex_write",
+          "value": "high"
+        }
+      ],
+      "isEnding": true,
+      "endingLabel": "信任结局"
+    },
+    {
+      "id": "404d8a1f-9e9b-437a-9881-ed6c70d28885",
+      "sceneId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "sceneTitle": "公寓",
+      "stage": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "actors": [
+        "f12c6270-33c1-4cbf-9601-c841c5e55337"
+      ],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": "堰纱",
+          "text": "……是吗。那请便。",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [
+        {
+          "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.met_player",
+          "type": "codex_write",
+          "value": true
+        },
+        {
+          "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.trust",
+          "type": "codex_write",
+          "value": "low"
+        }
+      ],
+      "isEnding": true,
+      "endingLabel": "疏远结局"
+    },
+    {
+      "id": "4258f749-cc4a-489a-b976-5e96a15b2f54",
+      "sceneId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "sceneTitle": "公寓",
+      "stage": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事从这里开始...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": false,
+      "endingLabel": null
+    },
+    {
+      "id": "bf103852-27aa-4e38-beb1-50b2890a0c84",
+      "sceneId": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "sceneTitle": "主场景",
+      "stage": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事从这里开始...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    },
+    {
+      "id": "4106ff3d-fa1a-4ed6-b377-4a85b824db36",
+      "sceneId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "sceneTitle": "公寓",
+      "stage": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "actors": [
+        "f12c6270-33c1-4cbf-9601-c841c5e55337"
+      ],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "bg",
+          "image": "apartment_rain",
+          "transition": null
+        },
+        {
+          "op": "bgm",
+          "track": "rain_piano",
+          "fadeMs": null,
+          "loop": true
+        },
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": "堰纱",
+          "text": "……你为什么会来这里？",
+          "voice": null,
+          "rich": null
+        },
+        {
+          "op": "choice",
+          "options": [
+            {
+              "label": "我来帮你",
+              "to": "cea7ab0c-a398-495c-b31a-3b7d55c91a66",
+              "condition": null
+            },
+            {
+              "label": "只是路过",
+              "to": "404d8a1f-9e9b-437a-9881-ed6c70d28885",
+              "condition": null
+            }
+          ]
+        }
+      ],
+      "effects": [],
+      "isEnding": false,
+      "endingLabel": null
+    },
+    {
+      "id": "11b7fd40-8897-4291-b76b-2a23620badcf",
+      "sceneId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "sceneTitle": "公寓",
+      "stage": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事暂告一段落...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    },
+    {
+      "id": "1a6cdab4-3563-4c3e-9e6f-fc73dc7df688",
+      "sceneId": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "sceneTitle": "主场景",
+      "stage": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事暂告一段落...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    }
+  ],
+  "transitions": [
+    {
+      "from": "4258f749-cc4a-489a-b976-5e96a15b2f54",
+      "to": "4106ff3d-fa1a-4ed6-b377-4a85b824db36",
+      "label": ""
+    }
+  ],
+  "characters": [
+    {
+      "id": "f12c6270-33c1-4cbf-9601-c841c5e55337",
+      "name": "堰纱",
+      "imagePath": null,
+      "expressions": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "title": "主场景",
+      "location": null,
+      "atmosphere": null,
+      "backgroundImage": null
+    },
+    {
+      "id": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "title": "公寓",
+      "location": null,
+      "atmosphere": null,
+      "backgroundImage": null
+    }
+  ],
+  "items": [],
+  "worldSetting": "雨夜的老旧公寓",
+  "glossary": [],
+  "characterProfiles": [
+    {
+      "id": "f12c6270-33c1-4cbf-9601-c841c5e55337",
+      "name": "堰纱",
+      "imagePath": null,
+      "summary": "跨作品记忆演示用角色",
+      "essence": "背负过往、却仍在寻找答案的少女",
+      "identity": "神秘来客",
+      "appearance": null,
+      "tags": [
+        "RN",
+        "示范角色"
+      ]
+    }
+  ],
+  "codexScope": [
+    "f12c6270-33c1-4cbf-9601-c841c5e55337"
+  ]
+}

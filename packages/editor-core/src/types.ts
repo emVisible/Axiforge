@@ -89,6 +89,7 @@ export type Transaction =
     }
   | { kind: "node.add"; node: NarrativeNode }
   | { kind: "node.move"; nodeId: NodeId; position: { x: number; y: number } }
+  | { kind: "node.restage"; nodeId: NodeId; stageId: string | null }
   | { kind: "node.remove"; nodeId: NodeId }
   | { kind: "node.patch"; nodeId: NodeId; patch: Partial<NarrativeData> }
   | { kind: "edges.replaceAll"; edges: Edge[] }

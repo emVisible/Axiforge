@@ -41,7 +41,7 @@ export type UndoRedoResult =
   | { ok: true; draft: Draft; journal: Journal }
   | { ok: false };
 
-export function undo(current: Draft, journal: Journal): UndoRedoResult {
+export function journalUndo(current: Draft, journal: Journal): UndoRedoResult {
   const last = journal.past[journal.past.length - 1];
   if (!last) return { ok: false };
   return {

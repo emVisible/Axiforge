@@ -3,11 +3,13 @@ import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } fro
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  useNodesState,
-  useEdgesState,
   type Node,
   type Edge,
   type Connection,
+  type NodeChange,
+  type EdgeChange,
+  type NodeMouseHandler,
+  MarkerType,
 } from "reactflow";
 import { CanvasWorkspace } from "@/shared/components/Shell";
 import Toast from "@/shared/components/Toast";
@@ -18,7 +20,7 @@ import { characterApi } from "@/shared/api/characters";
 import { useDeleteProject, useProject, PROJECT_KEYS } from "@/shared/hooks/useProjects";
 import ScriptPreview from "../components/ScriptPreview";
 import type { SimTarget } from "../components/ConditionSimulator";
-import { addEdge, MarkerType } from "../flow/FlowCanvas";
+import { addEdge } from "../flow/FlowCanvas";
 import {
   computeStageLanes,
   layoutNodesByStage,
@@ -54,14 +56,13 @@ import {
   axsToSyncPayload,
   beatLineForNode,
   collectProjectNodes,
-  nodeIdForBeat,
-  parseAxs,
   projectToAxs,
   projectAxsFromCanvas,
 } from "@/features/writer/lib/projection";
 import { sanitizeScript } from "@/features/studio/cut/timelineUtils";
 import { useDraftJournal } from "@/features/studio/hooks/useDraftJournal";
 import type {
+  Draft,
   Edge as KernelEdge,
   NarrativeNode as KernelNode,
   Origin,
@@ -69,6 +70,55 @@ import type {
 import { draftFromProject } from "@/features/writer/lib/projection";
 
 const LazyFlowStudioView = lazy(() => import("../flow/FlowStudioView"));
+
+/** Draft 节点 → React Flow 节点投影（data 形状与旧 nodeResponseToFlowNode 逐字段一致） */
+function flowNodeOf(
+  draft: Draft,
+  id: string,
+  dragPositions: Map<string, { x: number; y: number }>,
+  selected: boolean,
+  scenes: ProjectSceneResponse[] = [],
+  dimmed = false,
+): Node | null {
+  const n = draft.nodes.get(id);
+  if (!n) return null;
+  const nd = n.narrative;
+  const tc = nd.trigger_condition as Record<string, unknown> | null;
+  const ef = (nd.effects as unknown as Record<string, unknown>[]) || [];
+  const script = (nd.script as Instruction[]) || [];
+  const props = (nd.props as string[]) || [];
+  const palette = STAGE_PALETTE[stageColorIndex(n.stageId, scenes.map((x) => x.id))];
+  return {
+    id: n.id,
+    type: "custom",
+    position: dragPositions.get(n.id) ?? n.position,
+    selected,
+    style: dimmed ? { opacity: 0.3 } : undefined,
+    data: {
+      title: nd.title || "未命名",
+      description: nd.description || "",
+      is_anchor: Boolean(nd.is_anchor),
+      is_ending: Boolean(nd.is_ending),
+      ending_label: (nd.ending_label as string) || "",
+      speaker: nd.speaker || "",
+      dialogue: nd.dialogue || "",
+      narration: nd.narration || "",
+      script,
+      has_conditions: Boolean((tc as { conditions?: unknown[] } | null)?.conditions?.length),
+      has_effects: Boolean(ef.length),
+      has_script: Boolean(script.length),
+      trigger_condition: tc,
+      effects: ef,
+      props,
+      has_props: Boolean(props.length),
+      stage_id: n.stageId,
+      stage_title: scenes.find((x) => x.id === n.stageId)?.title ?? null,
+      stage_border: palette.border,
+      stage_header: palette.header,
+      stage_dot: palette.dot,
+    },
+  };
+}
 const LazyWriterStudioView = lazy(
   () => import("@/features/writer/components/WriterStudioView"),
 );
@@ -98,10 +148,16 @@ export default function ProjectFlowPage() {
   const [currentScene, setCurrentScene] = useState<ProjectSceneResponse | null>(
     null,
   );
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  // L2 内核：Draft 为图唯一持有者；React Flow 节点/边均为投影
+  const { draft, sync, dispatch, undo: undoJournal } = useDraftJournal();
+  const [dragPositions, setDragPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const selectedNode: Node | null = useMemo(
+    () => (selectedId ? flowNodeOf(draft, selectedId, dragPositions, true) : null),
+    [selectedId, draft, dragPositions],
+  );
+
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -110,7 +166,6 @@ export default function ProjectFlowPage() {
   const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<PanelTab>("content");
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const historyRef = useRef<{ nodes: Node[]; edges: Edge[] }[]>([]);
 
   const [nodeForm, setNodeForm] = useState<NodeFormState>({
     title: "",
@@ -144,35 +199,6 @@ export default function ProjectFlowPage() {
   const cutLayoutApiRef = useRef<CutLayoutApi | null>(null);
   const [cutSceneFilter, setCutSceneFilter] = useState<string | null>(sceneId);
 
-  // L2 内核接缝：一切编辑经 dispatch 单一写入口（Phase 1b 过渡态：
-  // Draft 为校验+记序层，React state 为渲染镜像；未保存节点被拒绝时保持旧语义）
-  const draftJournal = useDraftJournal();
-  const editOrigin: Origin = editorMode === "flow" ? "flow" : "cut";
-  const toKernelEdge = (e: Edge): KernelEdge => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: (e.label as string) ?? null,
-  });
-  // 拖拽落点记序：拖拽过程由 React Flow 内部状态承载（高频），松手才入事务
-  const handleNodeDragStop = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      draftJournal.dispatch(
-        { kind: "node.move", nodeId: node.id, position: node.position },
-        "flow",
-      );
-    },
-    [draftJournal],
-  );
-
-  const flowNodeToKernelNode = (n: Node): KernelNode => ({
-    id: n.id,
-    stageId: (n.data.stage_id as string) ?? null,
-    position: n.position,
-    narrative: n.data as Record<string, unknown>,
-    sortOrder: nodes.length,
-  });
-
   useEffect(() => {
     if (sceneId) setCutSceneFilter(sceneId);
   }, [sceneId]);
@@ -182,27 +208,90 @@ export default function ProjectFlowPage() {
     [projectRoles],
   );
 
-  const projectAxsFromCanvasState = useCallback(() => {
-    if (!project) return axsSource;
-    return projectAxsFromCanvas(
-      nodes.map((n) => ({ id: n.id, position: n.position, data: n.data })),
-      edges.map((e) => ({
+  const scenesList = useMemo(() => project?.scenes || [], [project]);
+
+  /** React Flow 节点投影：Draft + 拖拽临时层 + 选择/聚焦装饰 */
+  const rfNodes: Node[] = useMemo(() => {
+    const stageScoped = viewMode === "stage" && currentScene;
+    return [...draft.nodes.values()]
+      .filter((n) => (stageScoped ? n.stageId === currentScene!.id : true))
+      .map((n) =>
+        flowNodeOf(
+          draft,
+          n.id,
+          dragPositions,
+          selectedId === n.id,
+          scenesList,
+          Boolean(filteredStageId && n.stageId !== filteredStageId),
+        )!,
+      );
+  }, [draft, dragPositions, selectedId, filteredStageId, viewMode, currentScene, scenesList]);
+
+  /** React Flow 边投影（悬停高亮由 FlowCanvas 装饰） */
+  const rfEdges: Edge[] = useMemo(() => {
+    const stageScoped = viewMode === "stage" && currentScene;
+    const visible = stageScoped
+      ? new Set(
+          [...draft.nodes.values()]
+            .filter((n) => n.stageId === currentScene!.id)
+            .map((n) => n.id),
+        )
+      : null;
+    return draft.edges
+      .filter((e) => !visible || (visible.has(e.source) && visible.has(e.target)))
+      .map((e) => ({
+        id: e.id,
         source: e.source,
         target: e.target,
-        label: (e.label as string) || null,
-      })),
+        sourceHandle: "output",
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: flowEdgeStroke, strokeWidth: 2 },
+        label: e.label || "",
+        selected: selectedEdgeId === e.id,
+      }));
+  }, [draft, viewMode, currentScene, selectedEdgeId]);
+
+  const selectedEdge: Edge | null = useMemo(
+    () => (selectedEdgeId ? rfEdges.find((e) => e.id === selectedEdgeId) ?? null : null),
+    [selectedEdgeId, rfEdges],
+  );
+
+  const editOrigin: Origin = editorMode === "flow" ? "flow" : "cut";
+  const toKernelEdge = (e: Edge): KernelEdge => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    label: (e.label as string) ?? null,
+  });
+  const flowNodeToKernelNode = (n: Node): KernelNode => ({
+    id: n.id,
+    stageId: (n.data.stage_id as string) ?? null,
+    position: n.position,
+    narrative: n.data as Record<string, unknown>,
+    sortOrder: rfNodes.length,
+  });
+
+  const projectAxsFromCanvasState = useCallback(() => {
+    if (!project) return axsSource;
+    const stageScoped = viewMode === "stage" && currentScene;
+    return projectAxsFromCanvas(
+      [...draft.nodes.values()]
+        .filter((n) => (stageScoped ? n.stageId === currentScene!.id : true))
+        .map((n) => ({
+          id: n.id,
+          position: n.position,
+          data: { ...n.narrative, stage_id: n.stageId },
+        })),
+      draft.edges.map((e) => ({ source: e.source, target: e.target, label: e.label ?? null })),
       allProjectNodes,
       project.edges || [],
       project.scenes || [],
       rolesMap,
-      viewMode === "stage" && currentScene
-        ? { scopeStageId: currentScene.id }
-        : undefined,
+      stageScoped ? { scopeStageId: currentScene!.id } : undefined,
     );
   }, [
     project,
-    nodes,
-    edges,
+    draft,
     allProjectNodes,
     rolesMap,
     viewMode,
@@ -220,26 +309,31 @@ export default function ProjectFlowPage() {
     [id],
   );
 
-  const selectFlowNode = useCallback((node: Node) => {
-    setSelectedNode(node);
-    setSelectedEdge(null);
-    setActivePanel("content");
-    setNodeForm({
-      title: (node.data.title as string) || "",
-      description: (node.data.description as string) || "",
-      is_anchor: Boolean(node.data.is_anchor),
-      is_ending: Boolean(node.data.is_ending),
-      ending_label: (node.data.ending_label as string) || "",
-      speaker: (node.data.speaker as string) || "",
-      dialogue: (node.data.dialogue as string) || "",
-      narration: (node.data.narration as string) || "",
-    });
-    const tc = node.data.trigger_condition as Record<string, unknown> | null;
-    setConditions((tc?.conditions as ConditionItem[]) || []);
-    setEffects((node.data.effects as EffectItem[]) || []);
-    setNodeProps((node.data.props as string[]) || []);
-    setScript((node.data.script as Instruction[]) || []);
-  }, []);
+  const selectFlowNode = useCallback(
+    (nodeOrId: Node | string) => {
+      const id = typeof nodeOrId === "string" ? nodeOrId : nodeOrId.id;
+      setSelectedId(id);
+      setSelectedEdgeId(null);
+      setActivePanel("content");
+      const nd = draft.nodes.get(id)?.narrative ?? {};
+      setNodeForm({
+        title: (nd.title as string) || "",
+        description: (nd.description as string) || "",
+        is_anchor: Boolean(nd.is_anchor),
+        is_ending: Boolean(nd.is_ending),
+        ending_label: (nd.ending_label as string) || "",
+        speaker: (nd.speaker as string) || "",
+        dialogue: (nd.dialogue as string) || "",
+        narration: (nd.narration as string) || "",
+      });
+      const tc = nd.trigger_condition as Record<string, unknown> | null;
+      setConditions((tc?.conditions as ConditionItem[]) || []);
+      setEffects((nd.effects as EffectItem[]) || []);
+      setNodeProps((nd.props as string[]) || []);
+      setScript(((nd.script ?? []) as Instruction[]) || []);
+    },
+    [draft],
+  );
 
   const openWriterAtSelection = useCallback(() => {
     const projected = projectAxsFromCanvasState();
@@ -261,197 +355,9 @@ export default function ProjectFlowPage() {
     setToast({ message: m, type: t });
     setTimeout(() => setToast(null), 2500);
   };
-  const pushHistory = (nds: Node[], eds: Edge[]) => {
-    historyRef.current.push({
-      nodes: JSON.parse(JSON.stringify(nds)),
-      edges: JSON.parse(JSON.stringify(eds)),
-    });
-    if (historyRef.current.length > 50) historyRef.current.shift();
-  };
-
   const undo = useCallback(() => {
-    if (historyRef.current.length <= 1) return;
-    historyRef.current.pop();
-    const s = historyRef.current[historyRef.current.length - 1];
-    if (s) {
-      setNodes(s.nodes);
-      setEdges(s.edges);
-      showToast("已撤销");
-    }
-  }, [setNodes, setEdges]);
-
-  const nodeResponseToFlowNode = (
-    n: ProjectNodeResponse,
-    scenes: ProjectSceneResponse[],
-    stageIds: string[],
-  ): Node => {
-    const ed = n.editor_data || {};
-    const nd = n.narrative_data || {};
-    const tc = nd.trigger_condition as Record<string, unknown> | null;
-    const ef = nd.effects as Record<string, unknown>[] | null;
-    const stageId = n.stage_id ?? n.scene_id ?? null;
-    const colorIdx = stageColorIndex(stageId, stageIds);
-    const palette = STAGE_PALETTE[colorIdx];
-    const stageTitle =
-      scenes.find((s) => s.id === stageId)?.title ?? null;
-    return {
-      id: String(n.id),
-      type: "custom",
-      position: {
-        x: ed.position?.x ?? Math.random() * 400 + 100,
-        y: ed.position?.y ?? Math.random() * 300 + 50,
-      },
-      data: {
-        title: nd.title || "未命名",
-        description: nd.description || "",
-        is_anchor: Boolean(nd.is_anchor),
-        is_ending: Boolean(nd.is_ending),
-        ending_label: (nd.ending_label as string) || "",
-        speaker: nd.speaker || "",
-        dialogue: nd.dialogue || "",
-        narration: nd.narration || "",
-        script: (nd.script as Instruction[]) || [],
-        has_conditions: Boolean((tc as { conditions?: unknown[] })?.conditions?.length),
-        has_effects: Boolean(ef?.length),
-        has_script: Boolean((nd.script as Instruction[])?.length),
-        trigger_condition: tc,
-        effects: ef || [],
-        props: (nd.props as string[]) || [],
-        has_props: Boolean((nd.props as string[])?.length),
-        stage_id: stageId,
-        stage_title: stageTitle,
-        stage_border: palette.border,
-        stage_header: palette.header,
-        stage_dot: palette.dot,
-      },
-    };
-  };
-
-  const applySceneCanvas = useCallback(
-    (
-      scene: ProjectSceneResponse,
-      p: ProjectResponse,
-      projectNodes: ProjectNodeResponse[],
-    ): Node[] => {
-      setCurrentScene(scene);
-      const scenes = p.scenes || [];
-      const stageIds = scenes.map((s) => s.id);
-      const sceneNodes = projectNodes.filter(
-        (n) => (n.stage_id ?? n.scene_id) === scene.id,
-      );
-      const loadedNodes = sceneNodes.map((n) =>
-        nodeResponseToFlowNode(n, scenes, stageIds),
-      );
-      setNodes(loadedNodes);
-      const sceneNodeIds = new Set(sceneNodes.map((n) => String(n.id)));
-      const loadedEdges: Edge[] = (p.edges || [])
-        .filter(
-          (e) =>
-            sceneNodeIds.has(String(e.source_node_id)) &&
-            sceneNodeIds.has(String(e.target_node_id)),
-        )
-        .map((e) => ({
-          id: e.id,
-          source: e.source_node_id,
-          target: e.target_node_id,
-          sourceHandle: "output",
-          markerEnd: { type: MarkerType.ArrowClosed },
-          style: { stroke: flowEdgeStroke, strokeWidth: 2 },
-          label: e.label || "",
-        }));
-      setEdges(loadedEdges);
-      pushHistory(loadedNodes, loadedEdges);
-      return loadedNodes;
-    },
-    [setNodes, setEdges],
-  );
-
-  const applyFullCanvas = useCallback(
-    (
-      p: ProjectResponse,
-      projectNodes: ProjectNodeResponse[],
-    ): Node[] => {
-      setCurrentScene(null);
-      const scenes = p.scenes || [];
-      const stageIds = scenes.map((s) => s.id);
-      const loadedNodes = projectNodes.map((n) =>
-        nodeResponseToFlowNode(n, scenes, stageIds),
-      );
-      const allNodeIds = new Set(projectNodes.map((n) => String(n.id)));
-      const loadedEdges: Edge[] = (p.edges || [])
-        .filter(
-          (e) =>
-            allNodeIds.has(String(e.source_node_id)) &&
-            allNodeIds.has(String(e.target_node_id)),
-        )
-        .map((e) => ({
-          id: e.id,
-          source: e.source_node_id,
-          target: e.target_node_id,
-          sourceHandle: "output",
-          markerEnd: { type: MarkerType.ArrowClosed },
-          style: { stroke: flowEdgeStroke, strokeWidth: 2 },
-          label: e.label || "",
-        }));
-      setNodes(loadedNodes);
-      setEdges(loadedEdges);
-      pushHistory(loadedNodes, loadedEdges);
-      return loadedNodes;
-    },
-    [setNodes, setEdges],
-  );
-
-  const openBeatInFlow = useCallback(
-    (beatId: string) => {
-      if (!project) return;
-      const beat = parseAxs(axsSource, { roles: rolesMap }).beats.find(
-        (b) => b.id === beatId,
-      );
-      if (!beat) return;
-      const nodeId = nodeIdForBeat(beat, allProjectNodes);
-      if (!nodeId) {
-        showToast("未找到对应节点，请先保存剧本", "error");
-        return;
-      }
-      const projNode = allProjectNodes.find((n) => String(n.id) === nodeId);
-      if (!projNode) return;
-
-      const stageId = projNode.stage_id ?? projNode.scene_id;
-      const targetScene =
-        project.scenes?.find((s) => s.id === stageId) ?? project.scenes?.[0];
-
-      let flowNode: Node | undefined;
-      if (viewMode === "stage" && targetScene && targetScene.id !== currentScene?.id) {
-        const loadedNodes = applySceneCanvas(
-          targetScene,
-          project,
-          allProjectNodes,
-        );
-        flowNode = loadedNodes.find((n) => n.id === nodeId);
-        showToast(`已切换到舞台：${targetScene.title}`);
-      } else {
-        flowNode = nodes.find((n) => n.id === nodeId);
-      }
-      if (!flowNode) {
-        const scenes = project.scenes || [];
-        const stageIds = scenes.map((s) => s.id);
-        flowNode = nodeResponseToFlowNode(projNode, scenes, stageIds);
-      }
-      setEditorMode("flow");
-      selectFlowNode(flowNode);
-    },
-    [
-      project,
-      axsSource,
-      rolesMap,
-      allProjectNodes,
-      currentScene?.id,
-      nodes,
-      applySceneCanvas,
-      selectFlowNode,
-      viewMode,
-    ],
-  );
+    if (undoJournal()) showToast("已撤销");
+  }, [undoJournal]);
 
   const syncCanvasFromProject = useCallback(
     async (p: ProjectResponse) => {
@@ -496,9 +402,7 @@ export default function ProjectFlowPage() {
 
       const projectNodes = collectProjectNodes(p.nodes, p.scenes || []);
       setAllProjectNodes(projectNodes);
-      draftJournal.sync(
-        draftFromProject(projectNodes, p.edges || [], p.scenes || []),
-      );
+      sync(draftFromProject(projectNodes, p.edges || [], p.scenes || []));
       const scenes = p.scenes || [];
       if (activeStageId === null && scenes[0]) {
         setActiveStageId(scenes[0].id);
@@ -506,28 +410,14 @@ export default function ProjectFlowPage() {
 
       const scene = sceneId
         ? p.scenes?.find((s) => s.id === sceneId)
-        : p.scenes?.[0];
+        : null;
       if (!scene && !projectNodes.length) {
-        setNodes([]);
-        setEdges([]);
         setCurrentScene(null);
         setAxsSource(p.axs_source || `# 开始\n旁白：故事从这里开始。\n`);
         setAxsDirty(false);
         return;
       }
-      if (viewMode === "full") {
-        applyFullCanvas(p, projectNodes);
-      } else if (scene) {
-        applySceneCanvas(scene, p, projectNodes);
-      } else {
-        const stageIds = scenes.map((s) => s.id);
-        const loadedNodes = projectNodes.map((n) =>
-          nodeResponseToFlowNode(n, scenes, stageIds),
-        );
-        setNodes(loadedNodes);
-        setEdges([]);
-        pushHistory(loadedNodes, []);
-      }
+      setCurrentScene(scene ?? null);
 
       setAxsSource(
         p.axs_source ||
@@ -536,15 +426,7 @@ export default function ProjectFlowPage() {
       setAxsDirty(false);
       setFitViewTrigger((t) => t + 1);
     },
-    [
-      activeStageId,
-      applyFullCanvas,
-      applySceneCanvas,
-      sceneId,
-      setEdges,
-      setNodes,
-      viewMode,
-    ],
+    [activeStageId, sceneId, sync],
   );
 
   useEffect(() => {
@@ -556,6 +438,85 @@ export default function ProjectFlowPage() {
     if (!id) return;
     await qc.invalidateQueries({ queryKey: PROJECT_KEYS.detail(id) });
   }, [id, qc]);
+
+  const openBeatInFlow = useCallback(
+    (nodeId: string) => {
+      if (!project) return;
+      const projNode = allProjectNodes.find((n) => String(n.id) === nodeId);
+      if (!projNode) return;
+      const stageId = projNode.stage_id ?? projNode.scene_id;
+      const targetScene =
+        project.scenes?.find((s) => s.id === stageId) ?? project.scenes?.[0];
+      if (viewMode === "stage" && targetScene && targetScene.id !== currentScene?.id) {
+        setCurrentScene(targetScene);
+        showToast(`已切换到舞台：${targetScene.title}`);
+      }
+      setEditorMode("flow");
+      selectFlowNode(nodeId);
+    },
+    [project, allProjectNodes, currentScene?.id, selectFlowNode, viewMode],
+  );
+
+  // React Flow 变更分流：位置→拖拽临时层；选择→选择态；删除由 window 处理器负责
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const pos = changes.filter(
+        (c): c is Extract<NodeChange, { type: "position" }> =>
+          c.type === "position" && Boolean(c.position),
+      );
+      if (pos.length) {
+        setDragPositions((prev) => {
+          const m = new Map(prev);
+          for (const c of pos) m.set(c.id, c.position!);
+          return m;
+        });
+      }
+      const sel = changes.filter((c) => c.type === "select");
+      if (sel.length) {
+        const picked = sel.find((c) => (c as { selected?: boolean }).selected);
+        setSelectedId(picked ? picked.id : null);
+      }
+    },
+    [],
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const sel = changes.filter((c) => c.type === "select");
+      if (sel.length) {
+        const picked = sel.find((c) => (c as { selected?: boolean }).selected);
+        setSelectedEdgeId(picked ? picked.id : null);
+      }
+      const removed = changes.filter((c) => c.type === "remove");
+      if (removed.length) {
+        dispatch(
+          {
+            kind: "edges.replaceAll",
+            edges: draft.edges.filter((e) => !removed.some((c) => c.id === e.id)),
+          },
+          "flow",
+        );
+      }
+    },
+    [draft, dispatch],
+  );
+
+  // 拖拽落点记序：过程走临时层（高频），松手提交事务并清除临时层
+  const handleNodeDragStop = useCallback<NodeMouseHandler>(
+    (_, node) => {
+      dispatch(
+        { kind: "node.move", nodeId: node.id, position: node.position },
+        "flow",
+      );
+      setDragPositions((prev) => {
+        if (!prev.has(node.id)) return prev;
+        const m = new Map(prev);
+        m.delete(node.id);
+        return m;
+      });
+    },
+    [dispatch],
+  );
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -601,14 +562,9 @@ export default function ProjectFlowPage() {
           stage_dot: palette.dot,
         },
       };
-      draftJournal.dispatch({ kind: "node.add", node: flowNodeToKernelNode(newNode) }, "flow");
-      setNodes((nds) => {
-        const n = [...nds, newNode];
-        pushHistory(n, edges);
-        return n;
-      });
+      dispatch({ kind: "node.add", node: flowNodeToKernelNode(newNode) }, "flow");
     },
-    [nodes, edges, setNodes, project, viewMode, activeStageId, currentScene, draftJournal],
+    [dispatch, project, viewMode, activeStageId, currentScene, rfNodes.length],
   );
 
   const onConnect = useCallback(
@@ -624,17 +580,12 @@ export default function ProjectFlowPage() {
         style: { stroke: flowEdgeStroke, strokeWidth: 2 },
         label: "",
       };
-      draftJournal.dispatch(
-        { kind: "edges.replaceAll", edges: addEdge(newEdge, edges).map(toKernelEdge) },
+      dispatch(
+        { kind: "edges.replaceAll", edges: addEdge(newEdge, rfEdges).map(toKernelEdge) },
         "flow",
       );
-      setEdges((eds) => {
-        const e = addEdge(newEdge, eds);
-        pushHistory(nodes, e);
-        return e;
-      });
     },
-    [nodes, edges, setEdges, draftJournal],
+    [rfEdges, dispatch],
   );
 
   const onNodeClick = useCallback(
@@ -645,20 +596,20 @@ export default function ProjectFlowPage() {
   );
 
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
-    setSelectedEdge(edge);
-    setSelectedNode(null);
+    setSelectedEdgeId(edge.id);
+    setSelectedId(null);
   }, []);
 
   const onPaneClick = useCallback(() => {
-    setSelectedNode(null);
-    setSelectedEdge(null);
+    setSelectedId(null);
+    setSelectedEdgeId(null);
   }, []);
 
   const updateSelectedNode = (data: Partial<NodeFormState>) => {
     if (!selectedNode) return;
     const nd = { ...nodeForm, ...data };
     setNodeForm(nd);
-    draftJournal.dispatch(
+    dispatch(
       {
         kind: "node.patch",
         nodeId: selectedNode.id,
@@ -670,21 +621,6 @@ export default function ProjectFlowPage() {
       },
       editOrigin,
     );
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === selectedNode.id
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                ...nd,
-                is_anchor: Boolean(nd.is_anchor),
-                is_ending: Boolean(nd.is_ending),
-              },
-            }
-          : n,
-      ),
-    );
   };
 
   const updateConditions = useCallback(
@@ -693,48 +629,24 @@ export default function ProjectFlowPage() {
       if (!selectedNode) return;
       const hc = newC.length > 0;
       const tc = hc ? { type: "all", conditions: newC } : null;
-      draftJournal.dispatch(
+      dispatch(
         { kind: "node.patch", nodeId: selectedNode.id, patch: { trigger_condition: tc as Condition | null } },
         editOrigin,
       );
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedNode.id
-            ? {
-                ...n,
-                data: { ...n.data, has_conditions: hc, trigger_condition: tc },
-              }
-            : n,
-        ),
-      );
     },
-    [selectedNode, setNodes],
+    [selectedNode, dispatch, editOrigin],
   );
 
   const updateEffects = useCallback(
     (newE: EffectItem[]) => {
       setEffects(newE);
       if (!selectedNode) return;
-      draftJournal.dispatch(
+      dispatch(
         { kind: "node.patch", nodeId: selectedNode.id, patch: { effects: newE } },
         editOrigin,
       );
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedNode.id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  has_effects: newE.length > 0,
-                  effects: newE,
-                },
-              }
-            : n,
-        ),
-      );
     },
-    [selectedNode, setNodes],
+    [selectedNode, dispatch, editOrigin],
   );
 
   const updateScript = useCallback(
@@ -742,49 +654,20 @@ export default function ProjectFlowPage() {
       const cleaned = sanitizeScript(newS);
       setScript(cleaned);
       if (!selectedNode) return;
-      // 单一写入口：先经内核事务校验并入日志；未保存节点会被拒绝，
-      // 此时保持旧路径语义（仅视图更新）——绞杀者过渡态，零行为变更。
-      draftJournal.dispatch(
+      // 单一写入口：内核事务校验并入日志（Draft 唯一持有者，投影自动反映）
+      dispatch(
         { kind: "script.replace", nodeId: selectedNode.id, script: cleaned },
         editOrigin,
       );
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedNode.id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  script: cleaned,
-                  has_script: cleaned.length > 0,
-                },
-              }
-            : n,
-        ),
-      );
     },
-    [selectedNode, setNodes],
+    [selectedNode, dispatch, editOrigin],
   );
 
   const renameBeat = useCallback(
     (nodeId: string, title: string) => {
-      draftJournal.dispatch(
-        { kind: "node.patch", nodeId, patch: { title } },
-        editOrigin,
-      );
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId ? { ...n, data: { ...n.data, title } } : n,
-        ),
-      );
-      if (selectedNode?.id === nodeId) {
-        setNodeForm((f) => ({ ...f, title }));
-        setSelectedNode((n) =>
-          n ? { ...n, data: { ...n.data, title } } : n,
-        );
-      }
+      dispatch({ kind: "node.patch", nodeId, patch: { title } }, editOrigin);
     },
-    [selectedNode?.id, setNodes],
+    [dispatch, editOrigin],
   );
 
   const patchProjectMeta = useCallback(
@@ -805,32 +688,18 @@ export default function ProjectFlowPage() {
     (newProps: string[]) => {
       setNodeProps(newProps);
       if (!selectedNode) return;
-      draftJournal.dispatch(
+      dispatch(
         { kind: "node.patch", nodeId: selectedNode.id, patch: { props: newProps } },
         editOrigin,
       );
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === selectedNode.id
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  props: newProps,
-                  has_props: newProps.length > 0,
-                },
-              }
-            : n,
-        ),
-      );
     },
-    [selectedNode, setNodes],
+    [selectedNode, dispatch, editOrigin],
   );
 
   useEffect(() => {
-    if (editorMode !== "cut" || selectedNode || nodes.length === 0) return;
-    selectFlowNode(nodes[0]);
-  }, [editorMode, nodes, selectedNode, selectFlowNode]);
+    if (editorMode !== "cut" || selectedNode || rfNodes.length === 0) return;
+    selectFlowNode(rfNodes[0]!);
+  }, [editorMode, rfNodes, selectedNode, selectFlowNode]);
 
   const deleteSelectedNode = () => {
     if (!selectedNode) return;
@@ -842,48 +711,28 @@ export default function ProjectFlowPage() {
     ) {
       return;
     }
-    draftJournal.dispatch({ kind: "node.remove", nodeId: selectedNode.id }, "flow");
-    setNodes((nds) => {
-      const n = nds.filter((x) => x.id !== selectedNode.id);
-      pushHistory(n, edges);
-      return n;
-    });
-    setEdges((eds) =>
-      eds.filter(
-        (e) => e.source !== selectedNode.id && e.target !== selectedNode.id,
-      ),
-    );
-    setSelectedNode(null);
+    dispatch({ kind: "node.remove", nodeId: selectedNode.id }, "flow");
+    setSelectedId(null);
   };
 
   const handleEdgeLabelChange = (edgeId: string, label: string) => {
-    draftJournal.dispatch(
+    dispatch(
       {
         kind: "edges.replaceAll",
-        edges: edges.map((e) =>
-          e.id === edgeId ? { ...toKernelEdge(e), label } : toKernelEdge(e),
+        edges: draft.edges.map((e) =>
+          e.id === edgeId ? { ...e, label } : e,
         ),
       },
       "flow",
     );
-    setEdges((eds) =>
-      eds.map((e) => (e.id === edgeId ? { ...e, label } : e)),
-    );
-    setSelectedEdge((prev) =>
-      prev && prev.id === edgeId ? { ...prev, label } : prev,
-    );
   };
 
   const handleDeleteEdge = (edgeId: string) => {
-    draftJournal.dispatch(
-      {
-        kind: "edges.replaceAll",
-        edges: edges.filter((e) => e.id !== edgeId).map(toKernelEdge),
-      },
+    dispatch(
+      { kind: "edges.replaceAll", edges: draft.edges.filter((e) => e.id !== edgeId) },
       "flow",
     );
-    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
-    setSelectedEdge(null);
+    setSelectedEdgeId(null);
   };
 
   useEffect(() => {
@@ -894,21 +743,22 @@ export default function ProjectFlowPage() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "c" && selectedNode) {
         e.preventDefault();
-        const copied: Node = {
-          ...selectedNode,
-          id: `copy-${Date.now()}`,
-          position: {
-            x: selectedNode.position.x + 50,
-            y: selectedNode.position.y + 50,
+        dispatch(
+          {
+            kind: "node.add",
+            node: {
+              id: `copy-${Date.now()}`,
+              stageId: (selectedNode.data.stage_id as string) ?? null,
+              position: {
+                x: selectedNode.position.x + 50,
+                y: selectedNode.position.y + 50,
+              },
+              narrative: selectedNode.data as Record<string, unknown>,
+              sortOrder: rfNodes.length,
+            },
           },
-          selected: false,
-        };
-        draftJournal.dispatch({ kind: "node.add", node: flowNodeToKernelNode(copied) }, "flow");
-        setNodes((nds) => {
-          const n = [...nds, copied];
-          pushHistory(n, edges);
-          return n;
-        });
+          "flow",
+        );
         showToast("已复制");
       }
       const target = e.target as HTMLElement;
@@ -931,7 +781,7 @@ export default function ProjectFlowPage() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [undo, selectedNode, selectedEdge, nodes, edges, setNodes, editorMode]);
+  }, [undo, selectedNode, selectedEdge, handleDeleteEdge, editorMode]);
 
   const saveWriter = async () => {
     if (!id || !project) return;
@@ -947,7 +797,7 @@ export default function ProjectFlowPage() {
         allProjectNodes,
       );
       await projectApi.syncNarrative(id, payload);
-      draftJournal.dispatch(
+      dispatch(
         { kind: "axs.import", source: axsSource, roles: rolesMap },
         "writer",
       );
@@ -965,22 +815,21 @@ export default function ProjectFlowPage() {
     if (viewMode === "stage" && !currentScene) return;
     setSaving(true);
     try {
-      const currentIds = new Set(nodes.map((n) => n.id));
+      const draftNodes = [...draft.nodes.values()];
+      const currentIds = new Set(draftNodes.map((n) => n.id));
       const scopeNodes =
         viewMode === "full"
-          ? allProjectNodes
-          : allProjectNodes.filter(
-              (n) => (n.stage_id ?? n.scene_id) === currentScene!.id,
-            );
+          ? draftNodes
+          : draftNodes.filter((n) => n.stageId === currentScene!.id);
 
-      const resolveStageId = (node: Node) =>
-        (node.data.stage_id as string) ||
-        currentScene?.id ||
-        project.scenes?.[0]?.id;
+      const resolveStageId = (n: { stageId: string | null }) =>
+        n.stageId || currentScene?.id || project.scenes?.[0]?.id;
 
-      for (const node of scopeNodes) {
+      // 删除服务端存在、画布已消失的节点（作用域内，旧语义等价）
+      for (const node of allProjectNodes) {
+        const sid = node.stage_id ?? node.scene_id ?? currentScene?.id;
+        if (viewMode !== "full" && sid !== currentScene?.id) continue;
         if (!currentIds.has(String(node.id))) {
-          const sid = node.stage_id ?? node.scene_id ?? currentScene?.id;
           if (!sid) continue;
           try {
             await projectApi.deleteNode(id, sid, node.id);
@@ -991,72 +840,46 @@ export default function ProjectFlowPage() {
       }
 
       const nodeMap = new Map<string, string>();
-      for (const n of nodes) {
+      for (const n of draftNodes) {
         const sid = resolveStageId(n);
         if (!sid) continue;
         if (n.id.startsWith("new-") || n.id.startsWith("copy-")) {
           const created = await projectApi.addNode(id, sid, {
             stage_id: sid,
             editor_data: { position: n.position },
-            narrative_data: {
-              title: (n.data.title as string) || "未命名",
-              description: (n.data.description as string) || "",
-              is_anchor: Boolean(n.data.is_anchor),
-              is_ending: Boolean(n.data.is_ending),
-              ending_label: (n.data.ending_label as string) || null,
-              speaker: (n.data.speaker as string) || null,
-              dialogue: (n.data.dialogue as string) || null,
-              narration: (n.data.narration as string) || null,
-              script: (n.data.script as Instruction[]) || [],
-              trigger_condition: n.data.trigger_condition || null,
-              effects: n.data.effects || [],
-              props: (n.data.props as string[]) || [],
-            },
+            narrative_data: n.narrative as Record<string, unknown>,
           });
           nodeMap.set(n.id, created.id);
         } else {
           nodeMap.set(n.id, n.id);
         }
       }
-      for (const n of nodes) {
+      for (const n of draftNodes) {
         if (n.id.startsWith("new-") || n.id.startsWith("copy-")) continue;
         const sid = resolveStageId(n);
         if (!sid) continue;
         await projectApi.updateNode(id, sid, nodeMap.get(n.id) || n.id, {
           stage_id: sid,
           editor_data: { position: n.position },
-          narrative_data: {
-            title: (n.data.title as string) || "未命名",
-            description: (n.data.description as string) || "",
-            is_anchor: Boolean(n.data.is_anchor),
-            is_ending: Boolean(n.data.is_ending),
-            ending_label: (n.data.ending_label as string) || null,
-            speaker: (n.data.speaker as string) || null,
-            dialogue: (n.data.dialogue as string) || null,
-            narration: (n.data.narration as string) || null,
-            script: (n.data.script as Instruction[]) || [],
-            trigger_condition: n.data.trigger_condition || null,
-            effects: n.data.effects || [],
-            props: (n.data.props as string[]) || [],
-          },
+          narrative_data: n.narrative as Record<string, unknown>,
         });
       }
 
       if (viewMode === "full") {
-        const allEdges = edges.map((e) => ({
+        const allEdges = draft.edges.map((e) => ({
           source_node_id: nodeMap.get(e.source) || e.source,
           target_node_id: nodeMap.get(e.target) || e.target,
           source_port: "output",
-          label: (e.label as string) || null,
+          label: e.label || null,
         }));
         await projectApi.saveEdges(id, allEdges);
       } else {
         const sceneNodeIds = new Set<string>();
-        for (const n of nodes) {
+        for (const n of draftNodes) {
           sceneNodeIds.add(nodeMap.get(n.id) || n.id);
         }
         for (const n of scopeNodes) {
-          sceneNodeIds.add(String(n.id));
+          sceneNodeIds.add(n.id);
         }
 
         const preservedEdges = (project?.edges || [])
@@ -1072,28 +895,14 @@ export default function ProjectFlowPage() {
             label: e.label || null,
           }));
 
-        const currentSceneEdges = edges.map((e) => ({
+        const currentSceneEdges = draft.edges.map((e) => ({
           source_node_id: nodeMap.get(e.source) || e.source,
           target_node_id: nodeMap.get(e.target) || e.target,
           source_port: "output",
-          label: (e.label as string) || null,
+          label: e.label || null,
         }));
         await projectApi.saveEdges(id, [...preservedEdges, ...currentSceneEdges]);
       }
-
-      const un = nodes.map((n) => {
-        const r = nodeMap.get(n.id);
-        return r && r !== n.id ? { ...n, id: r } : n;
-      });
-      setNodes(un);
-      const ue = edges.map((e) => ({
-        ...e,
-        id: `${nodeMap.get(e.source) || e.source}-${nodeMap.get(e.target) || e.target}`,
-        source: nodeMap.get(e.source) || e.source,
-        target: nodeMap.get(e.target) || e.target,
-      }));
-      setEdges(ue);
-      pushHistory(un, ue);
 
       await refreshProject();
       if (viewMode === "stage" && currentScene && project) {
@@ -1122,10 +931,10 @@ export default function ProjectFlowPage() {
   };
 
   const simTargets: SimTarget[] = selectedNode
-    ? edges
+    ? rfEdges
         .filter((e) => e.source === selectedNode.id)
         .map((e) => {
-          const tgt = nodes.find((n) => n.id === e.target);
+          const tgt = rfNodes.find((n) => n.id === e.target);
           return {
             edgeId: e.id,
             label: (e.label as string) || "",
@@ -1169,61 +978,32 @@ export default function ProjectFlowPage() {
   }, [id, deleteProjectMutation, navigate]);
 
   const stageCounts = useMemo(
-    () => stageNodeCounts(nodes, project?.scenes || []),
-    [nodes, project?.scenes],
+    () => stageNodeCounts(rfNodes, project?.scenes || []),
+    [rfNodes, project?.scenes],
   );
 
   const stageLanes = useMemo(
     () =>
       viewMode === "full" && project?.scenes
-        ? computeStageLanes(nodes, project.scenes)
+        ? computeStageLanes(rfNodes, project.scenes)
         : [],
-    [viewMode, nodes, project?.scenes],
+    [viewMode, rfNodes, project?.scenes],
   );
 
   const stageFocusBounds = useMemo(
-    () => (focusStageId ? stageBounds(nodes, focusStageId) : null),
-    [focusStageId, nodes, stageFocusTrigger],
-  );
-
-  const displayNodes = useMemo(
-    () =>
-      nodes.map((n) => {
-        const sid = n.data.stage_id as string | undefined;
-        const dimmed = filteredStageId && sid !== filteredStageId;
-        return {
-          ...n,
-          selected: selectedNode?.id === n.id,
-          style: dimmed ? { opacity: 0.3 } : undefined,
-        };
-      }),
-    [nodes, selectedNode, filteredStageId],
+    () => (focusStageId ? stageBounds(rfNodes, focusStageId) : null),
+    [focusStageId, rfNodes, stageFocusTrigger],
   );
 
   const assignNodeStage = useCallback(
     (stageId: string) => {
-      if (!selectedNode || !project?.scenes) return;
-      const scenes = project.scenes;
-      const stageIds = scenes.map((s) => s.id);
-      const palette = STAGE_PALETTE[stageColorIndex(stageId, stageIds)];
-      const stageTitle = scenes.find((s) => s.id === stageId)?.title ?? null;
-      const patch = {
-        stage_id: stageId,
-        stage_title: stageTitle,
-        stage_border: palette.border,
-        stage_header: palette.header,
-        stage_dot: palette.dot,
-      };
-      const updated: Node = {
-        ...selectedNode,
-        data: { ...selectedNode.data, ...patch },
-      };
-      setSelectedNode(updated);
-      setNodes((nds) =>
-        nds.map((n) => (n.id === selectedNode.id ? updated : n)),
+      if (!selectedNode) return;
+      dispatch(
+        { kind: "node.restage", nodeId: selectedNode.id, stageId },
+        editOrigin,
       );
     },
-    [selectedNode, project, setNodes],
+    [selectedNode, dispatch, editOrigin],
   );
 
   const handleFocusStage = useCallback((stageId: string) => {
@@ -1239,27 +1019,28 @@ export default function ProjectFlowPage() {
 
   const autoLayoutByStage = useCallback(() => {
     if (!project?.scenes?.length) return;
-    const laid = layoutNodesByStage(nodes, project.scenes);
-    setNodes(laid);
-    pushHistory(laid, edges);
+    const laid = layoutNodesByStage(rfNodes, project.scenes);
+    for (const n of laid) {
+      dispatch({ kind: "node.move", nodeId: n.id, position: n.position }, "flow");
+    }
     setFitViewTrigger((t) => t + 1);
     showToast("已按舞台整理布局");
-  }, [project, nodes, edges, setNodes]);
+  }, [project, rfNodes, dispatch]);
 
   const switchScene = useCallback(
     (scene: ProjectSceneResponse) => {
-      if (!project) return;
-      applySceneCanvas(scene, project, allProjectNodes);
+      setCurrentScene(scene);
+      setSelectedId(null);
       setFitViewTrigger((t) => t + 1);
     },
-    [project, allProjectNodes, applySceneCanvas],
+    [],
   );
 
   const switchViewMode = (mode: CanvasViewMode) => {
     if (mode === viewMode || !project) return;
     setViewMode(mode);
-    setSelectedNode(null);
-    setSelectedEdge(null);
+    setSelectedId(null);
+    setSelectedEdgeId(null);
     setFilteredStageId(null);
     setFocusStageId(null);
   };
@@ -1309,12 +1090,12 @@ export default function ProjectFlowPage() {
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-ink-muted/60">{nodes.length} 节点</span>
+                <span className="text-[10px] text-ink-muted/60">{rfNodes.length} 节点</span>
               </>
             )}
             {editorMode !== "cut" && viewMode === "full" && (
               <span className="text-[10px] text-ink-muted/60">
-                全剧本 · {nodes.length} 节点
+                全剧本 · {rfNodes.length} 节点
               </span>
             )}
             {editorMode !== "cut" && (
@@ -1423,7 +1204,7 @@ export default function ProjectFlowPage() {
         <CutStudioView
           layoutApiRef={cutLayoutApiRef}
           project={project}
-          nodes={displayNodes}
+          nodes={rfNodes}
           selectedNode={selectedNode}
           onSelectBeat={selectFlowNode}
           sceneFilterId={cutSceneFilter}
@@ -1446,7 +1227,7 @@ export default function ProjectFlowPage() {
           onScriptChange={updateScript}
           scenes={project?.scenes || []}
           onStageChange={assignNodeStage}
-          allNodes={nodes}
+          allNodes={rfNodes}
           simTargets={simTargets}
           onPreviewScript={() => setShowPreview(true)}
           onDeleteNode={deleteSelectedNode}
@@ -1533,8 +1314,8 @@ export default function ProjectFlowPage() {
           wrapperRef={wrapperRef}
           viewMode={viewMode}
           projectScenes={project?.scenes}
-          displayNodes={displayNodes}
-          edges={edges}
+          displayNodes={rfNodes}
+          edges={rfEdges}
           hoveredEdge={hoveredEdge}
           selectedNode={selectedNode}
           selectedEdge={selectedEdge}
@@ -1553,12 +1334,12 @@ export default function ProjectFlowPage() {
           script={script}
           itemOptions={itemOptions}
           projectRoles={projectRoles}
-          nodes={nodes}
+          nodes={rfNodes}
           simTargets={simTargets}
           onActivePanelChange={setActivePanel}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onNodeDragStop={handleNodeDragStop}
-          onEdgesChange={onEdgesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}

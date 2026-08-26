@@ -94,7 +94,7 @@ describe(".axsp 边界分支", () => {
       project: bundle,
     });
     expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.error.detail).toContain("format");
+    if (!bad.ok) expect((bad.error as { detail: string }).detail).toContain("format");
 
     const r = unpackAxsp("42");
     expect(r.ok).toBe(false);

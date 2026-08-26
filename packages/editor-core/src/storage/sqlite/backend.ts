@@ -9,11 +9,22 @@
 
 export type SqlRow = Record<string, unknown>;
 
+export interface SqlStmt {
+  sql: string;
+  params?: unknown[];
+}
+
 export interface SqlBackend {
   /** 参数化查询；返回行集合 */
   select<T>(sql: string, params?: unknown[]): Promise<T[]>;
   /** 参数化执行；返回受影响行数 */
   execute(sql: string, params?: unknown[]): Promise<{ rowsAffected: number }>;
+  /**
+   * 单一事务内顺序执行全部语句，任一失败整体回滚（I4）。
+   * - sql.js：单连接 BEGIN/COMMIT（真原子）
+   * - Tauri：Rust 命令 sql_transaction（单连接池，绕开 sqlx 池化跨连接问题）
+   */
+  transactional(stmts: SqlStmt[]): Promise<{ rowsAffected: number }>;
 }
 
 /** schema v1：沿用 PG 关系模型；narrative_data/editor_data 保持 JSON 文本列 */
@@ -64,6 +75,13 @@ export const SCHEMA_MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX IF NOT EXISTS idx_nodes_project ON project_nodes(project_id);
   CREATE INDEX IF NOT EXISTS idx_edges_project ON project_edges(project_id);
+  `,
+  // 修复早期无 FK 约束时代留下的孤儿行（幂等）
+  `
+  DELETE FROM project_nodes WHERE project_id NOT IN (SELECT id FROM projects);
+  DELETE FROM project_edges WHERE project_id NOT IN (SELECT id FROM projects);
+  DELETE FROM project_scenes WHERE project_id NOT IN (SELECT id FROM projects);
+  DELETE FROM project_roles WHERE project_id NOT IN (SELECT id FROM projects);
   `,
 ];
 

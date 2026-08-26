@@ -12,6 +12,8 @@
     "global-shortcut:allow-unregister",
     "global-shortcut:allow-is-registered",
     "fs:default",
+    "fs:allow-write-text-file",
+    "fs:allow-mkdir",
     {
       "identifier": "fs:scope",
       "allow": [
@@ -24,6 +26,8 @@
       ]
     },
     "dialog:allow-open",
-    "dialog:allow-save"
+    "dialog:allow-save",
+    "sql:default",
+    "sql:allow-execute"
   ]
 }

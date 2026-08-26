@@ -56,6 +56,9 @@ class ThrowingBackend implements SqlBackend {
   async execute(): Promise<{ rowsAffected: number }> {
     throw new Error("模拟磁盘故障");
   }
+  async transactional(): Promise<{ rowsAffected: number }> {
+    throw new Error("模拟磁盘故障");
+  }
 }
 
 describe("SqliteStorageProvider io 错误路径", () => {

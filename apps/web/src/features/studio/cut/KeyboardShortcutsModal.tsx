@@ -12,6 +12,11 @@ const CUT_STUDIO_SHORTCUTS: ShortcutRow[] = [
   { keys: ["F"], label: "专注模式（隐藏侧栏与壳层）" },
   { keys: ["⌘", "."], label: "专注模式（备用）" },
   { keys: ["?"], label: "显示 / 关闭快捷键帮助" },
+  { keys: ["←"], label: "上一条指令" },
+  { keys: ["→"], label: "下一条指令" },
+  { keys: ["Alt", "↑"], label: "指令上移一位" },
+  { keys: ["Alt", "↓"], label: "指令下移一位" },
+  { keys: ["⌘", "D"], label: "复制选中指令" },
 ];
 
 interface KeyboardShortcutsModalProps {

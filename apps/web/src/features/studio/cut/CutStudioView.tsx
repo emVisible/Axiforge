@@ -376,6 +376,44 @@ export default function CutStudioView({
         deleteClipAt(selectedIndex);
         return;
       }
+      // ArrowLeft/Right: 逐 clip 导航
+      if (e.key === "ArrowLeft" && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        stepPrev();
+        return;
+      }
+      if (e.key === "ArrowRight" && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        stepNext();
+        return;
+      }
+      // Alt+ArrowUp/Down: 在脚本内重排选中 clip（上移/下移一位）
+      if (e.key === "ArrowUp" && e.altKey && script.length > 1) {
+        e.preventDefault();
+        if (selectedIndex > 0) {
+          const next = [...script];
+          [next[selectedIndex - 1], next[selectedIndex]] = [next[selectedIndex], next[selectedIndex - 1]];
+          onScriptChange(next);
+          selectClip(selectedIndex - 1);
+        }
+        return;
+      }
+      if (e.key === "ArrowDown" && e.altKey && script.length > 1) {
+        e.preventDefault();
+        if (selectedIndex < script.length - 1) {
+          const next = [...script];
+          [next[selectedIndex], next[selectedIndex + 1]] = [next[selectedIndex + 1], next[selectedIndex]];
+          onScriptChange(next);
+          selectClip(selectedIndex + 1);
+        }
+        return;
+      }
+      // Cmd/Ctrl+D: 复制选中 clip
+      if (e.key === "d" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        duplicateClip();
+        return;
+      }
       if (e.key === "\\" && !e.shiftKey) {
         e.preventDefault();
         toggleOutliner();
@@ -404,6 +442,10 @@ export default function CutStudioView({
     script.length,
     selectedIndex,
     deleteClipAt,
+    stepPrev,
+    stepNext,
+    duplicateClip,
+    onScriptChange,
   ]);
 
   useEffect(() => {

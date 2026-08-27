@@ -51,6 +51,33 @@ export function trackForOp(op: string): CutTrackId {
   }
 }
 
+/** 属于角色轨的指令（F2：show/hide/move 按 characterId 分轨） */
+export function characterTrackOp(inst: Instruction): string | null {
+  if (!inst || typeof inst !== "object") return null;
+  const op = (inst as { op?: string }).op;
+  if (op !== "show" && op !== "hide" && op !== "move") return null;
+  const cid = (inst as { characterId?: string }).characterId;
+  return cid ? op : null;
+}
+
+/** 角色轨分组：按 characterId 首次出现顺序 */
+export function characterTrackGroups(
+  script: Instruction[],
+): { characterId: string; indices: number[] }[] {
+  const order: string[] = [];
+  const byChar = new Map<string, number[]>();
+  script.forEach((inst, i) => {
+    if (!characterTrackOp(inst)) return;
+    const cid = (inst as { characterId: string }).characterId;
+    if (!byChar.has(cid)) {
+      byChar.set(cid, []);
+      order.push(cid);
+    }
+    byChar.get(cid)!.push(i);
+  });
+  return order.map((characterId) => ({ characterId, indices: byChar.get(characterId)! }));
+}
+
 /** 过滤无效条目，避免删除/重排后时间轴读到 undefined */
 export function sanitizeScript(script: Instruction[]): Instruction[] {
   return script.filter(
@@ -253,14 +280,13 @@ export function indicesOnTrack(
     .map(({ i }) => i);
 }
 
-/** 分轨内重排：只交换同轨片段在 script[] 中的槽位，其它轨不动 */
-export function reorderScriptWithinTrack(
+/** 按索引集重排：交换同轨片段在 script[] 中的槽位，其它轨不动（角色轨与固定轨共用） */
+export function reorderScriptByIndices(
   script: Instruction[],
-  trackId: CutTrackId,
+  indices: number[],
   fromLocal: number,
   toLocal: number,
 ): Instruction[] {
-  const indices = indicesOnTrack(script, trackId);
   if (
     fromLocal === toLocal ||
     fromLocal < 0 ||
@@ -280,6 +306,16 @@ export function reorderScriptWithinTrack(
   return next;
 }
 
+/** 分轨内重排（固定轨便捷入口） */
+export function reorderScriptWithinTrack(
+  script: Instruction[],
+  trackId: CutTrackId,
+  fromLocal: number,
+  toLocal: number,
+): Instruction[] {
+  return reorderScriptByIndices(script, indicesOnTrack(script, trackId), fromLocal, toLocal);
+}
+
 /** 分轨内点击/拖拽落点 → 轨内局部下标 */
 export function localIndexAtPixel(
   script: Instruction[],
@@ -287,7 +323,16 @@ export function localIndexAtPixel(
   pixelX: number,
   zoom: number,
 ): number {
-  const indices = indicesOnTrack(script, trackId);
+  return localIndexAtPixelForIndices(indicesOnTrack(script, trackId), script, pixelX, zoom);
+}
+
+/** 按索引集的局部下标（角色轨共用） */
+export function localIndexAtPixelForIndices(
+  indices: number[],
+  script: Instruction[],
+  pixelX: number,
+  zoom: number,
+): number {
   if (!indices.length) return 0;
   const positions = clipPositions(script, zoom);
   for (let local = indices.length - 1; local >= 0; local--) {

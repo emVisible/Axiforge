@@ -19,7 +19,7 @@ import MasterTimelineBar from "./MasterTimelineBar";
 import TransportBar from "./TransportBar";
 import OutlinerPanel from "./outliner/OutlinerPanel";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
-import { clipLabel, patchClipDuration, reorderScriptByIndices, totalDurationMs, indicesOnTrack, characterTrackGroups, type CutTrackId } from "./timelineUtils";
+import { clipLabel, patchClipDuration, reorderScriptByIndices, totalDurationMs, indicesOnTrack, characterTrackGroups, insertShowInstruction, type CutTrackId } from "./timelineUtils";
 import {
   buildMasterTimeline,
   locateMasterPosition,
@@ -198,6 +198,15 @@ export default function CutStudioView({
           )?.indices ?? [])
         : indicesOnTrack(next, trackKey.slice(4) as CutTrackId);
       selectClip(nextIndices[toLocal] ?? 0);
+    },
+    [script, onScriptChange, selectClip],
+  );
+
+  const handleSpriteDrop = useCallback(
+    (characterId: string, expression: string, insertIndex: number) => {
+      const next = insertShowInstruction(script, insertIndex, characterId, expression);
+      onScriptChange(next);
+      selectClip(Math.min(insertIndex, next.length - 1));
     },
     [script, onScriptChange, selectClip],
   );
@@ -501,6 +510,7 @@ export default function CutStudioView({
             projectRoles.map((r) => [r.characterRefId, r.name]),
           )}
           onReorderTrack={handleReorderTrack}
+          onSpriteDrop={handleSpriteDrop}
           onDeleteClip={(index) => {
             selectClip(index);
             deleteClipAt(index);

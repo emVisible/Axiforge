@@ -7,6 +7,7 @@ export interface ProjectRoleOption {
   name: string;
   imagePath?: string | null;
   spriteKeys?: string[];
+  sprites?: Record<string, string>;
 }
 
 export interface ConditionItem {

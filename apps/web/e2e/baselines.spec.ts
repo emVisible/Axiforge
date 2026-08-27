@@ -447,3 +447,88 @@ test("E9 角色轨：双角色分轨渲染、折叠往返、片段选择", async
   const ops = (beat.narrative_data.script as any[]).map((i) => i.op);
   expect(ops).toEqual(["show", "say", "show", "move", "hide"]);
 });
+
+
+// ---------------------------------------------------------------------------
+// E10 精灵拖入：角色面板 sprite 缩略图 → 拖入时间轴生成 show 指令
+// ---------------------------------------------------------------------------
+
+test("E10 精灵拖入：角色面板缩略图可见、拖入生成 show 指令", async ({
+  page,
+  request,
+}) => {
+  const creatorId = "creator-e2e-fixed";
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key!, value!),
+    ["axiforge.creatorId", creatorId],
+  );
+
+  // 创建带 sprites 的角色
+  const res = await request.post("http://localhost:8000/api/v1/characters/", {
+    data: {
+      character_data: {
+        anchor: { name: `${E2E_TAG}拖入精灵` },
+        sprites: { smile: "/uploads/test-smile.png", angry: "/uploads/test-angry.png" },
+      },
+      is_public: false,
+      author_id: creatorId,
+    },
+  });
+  const char = await res.json();
+
+  const project = await createProject(request, "E10 精灵拖入");
+  await addRole(request, project.id, char.id);
+  await addNode(request, project.id, project.scenes[0].id, {
+    title: "E10拍",
+    script: [],
+  });
+
+  await openStudio(page, project.id);
+  // 选中目标 Beat
+  await page.getByRole("button", { name: "E10拍" }).first().click();
+
+  // 展开角色区（折叠状态）才能看到 sprite 缩略图
+  const roleSection = page.getByRole("button", { name: /角色 \d+/ });
+  await roleSection.click();
+  await expect(page.getByText("smile").first()).toBeVisible();
+  await expect(page.getByText("angry").first()).toBeVisible();
+
+  // 模拟拖入：用 page.evaluate 构造原生 DragEvent（Playwright 无法序列化 DataTransfer）
+  const timeline = page.locator('[class*="overflow-x-auto"]').first();
+  await expect(timeline).toBeVisible();
+
+  await page.evaluate(
+    ([cid, expr]) => {
+      const el = document.querySelector('[class*="overflow-x-auto"]')!;
+      const rect = el.getBoundingClientRect();
+      const dt = new DataTransfer();
+      dt.setData(
+        "application/axiforge/sprite",
+        JSON.stringify({ characterId: cid, expression: expr }),
+      );
+      el.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer: dt }));
+      el.dispatchEvent(
+        new DragEvent("drop", {
+          bubbles: true,
+          dataTransfer: dt,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+        }),
+      );
+    },
+    [char.id, "smile"],
+  );
+
+  // 保存 → API 验证：脚本包含 show 指令
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.getByText("已保存")).toBeVisible({ timeout: 15_000 });
+
+  const fresh = await getProject(request, project.id);
+  const beat = fresh.nodes.find((n: any) => n.narrative_data?.title === "E10拍");
+  const script = beat.narrative_data.script as any[];
+  expect(script.length).toBeGreaterThanOrEqual(1);
+  const showInst = script.find((i) => i.op === "show");
+  expect(showInst).toBeTruthy();
+  expect(showInst.characterId).toBe(char.id);
+  expect(showInst.expression).toBe("smile");
+});

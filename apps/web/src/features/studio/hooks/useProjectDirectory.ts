@@ -31,6 +31,7 @@ export async function fetchProjectDirectory(p: ProjectResponse): Promise<{
       name: char?.name ?? `角色 ${role.character_ref_id.slice(0, 8)}`,
       imagePath: char?.image_path,
       spriteKeys: Object.keys(char?.character_data?.sprites || {}),
+      sprites: (char?.character_data?.sprites || {}) as Record<string, string>,
     };
   });
 

@@ -46,6 +46,7 @@ interface TimelineShellProps {
   onScrub: (index: number) => void;
   onReorder?: (from: number, to: number) => void;
   characterLabels?: Record<string, string>;
+  onSpriteDrop?: (characterId: string, expression: string, insertIndex: number) => void;
   onReorderTrack?: (
     trackId: string,
     fromLocal: number,
@@ -72,6 +73,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       onReorder,
       onReorderTrack,
       characterLabels = {},
+      onSpriteDrop,
       onDeleteClip,
       onDurationChange,
     },
@@ -348,6 +350,39 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
           <div
             ref={scrollRef}
             className="relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden"
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("application/axiforge/sprite")) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+              }
+            }}
+            onDrop={(e) => {
+              const raw = e.dataTransfer.getData("application/axiforge/sprite");
+              if (!raw || !onSpriteDrop || !scrollRef.current) return;
+              e.preventDefault();
+              try {
+                const { characterId, expression } = JSON.parse(raw) as {
+                  characterId: string;
+                  expression: string;
+                };
+                const el = scrollRef.current;
+                const rect = el.getBoundingClientRect();
+                const x = e.clientX - rect.left + el.scrollLeft - TIMELINE_PAD;
+                // 按像素定位插入下标
+                const charGroups = characterTrackGroups(script);
+                const charIndices = charGroups
+                  .filter((g) => g.characterId === characterId)
+                  .flatMap((g) => g.indices);
+                const allIndices = charIndices.length
+                  ? charIndices
+                  : script.map((_, i) => i);
+                const idx = localIndexAtPixelForIndices(allIndices, script, x, zoom);
+                const globalIdx = allIndices[idx] ?? script.length;
+                onSpriteDrop(characterId, expression, globalIdx);
+              } catch {
+                /* malformed data — ignore */
+              }
+            }}
             onClick={handleTrackClick}
           >
             <div className="relative" style={{ minWidth: width }}>

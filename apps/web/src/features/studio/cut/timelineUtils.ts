@@ -86,6 +86,26 @@ export function sanitizeScript(script: Instruction[]): Instruction[] {
   );
 }
 
+/**
+ * 在指定下标处插入 show 指令（F3：精灵拖入时间轴）。
+ * 返回新数组；若 index 越界则追加到末尾。
+ */
+export function insertShowInstruction(
+  script: Instruction[],
+  index: number,
+  characterId: string,
+  expression: string,
+): Instruction[] {
+  const inst: Instruction = {
+    op: "show",
+    characterId,
+    expression,
+    position: "center",
+  } as Instruction;
+  const i = Math.max(0, Math.min(index, script.length));
+  return [...script.slice(0, i), inst, ...script.slice(i)];
+}
+
 export function clipLabel(inst: Instruction | null | undefined): string {
   if (!inst) return "—";
   switch (inst.op) {

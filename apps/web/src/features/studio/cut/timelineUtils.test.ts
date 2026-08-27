@@ -3,6 +3,7 @@ import type { Instruction } from "@axiforge/core";
 import {
   characterTrackGroups,
   characterTrackOp,
+  insertShowInstruction,
   localIndexAtPixelForIndices,
   reorderScriptByIndices,
   reorderScriptWithinTrack,
@@ -71,6 +72,34 @@ describe("reorderScriptByIndices（角色轨/固定轨共用重排）", () => {
     // 两种入口对同构输入产生同构重排（按 op 序列断言）
     expect((viaGeneral[2] as { text: string }).text).toBe("2");
     expect((viaTrack[2] as { text: string }).text).toBe("2");
+  });
+});
+
+describe("insertShowInstruction（F3 精灵拖入）", () => {
+  const script = [say("开场"), say("过渡")];
+
+  it("在指定下标插入 show 指令，后续指令后移", () => {
+    const next = insertShowInstruction(script, 1, "char-1", "smile");
+    expect(next).toHaveLength(3);
+    expect((next[1] as { op: string }).op).toBe("show");
+    expect((next[1] as { characterId: string }).characterId).toBe("char-1");
+    expect((next[1] as { expression: string }).expression).toBe("smile");
+    expect((next[2] as { text: string }).text).toBe("过渡");
+  });
+
+  it("index=0 插入头部，index>=length 追加到末尾", () => {
+    const head = insertShowInstruction(script, 0, "c", "angry");
+    expect((head[0] as { op: string }).op).toBe("show");
+    expect(head).toHaveLength(3);
+    const tail = insertShowInstruction(script, 99, "c", "sad");
+    expect((tail[2] as { op: string }).op).toBe("show");
+    expect(tail).toHaveLength(3);
+  });
+
+  it("空脚本追加", () => {
+    const next = insertShowInstruction([], 0, "c", "x");
+    expect(next).toHaveLength(1);
+    expect((next[0] as { op: string }).op).toBe("show");
   });
 });
 

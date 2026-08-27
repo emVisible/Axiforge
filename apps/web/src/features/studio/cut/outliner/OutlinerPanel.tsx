@@ -17,6 +17,7 @@ import { cn } from "@/shared/components/ui";
 import CharacterSearchSelect from "@/features/character/components/CharacterSearchSelect";
 import { EntitySearchSelect } from "@/shared/components/ui";
 import { searchApi } from "@/shared/api/search";
+import { getImageUrl } from "@/shared/lib/imageUrl";
 import type {
   ProjectResponse,
   ProjectRoleResponse,
@@ -331,22 +332,64 @@ export default function OutlinerPanel({
               return (
                 <div
                   key={role.roleId}
-                  className="group flex items-center justify-between rounded px-1.5 py-1 hover:bg-surface-raised"
+                  className="group/role rounded hover:bg-surface-raised"
                 >
-                  <Link
-                    to={routes.characters.detail(role.characterRefId)}
-                    className="min-w-0 truncate text-[11px] text-ink-muted hover:text-ink"
-                  >
-                    {role.name}
-                  </Link>
-                  {pr && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveRole(pr.id)}
-                      className="text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
+                  <div className="flex items-center justify-between px-1.5 py-1">
+                    <Link
+                      to={routes.characters.detail(role.characterRefId)}
+                      className="min-w-0 truncate text-[11px] text-ink-muted hover:text-ink"
                     >
-                      移除
-                    </button>
+                      {role.name}
+                    </Link>
+                    {pr && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveRole(pr.id)}
+                        className="text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover/role:opacity-100"
+                      >
+                        移除
+                      </button>
+                    )}
+                  </div>
+                  {role.spriteKeys && role.spriteKeys.length > 0 && (
+                    <div className="flex flex-wrap gap-1 px-1.5 pb-1">
+                      {role.spriteKeys.map((key) => {
+                        const src = getImageUrl(role.sprites?.[key]);
+                        return (
+                          <div
+                            key={key}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData(
+                                "application/axiforge/sprite",
+                                JSON.stringify({
+                                  characterId: role.characterRefId,
+                                  expression: key,
+                                }),
+                              );
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            className="flex cursor-grab flex-col items-center gap-0.5 rounded border border-border bg-surface p-0.5 transition-colors hover:border-brand active:cursor-grabbing"
+                            title={`拖入时间轴：${role.name} · ${key}`}
+                          >
+                            {src ? (
+                              <img
+                                src={src}
+                                alt={key}
+                                className="h-6 w-6 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-6 w-6 items-center justify-center rounded bg-surface-raised text-[8px] text-ink-faint">
+                                {key[0]}
+                              </div>
+                            )}
+                            <span className="max-w-[40px] truncate text-[8px] text-ink-faint">
+                              {key}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );

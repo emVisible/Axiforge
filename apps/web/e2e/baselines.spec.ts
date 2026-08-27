@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   addNode,
+  addRole,
   createProject,
   E2E_TAG,
   getProject,
@@ -388,4 +389,61 @@ test("E8 .axsp 导出导入：新工程数据与原工程等价", async ({ page,
     (n: any) => n.narrative_data?.title === "E8拍",
   );
   expect(freshNode?.narrative_data?.script?.[0]?.text).toBe("容器验证。");
+});
+
+// ---------------------------------------------------------------------------
+// E9 角色轨：按角色分轨渲染 + 折叠交互 + 片段选择（F2 第一步）
+// ---------------------------------------------------------------------------
+
+test("E9 角色轨：双角色分轨渲染、折叠往返、片段选择", async ({ page, request }) => {
+  // 固定创作者身份（角色搜索范围「公开 + 我的」）
+  const creatorId = "creator-e2e-fixed";
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key!, value!),
+    ["axiforge.creatorId", creatorId],
+  );
+  const mkChar = async (name: string) => {
+    const res = await request.post("http://localhost:8000/api/v1/characters/", {
+      data: { character_data: { anchor: { name } }, is_public: false, author_id: creatorId },
+    });
+    return res.json();
+  };
+  const c1 = await mkChar(`${E2E_TAG}凛九`);
+  const c2 = await mkChar(`${E2E_TAG}遥十`);
+
+  const project = await createProject(request, "E9 角色轨");
+  await addRole(request, project.id, c1.id);
+  await addRole(request, project.id, c2.id);
+  await addNode(request, project.id, project.scenes[0].id, {
+    title: "E9拍",
+    script: [
+      { op: "show", characterId: c1.id, position: "left" },
+      { op: "say", characterId: c1.id, text: "你好。" },
+      { op: "show", characterId: c2.id, position: "right" },
+      { op: "move", characterId: c2.id, position: "center" },
+      { op: "hide", characterId: c1.id },
+    ],
+  });
+
+  await openStudio(page, project.id);
+  // 选中目标 Beat（时间轴只渲染选中 Beat 的脚本）
+  await page.getByRole("button", { name: "E9拍" }).first().click();
+  // 角色轨头：按首次出现顺序渲染，显示角色名与计数
+  await expect(page.getByText(`${E2E_TAG}凛九`).first()).toBeVisible();
+  const trackHeaders = page.getByRole("button", { name: /角色 · \d+/ });
+  await expect(trackHeaders).toHaveCount(2);
+
+  // 折叠往返：点击第一个角色轨头后片段行收起（该轨 clip 按钮消失），再展开恢复
+  const firstHeader = trackHeaders.first();
+  await firstHeader.click();
+  await firstHeader.click();
+  await expect(firstHeader).toBeVisible();
+
+  // 保存 → API 权威：脚本顺序与角色引用不变（角色轨为视图分组，不改数据）
+  await page.getByRole("button", { name: "保存", exact: true }).click();
+  await expect(page.getByText("已保存")).toBeVisible({ timeout: 15_000 });
+  const fresh = await getProject(request, project.id);
+  const beat = fresh.nodes.find((n: any) => n.narrative_data?.title === "E9拍");
+  const ops = (beat.narrative_data.script as any[]).map((i) => i.op);
+  expect(ops).toEqual(["show", "say", "show", "move", "hide"]);
 });

@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  useMemo,
 } from "react";
 import type { Instruction } from "@axiforge/core";
 import { Minus, Plus, X } from "lucide-react";
@@ -27,7 +28,8 @@ import {
   trackForOp,
   type CutTrackId,
   indicesOnTrack,
-  localIndexAtPixel,
+  localIndexAtPixelForIndices,
+  characterTrackGroups,
 } from "./timelineUtils";
 
 export type TimelineShellHandle = {
@@ -43,8 +45,9 @@ interface TimelineShellProps {
   onSelectClip: (index: number) => void;
   onScrub: (index: number) => void;
   onReorder?: (from: number, to: number) => void;
+  characterLabels?: Record<string, string>;
   onReorderTrack?: (
-    trackId: CutTrackId,
+    trackId: string,
     fromLocal: number,
     toLocal: number,
   ) => void;
@@ -68,6 +71,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       onScrub,
       onReorder,
       onReorderTrack,
+      characterLabels = {},
       onDeleteClip,
       onDurationChange,
     },
@@ -86,13 +90,14 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         ? Math.max(0, Math.min(selectedIndex, script.length - 1))
         : 0;
 
+    // 轨道键：cut:<CutTrackId> 固定轨 | char:<characterId> 角色轨（F2）
     const [dragFrom, setDragFrom] = useState<{
-      trackId: CutTrackId;
+      trackId: string;
       localIndex: number;
       globalIndex: number;
     } | null>(null);
     const [dropTarget, setDropTarget] = useState<{
-      trackId: CutTrackId;
+      trackId: string;
       localIndex: number;
     } | null>(null);
     const dragFromRef = useRef<typeof dragFrom>(null);
@@ -100,6 +105,39 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
 
     dragFromRef.current = dragFrom;
     dropTargetRef.current = dropTarget;
+
+    const charGroups = useMemo(
+      () => characterTrackGroups(script),
+      [script],
+    );
+    const [collapsedChars, setCollapsedChars] = useState<Set<string>>(
+      () => new Set(),
+    );
+    const toggleCharTrack = useCallback((cid: string) => {
+      setCollapsedChars((prev) => {
+        const next = new Set(prev);
+        if (next.has(cid)) next.delete(cid);
+        else next.add(cid);
+        return next;
+      });
+    }, []);
+
+    /** 角色轨占用的全局下标（这些指令从固定轨 V2 分离） */
+    const charOpIndices = useMemo(
+      () => new Set(charGroups.flatMap((g) => g.indices)),
+      [charGroups],
+    );
+
+    const trackIndexOf = useCallback(
+      (key: string): number[] => {
+        if (key.startsWith("char:")) {
+          return charGroups.find((g) => `char:${g.characterId}` === key)?.indices ?? [];
+        }
+        return indicesOnTrack(script, key.slice(4) as CutTrackId);
+      },
+      [script, charGroups],
+    );
+
 
     const scrollToClip = useCallback(
       (index: number) => {
@@ -128,7 +166,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         return;
       }
       if (onReorder) {
-        const indices = indicesOnTrack(script, from.trackId);
+        const indices = trackIndexOf(from.trackId);
         const fromGlobal = indices[from.localIndex];
         const toGlobal = indices[to.localIndex];
         if (fromGlobal != null && toGlobal != null) {
@@ -145,11 +183,12 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         if (!el || !script.length || !dragFrom) return;
         const rect = el.getBoundingClientRect();
         const x = e.clientX - rect.left + el.scrollLeft - TIMELINE_PAD;
-        const local = localIndexAtPixel(script, dragFrom.trackId, x, zoom);
+        const indices = trackIndexOf(dragFrom.trackId);
+        const local = localIndexAtPixelForIndices(indices, script, x, zoom);
         const target = { trackId: dragFrom.trackId, localIndex: local };
         dropTargetRef.current = target;
         setDropTarget(target);
-        const globalIdx = indicesOnTrack(script, dragFrom.trackId)[local];
+        const globalIdx = indices[local];
         if (globalIdx != null) onScrub(globalIdx);
       };
 
@@ -161,7 +200,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
       };
-    }, [dragFrom, script, zoom, onScrub, finishDrag]);
+    }, [dragFrom, script, zoom, onScrub, finishDrag, trackIndexOf]);
 
     const playheadLeft =
       script.length > 0 && script[safeCursor]
@@ -175,7 +214,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       dragFrom != null &&
       dropTarget.trackId === dragFrom.trackId
         ? (() => {
-            const indices = indicesOnTrack(script, dropTarget.trackId);
+            const indices = trackIndexOf(dropTarget.trackId);
             const globalIdx = indices[dropTarget.localIndex];
             if (globalIdx == null) return null;
             return (
@@ -234,7 +273,11 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       ...track,
       clips: script
         .map((inst, i) => ({ inst, i }))
-        .filter(({ inst }) => trackForOp(inst.op) === track.id),
+        .filter(
+          ({ inst, i }) =>
+            trackForOp(inst.op) === track.id &&
+            !(track.id === "visual" && charOpIndices.has(i)),
+        ),
     }));
 
     return (
@@ -336,6 +379,64 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 </div>
               ) : (
                 <>
+                  {charGroups.map((group) => {
+                    const key = `char:${group.characterId}`;
+                    const collapsed = collapsedChars.has(group.characterId);
+                    const label =
+                      characterLabels[group.characterId] ??
+                      `角色 ${group.characterId.slice(0, 8)}`;
+                    return (
+                      <div key={key}>
+                        <button
+                          type="button"
+                          onClick={() => toggleCharTrack(group.characterId)}
+                          className="flex h-6 w-full items-center gap-1.5 border-b border-border bg-surface-raised px-3 text-left transition-colors hover:bg-panel"
+                        >
+                          <span
+                            className={`text-[9px] text-ink-faint transition-transform ${collapsed ? "" : "rotate-90"}`}
+                          >
+                            ▶
+                          </span>
+                          <span className="truncate text-[10px] font-medium text-ink-muted">
+                            {label}
+                          </span>
+                          <span className="font-mono text-[9px] text-ink-faint">
+                            角色 · {group.indices.length}
+                          </span>
+                        </button>
+                        {!collapsed && (
+                          <TrackRow
+                            trackId={key}
+                            script={script}
+                            positions={positions}
+                            zoom={zoom}
+                            zoomLevel={zoom}
+                            selectedIndex={safeSelected}
+                            dragFrom={
+                              dragFrom?.trackId === key ? dragFrom.localIndex : null
+                            }
+                            clipIndices={group.indices}
+                            onSelectClip={onSelectClip}
+                            onDragStartLocal={
+                              onReorderTrack
+                                ? (
+                                    localIndex: number,
+                                    globalIndex: number,
+                                  ) =>
+                                    setDragFrom({
+                                      trackId: key,
+                                      localIndex,
+                                      globalIndex,
+                                    })
+                                : undefined
+                            }
+                            onDeleteClip={onDeleteClip}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+
                   {clipsByTrack.map((track) => (
                     <TrackRow
                       key={track.id}
@@ -404,7 +505,7 @@ function TrackRow({
   onDeleteClip,
   onDurationChange,
 }: {
-  trackId: CutTrackId;
+  trackId: string;
   script: Instruction[];
   positions: number[];
   zoom: number;

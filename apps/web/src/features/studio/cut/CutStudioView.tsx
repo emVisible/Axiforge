@@ -19,7 +19,7 @@ import MasterTimelineBar from "./MasterTimelineBar";
 import TransportBar from "./TransportBar";
 import OutlinerPanel from "./outliner/OutlinerPanel";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
-import { clipLabel, patchClipDuration, reorderScriptWithinTrack, totalDurationMs, indicesOnTrack, type CutTrackId } from "./timelineUtils";
+import { clipLabel, patchClipDuration, reorderScriptByIndices, totalDurationMs, indicesOnTrack, characterTrackGroups, type CutTrackId } from "./timelineUtils";
 import {
   buildMasterTimeline,
   locateMasterPosition,
@@ -183,11 +183,21 @@ export default function CutStudioView({
   const beatIdRef = useRef<string | null>(null);
 
   const handleReorderTrack = useCallback(
-    (trackId: CutTrackId, fromLocal: number, toLocal: number) => {
-      const next = reorderScriptWithinTrack(script, trackId, fromLocal, toLocal);
+    (trackKey: string, fromLocal: number, toLocal: number) => {
+      // 轨道键：char:<characterId> 角色轨（F2）| 其余为固定轨
+      const indices = trackKey.startsWith("char:")
+        ? (characterTrackGroups(script).find(
+            (g) => `char:${g.characterId}` === trackKey,
+          )?.indices ?? [])
+        : indicesOnTrack(script, trackKey.slice(4) as CutTrackId);
+      const next = reorderScriptByIndices(script, indices, fromLocal, toLocal);
       onScriptChange(next);
-      const indices = indicesOnTrack(next, trackId);
-      selectClip(indices[toLocal] ?? 0);
+      const nextIndices = trackKey.startsWith("char:")
+        ? (characterTrackGroups(next).find(
+            (g) => `char:${g.characterId}` === trackKey,
+          )?.indices ?? [])
+        : indicesOnTrack(next, trackKey.slice(4) as CutTrackId);
+      selectClip(nextIndices[toLocal] ?? 0);
     },
     [script, onScriptChange, selectClip],
   );
@@ -487,6 +497,9 @@ export default function CutStudioView({
           onScrub={(index) => {
             scrubTo(index);
           }}
+          characterLabels={Object.fromEntries(
+            projectRoles.map((r) => [r.characterRefId, r.name]),
+          )}
           onReorderTrack={handleReorderTrack}
           onDeleteClip={(index) => {
             selectClip(index);

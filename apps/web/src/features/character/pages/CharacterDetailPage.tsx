@@ -1,4 +1,6 @@
 import { useState, type ComponentType } from "react";
+import { Image as ImageIcon } from "lucide-react";
+import { getImageUrl } from "@/shared/lib/imageUrl";
 import { useParams, useNavigate, Link } from "react-router";
 import {
   Anchor,
@@ -128,6 +130,7 @@ const mainTabs = [
   { key: "info" as const, label: "角色信息", Icon: FileText },
   { key: "relations" as const, label: "关系", Icon: Network },
   { key: "stories" as const, label: "传记", Icon: BookOpen },
+  { key: "sprites" as const, label: "立绘", Icon: ImageIcon },
 ];
 
 export default function CharacterDetailPage() {
@@ -142,7 +145,7 @@ export default function CharacterDetailPage() {
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
   const [isVersionOpen, setIsVersionOpen] = useState(false);
   const [activeLayer, setActiveLayer] = useState("anchor");
-  const [activeTab, setActiveTab] = useState<"info" | "relations" | "stories">(
+  const [activeTab, setActiveTab] = useState<"info" | "relations" | "stories" | "sprites">(
     "info",
   );
   const [copiedId, setCopiedId] = useState(false);
@@ -649,6 +652,53 @@ export default function CharacterDetailPage() {
           <StoryList />
         </div>
       )}
+
+      {/* 立绘 */}
+      {activeTab === "sprites" && (() => {
+        const cd = character.character_data as CharacterData;
+        const sprites = (cd?.sprites || {}) as Record<string, string>;
+        const entries = Object.entries(sprites);
+        return (
+          <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-ink">立绘管理</h2>
+              <Button
+                size="sm"
+                onClick={() => navigate(`/studio/characters/${character.id}/edit`)}
+              >
+                编辑立绘
+              </Button>
+            </div>
+            {entries.length === 0 ? (
+              <p className="text-sm text-ink-muted py-8 text-center">
+                暂无立绘差分。点击「编辑立绘」添加表情差分图片。
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                {entries.map(([key, url]) => (
+                  <div
+                    key={key}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-border p-3"
+                  >
+                    {url ? (
+                      <img
+                        src={getImageUrl(url) || url}
+                        alt={key}
+                        className="h-20 w-20 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-canvas text-lg font-semibold text-ink-faint">
+                        {key[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-xs font-medium text-ink-muted">{key}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="mt-6 text-xs text-ink-muted/40 flex justify-between">
         <span>

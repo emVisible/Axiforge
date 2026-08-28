@@ -234,7 +234,7 @@ export function useProjectEditor(id: string) {
     [selectedEdgeId, rfEdges],
   );
 
-  const editOrigin: Origin = editorMode === "flow" ? "flow" : "cut";
+  const editOrigin: Origin = editorMode === "writer" ? "writer" : editorMode === "flow" ? "flow" : "cut";
   const toKernelEdge = (e: Edge): KernelEdge => ({
     id: e.id,
     source: e.source,
@@ -924,14 +924,18 @@ export function useProjectEditor(id: string) {
       if (id) {
         const fresh = await providerRef.current?.loadProject(id);
         if (fresh?.ok) {
-          const freshResponse = bundleToResponse(fresh.data);
-          const projected = projectToAxs(
-            collectProjectNodes(freshResponse.nodes, freshResponse.scenes || []),
-            freshResponse.edges || [],
-            freshResponse.scenes || [],
-            rolesMap,
-          );
-          await persistAxsProjection(projected);
+          // ADR-025 last-editor-wins: 仅当 Writer 无独立编辑时才重写 axs_source
+          // axsDirty=true 说明 Writer 有未保存的文本编辑，保留其手写内容不覆盖
+          if (!axsDirty) {
+            const freshResponse = bundleToResponse(fresh.data);
+            const projected = projectToAxs(
+              collectProjectNodes(freshResponse.nodes, freshResponse.scenes || []),
+              freshResponse.edges || [],
+              freshResponse.scenes || [],
+              rolesMap,
+            );
+            await persistAxsProjection(projected);
+          }
         }
       }
 

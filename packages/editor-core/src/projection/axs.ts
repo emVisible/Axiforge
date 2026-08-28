@@ -208,7 +208,7 @@ export function parseAxsToPlan(
   return { nodes, edges, beatIdToNodeId };
 }
 
-/** 节点 ID / 标题 → AXS 标题行号（锚点 v0，ADR-025 将升级为指令级）。 */
+/** 节点 ID / 标题 → AXS 标题行号。 */
 export function beatLineForNode(
   source: string,
   roles: Record<string, string>,
@@ -223,4 +223,26 @@ export function beatLineForNode(
     if (byTitle) return byTitle.line;
   }
   return null;
+}
+
+/**
+ * 节点 + 指令下标 → AXS 源行号（指令级锚点，ADR-025）。
+ * 若 lineMap 不可用则回退到 beat 标题行号。
+ */
+export function instructionLineForNode(
+  source: string,
+  roles: Record<string, string>,
+  nodeId: NodeId,
+  instructionIndex: number,
+  nodeTitle?: string,
+): number | null {
+  const doc = parseAxs(source, { roles });
+  const beat =
+    doc.beats.find((b) => b.id === nodeId) ??
+    (nodeTitle ? doc.beats.find((b) => b.title === nodeTitle) : null);
+  if (!beat) return null;
+  if (beat.lineMap && instructionIndex >= 0 && instructionIndex < beat.lineMap.length) {
+    return beat.lineMap[instructionIndex] ?? beat.line;
+  }
+  return beat.line;
 }

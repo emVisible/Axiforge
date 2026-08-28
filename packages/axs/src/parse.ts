@@ -465,7 +465,12 @@ export function parseAxs(source: string, options: ParseOptions = {}): AxsDocumen
         label: c.label,
         to: c.to,
       })),
-    });
+    } as Instruction);
+    // choice 行号：取最后一条 choice 选项的行号
+    const lastChoiceLine = pendingChoices.length > 0
+      ? (pendingChoices[pendingChoices.length - 1] as any)._line ?? 0
+      : 0;
+    current.lineMap!.push(lastChoiceLine);
     pendingChoices = [];
   };
 
@@ -490,6 +495,7 @@ export function parseAxs(source: string, options: ParseOptions = {}): AxsDocumen
         endingLabel: heading.endingLabel,
         trigger: heading.trigger,
         script: [],
+        lineMap: [],
         effects: [],
         jumps: [],
         passthrough: [],
@@ -517,7 +523,7 @@ export function parseAxs(source: string, options: ParseOptions = {}): AxsDocumen
 
     const choice = parseChoiceLine(trimmed);
     if (choice) {
-      pendingChoices.push(choice);
+      pendingChoices.push({ ...choice, _line: lineNo } as any);
       continue;
     }
 
@@ -525,7 +531,10 @@ export function parseAxs(source: string, options: ParseOptions = {}): AxsDocumen
 
     if (trimmed.startsWith("@")) {
       const parsed = parseDirectiveLine(trimmed, lineNo, roles, diagnostics);
-      if (parsed.instruction) current.script.push(parsed.instruction);
+      if (parsed.instruction) {
+        current.script.push(parsed.instruction);
+        current.lineMap!.push(lineNo);
+      }
       if (parsed.effect) {
         current.effects!.push(parsed.effect);
       }
@@ -535,16 +544,21 @@ export function parseAxs(source: string, options: ParseOptions = {}): AxsDocumen
 
     if (trimmed.startsWith("\\")) {
       current.script.push({ op: "narration", text: trimmed.slice(1) });
+      current.lineMap!.push(lineNo);
       continue;
     }
 
     const dialogue = parseDialogueLine(trimmed, roles);
     if (dialogue) {
-      current.script.push(...dialogue);
+      for (const d of dialogue) {
+        current.script.push(d);
+        current.lineMap!.push(lineNo);
+      }
       continue;
     }
 
     current.script.push({ op: "narration", text: trimmed });
+    current.lineMap!.push(lineNo);
   }
 
   flushChoices();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseAxs } from "./parse";
 import { printAxs } from "./print";
+import { instructionLineForNode } from "../../editor-core/src/projection/axs";
 import type { AxsBeat, AxsDocument } from "./types";
 
 function structuralKey(doc: AxsDocument) {
@@ -23,6 +24,50 @@ function structuralKey(doc: AxsDocument) {
     })),
   });
 }
+
+describe("instruction-level lineMap（ADR-025 指令级锚点）", () => {
+  it("每条指令都有对应的源行号", () => {
+    const source = `# 开始
+@bg 教室
+凛九: 你好。
+\旁白内容`;
+    const doc = parseAxs(source);
+    const beat = doc.beats[0]!;
+    expect(beat.lineMap).toBeDefined();
+    expect(beat.lineMap).toEqual([2, 3, 4]);
+  });
+
+  it("show+say 合写占同一行", () => {
+    const source = `# 开始
+凛九(smile): 你好。`;
+    const doc = parseAxs(source);
+    const beat = doc.beats[0]!;
+    // show + say 两条指令，均来自第 2 行
+    expect(beat.script.length).toBe(2);
+    expect(beat.lineMap).toEqual([2, 2]);
+  });
+
+  it("instructionLineForNode 返回指令级行号", () => {
+    const source = `# 开始
+@bg 教室
+凛九: 你好。`;
+    const doc = parseAxs(source);
+    const beat = doc.beats[0]!;
+    const line = instructionLineForNode(source, {}, beat.id, 1, undefined);
+    expect(line).toBe(3);
+  });
+
+  it("lineMap 缺失时回退到 beat 标题行号", () => {
+    const source = `# 开始
+凛九: 你好。`;
+    const doc = parseAxs(source);
+    // 手动删除 lineMap 模拟旧数据
+    const beat = doc.beats[0]!;
+    delete (beat as any).lineMap;
+    const line = instructionLineForNode(source, {}, beat.id, 0, undefined);
+    expect(line).toBe(2);
+  });
+});
 
 describe("roundtrip structural equivalence", () => {
   it("full showcase script", () => {

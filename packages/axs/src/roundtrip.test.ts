@@ -69,6 +69,25 @@ describe("instruction-level lineMap（ADR-025 指令级锚点）", () => {
   });
 });
 
+describe("roundtrip relation（RN 关系）", () => {
+  it("relation effect and condition round-trip", () => {
+    const source = `# 开始
+@relation 堰纱.玩家.trust = high
+堰纱: 你好`;
+    const doc = parseAxs(source);
+    expect(doc.beats[0]!.effects).toEqual([{ type: "relationship", key: "堰纱.玩家.trust", value: "high" }]);
+    const round = parseAxs(printAxs(doc));
+    expect(round.beats[0]!.effects).toEqual(doc.beats[0]!.effects);
+
+    const source2 = `# 信任 [if: relation.堰纱.玩家.trust == high]
+堰纱(smile): 谢谢`;
+    const doc2 = parseAxs(source2);
+    expect(doc2.beats[0]!.trigger).toEqual({ type: "relationship", key: "堰纱.玩家.trust", operator: "eq", value: "high" });
+    const round2 = parseAxs(printAxs(doc2));
+    expect(round2.beats[0]!.trigger).toEqual(doc2.beats[0]!.trigger);
+  });
+});
+
 describe("roundtrip structural equivalence", () => {
   it("full showcase script", () => {
     const source = `# 雨夜 @stage(公寓) [key: intro]

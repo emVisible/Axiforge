@@ -47,6 +47,8 @@ function printAtom(cond: AtomCondition): string {
       return `codex.${cond.key} ${op} ${val}`;
     case "character_state":
       return `state.${cond.key} ${op} ${val}`;
+    case "relationship":
+      return `relation.${cond.key} ${op} ${val}`;
     default:
       return `${cond.type}.${cond.key ?? ""} ${op} ${val}`;
   }
@@ -71,6 +73,8 @@ function printEffect(effect: Effect): string {
       return `@state ${effect.key} = ${val}`;
     case "codex_write":
       return `@codex ${effect.key} = ${val}`;
+    case "relationship":
+      return `@relation ${effect.key} = ${val}`;
     default:
       return `@${effect.type} ${effect.key} = ${val}`;
   }

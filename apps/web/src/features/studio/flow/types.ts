@@ -114,6 +114,11 @@ export const CONDITION_TYPES = [
     label: "跨作品记忆",
     color: "bg-indigo-50 border-indigo-200 text-indigo-700",
   },
+  {
+    value: "relationship" as const,
+    label: "关系",
+    color: "bg-pink-50 border-pink-200 text-pink-700",
+  },
 ];
 
 export const EFFECT_TYPES = [
@@ -136,6 +141,11 @@ export const EFFECT_TYPES = [
     value: "codex_write" as const,
     label: "写入跨作品记忆",
     color: "bg-indigo-50 border-indigo-200 text-indigo-700",
+  },
+  {
+    value: "relationship" as const,
+    label: "关系变化",
+    color: "bg-pink-50 border-pink-200 text-pink-700",
   },
 ];
 

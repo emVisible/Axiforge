@@ -107,6 +107,7 @@ AXS 是 Axiforge 的类 Markdown 剧本语言，用于在 **Studio → 剧本模
 @flag met = true
 @memory score = 10
 @state 堰纱.mood = calm
+@relation 堰纱.玩家.trust = high
 @codex 堰纱.trust = high
 ```
 
@@ -115,6 +116,7 @@ AXS 是 Axiforge 的类 Markdown 剧本语言，用于在 **Studio → 剧本模
 | `@flag` | 剧本旗标（分支条件常用） |
 | `@memory` | 玩家记忆变量 |
 | `@state` | 角色运行时状态（`角色.key`） |
+| `@relation` | 关系变化（`A.B.关系=值`，如 `@relation 堰纱.玩家.trust = high`） |
 | `@codex` | 写入角色图鉴/Codex 字段 |
 
 值支持布尔、数字、引号字符串与裸词（见「字面量」）。
@@ -136,6 +138,7 @@ AXS 是 Axiforge 的类 Markdown 剧本语言，用于在 **Studio → 剧本模
 | `memory.` | `memory.chapter != 2` |
 | `state.` | `state.堰纱.mood == calm` |
 | `codex.` | `codex.堰纱.trust contains high` |
+| `relation.` | `relation.堰纱.玩家.trust == high` |
 
 ### 运算符
 

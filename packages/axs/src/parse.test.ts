@@ -30,6 +30,26 @@ describe("parseCondition", () => {
       ],
     });
   });
+
+  it("parses relation condition and effect alias", () => {
+    expect(parseCondition("relation.堰纱.玩家.trust == high")).toEqual({
+      type: "relationship",
+      key: "堰纱.玩家.trust",
+      operator: "eq",
+      value: "high",
+    });
+    expect(parseCondition("relationship.堰纱.玩家.trust contains high")).toEqual({
+      type: "relationship",
+      key: "堰纱.玩家.trust",
+      operator: "contains",
+      value: "high",
+    });
+    const doc = parseAxs(`# 开场
+@relationship 堰纱.玩家.trust = 10`);
+    expect(doc.beats[0]!.effects).toEqual([
+      { type: "relationship", key: "堰纱.玩家.trust", value: 10 },
+    ]);
+  });
 });
 
 describe("parseAxs basics", () => {
@@ -62,6 +82,7 @@ describe("parseAxs basics", () => {
 @flag met = true
 @memory score = 10
 @state 堰纱.mood = calm
+@relation 堰纱.玩家.trust = high
 @codex 堰纱.trust = high`);
     const beat = doc.beats[0]!;
     expect(beat.script.map((s) => s.op)).toEqual(["bg", "bgm", "wait"]);
@@ -69,6 +90,7 @@ describe("parseAxs basics", () => {
       { type: "flag", key: "met", value: true },
       { type: "memory", key: "score", value: 10 },
       { type: "character_state", key: "堰纱.mood", value: "calm" },
+      { type: "relationship", key: "堰纱.玩家.trust", value: "high" },
       { type: "codex_write", key: "堰纱.trust", value: "high" },
     ]);
   });

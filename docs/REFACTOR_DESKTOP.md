@@ -85,7 +85,7 @@
 #### 1a 测试栈落地与行为基线
 
 - [x] Vitest 接入 apps/web 纯逻辑层：`projection.ts` 行为基线 18 例全绿
-- [ ] `timelineUtils` 纯函数单测（随 1b 迁移补齐）
+- [x] `timelineUtils` 纯函数单测（`timelineUtils.test.ts` 9 例：characterTrack/insertShow/localIndex 全覆盖）
 - [x] Playwright 落地：独立 e2e 库 `axiforge_e2e`（本机 PG 直连，alembic 全新链验证；开发库零接触），`pnpm e2e` 一键自包含闭环
 - [x] 录制 6 条关键路径基线并全绿（确定性复跑通过，~8s）：
   - [x] E1 三轨切换往返（cut ↔ writer ↔ flow）不丢 script
@@ -104,7 +104,7 @@
 - [x] 新包 `packages/editor-core`：按 [KERNEL_DESIGN.md](./KERNEL_DESIGN.md) 实现 L2 文档模型（Draft/Transaction/Journal）+ L3 投影（自 `apps/web/src/features/writer/lib/projection.ts` 迁移），零 React/DOM
   - 55 例单测全绿；行覆盖 99.3%、分支覆盖 95.4%（G2 达标）；web 侧 18 例基线在适配器化后原样通过（行为等价证明）
 - [x] `ProjectFlowPage.tsx`（1389 行）已删除 → `pages/editor/`：ProjectEditorPage 212 行薄宿主 + Cut/Writer/Flow 三工作台（157/46/115 行，G1 全达标）
-- [ ] Draft/Transaction/Journal 接入 ProjectFlowPage 状态层（一切编辑经 `apply`，单一写入口落地）
+- [x] Draft/Transaction/Journal 接入 ProjectFlowPage 状态层（一切编辑经 `apply`，单一写入口落地）
   - [x] 接缝落地：`useDraftJournal`（sync + dispatch 单一写入口）接入 `updateScript`（cut 轨）与 `saveWriter`（writer 记序）；未保存节点被 apply 拒绝时保持旧路径语义，零行为变更（绞杀者过渡态，E2E 基线原样通过）
   - [x] 拖拽记序：`node.move` 事务（内核 + E7 基线）+ `onNodeDragStop` 接线——拖拽过程走 React Flow 内部状态（高频），松手才入事务（分层设计先于 Draft 唯一持有者改造）
   - [x] 其余写路径收敛：表单/条件/效果/道具/重命名/边标签/删边/删节点/复制/onDrop 新建/onConnect 连线共 12 条全部经 `dispatch`（origin 按轨记序：cut/flow/writer）；未保存节点被拒绝时保持旧语义，零行为变更
@@ -119,10 +119,10 @@
 
 #### 1c StorageProvider 接口
 
-- [ ] 定义接口：listProjects / loadProject / saveNarrative / saveRoles / saveCharacters / …
-- [ ] HTTP 实现（包装现有 api 层），web 应用全部数据访问经 Provider
-- [ ] 内存版 mock 实现跑通 E2E 子集（证明接口完整、UI 不直连 HTTP）
-- [ ] 失败语义成文：每方法「如果失败，返回什么，调用方会怎样」（铁律 8）
+- [x] 定义接口：listProjects / loadProject / saveNarrative / saveRoles / saveCharacters / …（已由 Phase2 L4契约 `packages/editor-core/src/storage.ts` 完成）
+- [x] HTTP 实现（包装现有 api 层），web 应用全部数据访问经 Provider（`HttpStorageProvider` + Provider 工厂，Phase2）
+- [x] 内存版 mock 实现跑通 E2E 子集（证明接口完整、UI 不直连 HTTP）（`MemoryStorageProvider` + 契约测试，Phase2）
+- [x] 失败语义成文：每方法「如果失败，返回什么，调用方会怎样」（铁律 8）（`storage.ts` 判别联合 + contract.ts，Phase2）
 
 #### 1d StoryCompiler TS 移植（2026-08-26 完成）
 
@@ -159,9 +159,9 @@
 - [x] `apps/desktop`：Tauri v2 壳落地（cargo check ✓ + dev 冒烟 ✓：窗口进程 + WebView 加载前端）
       插件：global-shortcut / fs（素材目录作用域 `$HOME/Documents/Axiforge`）/ dialog / opener；
       `pnpm dev:desktop` 一键起（beforeDevCommand 自动拉 web dev server）
-- [ ] StorageProvider 的 SQLite 实现（schema 沿用 PG 关系模型；`narrative_data` 保持 JSON 列）；素材落工程目录 + DB 存相对路径
-- [ ] `.axsp` 打包/打开（叙事 JSON + 素材引用清单）；SQLite 为工作缓存
-- [ ] FastAPI 后端转为可选协作/发布服务；云能力缺席时全部创作流可用
+- [x] StorageProvider 的 SQLite 实现（schema 沿用 PG 关系模型；`narrative_data` 保持 JSON 列）；素材落工程目录 + DB 存相对路径（`SqliteStorageProvider` + `sql_transaction` 原子，Phase2 8步冒烟 PASS）
+- [x] `.axsp` 打包/打开（叙事 JSON + 素材引用清单）；SQLite 为工作缓存（`.axsp` v0 + pack/unpack + E8 数据等价，Phase2）
+- [x] FastAPI 后端转为可选协作/发布服务；云能力缺席时全部创作流可用（断网试玩链路 PlayerPage `loadStoryOffline` + 桌面离线降级，Phase2）
 - [x] 验收（2026-08-26）：
   - `.axsp` 导出再导入数据等价 → **E2E E8 断言** ✓
   - 断网链路各环节实证 → 壳内冒烟 8 步 PASS（create/bootstrap/覆写/回滚/离线编译/角色去重/清理）+ release 产物冒烟（.app 运行 + SQLite 自动建库）✓

@@ -19,6 +19,7 @@ import MasterTimelineBar from "./MasterTimelineBar";
 import TransportBar from "./TransportBar";
 import OutlinerPanel from "./outliner/OutlinerPanel";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
+import MiniAxsEditor from "./MiniAxsEditor";
 import { clipLabel, patchClipDuration, reorderScriptByIndices, totalDurationMs, indicesOnTrack, characterTrackGroups, insertShowInstruction, type CutTrackId } from "./timelineUtils";
 import {
   buildMasterTimeline,
@@ -460,6 +461,12 @@ export default function CutStudioView({
 
   const selectedClip = script[selectedIndex];
 
+  const miniRoles = useMemo(
+    () => Object.fromEntries(projectRoles.map((r) => [r.name, r.characterRefId])),
+    [projectRoles],
+  );
+  const miniRoleNames = useMemo(() => projectRoles.map((r) => r.name), [projectRoles]);
+
   return (
     <>
     <CutStudioLayout
@@ -595,6 +602,17 @@ export default function CutStudioView({
                 </div>
               </div>
             </div>
+          )}
+          {activePanel === "script" && selectedNode && (
+            <MiniAxsEditor
+              script={script}
+              selectedIndex={selectedIndex}
+              beatTitle={beatTitle ?? "未命名"}
+              roles={miniRoles}
+              roleNames={miniRoleNames}
+              onSelectClip={selectClip}
+              onScriptChange={onScriptChange}
+            />
           )}
           <div className="min-h-0 flex-1 overflow-hidden">
             <NodeInspectorPanel

@@ -560,6 +560,7 @@ export default function CutStudioView({
           )}
           onReorderTrack={handleReorderTrack}
           onSpriteDrop={handleSpriteDrop}
+          effects={effects as never[]}
           onDeleteClip={(index) => {
             selectClip(index);
             deleteClipAt(index);

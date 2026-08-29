@@ -7,7 +7,7 @@ import {
   useState,
   useMemo,
 } from "react";
-import type { Instruction } from "@axiforge/core";
+import type { Effect, Instruction } from "@axiforge/core";
 import { Minus, Plus, X } from "lucide-react";
 import { cn } from "@/shared/components/ui";
 import {
@@ -20,6 +20,9 @@ import {
   clipLeft,
   clipPositions,
   clipWidth,
+  effectColor,
+  effectLabel,
+  effectWidth,
   formatNarrativeTime,
   indexAtPixel,
   msFromClipWidth,
@@ -54,6 +57,7 @@ interface TimelineShellProps {
   ) => void;
   onDeleteClip?: (index: number) => void;
   onDurationChange?: (index: number, ms: number) => void;
+  effects?: Effect[];
 }
 
 const TRACK_H = 36;
@@ -76,11 +80,17 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       onSpriteDrop,
       onDeleteClip,
       onDurationChange,
+      effects = [],
     },
     ref,
   ) {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const width = totalTimelineWidth(script, zoom);
+    const baseWidth = totalTimelineWidth(script, zoom);
+    const effectsExtra = effects.length
+      ? effects.reduce((acc, e) => acc + effectWidth(effectLabel(e), zoom) + 6, 16)
+      : 0;
+    const effectsStart = baseWidth;
+    const width = effects.length ? Math.max(baseWidth, effectsStart + effectsExtra + 24) : baseWidth;
     const positions = clipPositions(script, zoom);
     const totalMs = totalDurationMs(script);
     const safeCursor =
@@ -345,6 +355,15 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 </span>
               </div>
             ))}
+            {effects.length > 0 && (
+              <div
+                className="flex shrink-0 items-center border-b border-border bg-pink-50/50 px-2 dark:bg-pink-950/20"
+                style={{ height: TRACK_H }}
+              >
+                <span className="font-mono text-[10px] font-semibold text-pink-600 dark:text-pink-300">RN</span>
+                <span className="ml-1.5 truncate text-[9px] text-ink-faint">关系</span>
+              </div>
+            )}
           </div>
 
           <div
@@ -500,6 +519,28 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                       zoomLevel={zoom}
                     />
                   ))}
+                  {effects.length > 0 && (
+                    <div className="relative border-b border-border bg-pink-50/30 dark:bg-pink-950/10" style={{ height: TRACK_H }}>
+                      <div className="absolute inset-0 flex items-center gap-1.5 px-2" style={{ left: 0 }}>
+                        {(() => {
+                          return effects.map((e, idx) => {
+                            const label = effectLabel(e);
+                            const w = effectWidth(label, zoom);
+                            return (
+                              <div
+                                key={`${e.type}-${e.key}-${idx}`}
+                                style={{ width: w, height: TRACK_H - 8 }}
+                                className={`inline-flex shrink-0 items-center justify-center rounded border px-1.5 text-[9px] font-medium leading-none ${effectColor(e.type)}`}
+                                title={`${e.type}: ${e.key} = ${String(e.value)}`}
+                              >
+                                <span className="truncate">{label}</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
 
                   {dropMarkerLeft != null && dragFrom != null && (
                     <div

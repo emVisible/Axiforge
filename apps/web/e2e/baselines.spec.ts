@@ -532,3 +532,28 @@ test("E10 精灵拖入：角色面板缩略图可见、拖入生成 show 指令"
   expect(showInst.characterId).toBe(char.id);
   expect(showInst.expression).toBe("smile");
 });
+
+// ---------------------------------------------------------------------------
+// E11 FX轨可视化：Beat.effects 在 FX/RN 轨渲染
+// ---------------------------------------------------------------------------
+
+test("E11 FX轨：memory/relationship 效果在 RN 轨可视化", async ({ page, request }) => {
+  const project = await createProject(request, "E11 RN FX");
+  await addNode(request, project.id, project.scenes[0].id, {
+    title: "E11拍",
+    script: [{ op: "say", speaker: "堰纱", text: "测试台词" }],
+    effects: [
+      { type: "memory", key: "score", value: 10 },
+      { type: "relationship", key: "yansha.player.trust", value: "high" },
+    ],
+  });
+
+  await openStudio(page, project.id);
+  await page.getByRole("button", { name: "E11拍" }).first().click();
+
+  // RN 轨头可见
+  await expect(page.getByText("RN").first()).toBeVisible();
+  // 效果色块：记忆与关系标签
+  await expect(page.getByText(/记忆·score/).first()).toBeVisible();
+  await expect(page.getByText(/关系·yansha/).first()).toBeVisible();
+});

@@ -1,4 +1,4 @@
-import type { Instruction } from "@axiforge/core";
+import type { Effect, Instruction } from "@axiforge/core";
 
 export const TIMELINE_PAD = 16;
 
@@ -385,4 +385,39 @@ export function reorderScript(
 export function clipLeft(script: Instruction[], index: number, zoom = 1): number {
   const positions = clipPositions(script, zoom);
   return TIMELINE_PAD + (positions[index] ?? 0);
+}
+
+export const EFFECT_LABELS: Record<string, string> = {
+  memory: "记忆",
+  flag: "标志",
+  character_state: "状态",
+  relationship: "关系",
+  codex_write: "图鉴",
+};
+
+export function effectLabel(e: Effect): string {
+  const tag = EFFECT_LABELS[e.type] ?? e.type;
+  const val = String(e.value ?? "").slice(0, 12);
+  return `${tag}·${e.key}=${val}`;
+}
+
+export function effectColor(type: string): string {
+  switch (type) {
+    case "memory":
+      return "bg-purple-500/20 border-purple-400/40 text-purple-700 dark:text-purple-300";
+    case "flag":
+      return "bg-red-500/20 border-red-400/40 text-red-700 dark:text-red-300";
+    case "character_state":
+      return "bg-blue-500/20 border-blue-400/40 text-blue-700 dark:text-blue-300";
+    case "relationship":
+      return "bg-pink-500/20 border-pink-400/40 text-pink-700 dark:text-pink-300";
+    case "codex_write":
+      return "bg-indigo-500/20 border-indigo-400/40 text-indigo-700 dark:text-indigo-300";
+    default:
+      return "bg-panel-raised border-border text-ink-muted";
+  }
+}
+
+export function effectWidth(label: string, zoom = 1): number {
+  return Math.round(Math.max(64, Math.min(160, 12 + label.length * 6.5)) * zoom);
 }

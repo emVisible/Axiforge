@@ -207,8 +207,8 @@
 **目标**：把 RN 维度暴露进 AXS 与剪辑台——竞品抄不走的那一层成为日常创作词汇。
 
 - [x] AXS 新增 `@memory` / `@relation` 类指令（IR 已有 codex 条件/效果，纯语法层暴露）：parser / printer / 单测 / 语法文档同步（`@relation A.B.field = val` / `relation.A.B.field op val`）
-- [ ] FX 轨可视化关系值与记忆变化
-- [ ] 示范作修订：至少一段剧情的关系分支可直接在剧本轨书写、在 FX 轨检视
+- [x] FX 轨可视化关系值与记忆变化（RN 行：timelineUtils effectLabel/effectColor + TimelineShell RN 轨 + CutStudioView 透传；E11 验证）
+- [x] 示范作修订：至少一段剧情的关系分支可直接在剧本轨书写、在 FX 轨检视（seed_showcase 缘起·选择/再会·记忆加入 @relation 效果与 relation 条件；新增旅人角色；E11 闭环）
 
 **非目标**：世界 tick、AI 运行时、跨作品自动继承策略变更。
 

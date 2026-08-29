@@ -27,6 +27,8 @@ const EFFECT_TYPE_MAP: Record<string, EffectType> = {
   memory: "memory",
   state: "character_state",
   codex: "codex_write",
+  relation: "relationship",
+  relationship: "relationship",
 };
 
 /** 将标题转为 beat id（slug） */
@@ -104,6 +106,12 @@ function parseAtomCondition(part: string): AtomCondition | null {
   }
   if (left.startsWith("state.")) {
     return { type: "character_state", key: left.slice(6), operator, value };
+  }
+  if (left.startsWith("relation.")) {
+    return { type: "relationship", key: left.slice(9), operator, value };
+  }
+  if (left.startsWith("relationship.")) {
+    return { type: "relationship", key: left.slice(13), operator, value };
   }
   return null;
 }

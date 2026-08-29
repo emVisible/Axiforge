@@ -62,7 +62,7 @@ export interface MiniAxsEditorProps {
   onScriptChange: (next: Instruction[]) => void;
 }
 
-const DIRECTIVES = ["@bg", "@bgm", "@se", "@voice", "@wait", "@show", "@hide", "@move", "@fx", "@camera", "@transition"];
+const DIRECTIVES = ["@bg", "@bgm", "@se", "@voice", "@wait", "@show", "@hide", "@move", "@fx", "@camera", "@transition", "@flag", "@memory", "@state", "@codex", "@relation"];
 
 export default function MiniAxsEditor({
   script,

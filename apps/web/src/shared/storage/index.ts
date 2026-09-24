@@ -13,6 +13,7 @@ import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
 import { TauriAssetStore } from "./tauriAssetStore";
 import { setLocalAssetRoot } from "./assetContext";
+import { seedDesktopIfEmpty, type SeedOutcome } from "./desktopSeed";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import type {
   ProjectEdgeResponse,
@@ -148,12 +149,22 @@ export async function loadStoryOffline(projectId: string): Promise<StoryPackage>
   );
 }
 
+/** 桌面空库首启播种：整进程一次，并发取 Provider 也只灌一遍；结果可观测 */
+let seedOnce: Promise<SeedOutcome> | null = null;
+let seedOutcome: SeedOutcome | null = null;
+
+export function getSeedOutcome(): SeedOutcome | null {
+  return seedOutcome;
+}
+
 export async function createStorageProvider(): Promise<StorageProvider> {
   if (isTauriEnvironment()) {
     const assets = await TauriAssetStore.create();
     setLocalAssetRoot(assets.rootDir);
     const provider = new SqliteStorageProvider(new TauriSqlBackend(), assets);
     await provider.init();
+    if (!seedOnce) seedOnce = seedDesktopIfEmpty(provider, importProjectFromAxsp);
+    seedOutcome = await seedOnce;
     return provider;
   }
   setLocalAssetRoot(null);

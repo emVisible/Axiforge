@@ -8,6 +8,7 @@
  * 失败语义：404 → not_found；其余网络/服务端错误 → io（detail 携带状态码）。
  */
 import { projectApi } from "@/shared/api/editor";
+import { getApiBase } from "@/shared/api/client";
 import { characterApi } from "@/shared/api/characters";
 import { collectProjectNodes } from "@/features/writer/lib/projection";
 import type {
@@ -235,7 +236,7 @@ export class HttpStorageProvider implements StorageProvider {
     try {
       const form = new FormData();
       form.append("file", new Blob([input.bytes as BlobPart], { type: input.mime }), input.name);
-      const res = await fetch("/api/v1/upload", { method: "POST", body: form });
+      const res = await fetch(`${getApiBase()}/upload`, { method: "POST", body: form });
       if (!res.ok) {
         return err({ code: "io", detail: `素材上传失败 (HTTP ${res.status})` });
       }

@@ -1,4 +1,4 @@
-# Build Blueprint v1.2 | Status: confirmed v1.0 → executing v1.2
+# Build Blueprint v1.3 | Status: confirmed v1.0 → executing v1.3
 > 日期 2026-09-24 · 分支 `desktop` · 基线 `e123f1a`（tag `desktop-v0.6`）· 关联 [ADR-024](docs/ADR/024-desktop-local-first.md) 决策 3/4、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)（新增 Phase 6）
 
 ## 1. Goals & Non-Goals
@@ -55,7 +55,7 @@
 - [x] S1-T4 上传入口平台分派：`ImageUpload` 增可选 `upload?: (file)=>Promise<string>` 注入点（默认保持现 HTTP 行为）；web 侧桌面态传 Provider 版 uploader；显示统一走 `resolveAssetUrl` | Acceptance: 未注入时行为逐字段不变（单测）；打包态新角色立绘可显示并保存后重开仍在 | M1
 - [x] S2-T1 `.axsp` v2 容器：zip 布局（`manifest.json` / `project.json` / **`characters.json`** / `assets/*`）+ pack/unpack + v1 只读兼容 + 角色 id 重映射纯函数 | Acceptance: axsp.test.ts 新增 v2 往返逐字段等价、v1 文件仍可读、损坏包 → `corrupted` 三组用例全绿 | M2
 - [x] S2-T2 导出/导入接真实字节：导出按 `manifest.assets` 收集本地文件入包并带上演员表；导入素材落盘（内容寻址 → ref 两端一致）、角色新建、引用重映射后再建工程 | Acceptance: `pnpm e2e` 新增 E12「导出带角色 → 导入新建角色且 characterId 重映射」断言绿（12 条基线）；壳内冒烟新增 v2 媒体入包断言 | M2
-- [ ] S2-T3 首启播种：示范作 `.axsp` v2 随包资源分发，`listProjects` 为空时自动导入一次 | Acceptance: 删本地库与素材目录后启动 .app → 工程列表出现示范作且可断网试玩；重复启动不二次播种（单测 + 手动） | M2
+- [x] S2-T3 首启播种：示范作 `.axsp` v2 随前端资源分发（`apps/web/public/seeds/`），`listProjects` 为空且无播种标记时自动导入一次 | Acceptance: 删本地库与素材目录后启动 .app → 工程列表出现三部示范作且可断网试玩；重复启动不二次播种（单测 + 壳内冒烟两步断言） | M2
 - [ ] S3-T1 角色域 Provider 化：`MyCharactersPage`/`CharacterDetailPage`/`CharacterSearchSelect`/`useProjectDirectory` 在桌面态经 `listCharacters/getCharacter/saveCharacter`（契约已存在，属接线非新增） | Acceptance: 打包离线态角色列表与详情不再出现「加载角色失败」；web 态行为零变更 | M3
 - [ ] S3-T2 缺席域显式降级：版本/关系/传记/发现/全局搜索/概览在本地态给「需后端」可读态；**错误态必须抑制空态**（实测缺陷） | Acceptance: 断网打包态走查无「沉默失败」；错误/空态互斥有单测或组件用例 | M3
 - [ ] S3-T3 首屏路由收口：桌面态 `/` 与 `*` 落 `/studio/projects`，`/studio` index 不再落云端概览 | Acceptance: 打包 .app 冷启动首屏即本地工程列表（截图）；浏览器态仍默认 `/discover`（回归断言） | M3
@@ -97,3 +97,6 @@
 - 格式约束（本轮踩到两次）：§8 与 §3 不得出现裸任务 ID，否则 check-ids 判为重复条目；引用任务一律用标题词。
 - v1.2 L2（2026-09-24）容器任务·范围扩充：写 v2 时发现 v0/v1 只装工程束——`roles` 仅存 `characterRefId`，换机导入后引用指向不存在的角色，即「分发」根本不成立。故 zip 多一条 `characters.json`，并新增角色 id 重映射纯函数（覆盖 `characterId` 直引 / 条件效果 `key` 前缀 / `codexScope` / `roles` 四处引用面）。不扩这一项，M2 的验收就是假的。
 - v1.2 L2（2026-09-24）容器任务·证据形式：媒体内嵌只在桌面态可证（web 的 ref 是 `/uploads/...` 属 direct，按格式规定不入包）。故 Playwright 侧断言 zip 结构 + 演员表迁移 + 导入新建角色；「素材字节确实进包」改由壳内冒烟承担（并已在磁盘上以外部 `shasum -a 256` 反查文件名摘要一致）。§7 的自动化边界预判在此兑现，未临时改用例迁就实现。
+- v1.3 L2（2026-09-24）播种任务·三处实态修正：① 清单来源改用播种端点自身返回的 `projects`——首版走 discover，实测把 dev 库里 50 个历史 `is_public` 测试工程（「编译剧本」「差分剧本」）一起灌进新用户首启；② `capabilities` 缺 `fs:allow-exists`，`fs.exists` 直接 forbidden；③ Tauri fs scope 默认不匹配隐藏文件，标记名从 `.seeded` 改为 `seeded.json`。
+- v1.3 L2（2026-09-24）播种可观测性：首版用 `.catch(() => 0)` 吞掉一切异常，导致「没播种」与「不需要播种」不可区分——正是本轮要消灭的沉默失败。改为结构化 `SeedOutcome`（seeded/skipped/failed），纳入冒烟步骤并写进 PASS 行；标记读不到时按 failed 上报而非当作已播过。
+- v1.3 L1（2026-09-24）工具化：`apiClient` 支持 `setApiBase`（构建期脚本在 Node 里跑真实请求所需；浏览器默认同源相对路径逐字不变）；三部示范作 `.axsp` + `manifest.json` 作为刻意提交的构建产物入库。

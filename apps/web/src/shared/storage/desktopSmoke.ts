@@ -3,7 +3,7 @@
  * 验证链路：plugin-sql → TauriSqlBackend → SqliteStorageProvider → 契约关键语义。
  * 输出可 grep 标记：AXIFORGE-DESKTOP-STORAGE: PASS / FAIL <步骤>
  */
-import { bundleToCompilerInput, createStorageProvider, exportProjectAsAxsp } from "./index";
+import { bundleToCompilerInput, createStorageProvider, exportProjectAsAxsp, getSeedOutcome } from "./index";
 import { assetDisplayUrl, getLocalAssetRoot } from "./assetContext";
 import { localAssetPath, unpackAxsp, type StorageProvider } from "@axiforge/editor-core";
 import { compileStory } from "@axiforge/core";
@@ -71,6 +71,15 @@ export async function smokeDesktopStorage(): Promise<boolean> {
   try {
     const p = await createStorageProvider();
     mark(true, "provider-init");
+
+    // 首启播种（C2）：新库应灌入示范作；已有内容或已标记则跳过——失败不可接受
+    const seed = getSeedOutcome();
+    const seedOk = seed !== null && seed.status !== "failed";
+    mark(seedOk, `seed ${JSON.stringify(seed)}`);
+    if (!seedOk) {
+      await writeResultFile(`FAIL seed: ${JSON.stringify(seed)}`);
+      return false;
+    }
 
     const created = await p.createProject({ title: "壳内冒烟" });
     mark(created.ok, "createProject");
@@ -210,7 +219,9 @@ export async function smokeDesktopStorage(): Promise<boolean> {
     await p.deleteProject(seeded.projectId);
 
     console.log(`AXIFORGE-DESKTOP-STORAGE: PASS`);
-    await writeResultFile("PASS");
+    await writeResultFile(
+      `PASS seed=${seed.status}${"imported" in seed ? `:${seed.imported}` : "reason" in seed ? `:${seed.reason}` : ""}`,
+    );
     return true;
   } catch (e) {
     console.error("AXIFORGE-DESKTOP-STORAGE: FAIL exception", e);

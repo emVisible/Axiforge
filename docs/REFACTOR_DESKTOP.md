@@ -118,6 +118,9 @@
 > 域拆分（graph/persistence）随 Phase 2 StorageProvider 改造一并处理——届时持久化层本就要重切。
 > **G2/G4 偏差记录（v0.6 核验）**：`packages/core` 缺 `@vitest/coverage-v8` 依赖，覆盖率不可跑（史前状态，非本轮引入；editor-core 96.85%/93.38% 达标，axs round-trip 20/20 全绿）；
 > 仓内无 dpdm/madge 配置与 CI 步骤，G4“循环依赖=0”无自动化断言（史前缺失；本轮零新增跨包导入）。两者均记为已知缺口，不阻塞 v0.6（纯核验轮，未引入新耦合）。
+>
+> **纠偏（2026-09-24，Phase 6 M4）**：上述两个缺口现已闭合——`@vitest/coverage-v8` 已装、`dpdm` 已装，`pnpm gates` 一条命令跑完 tsc(4 包) / vitest(core·axs·editor-core·web) / oxlint+颜色令牌 / 内核纯净度 / 循环依赖，并新增 CI `frontend-gates` job 执行它。
+> 但覆盖率一旦可跑就暴露了新事实：**`packages/core` 实测 83.47% 语句 / 72.02% 分支，低于 G2 要求的 ≥90%**——此前因「跑不了」而被当作达标。差额记为 Phase 7 测试债，不下调门禁标准来迁就现状。
 
 #### 1c StorageProvider 接口
 
@@ -253,6 +256,7 @@
 
 **目标**：让产品「像成品，不像工程」。本轮是纯设计轮，产出可对比的视觉证据。
 
+- [ ] `packages/core` 覆盖率补到 G2 门禁线：实测 83.47% 语句 / 72.02% 分支 → ≥90%（覆盖率可跑之后才暴露的差额；宪章要求「这是引擎，不是业务代码」，100% 是原意，先回 90 再谈 100）
 - [ ] 四态原语逐页迁移：`shared/lib/queryState.ts::resolveQueryState` 已建立并接入角色页与剧本列表页；道具/场景/发现各 tab/玩家页收敛到该原语（Phase 6 已逐页修正行为，此处统一形态）
 - [ ] 设计令牌审计：字阶（type scale）、间距韵律（4/8 基准）、圆角与阴影层级、色彩语义（禁硬编码，`check-ui-tokens.mjs` 覆盖面扩到全 apps）
 - [ ] 日夜双主题复检（ADR-023）：逐屏截图对比，修不可读对比度（WCAG AA 文本 4.5:1）

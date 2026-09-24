@@ -18,11 +18,18 @@
     "test:api": "cd backend && uv run pytest tests/ -v",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "lint": "pnpm --filter @axiforge/web lint && pnpm --filter @axiforge/admin lint:colors"
+    "lint": "pnpm --filter @axiforge/web lint && pnpm --filter @axiforge/admin lint:colors",
+    "typecheck": "pnpm -r --filter @axiforge/core --filter @axiforge/axs --filter @axiforge/editor-core typecheck && pnpm --filter @axiforge/web exec tsc -b",
+    "test:unit": "pnpm --filter @axiforge/core test && pnpm --filter @axiforge/axs test && pnpm --filter @axiforge/editor-core test && pnpm --filter @axiforge/web test",
+    "coverage": "pnpm --filter @axiforge/core test:coverage && pnpm --filter @axiforge/editor-core test:coverage",
+    "check:purity": "node scripts/check-package-purity.mjs",
+    "check:circular": "dpdm --no-warning --no-tree --exit-code circular:1 \"packages/core/src/index.ts\" \"packages/axs/src/index.ts\" \"packages/editor-core/src/index.ts\" \"packages/ui/src/index.ts\"",
+    "gates": "pnpm typecheck && pnpm test:unit && pnpm lint && pnpm check:purity && pnpm check:circular"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
-    "concurrently": "^9.2.0"
+    "concurrently": "^9.2.0",
+    "dpdm": "^4.3.0"
   },
   "packageManager": "pnpm@10.8.1"
 }

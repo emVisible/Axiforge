@@ -6,6 +6,27 @@ on:
   pull_request:
 
 jobs:
+  frontend-gates:
+    name: 前端门禁（类型 / 单测 / lint / 内核纯净 / 循环依赖）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 一条命令跑完宪章 G2/G4/G5/Q9 的全部可自动化部分：
+      # tsc --noEmit（4 个包）→ vitest（core/axs/editor-core/web）→ oxlint + 颜色令牌
+      # → packages 零平台依赖断言 → dpdm 循环依赖=0
+      - name: Run gates
+        run: pnpm gates
+      - name: Core coverage (G2)
+        run: pnpm --filter @axiforge/core test:coverage
+
   build-and-test:
     runs-on: ubuntu-latest
 
@@ -60,3 +81,15 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/axiforge_test
           TESTING: "1"
         run: uv run pytest tests/ -v
+
+      # G3 行为基线：e2e 用独立库 axiforge_e2e（零接触 axiforge_test），
+      # 库本身需要先建好——本机 pnpm e2e 走的是 scripts/setup-db.sh 的自动建库，CI 里显式建。
+      - name: Create e2e database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE axiforge_e2e"
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E behaviour baseline
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/axiforge_test
+          E2E_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/axiforge_e2e
+        run: pnpm e2e

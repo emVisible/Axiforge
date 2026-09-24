@@ -331,6 +331,37 @@
 [x] 打 tag desktop-v0.x —— v0.6：desktop-v0.6（见 git show）
 ```
 
+### Phase 6 收尾检查单（v0.7 · 2026-09-24）
+
+```
+[x] G1 新建文件 ≤400 行 —— 本轮 13 个新文件最大 163 行（assets.test.ts）；
+    存量 >400 行 8 个（PlayerPage 1370 / useProjectEditor 1163 / CharacterDetailPage 734 /
+    TimelineShell 712 / CutStudioView 658 / baselines.spec 649 / OutlinerPanel 624 / ScriptEditor 614），
+    按铁律 3 本轮不夹带拆分，全部登记 Phase 7 清零点
+[x] G2 覆盖率 —— editor-core 与 core 均可跑；**core 实测 83.47% 语句 / 72.02% 分支，未达 ≥90%**，
+    记为 Phase 7 测试债（此前因缺 @vitest/coverage-v8 根本跑不了，被当作达标）
+[x] G3 E2E 行为基线 —— 13/13 全绿（15.9s）：E1–E11 原样通过 + E12（.axsp v2 演员表与引用重映射）
+    + E13（浏览器首屏落 /discover 的回归护栏）
+[x] G4 循环依赖 = 0 —— dpdm 68 模块 0 循环，已进 pnpm gates 与 CI
+[x] G5 类型与 lint —— tsc 0 error（core/axs/editor-core/web）；oxlint 0 error（3 史前 warning，无新增）
+[x] G6 编译器等价 —— golden 用例随 packages/core 49 测试通过（TS 与 Python 逐字段一致）
+[x] G7 依赖准入 —— fflate（zip 容器）：非五十行可自写 / 活跃无依赖 ~8KB / 只用 zipSync+unzipSync；
+    dpdm 与 @vitest/coverage-v8 为 dev 工具，不进产物
+[x] G8 提交纪律 —— 本轮 9 次 conventional commits 带 scope；两个 backend 无关脏文件全程未入暂存
+[x] G9 文档同步 —— ADR-026 新建、KERNEL_DESIGN §2.5 回写、docs/user 新增桌面版页、
+    README 结构段与脚本表纠偏、BACKLOG_V1 矛盾清除（追加注记，历史表未删）
+[~] G10 手动验收路径 —— 第 1 步在 **release 打包产物**（非 dev 壳、:8000/:5174 均无监听、全新库）实证：
+    冷启动后本地库出现且仅出现三部【示范】工程。由于播种发生在 `createStorageProvider()`，
+    而它由 `/studio/projects` 路由上的组件调用，故「库被播种」本身即证明 release 包的
+    React 已挂载、路由已落到新的桌面首屏、列表组件已执行——这是非视觉证据。
+    **视觉截图未取得**：本轮次实测时 macOS 显示处于锁定/休眠，`screencapture` 只返回全黑帧
+    （2940px 原分辨率、体积与黑帧一致），不据此声称看过界面。
+    第 2 步「在 release .app 里点『导入立绘』唤起原生文件面板」需真实点击，**待人类验证**；
+    该环节的字节链路已在壳内冒烟实证（真实可解码 PNG 的 img.onload + 外部 shasum 反查摘要一致）。
+    第 3–5 步（导出→导入随包含素材与角色、引用重映射）由 E12 与冒烟 axsp-v2-carries-media 覆盖。
+[ ] 打 tag desktop-v0.7 —— 按授权分级，push 与 tag 等人类批准；本轮只本地提交
+```
+
 ## 第三部 · 自治迭代执行协议（无人值守轮次的工作宪法）
 
 > 适用：人类不在场时的连续版本推进（Phase 6 → 12）。任何与本节冲突的临时冲动，以本节为准。

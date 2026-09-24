@@ -48,3 +48,14 @@ Tailwind v4 的自动源扫描不覆盖 `apps/web` 之外的 workspace 包，
 
 已看过的只有 discover / studio projects / editor 三个界面，
 角色详情、发现各 tab、玩家页、admin 端均未逐屏核验。
+
+## 第三对：公开发现页「失败伪装成空态」的修复证据
+
+| 文件 | 说明 |
+|------|------|
+| `discover-BEFORE-fix-api-down.png` | **后端停机**状态下仍显示「还没有公开作品」——把「我没取到」说成「这里没有内容」 |
+| `discover-error-state-when-api-down.png` | 同样停机条件下显示「剧本清单加载失败」+ 重试 |
+
+复现方式（这一步很关键，否则测的是旧产物）：
+只启动 `vite preview`、**不启动后端**，且必须 `rm -rf apps/web/dist && pnpm build` 之后再看。
+本次第一版验证就是因为用了改动前构建的 dist，误判成「修复没生效」。

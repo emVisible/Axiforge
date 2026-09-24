@@ -62,7 +62,7 @@
 - [x] S4-T1 CI 前端门禁：新增 job 跑 `tsc --noEmit` + `vitest run`（core/axs/editor-core/web）+ `oxlint` + dpdm 循环依赖 + `packages/*` 禁 react/dom 的 lint 断言；补 `@vitest/coverage-v8` 使 core 覆盖率可跑 | Acceptance: 步骤在本地以 `pnpm gates` 全链跑通、workflow YAML 通过 lint、CI 绿等首次 push 后确认（不 push 不谎称已绿）；宪章 G2/G4/Q9 的「CI 断言」指向真实步骤 | M4
 - [x] S4-T2 决策落文：新建 ADR-026（素材本地化与 `.axsp` v2 容器），回写 `KERNEL_DESIGN.md` §2.5 方法表与 §一 依赖铁律的 CI 事实 | Acceptance: ADR-026 状态「已采纳」含备选与否决理由、后果含未清偿欠账；KERNEL 方法表含 saveAsset/readAsset/范围语义；ADR 索引已登记 | M4
 - [x] S4-T3 文档对账：宪章新增 Phase 6 段并回写勾选；Phase 2「素材落工程目录」虚假勾选纠偏；`BACKLOG_V1.md` 清除「`.axsp` 导出=明确不做」矛盾；README 结构段与脚本表按实态重写；`docs/user` 新增桌面版与工程包文档并加注册表完整性用例 | Acceptance: 逐文件 diff 可指认，不再有文档声称已交付而代码未交付的项；历史「已完成」表未被删改（纠偏以追加形式落地） | M4
-- [~] S4-T4 收尾：G1–G9 门禁证据 + 附录检查单全勾 + 手动验收路径写入 + 打 tag `desktop-v0.7` | Acceptance: 证据已写入宪章 Phase 6 检查单（G2 如实记未达标）；**tag 与 push 按授权分级待人类批准**；release .app 视觉截图与「导入立绘」原生面板点击两项待人类验证 | M4
+- [~] S4-T4 收尾：G1–G9 门禁证据 + 附录检查单全勾 + 手动验收路径写入 + 打 tag `desktop-v0.7` | Acceptance: 证据已写入宪章 Phase 6 检查单（G2 如实记未达标）；**tag 与 push 已于 2026-09-24 经人类单独批准执行**（附注标签 → 6c95634，分支快进推送 52 颗）；release .app 视觉截图与「导入立绘」原生面板点击两项仍待人类验证，故本条保持 `[~]` | M4
 
 ## 6. Acceptance Criteria（手动验收路径）
 
@@ -112,3 +112,4 @@
 - v1.8 L2（2026-09-24）门禁固化（M4 首步）：`pnpm gates`（tsc×4 → vitest×4 → oxlint+颜色令牌 → 内核纯净度 → dpdm 循环依赖）本地全链跑通，新增 `scripts/check-package-purity.mjs`（24 文件 0 违规）与 CI `frontend-gates` job；e2e 进 CI 需显式建 `axiforge_e2e` 库，已加步骤。**CI 绿要等首次 push 才能声称，本轮不 push 故只声明本地事实 + YAML lint 通过。**
 - v1.8 L2（2026-09-24）覆盖率一跑就露馅：`packages/core` 实测 **83.47% 语句 / 72.02% 分支**，低于 G2 的 ≥90%——此前因缺 `@vitest/coverage-v8` 根本跑不了，所以被当成达标。没有下调门禁迁就现状，差额登记为 Phase 7 测试债。
 - v1.9 L1（2026-09-24）文档对账：README 结构段与脚本表按实态重写（原文列的 `apps/web/apps/studio`、`backend/src/main.py` 均不存在）；`BACKLOG_V1` 移除与已交付冲突的「`.axsp` 导出=不做」条目——**纠偏以追加注记落地，中途误删的「已完成（v2.1）」表已恢复**；`docs/user` 新增桌面版与工程包页（含「已知限制」与能力边界），并补 `_nav.json` 与正文不漂移的完整性用例。
+- v1.10 L2（2026-09-24）发布动作补记：收尾任务原本按授权分级停在「tag 与 push 待批准」。人类单独批准后执行——`git push -u origin desktop`（`c9e3e56..db48f5d`，52 颗，先以 `merge-base --is-ancestor` 确认快进、非强推），并打附注标签 `desktop-v0.7` 指向 **v0.7 的最后一颗提交 6c95634**（即 v0.8 M1 的父节点），而非当时的 HEAD：标签必须落在版本边界上，否则「v0.7 发布」这个说法本身是错的。标签形式沿用 `desktop-v0.5/0.6` 的附注约定，远程 peel 值已用 `ls-remote` 独立复核。**CI 首次实跑结果仍未取证**（本地 `gh` 未认证），不以「已推送」推断「已绿」；两项 release 手动验收仍待人类。

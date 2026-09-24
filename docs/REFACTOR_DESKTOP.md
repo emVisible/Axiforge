@@ -461,7 +461,11 @@
     第 2 步「在 release .app 里点『导入立绘』唤起原生文件面板」需真实点击，**待人类验证**；
     该环节的字节链路已在壳内冒烟实证（真实可解码 PNG 的 img.onload + 外部 shasum 反查摘要一致）。
     第 3–5 步（导出→导入随包含素材与角色、引用重映射）由 E12 与冒烟 axsp-v2-carries-media 覆盖。
-[ ] 打 tag desktop-v0.7 —— 按授权分级，push 与 tag 等人类批准；本轮只本地提交
+[x] 打 tag desktop-v0.7 —— 2026-09-24 经人类单独批准后执行：附注标签 `desktop-v0.7`
+    （tag 对象 638dc53 → commit 6c95634，即 v0.7 最后一颗提交、v0.8 M1 的父节点），
+    `git ls-remote origin "refs/tags/desktop-v0.7^{}"` 复核 peel 值为 6c95634；
+    分支推送 `c9e3e56..db48f5d`（52 颗，快进，`merge-base --is-ancestor` 先行确认）并设 upstream。
+    **仍未取证**：CI `frontend-gates` 首次实跑结果——本地 `gh` 未认证，不以「已推送」推断「已绿」。
 ```
 
 ## 第三部 · 自治迭代执行协议（无人值守轮次的工作宪法）

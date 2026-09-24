@@ -77,7 +77,7 @@ Tier: Standard（8 节 · 单一执行权威）
 - [x] S1-T3 两个 Provider 落地实现：SQLite 侧读写本地表，HTTP 侧转发既有 REST 路径，二者语义等价 | Acceptance: 同一份契约测试文件对两个 Provider 各跑一遍全绿（单一测试源、双实现） | M1
 - [ ] S1-T4 道具与场景页接本地：`useAssets` 按环境分派，桌面断网可建/列/删 | Acceptance: **验收句改判**——分派代码与「写→回读」已落地，但其原判据「e2e 在无后端条件下通过」不成立：Playwright 跑在浏览器态，`isTauriEnvironment()` 恒为 false，e2e 永远只走 HTTP 支。桌面支目前只有契约套件（双实现 128 例）为证，hook 层的分派接线尚无自动证据（vitest 环境为 node，无 hook 测试装置）。故本项保持未勾，待打包态实测或补 hook 装置 | M1
 - [ ] S1-T5 工程元数据补齐：`projects` 表补 `description` / `cover_image` / `theme_tags` / `mechanism` / `genre` / `is_meta`，播种携带真实值而非填空 | Acceptance: **部分达成**——本地列、读写、`projectMetaToResponse` 逐字段透传已完成（桌面自建工程编辑后卡片可显示真实描述）；「播种携带真实值」未达成，见随包重导出欠账 | M1
-- [ ] S1-T6 存档与成就本地化：播放页存读走本地，含 player_token 跨重启稳定性 | Acceptance: 契约层已绿；播放页 hook 层按环境分派并实测一次存→重开→读回 | M1
+- [ ] S1-T6 存档与成就本地化：**先抽口再分派**——实测播放页不经 hook 层，9 处直接调 `playerApi` / `ginkgoApi`（列表 / 读取 / 覆写 / 清除 / 解锁），其中成就解锁与两处清除写作 `.catch(() => {})` 静默吞失败。先抽出一个带环境分派的玩家持久化模块、把失败显式化，再由播放页改调该模块；不直接编辑 1370 行巨石 | Acceptance: 新模块单测覆盖本地支四步（存→列→读→删）与失败可见性；播放页调用点全部改指该模块且 e2e 全绿 | M1
 - [ ] S1-T7 随包示范作补元数据：既播的 `.axsp` 早于新列生成，其 `project.json` 无描述/标签，播种后卡片仍「暂无描述」；须在联后端后重导出随包（打包 project.json 已整体序列化 meta，重导出即自动带上） | Acceptance: 重导出的随包在桌面首启后卡片显示真实描述与机制标签 | M1
 - [ ] S1-T8 契约单条读口：新增 `getItem(id)` / `getScene(id)`，替换 hook 层「拉全表再 find」的临时取巧 | Acceptance: 两个新方法的契约用例双实现绿，hook 层不再依赖清单过滤 | M1
 - [ ] S1-T9 G1 回归清偿：本轮新增使 `sqliteProvider.ts` 408→523、`memory.ts` →433、`httpStorageProvider.ts` →414，全部越过本阶段要清零的 400 行预算；须按域继续外提 | Acceptance: 三文件回到 ≤400 且 128+ 契约用例不减 | M1

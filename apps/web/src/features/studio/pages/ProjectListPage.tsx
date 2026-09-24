@@ -27,7 +27,7 @@ import {
 } from "@/shared/components/ui";
 import type { ProjectResponse } from "@/shared/types/project";
 import { getCreatorId } from "@/shared/lib/creatorId";
-import { createStorageProvider, importProjectFromAxsp, openTextFile } from "@/shared/storage";
+import { createStorageProvider, importProjectFromAxsp, openBinaryFile } from "@/shared/storage";
 import { PROJECT_WORKFLOW } from "@/shared/lib/workflowSteps";
 import { projectApi } from "@/shared/api/editor";
 
@@ -195,11 +195,11 @@ export default function ProjectListPage() {
               variant="ghost"
               icon={<FileUp className="h-4 w-4" strokeWidth={1.75} />}
               onClick={async () => {
-                const text = await openTextFile(".axsp,application/json");
-                if (!text) return;
+                const bytes = await openBinaryFile(".axsp");
+                if (!bytes) return;
                 try {
                   const provider = await createStorageProvider();
-                  const res = await importProjectFromAxsp(provider, text);
+                  const res = await importProjectFromAxsp(provider, bytes);
                   if (res.ok) {
                     navigate(`/studio/projects/${res.data.id}`);
                   } else {

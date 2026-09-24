@@ -3,9 +3,9 @@
  * 验证链路：plugin-sql → TauriSqlBackend → SqliteStorageProvider → 契约关键语义。
  * 输出可 grep 标记：AXIFORGE-DESKTOP-STORAGE: PASS / FAIL <步骤>
  */
-import { bundleToCompilerInput, createStorageProvider } from "./index";
+import { bundleToCompilerInput, createStorageProvider, exportProjectAsAxsp } from "./index";
 import { assetDisplayUrl, getLocalAssetRoot } from "./assetContext";
-import { localAssetPath } from "@axiforge/editor-core";
+import { localAssetPath, unpackAxsp, type StorageProvider } from "@axiforge/editor-core";
 import { compileStory } from "@axiforge/core";
 
 /** 真实可解码的 1x1 透明 PNG（68 字节）——素材出图断言的固定样本 */
@@ -39,6 +39,27 @@ async function writeResultFile(text: string): Promise<void> {
   } catch (e) {
     console.error("AXIFORGE-DESKTOP-STORAGE: 结果文件写入失败", e);
   }
+}
+
+/** 造一个「角色 + 立绘 + 引用该角色」的工程，供容器断言使用 */
+async function createProjectWithAsset(
+  p: StorageProvider,
+): Promise<{ projectId: string; ref: string; png: Uint8Array }> {
+  const created = await p.createProject({ title: "容器冒烟" });
+  if (!created.ok) throw new Error("容器冒烟：建工程失败");
+  const png = Uint8Array.from(atob(PNG_1X1), (c) => c.charCodeAt(0));
+  const asset = await p.saveAsset({ name: "seed.png", mime: "image/png", bytes: png });
+  if (!asset.ok) throw new Error("容器冒烟：素材落盘失败");
+  const ref = asset.data.ref;
+  const char = await p.saveCharacter({
+    id: "",
+    name: "容器角色",
+    characterData: {},
+    imagePath: ref,
+  });
+  if (!char.ok) throw new Error("容器冒烟：角色建档失败");
+  await p.addRole(created.data.id, { characterRefId: char.data.id });
+  return { projectId: created.data.id, ref, png };
 }
 
 export async function smokeDesktopStorage(): Promise<boolean> {
@@ -165,6 +186,28 @@ export async function smokeDesktopStorage(): Promise<boolean> {
     const gone = del.ok && !(await p.loadProject(id)).ok;
     mark(gone, "delete-cleanup");
     cleanup = null;
+
+    // .axsp v2 桌面态实证：素材字节与演员表真的进包（内容寻址 → 包内路径即 ref）
+    const seeded = await createProjectWithAsset(p);
+    const packed = await exportProjectAsAxsp(p, seeded.projectId);
+    if (!packed.ok) {
+      await writeResultFile(`FAIL axsp-pack: ${JSON.stringify(packed.error)}`);
+      return false;
+    }
+    const unpacked = unpackAxsp(packed.data);
+    const carried =
+      unpacked.ok &&
+      Object.keys(unpacked.data.assets).includes(seeded.ref) &&
+      Array.from(unpacked.data.assets[seeded.ref]!).every((v, i) => v === seeded.png[i]) &&
+      unpacked.data.characters.some((c) => c.imagePath === seeded.ref);
+    mark(carried, `axsp-v2-carries-media bytes=${packed.data.byteLength}`);
+    if (!carried) {
+      await writeResultFile(
+        `FAIL axsp-v2-carries-media: ok=${unpacked.ok} refs=${unpacked.ok ? Object.keys(unpacked.data.assets).join(",") : "err"}`,
+      );
+      return false;
+    }
+    await p.deleteProject(seeded.projectId);
 
     console.log(`AXIFORGE-DESKTOP-STORAGE: PASS`);
     await writeResultFile("PASS");

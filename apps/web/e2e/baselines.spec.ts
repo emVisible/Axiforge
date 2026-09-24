@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   addNode,
   addRole,
+  createCharacter,
   createProject,
   E2E_TAG,
   getProject,
@@ -10,7 +11,7 @@ import {
 } from "./helpers";
 
 /**
- * E1–E6 行为基线（Phase 1a，宪章 G3）。
+ * E1–E12 行为基线（Phase 1a 起逐步扩充，宪章 G3）。
  * 这些断言钉住「行为」而非实现；Phase 1b 拆巨石后必须原样通过。
  */
 
@@ -556,4 +557,78 @@ test("E11 FX轨：memory/relationship 效果在 RN 轨可视化", async ({ page,
   // 效果色块：记忆与关系标签
   await expect(page.getByText(/记忆·score/).first()).toBeVisible();
   await expect(page.getByText(/关系·yansha/).first()).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// E12 .axsp v2：演员表随包迁移，导入端角色另立新档且引用重映射
+// ---------------------------------------------------------------------------
+
+test("E12 .axsp v2：导出带角色，导入新建角色并重映射 characterId", async ({
+  page,
+  request,
+}) => {
+  const creatorId = "creator-e2e-fixed";
+  await page.addInitScript(
+    ([key, value]) => localStorage.setItem(key!, value!),
+    ["axiforge.creatorId", creatorId],
+  );
+
+  const charName = `${E2E_TAG}渡边${Date.now().toString(36).slice(-4)}`;
+  const character = await createCharacter(request, charName);
+  const project = await createProject(request, "E12 容器");
+  await addRole(request, project.id, character.id);
+  await updateNode(request, project.id, project.scenes[0].id, String(project.nodes[0].id), {
+    title: "E12拍",
+    script: [{ op: "say", characterId: character.id, text: "带着我走。" }],
+  });
+
+  // 导出
+  await openStudio(page, project.id);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "导出" }).click(),
+  ]);
+  expect((download.suggestedFilename() ?? "").endsWith(".axsp")).toBe(true);
+  const exportPath = await download.path();
+  expect(exportPath).toBeTruthy();
+
+  // 包体结构：zip 魔数 + 三个 JSON 条目名（zip 中央目录内条目名为明文）
+  const { readFileSync } = await import("node:fs");
+  const raw = readFileSync(exportPath!);
+  expect([raw[0], raw[1], raw[2], raw[3]]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+  for (const entry of ["manifest.json", "project.json", "characters.json"]) {
+    expect(raw.includes(Buffer.from(entry)), `包内应含 ${entry}`).toBe(true);
+  }
+
+  // 导入 → 自动进入新工程
+  await page.goto("/studio/projects");
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.getByRole("button", { name: /导入 \.axsp/ }).click(),
+  ]);
+  await chooser.setFiles(exportPath!);
+  await page.waitForURL(/\/studio\/projects\/[0-9a-f-]{36}/, { timeout: 15_000 });
+  const newId = page.url().split("/").pop()!;
+  expect(newId).not.toBe(project.id);
+
+  // 行为断言：台词引用改指新角色 id，且新角色与导出端同名
+  const fresh = await getProject(request, newId);
+  const beat = fresh.nodes.find((n: any) => n.narrative_data?.title === "E12拍");
+  expect(beat).toBeTruthy();
+  const newCharId = beat.narrative_data.script[0].characterId;
+  expect(newCharId).toBeTruthy();
+  expect(newCharId).not.toBe(character.id);
+
+  const importedChar = await request.get(
+    `http://localhost:8000/api/v1/characters/${newCharId}`,
+  );
+  expect(importedChar.ok()).toBeTruthy();
+  const body = await importedChar.json();
+  expect(body.character_data?.anchor?.name ?? body.name).toBe(charName);
+
+  // 导入是「新建」而非覆盖：导出端角色仍在原位
+  const original = await request.get(
+    `http://localhost:8000/api/v1/characters/${character.id}`,
+  );
+  expect(original.ok()).toBeTruthy();
 });

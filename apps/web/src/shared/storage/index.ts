@@ -6,8 +6,8 @@
  * 云同步/协作服务后期以装饰器形态叠加，不改变本工厂签名。
  */
 import { compileStory, type CompilerProjectInput, type StoryPackage } from "@axiforge/core";
-import { bundleToAxsp, collectAssetRefs, packAxsp, unpackAxsp } from "@axiforge/editor-core";
-import type { ProjectBundle } from "@axiforge/editor-core";
+import { collectAssetRefs, packAxsp, remapCharacterIds, unpackAxsp } from "@axiforge/editor-core";
+import type { ProjectBundle, StoredCharacter } from "@axiforge/editor-core";
 import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
 import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
@@ -161,44 +161,77 @@ export async function createStorageProvider(): Promise<StorageProvider> {
 }
 
 // ============================================================
-// .axsp 导出 / 导入（容器 v0；导入 = 现有契约的组合，不新增接口方法）
+// .axsp 导出 / 导入（容器 v2：工程束 + 演员表 + 素材字节）
 // ============================================================
 
-/** 导出：工程束 → .axsp 文本（素材引用清单自动收集） */
+/**
+ * 导出：工程束 + 其演员表 + 表内引用的素材字节 → .axsp zip。
+ * 素材读不到时跳过而不中断导出（清单只记实际入包者，包体自洽）；
+ * 角色取不到（已删）同理跳过，导入端会看到引用缺席。
+ */
 export async function exportProjectAsAxsp(
   provider: StorageProvider,
   projectId: string,
-): Promise<StorageResult<string>> {
+): Promise<StorageResult<Uint8Array>> {
   const bundle = await provider.loadProject(projectId);
   if (!bundle.ok) return bundle;
-  return packAxsp(
-    bundleToAxsp(bundle.data, collectAssetRefs(bundle.data)),
-  );
+
+  const characters: StoredCharacter[] = [];
+  for (const role of bundle.data.roles) {
+    const got = await provider.getCharacter(role.characterRefId);
+    if (got.ok) characters.push(got.data);
+  }
+  const assets: Record<string, Uint8Array> = {};
+  for (const ref of collectAssetRefs(bundle.data, characters)) {
+    const read = await provider.readAsset(ref);
+    if (read.ok) assets[ref] = read.data;
+  }
+  return packAxsp({ project: bundle.data, characters, assets });
 }
 
-/** 导入：.axsp 文本 → 新工程（分配新 id；角色引用重建） */
+/**
+ * 导入：素材先落盘（内容寻址，ref 两端一致）→ 角色建新档 → 按新 id 重映射引用
+ * → 建工程。角色一律新建而非覆盖：导入不得改写接收方已有的同名角色。
+ */
 export async function importProjectFromAxsp(
   provider: StorageProvider,
-  text: string,
+  bytes: Uint8Array | string,
 ): Promise<StorageResult<ProjectMeta>> {
-  const unpacked = unpackAxsp(text);
+  const unpacked = unpackAxsp(bytes);
   if (!unpacked.ok) return unpacked;
-  const bundle = unpacked.data.project;
+  const { project, characters, assets } = unpacked.data;
 
-  const created = await provider.createProject({ title: bundle.meta.title });
+  for (const [ref, raw] of Object.entries(assets)) {
+    const saved = await provider.saveAsset({
+      name: ref.split("/").pop() ?? ref,
+      mime: "application/octet-stream",
+      bytes: raw,
+    });
+    if (!saved.ok) return saved;
+  }
+
+  const idMap: Record<string, string> = {};
+  for (const c of characters) {
+    const created = await provider.saveCharacter({ ...c, id: "" });
+    if (!created.ok) return created;
+    idMap[c.id] = created.data.id;
+  }
+  const remapped = remapCharacterIds(project, idMap);
+
+  const created = await provider.createProject({ title: remapped.meta.title });
   if (!created.ok) return created;
   const newId = created.data.id;
 
   const saved = await provider.saveNarrative(newId, {
-    axsSource: bundle.axsSource,
-    nodes: bundle.nodes,
-    edges: bundle.edges,
+    axsSource: remapped.axsSource,
+    nodes: remapped.nodes,
+    edges: remapped.edges,
   });
   if (!saved.ok) {
     await provider.deleteProject(newId);
     return saved;
   }
-  for (const role of bundle.roles) {
+  for (const role of remapped.roles) {
     const r = await provider.addRole(newId, {
       characterRefId: role.characterRefId,
     });
@@ -210,20 +243,22 @@ export async function importProjectFromAxsp(
   return created;
 }
 
-/** 平台文件保存：桌面 dialog+fs；浏览器 blob 下载 */
-export async function saveTextFile(
+/** 平台二进制保存：桌面 dialog+fs；浏览器 blob 下载 */
+export async function saveBinaryFile(
   defaultName: string,
-  text: string,
+  bytes: Uint8Array,
 ): Promise<boolean> {
   if (isTauriEnvironment()) {
     const { save } = await import("@tauri-apps/plugin-dialog");
     const fs = await import("@tauri-apps/plugin-fs");
     const path = await save({ defaultPath: defaultName });
     if (!path) return false;
-    await fs.writeTextFile(path, text);
+    await fs.writeFile(path, bytes);
     return true;
   }
-  const blob = new Blob([text], { type: "application/json" });
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const blob = new Blob([copy as unknown as BlobPart], { type: "application/zip" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -233,17 +268,17 @@ export async function saveTextFile(
   return true;
 }
 
-/** 平台文件读取：桌面 dialog+fs；浏览器 file input（返回 null=用户取消） */
-export async function openTextFile(accept: string): Promise<string | null> {
+/** 平台二进制读取：桌面 dialog+fs；浏览器 file input（返回 null=用户取消） */
+export async function openBinaryFile(accept: string): Promise<Uint8Array | null> {
   if (isTauriEnvironment()) {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const fs = await import("@tauri-apps/plugin-fs");
     const path = await open({
       multiple: false,
-      filters: [{ name: "Axiforge 工程", extensions: ["axsp", "json"] }],
+      filters: [{ name: "Axiforge 工程", extensions: ["axsp"] }],
     });
     if (typeof path !== "string") return null;
-    return await fs.readTextFile(path);
+    return await fs.readFile(path);
   }
   return new Promise((resolve) => {
     const input = document.createElement("input");
@@ -252,10 +287,10 @@ export async function openTextFile(accept: string): Promise<string | null> {
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return resolve(null);
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => resolve(null);
-      reader.readAsText(file);
+      file.arrayBuffer().then(
+        (buf) => resolve(new Uint8Array(buf)),
+        () => resolve(null),
+      );
     };
     input.click();
   });

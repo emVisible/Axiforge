@@ -1,4 +1,4 @@
-# Build Blueprint v1.1 | Status: confirmed v1.0 → executing v1.1
+# Build Blueprint v1.2 | Status: confirmed v1.0 → executing v1.2
 > 日期 2026-09-24 · 分支 `desktop` · 基线 `e123f1a`（tag `desktop-v0.6`）· 关联 [ADR-024](docs/ADR/024-desktop-local-first.md) 决策 3/4、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)（新增 Phase 6）
 
 ## 1. Goals & Non-Goals
@@ -53,8 +53,8 @@
 - [x] S1-T2 壳能力开通：`capabilities/default.json` 增二进制读写（`fs:allow-read-file`/`fs:allow-write-file`，scope 保持 `$HOME/Documents/Axiforge/**`）；`tauri.conf.json` 开 `app.security.assetProtocol{enable,scope}`；`Cargo.toml` tauri features 加 `protocol-asset` | Acceptance: `pnpm --filter @axiforge/desktop build` 成功；**出图证据双轨**——壳内冒烟以真实可解码 PNG 的 `img.onload` 持续回归（dev 壳），release `.app` 手动截图在 M1 收尾统一做一次 | M1
 - [x] S1-T3 素材目录与去重：`FsBridge` 注入 `SqliteStorageProvider`；落 `assets/<sha256>.<ext>`，同内容复用一份，DB 只存相对路径 | Acceptance: 同一文件导入两次 → 磁盘仅 1 个文件、两处引用同路径；单测用内存 stub 断言 | M1
 - [x] S1-T4 上传入口平台分派：`ImageUpload` 增可选 `upload?: (file)=>Promise<string>` 注入点（默认保持现 HTTP 行为）；web 侧桌面态传 Provider 版 uploader；显示统一走 `resolveAssetUrl` | Acceptance: 未注入时行为逐字段不变（单测）；打包态新角色立绘可显示并保存后重开仍在 | M1
-- [ ] S2-T1 `.axsp` v2 容器：zip 布局（`manifest.json` / `project.json` / `assets/*`）+ pack/unpack + v1 只读兼容 | Acceptance: axsp.test.ts 新增 v2 往返逐字段等价、v1 文件仍可读、损坏包 → `corrupted` 三组用例全绿 | M2
-- [ ] S2-T2 导出/导入接真实字节：导出按 `manifest.assets` 收集本地文件入包；导入落盘并重写相对路径（新工程 id 与素材路径同时重映射） | Acceptance: `pnpm e2e` 新增 E12「导出→清空素材→导入→引用可解析」断言绿（12 条基线） | M2
+- [x] S2-T1 `.axsp` v2 容器：zip 布局（`manifest.json` / `project.json` / **`characters.json`** / `assets/*`）+ pack/unpack + v1 只读兼容 + 角色 id 重映射纯函数 | Acceptance: axsp.test.ts 新增 v2 往返逐字段等价、v1 文件仍可读、损坏包 → `corrupted` 三组用例全绿 | M2
+- [x] S2-T2 导出/导入接真实字节：导出按 `manifest.assets` 收集本地文件入包并带上演员表；导入素材落盘（内容寻址 → ref 两端一致）、角色新建、引用重映射后再建工程 | Acceptance: `pnpm e2e` 新增 E12「导出带角色 → 导入新建角色且 characterId 重映射」断言绿（12 条基线）；壳内冒烟新增 v2 媒体入包断言 | M2
 - [ ] S2-T3 首启播种：示范作 `.axsp` v2 随包资源分发，`listProjects` 为空时自动导入一次 | Acceptance: 删本地库与素材目录后启动 .app → 工程列表出现示范作且可断网试玩；重复启动不二次播种（单测 + 手动） | M2
 - [ ] S3-T1 角色域 Provider 化：`MyCharactersPage`/`CharacterDetailPage`/`CharacterSearchSelect`/`useProjectDirectory` 在桌面态经 `listCharacters/getCharacter/saveCharacter`（契约已存在，属接线非新增） | Acceptance: 打包离线态角色列表与详情不再出现「加载角色失败」；web 态行为零变更 | M3
 - [ ] S3-T2 缺席域显式降级：版本/关系/传记/发现/全局搜索/概览在本地态给「需后端」可读态；**错误态必须抑制空态**（实测缺陷） | Acceptance: 断网打包态走查无「沉默失败」；错误/空态互斥有单测或组件用例 | M3
@@ -95,3 +95,5 @@
 - v1.1 L2（2026-09-24）壳能力开通·验收措辞：原写「打包 .app 截图出图」，实测改用壳内 DEV 冒烟以真实可解码 PNG 的 `img.onload` 断言（更强的持续回归形式，可 grep 落盘），release 截图并入 M1 收尾。首轮探针误用不可解码的假 PNG 造成 `display=false` 假阴性，纠正后四段全通（dedup/roundtrip/protocol/PASS）。
 - v1.1 L2（2026-09-24）素材落盘·端口命名：§3 的 `FsBridge{writeBytes}` 落地为 `AssetStore{write,read}`——多出的 `read` 是 M2 容器打包（收集真实字节）的既有需求，同批改签名比二次破坏契约更省；`AssetStore` 与 `SqlBackend` 同构，仍是方法级端口而非新抽象层。
 - 格式约束（本轮踩到两次）：§8 与 §3 不得出现裸任务 ID，否则 check-ids 判为重复条目；引用任务一律用标题词。
+- v1.2 L2（2026-09-24）容器任务·范围扩充：写 v2 时发现 v0/v1 只装工程束——`roles` 仅存 `characterRefId`，换机导入后引用指向不存在的角色，即「分发」根本不成立。故 zip 多一条 `characters.json`，并新增角色 id 重映射纯函数（覆盖 `characterId` 直引 / 条件效果 `key` 前缀 / `codexScope` / `roles` 四处引用面）。不扩这一项，M2 的验收就是假的。
+- v1.2 L2（2026-09-24）容器任务·证据形式：媒体内嵌只在桌面态可证（web 的 ref 是 `/uploads/...` 属 direct，按格式规定不入包）。故 Playwright 侧断言 zip 结构 + 演员表迁移 + 导入新建角色；「素材字节确实进包」改由壳内冒烟承担（并已在磁盘上以外部 `shasum -a 256` 反查文件名摘要一致）。§7 的自动化边界预判在此兑现，未临时改用例迁就实现。

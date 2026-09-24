@@ -52,7 +52,7 @@ import {
   bundleToResponse,
   createStorageProvider,
   exportProjectAsAxsp,
-  saveTextFile,
+  saveBinaryFile,
 } from "@/shared/storage";
 import type { StorageProvider } from "@axiforge/editor-core";
 
@@ -796,7 +796,7 @@ export function useProjectEditor(id: string) {
       showToast(`导出失败：${res.error.code}`, "error");
       return;
     }
-    const saved = await saveTextFile(
+    const saved = await saveBinaryFile(
       `${project?.title || "工程"}.axsp`,
       res.data,
     );

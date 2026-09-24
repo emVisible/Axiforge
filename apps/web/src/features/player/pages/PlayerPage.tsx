@@ -869,7 +869,7 @@ export default function PlayerPage() {
             <ScrollText className="h-7 w-7" strokeWidth={1.5} />
           </div>
           <h1 className="text-white/60 text-xl font-light">暂无内容</h1>
-          <p className="text-white/20 text-sm">该剧本还没有可播放的演出</p>
+          <p className="text-white/65 text-sm">该剧本还没有可播放的演出</p>
           <Link
             to={routes.project(projectId!)}
             className="inline-block rounded-xl bg-white/10 px-6 py-2.5 text-sm text-white/60 hover:bg-white/20"
@@ -896,7 +896,7 @@ export default function PlayerPage() {
               <p className="text-sm tracking-wider text-white/50">{endingLabel}</p>
             )}
           </div>
-          <p className="text-white/30 text-sm">故事已结束</p>
+          <p className="text-white/65 text-sm">故事已结束</p>
           <div className="flex flex-wrap gap-3 justify-center pt-4">
             <button
               onClick={restartFresh}
@@ -1133,7 +1133,7 @@ export default function PlayerPage() {
                 记忆 ({memEntries.length})
               </h3>
               {memEntries.length === 0 ? (
-                <p className="text-sm text-white/15">暂无记忆</p>
+                <p className="text-sm text-white/65">暂无记忆</p>
               ) : (
                 <div className="space-y-2">
                   {memEntries.map(([k, v]) => (
@@ -1150,7 +1150,7 @@ export default function PlayerPage() {
                 标志 ({flagEntries.length})
               </h3>
               {flagEntries.length === 0 ? (
-                <p className="text-sm text-white/15">暂无标志</p>
+                <p className="text-sm text-white/65">暂无标志</p>
               ) : (
                 <div className="space-y-2">
                   {flagEntries.map(([k, v]) => (
@@ -1167,7 +1167,7 @@ export default function PlayerPage() {
                 角色状态 ({charEntries.length})
               </h3>
               {charEntries.length === 0 ? (
-                <p className="text-sm text-white/15">暂无角色状态</p>
+                <p className="text-sm text-white/65">暂无角色状态</p>
               ) : (
                 <div className="space-y-2">
                   {charEntries.map(([id, fields]) => (
@@ -1333,7 +1333,7 @@ export default function PlayerPage() {
             </p>
             {textComplete && (
               <div className="mt-4 text-right">
-                <span className="text-white/10 text-xs animate-pulse">空格继续</span>
+                <span className="text-white/70 text-xs animate-pulse">空格继续</span>
               </div>
             )}
           </div>

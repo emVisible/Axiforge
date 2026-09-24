@@ -17,13 +17,23 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const SCAN_ROOTS = [
+/**
+ * 两条规则的作用域**故意不同**，这是实测出来的：
+ * 把 player 塞进硬编码色的扫描根，会一次性报出约 150 处 text-white/*——
+ * 但玩家页是沉浸式黑底画面，白色半透明本来就是它的正确语汇，
+ * 用它套「必须走语义令牌」的硬规则是判错的。常红的门禁等于没有门禁。
+ *
+ * 所以：硬规则只管「走设计令牌的界面」；player 交给低透明度文字棘轮去管
+ * ——那边框/底色可以白，但 10% 白度的正文读不出来是真缺陷。
+ */
+const HARD_COLOR_ROOTS = [
   "apps/web/src/features/studio",
   "apps/web/src/features/discover",
   "apps/web/src/features/character",
   "apps/admin/src",
   "packages/ui/src",
 ];
+const RATCHET_ROOTS = [...HARD_COLOR_ROOTS, "apps/web/src/features/player"];
 
 const PATTERNS = [
   { name: "arbitrary bg hex", regex: /bg-\[#/ },
@@ -49,6 +59,19 @@ const RATCHETS = [
     hint: "改用 tokens.css 的 --text-3xs / --text-2xs（text-3xs / text-2xs）。",
   },
   {
+    /*
+     * 低透明度的白字在纯黑演出画面上是真实的可读性问题：
+     * white/20 对黑底约 1.7:1、white/30 约 2.2:1，都远低于任何一档 WCAG 要求，
+     * 而它们曾被用在正文字句上（不是装饰遮罩）。玩家页此前不在扫描范围内，
+     * 所以门禁一直看不见——这条把它纳入棘轮。
+     */
+    id: "dim-text",
+    label: "低透明度文字",
+    regex: /(?:^|[\s"'`:])(?:[a-z-]+:)*text-white\/(?:[1-9]|1[0-9]|2[0-9]|3[0-9])\b/g,
+    baseline: path.join(root, "scripts", "ui-dim-text-baseline.json"),
+    hint: "正文字句不要低于 text-white/60；确需弱化的次要信息用 /50 以上。",
+  },
+  {
     id: "transitions",
     label: "transition-all",
     regex: /transition-all/g,
@@ -72,7 +95,7 @@ function walk(dir, files = []) {
 
 let failed = false;
 
-for (const scanRoot of SCAN_ROOTS) {
+for (const scanRoot of HARD_COLOR_ROOTS) {
   const absRoot = path.join(root, scanRoot);
   const files = walk(absRoot);
 
@@ -94,7 +117,7 @@ for (const scanRoot of SCAN_ROOTS) {
 // ---- ② 棘轮规则：逐文件计数，只准变短 ----
 const collect = () => {
   const out = [];
-  for (const scanRoot of SCAN_ROOTS) {
+  for (const scanRoot of RATCHET_ROOTS) {
     for (const file of walk(path.join(root, scanRoot))) out.push(path.relative(root, file));
   }
   return out;

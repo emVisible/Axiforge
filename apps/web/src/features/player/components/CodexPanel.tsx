@@ -98,10 +98,10 @@ export default function CodexPanel({
               </button>
             ))}
           {tab === "terms" && glossary.length === 0 && (
-            <p className="px-2 py-8 text-center text-2xs text-white/15">暂无术语</p>
+            <p className="px-2 py-8 text-center text-2xs text-white/65">暂无术语</p>
           )}
           {tab === "chars" && profiles.length === 0 && (
-            <p className="px-2 py-8 text-center text-2xs text-white/15">暂无角色档案</p>
+            <p className="px-2 py-8 text-center text-2xs text-white/65">暂无角色档案</p>
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-6">
@@ -164,7 +164,7 @@ export default function CodexPanel({
             </div>
           )}
           {!selectedTerm && !selectedChar && (
-            <p className="py-20 text-center text-sm text-white/15">选择左侧条目查看详情</p>
+            <p className="py-20 text-center text-sm text-white/65">选择左侧条目查看详情</p>
           )}
         </div>
       </div>

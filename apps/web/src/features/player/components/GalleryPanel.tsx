@@ -57,7 +57,7 @@ export default function GalleryPanel({
       </div>
       <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-6 sm:grid-cols-3">
         {items.length === 0 && (
-          <p className="col-span-full py-20 text-center text-sm text-white/15">
+          <p className="col-span-full py-20 text-center text-sm text-white/65">
             本作品暂无可鉴赏资产
           </p>
         )}

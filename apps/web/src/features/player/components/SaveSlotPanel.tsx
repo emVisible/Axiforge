@@ -75,7 +75,7 @@ export default function SaveSlotPanel({
                       className="h-full w-full object-cover opacity-70"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-white/10">
+                    <div className="flex h-full items-center justify-center text-xs text-white/65">
                       {save ? "无预览" : "空"}
                     </div>
                   )}

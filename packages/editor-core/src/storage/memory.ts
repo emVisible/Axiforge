@@ -41,6 +41,7 @@ import type {
   VisibilityScope,
 } from "./types";
 import { emptyProjectMetadata, err, ok } from "./types";
+import { MemoryPools } from "./memoryPools";
 
 interface ProjectRow {
   meta: ProjectMeta;
@@ -82,20 +83,15 @@ function bootstrapScenesAndNodes(): {
 }
 
 export class MemoryStorageProvider implements StorageProvider {
+  /** 注入自身能力给资产池域，避免把 projects/nextId 变成公开的跨模块契约 */
+  private readonly pools = new MemoryPools(
+    (id) => this.projects.has(id),
+    (prefix) => this.nextId(prefix),
+  );
+
   private projects = new Map<string, ProjectRow>();
   private characters = new Map<string, StoredCharacter>();
 
-  /** 全局资产池与运行时状态：与 SQLite 实现同键语义（存档三元组、解锁按 key） */
-  private items = new Map<string, StoredAssetItem>();
-  private scenes = new Map<string, StoredAssetScene>();
-  private saves = new Map<string, LocalSaveSlot>();
-  private achievements = new Map<string, StoredAchievement>();
-  private unlocked = new Map<string, Map<string, string>>();
-  /** 成就定义归属工程——id 是随机串，故单独记账而非塞进 StoredAchievement（契约里 project 是入参不是字段） */
-  private achievementProject = new Map<string, string>();
-  private saveKey(projectId: string, token: string, slot: number) {
-    return `${projectId}\u0000${token}\u0000${slot}`;
-  }
   private assets = new Map<string, Uint8Array>();
   private seq = 0;
 
@@ -242,153 +238,80 @@ export class MemoryStorageProvider implements StorageProvider {
     return ok(bytes.slice());
   }
 
-  async listItems(scope?: VisibilityScope): Promise<StorageResult<StoredAssetItem[]>> {
-    return ok(filterByVisibility([...this.items.values()], scope));
+  // ---------- 资产池与运行时域：实现体在 memoryPools.ts ----------
+
+  listItems(scope?: VisibilityScope): Promise<StorageResult<StoredAssetItem[]>> {
+    return this.pools.listItems(scope);
   }
 
-  async saveItem(item: StoredAssetItem): Promise<StorageResult<{ id: string }>> {
-    const id = item.id || this.nextId("item");
-    this.items.set(id, { ...item, id, updatedAt: new Date().toISOString() });
-    return ok({ id });
+  saveItem(item: StoredAssetItem): Promise<StorageResult<{ id: string }>> {
+    return this.pools.saveItem(item);
   }
 
-  async deleteItem(id: string): Promise<StorageResult<void>> {
-    return this.items.delete(id)
-      ? ok(undefined)
-      : err({ code: "not_found", entity: "item", id });
+  deleteItem(id: string): Promise<StorageResult<void>> {
+    return this.pools.deleteItem(id);
   }
 
-  async listScenes(scope?: VisibilityScope): Promise<StorageResult<StoredAssetScene[]>> {
-    return ok(filterByVisibility([...this.scenes.values()], scope));
+  listScenes(scope?: VisibilityScope): Promise<StorageResult<StoredAssetScene[]>> {
+    return this.pools.listScenes(scope);
   }
 
-  async saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>> {
-    const id = scene.id || this.nextId("scene");
-    this.scenes.set(id, { ...scene, id, updatedAt: new Date().toISOString() });
-    return ok({ id });
+  saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>> {
+    return this.pools.saveScene(scene);
   }
 
-  async deleteScene(id: string): Promise<StorageResult<void>> {
-    return this.scenes.delete(id)
-      ? ok(undefined)
-      : err({ code: "not_found", entity: "scene", id });
+  deleteScene(id: string): Promise<StorageResult<void>> {
+    return this.pools.deleteScene(id);
   }
 
-  async listSaves(
-    projectId: string,
-    playerToken: string,
-  ): Promise<StorageResult<LocalSaveSlot[]>> {
-    const prefix = `${projectId}\u0000${playerToken}\u0000`;
-    const out = [...this.saves.entries()]
-      .filter(([k]) => k.startsWith(prefix))
-      .map(([, v]) => v)
-      .sort((a, b) => a.slot - b.slot);
-    return ok(out);
+  listSaves(projectId: string, playerToken: string): Promise<StorageResult<LocalSaveSlot[]>> {
+    return this.pools.listSaves(projectId, playerToken);
   }
 
-  async getSave(
-    projectId: string,
-    playerToken: string,
-    slot = 0,
-  ): Promise<StorageResult<LocalSaveSlot>> {
-    const hit = this.saves.get(this.saveKey(projectId, playerToken, slot));
-    return hit
-      ? ok(hit)
-      : err({ code: "not_found", entity: "save_slot", id: `${projectId}/${slot}` });
+  getSave(projectId: string, playerToken: string, slot = 0): Promise<StorageResult<LocalSaveSlot>> {
+    return this.pools.getSave(projectId, playerToken, slot);
   }
 
-  async writeSave(
+  writeSave(
     projectId: string,
     playerToken: string,
     input: SaveSlotInput,
   ): Promise<StorageResult<LocalSaveSlot>> {
-    if (!this.projects.has(projectId)) {
-      return err({ code: "not_found", entity: "project", id: projectId });
-    }
-    const slot = input.slot ?? 0;
-    const row: LocalSaveSlot = {
-      slot,
-      state: input.state,
-      summary: input.summary ?? null,
-      beatId: input.beatId ?? null,
-      thumbRef: input.thumbRef ?? null,
-      updatedAt: new Date().toISOString(),
-    };
-    this.saves.set(this.saveKey(projectId, playerToken, slot), row);
-    return ok(row);
+    return this.pools.writeSave(projectId, playerToken, input);
   }
 
-  async clearSave(
-    projectId: string,
-    playerToken: string,
-    slot = 0,
-  ): Promise<StorageResult<void>> {
-    const key = this.saveKey(projectId, playerToken, slot);
-    return this.saves.delete(key)
-      ? ok(undefined)
-      : err({ code: "not_found", entity: "save_slot", id: `${projectId}/${slot}` });
+  clearSave(projectId: string, playerToken: string, slot = 0): Promise<StorageResult<void>> {
+    return this.pools.clearSave(projectId, playerToken, slot);
   }
 
-  async listAchievements(
-    projectId: string,
-  ): Promise<StorageResult<StoredAchievement[]>> {
-    const out = [...this.achievements.values()].filter(
-      (a) => this.achievementProject.get(a.id) === projectId,
-    );
-    return ok(out);
+  listAchievements(projectId: string): Promise<StorageResult<StoredAchievement[]>> {
+    return this.pools.listAchievements(projectId);
   }
 
-  async saveAchievement(
+  saveAchievement(
     projectId: string,
     achievement: StoredAchievement,
   ): Promise<StorageResult<StoredAchievement>> {
-    if (!this.projects.has(projectId)) {
-      return err({ code: "not_found", entity: "project", id: projectId });
-    }
-    const row = { ...achievement, id: achievement.id || this.nextId("ach") };
-    this.achievements.set(row.id, row);
-    this.achievementProject.set(row.id, projectId);
-    return ok(row);
+    return this.pools.saveAchievement(projectId, achievement);
   }
 
-  async deleteAchievement(
-    projectId: string,
-    id: string,
-  ): Promise<StorageResult<void>> {
-    if (this.achievementProject.get(id) !== projectId || !this.achievements.delete(id)) {
-      return err({ code: "not_found", entity: "achievement", id });
-    }
-    this.achievementProject.delete(id);
-    return ok(undefined);
+  deleteAchievement(projectId: string, id: string): Promise<StorageResult<void>> {
+    return this.pools.deleteAchievement(projectId, id);
   }
 
-  async unlockAchievement(
+  unlockAchievement(
     projectId: string,
     playerToken: string,
     key: string,
   ): Promise<StorageResult<void>> {
-    const def = [...this.achievements.values()].find(
-      (a) => a.key === key && this.achievementProject.get(a.id) === projectId,
-    );
-    if (!def) return err({ code: "not_found", entity: "achievement", id: `${projectId}/${key}` });
-    const bucketKey = `${projectId}\u0000${playerToken}`;
-    const bucket = this.unlocked.get(bucketKey) ?? new Map<string, string>();
-    if (!bucket.has(def.key)) {
-      bucket.set(def.key, new Date().toISOString()); // 幂等：已解锁则不改写时间
-      this.unlocked.set(bucketKey, bucket);
-    }
-    return ok(undefined);
+    return this.pools.unlockAchievement(projectId, playerToken, key);
   }
 
-  async listUnlocked(
+  listUnlocked(
     projectId: string,
     playerToken: string,
   ): Promise<StorageResult<UnlockedAchievement[]>> {
-    const bucket = this.unlocked.get(`${projectId}\u0000${playerToken}`);
-    if (!bucket) return ok([]);
-    return ok(
-      [...bucket.entries()].map(([key, unlockedAt]) => ({ key, unlockedAt })),
-    );
+    return this.pools.listUnlocked(projectId, playerToken);
   }
 
   // ---- 测试辅助：Draft 视图 ----

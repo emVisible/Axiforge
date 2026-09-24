@@ -12,6 +12,7 @@ import { getApiBase } from "@/shared/api/client";
 import { characterApi } from "@/shared/api/characters";
 import { collectProjectNodes } from "@/features/writer/lib/projection";
 import {
+  fail,
   httpClearSave,
   httpDeleteAchievement,
   httpDeleteItem,
@@ -27,6 +28,7 @@ import {
   httpSaveScene,
   httpUnlockAchievement,
   httpWriteSave,
+  toStoredCharacter,
 } from "./httpDomains";
 import type {
   AssetInput,
@@ -53,35 +55,6 @@ import type {
   ProjectResponse,
   ProjectUpdate,
 } from "@/shared/types/project";
-
-function fail<T>(e: unknown, entity: string, id: string): StorageResult<T> {
-  const status = (e as { status?: number })?.status;
-  if (status === 404) return err({ code: "not_found", entity, id });
-  return err({
-    code: "io",
-    detail: `${entity} 请求失败${status ? ` (HTTP ${status})` : ""}`,
-    cause: e,
-  });
-}
-
-/** 传输态 Character → 存储态 StoredCharacter（字段显式映射，缺省即声明缺省） */
-function toStoredCharacter(c: {
-  id: string | number;
-  name: string;
-  character_data?: unknown;
-  image_path?: string | null;
-  author_id?: string | null;
-  is_public?: boolean | null;
-}): StoredCharacter {
-  return {
-    id: String(c.id),
-    name: c.name,
-    characterData: (c.character_data ?? {}) as Record<string, unknown>,
-    imagePath: c.image_path ?? null,
-    isPublic: c.is_public ?? false,
-    authorId: c.author_id ?? null,
-  };
-}
 
 /** 工程元数据：一处映射，list / create / bundle 三处共用，避免同一转换写三遍 */
 function projectMetaOf(p: ProjectResponse): ProjectMeta {

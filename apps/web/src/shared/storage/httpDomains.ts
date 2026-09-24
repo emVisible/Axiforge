@@ -18,13 +18,14 @@ import type {
   StoredAchievement,
   StoredAssetItem,
   StoredAssetScene,
+  StoredCharacter,
   StorageResult,
   UnlockedAchievement,
   VisibilityScope,
 } from "@axiforge/editor-core";
 import { err, filterByVisibility, ok } from "@axiforge/editor-core";
 
-function fail<T>(e: unknown, entity: string, id: string): StorageResult<T> {
+export function fail<T>(e: unknown, entity: string, id: string): StorageResult<T> {
   const status = (e as { status?: number })?.status;
   if (status === 404) return err({ code: "not_found", entity, id });
   return err({
@@ -333,4 +334,23 @@ export async function httpListUnlocked(
   } catch (e) {
     return fail(e, "player_achievements", projectId);
   }
+}
+
+/** 传输态 Character → 存储态 StoredCharacter（字段显式映射，缺省即声明缺省） */
+export function toStoredCharacter(c: {
+  id: string | number;
+  name: string;
+  character_data?: unknown;
+  image_path?: string | null;
+  author_id?: string | null;
+  is_public?: boolean | null;
+}): StoredCharacter {
+  return {
+    id: String(c.id),
+    name: c.name,
+    characterData: (c.character_data ?? {}) as Record<string, unknown>,
+    imagePath: c.image_path ?? null,
+    isPublic: c.is_public ?? false,
+    authorId: c.author_id ?? null,
+  };
 }

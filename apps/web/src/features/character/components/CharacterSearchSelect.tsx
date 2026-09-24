@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
 import { characterApi } from "@/shared/api/characters";
+import { getStorageProvider, storedCharacterToResponse } from "@/shared/storage";
+import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
 import { SearchInput } from "@/shared/components/ui";
 import type { Character } from "@/shared/types/character";
 import { getCreatorId } from "@/shared/lib/creatorId";
@@ -60,17 +62,43 @@ export default function CharacterSearchSelect({
       return;
     }
     setLoading(true);
-    Promise.all([
-      characterApi.listPublic({ search: debouncedSearch, limit: 8 }),
-      characterApi.listUser(getCreatorId()),
-    ])
-      .then(([publicResult, userItems]) =>
-        setResults(
-          mergeCharacters(publicResult.items, userItems, debouncedSearch, excludeId),
-        ),
-      )
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    (async () => {
+      const creatorId = getCreatorId();
+      if (isTauriEnvironment()) {
+        // 本地一次取「我的 ∪ 公开」，再按归属拆回两栏供 mergeCharacters 排优先级
+        const provider = await getStorageProvider();
+        const r = await provider.listCharacters({
+          authorId: creatorId,
+          includePublic: true,
+          search: debouncedSearch,
+        });
+        const all = r.ok ? r.data.map(storedCharacterToResponse) : [];
+        return {
+          publicItems: all.filter((c) => c.author_id !== creatorId),
+          userItems: all.filter((c) => c.author_id === creatorId),
+        };
+      }
+      const [publicResult, userItems] = await Promise.all([
+        characterApi.listPublic({ search: debouncedSearch, limit: 8 }),
+        characterApi.listUser(creatorId),
+      ]);
+      return { publicItems: publicResult.items, userItems };
+    })()
+      .then(({ publicItems, userItems }) => {
+        if (!cancelled) {
+          setResults(mergeCharacters(publicItems, userItems, debouncedSearch, excludeId));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedSearch, excludeId]);
 
   useEffect(() => {

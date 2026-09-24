@@ -1,4 +1,4 @@
-# Build Blueprint v1.4 | Status: confirmed v1.0 → executing v1.4
+# Build Blueprint v1.5 | Status: confirmed v1.0 → executing v1.5
 > 日期 2026-09-24 · 分支 `desktop` · 基线 `e123f1a`（tag `desktop-v0.6`）· 关联 [ADR-024](docs/ADR/024-desktop-local-first.md) 决策 3/4、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)（新增 Phase 6）
 
 ## 1. Goals & Non-Goals
@@ -56,7 +56,7 @@
 - [x] S2-T1 `.axsp` v2 容器：zip 布局（`manifest.json` / `project.json` / **`characters.json`** / `assets/*`）+ pack/unpack + v1 只读兼容 + 角色 id 重映射纯函数 | Acceptance: axsp.test.ts 新增 v2 往返逐字段等价、v1 文件仍可读、损坏包 → `corrupted` 三组用例全绿 | M2
 - [x] S2-T2 导出/导入接真实字节：导出按 `manifest.assets` 收集本地文件入包并带上演员表；导入素材落盘（内容寻址 → ref 两端一致）、角色新建、引用重映射后再建工程 | Acceptance: `pnpm e2e` 新增 E12「导出带角色 → 导入新建角色且 characterId 重映射」断言绿（12 条基线）；壳内冒烟新增 v2 媒体入包断言 | M2
 - [x] S2-T3 首启播种：示范作 `.axsp` v2 随前端资源分发（`apps/web/public/seeds/`），`listProjects` 为空且无播种标记时自动导入一次 | Acceptance: 删本地库与素材目录后启动 .app → 工程列表出现三部示范作且可断网试玩；重复启动不二次播种（单测 + 壳内冒烟两步断言） | M2
-- [ ] S3-T1 角色域 Provider 化：`MyCharactersPage`/`CharacterDetailPage`/`CharacterSearchSelect`/`useProjectDirectory` 在桌面态经 `listCharacters/getCharacter/saveCharacter`（契约已存在，属接线非新增） | Acceptance: 打包离线态角色列表与详情不再出现「加载角色失败」；web 态行为零变更 | M3
+- [x] S3-T1 角色域 Provider 化：`MyCharactersPage`/`CharacterDetailPage`/`CharacterSearchSelect`/`useProjectDirectory` 在桌面态经 `listCharacters/getCharacter/saveCharacter`（契约已存在，属接线非新增） | Acceptance: 打包离线态角色列表与详情不再出现「加载角色失败」；web 态行为零变更 | M3
 - [ ] S3-T2 缺席域显式降级：版本/关系/传记/发现/全局搜索/概览在本地态给「需后端」可读态；**错误态必须抑制空态**（实测缺陷） | Acceptance: 断网打包态走查无「沉默失败」；错误/空态互斥有单测或组件用例 | M3
 - [ ] S3-T3 首屏路由收口：桌面态 `/` 与 `*` 落 `/studio/projects`，`/studio` index 不再落云端概览 | Acceptance: 打包 .app 冷启动首屏即本地工程列表（截图）；浏览器态仍默认 `/discover`（回归断言） | M3
 - [ ] S4-T1 CI 前端门禁：新增 job 跑 `tsc --noEmit` + `vitest run`（core/axs/editor-core/web）+ `oxlint` + dpdm 循环依赖 + `packages/*` 禁 react/dom 的 lint 断言；补 `@vitest/coverage-v8` 使 core 覆盖率可跑 | Acceptance: CI 上上述步骤可见且绿；宪章 G2/G4/Q9 的「CI 断言」指向真实步骤 | M4
@@ -103,3 +103,4 @@
 - v1.3 L1（2026-09-24）工具化：`apiClient` 支持 `setApiBase`（构建期脚本在 Node 里跑真实请求所需；浏览器默认同源相对路径逐字不变）；三部示范作 `.axsp` + `manifest.json` 作为刻意提交的构建产物入库。
 - v1.4 L2（2026-09-24）角色域接线方式（开工前裁决）：`useCharacters.ts` 的 8 个 hooks 全部返回**传输态 DTO**，而 `StoredCharacter` 不含 `created_at`/`view_count`/`content_status` 等字段。若让 web 也改走 Provider，就得给这些字段填假值——那是拿冻结线的显示换假数据。裁决：**在 hook 层按运行环境分派**（桌面走 Provider + `storedCharacterToResponse` 适配；浏览器保持现有 API 路径逐字不变），与 PlayerPage 既有的 `isTauriEnvironment()` 分派同构；配套在 `shared/storage` 增加 `getStorageProvider()` 记忆化，避免每次查询重建 Provider。范围：`useUserCharacters`/`useCharacter`/`useCreateCharacter`/`useUpdateCharacter` + `useProjectDirectory` 的角色目录；`usePublicCharacters`/`useForkChain`/`useDeleteCharacter` 属云端语义，桌面态走显式降级（M3 降级任务）。
 - v1.4 L2（2026-09-24）角色域前置·契约扩宽（§7 R6 兑现）：`StoredCharacter` 补必填 `isPublic`/`authorId`；`listCharacters(scope?)` 语义定为「我的 ∪ 公开」，实现在 `storage/characters.ts::filterCharacters` 一处收口，HTTP 实现按同语义合并 listUser/listPublic；SQLite 加 `is_public` 列并带**缺列才 ALTER** 的幂等迁移（旧库 `CREATE TABLE IF NOT EXISTS` 不会补列）。连带修正导入语义：角色归属改判接收方、公开位不继承导出者——否则导入的角色在接收方「我的角色」里查不到。`KERNEL_DESIGN §2.5` 同批回写。
+- v1.5 L1（2026-09-24）角色域接线落地：按裁决在 hook 层分派（我的清单 / 详情 / 创建 / 更新 + 工程角色目录），浏览器路径逐字不变。核查中发现**选角搜索组件绕过 hooks 直连 API**——只改 hooks 会留下离线缺口，已一并分派，并把「我的 ∪ 公开」按归属拆回两栏以保留原有排序。新增适配层单测 2 例、壳内冒烟角色域步骤（含归属隔离断言）。

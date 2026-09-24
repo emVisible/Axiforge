@@ -220,6 +220,32 @@ export async function smokeDesktopStorage(): Promise<boolean> {
     }
     await p.deleteProject(seeded.projectId);
 
+    // 角色域本地可用：M3 的 hooks 接线走的就是这条 Provider 路径（含归属范围隔离）
+    const authorId = "smoke-author";
+    const madeChar = await p.saveCharacter({
+      id: "",
+      name: "冒烟角色",
+      characterData: { anchor: { name: "冒烟角色" } },
+      imagePath: null,
+      isPublic: false,
+      authorId,
+    });
+    const mine = await p.listCharacters({ authorId });
+    const others = await p.listCharacters({ authorId: "someone-else" });
+    const charOk =
+      madeChar.ok &&
+      mine.ok &&
+      mine.data.some((c) => c.id === madeChar.data.id) &&
+      others.ok &&
+      !others.data.some((c) => c.id === madeChar.data.id);
+    mark(charOk, `character-domain mine=${mine.ok ? mine.data.length : "err"}`);
+    if (!charOk) {
+      await writeResultFile(
+        `FAIL character-domain: made=${madeChar.ok} mine=${mine.ok ? mine.data.length : "err"}`,
+      );
+      return false;
+    }
+
     console.log(`AXIFORGE-DESKTOP-STORAGE: PASS`);
     await writeResultFile(
       `PASS seed=${seed.status}${"imported" in seed ? `:${seed.imported}` : "reason" in seed ? `:${seed.reason}` : ""}`,

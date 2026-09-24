@@ -9,6 +9,7 @@ import { compileStory, type CompilerProjectInput, type StoryPackage } from "@axi
 import { collectAssetRefs, packAxsp, remapCharacterIds, unpackAxsp } from "@axiforge/editor-core";
 import type { ProjectBundle, StoredCharacter } from "@axiforge/editor-core";
 import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
+import type { Character, CharacterData } from "@/shared/types/character";
 import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
 import { TauriAssetStore } from "./tauriAssetStore";
@@ -169,6 +170,35 @@ export async function createStorageProvider(): Promise<StorageProvider> {
   }
   setLocalAssetRoot(null);
   return new HttpStorageProvider(getCreatorId());
+}
+
+/** 记忆化 Provider：hooks 每次查询都要取，重建 SQLite 连接没有意义 */
+let providerPromise: Promise<StorageProvider> | null = null;
+
+export function getStorageProvider(): Promise<StorageProvider> {
+  if (!providerPromise) providerPromise = createStorageProvider();
+  return providerPromise;
+}
+
+/**
+ * 存储态角色 → 传输态 Character，让同一批角色组件在桌面离线态复用。
+ * 本地尚无标签域 / Fork 血统 / 浏览计数 / 时间戳列，此处给的是**真实的空值**而非猜测值；
+ * 消费方（角色列表·详情·选角目录）实测不读这四个字段，读到的 tags 为空即标签搜索无结果。
+ */
+export function storedCharacterToResponse(c: StoredCharacter): Character {
+  return {
+    id: c.id,
+    name: c.name,
+    author_id: c.authorId ?? "",
+    character_data: c.characterData as unknown as CharacterData,
+    is_public: c.isPublic,
+    tags: [],
+    image_path: c.imagePath ?? undefined,
+    fork_from: null,
+    created_at: "",
+    updated_at: "",
+    view_count: 0,
+  };
 }
 
 // ============================================================

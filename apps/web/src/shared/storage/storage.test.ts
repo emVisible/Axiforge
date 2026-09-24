@@ -74,6 +74,45 @@ describe(".axsp 导出/导入组合", () => {
  * v2 容器的跨机语义：演员表与素材字节随包迁移，角色在目标库另建新 id，
  * 工程内的 characterId 引用随之重映射；素材 ref 内容寻址，两端同路径。
  */
+describe("storedCharacterToResponse（桌面离线态复用角色组件的适配层）", () => {
+  it("逐字段映射；本地不存在的标签/血统/计数给真实空值而非猜测值", async () => {
+    const { storedCharacterToResponse } = await import("./index");
+    const r = storedCharacterToResponse({
+      id: "c1",
+      name: "堰纱",
+      characterData: { anchor: { name: "堰纱" }, sprites: { smile: "assets/s.png" } },
+      imagePath: "assets/p.png",
+      isPublic: true,
+      authorId: "u1",
+    });
+    expect(r.id).toBe("c1");
+    expect(r.name).toBe("堰纱");
+    expect(r.image_path).toBe("assets/p.png");
+    expect(r.is_public).toBe(true);
+    expect(r.author_id).toBe("u1");
+    expect(r.character_data.anchor.name).toBe("堰纱");
+    expect(r.character_data.sprites).toEqual({ smile: "assets/s.png" });
+    expect(r.tags).toEqual([]);
+    expect(r.fork_from).toBeNull();
+    expect(r.view_count).toBe(0);
+  });
+
+  it("authorId 为 null 时归一为空串（DTO 要求 string，不造归属）", async () => {
+    const { storedCharacterToResponse } = await import("./index");
+    const r = storedCharacterToResponse({
+      id: "c2",
+      name: "无主",
+      characterData: {},
+      imagePath: null,
+      isPublic: false,
+      authorId: null,
+    });
+    expect(r.author_id).toBe("");
+    expect(r.image_path).toBeUndefined();
+    expect(r.is_public).toBe(false);
+  });
+});
+
 describe(".axsp v2 导出/导入：演员表与素材随包", () => {
   it("角色新建、引用重映射、素材字节可读回", async () => {
     const src = new MemoryStorageProvider();

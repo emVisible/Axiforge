@@ -2,11 +2,14 @@ import { characterApi } from "@/shared/api/characters";
 import type { Character } from "@/shared/types/character";
 import { itemApi } from "@/shared/api/editor";
 import type { ProjectResponse } from "@/shared/types/project";
+import { getStorageProvider, storedCharacterToResponse } from "@/shared/storage";
+import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
 import type { ProjectRoleOption } from "../flow/types";
 
 /**
  * 工程目录装载（角色 + 道具引用）——批量获取，消除逐条 N+1。
  * 缺失/失败的角色以占位名兜底，不阻塞工程打开。
+ * 桌面态按角色引用逐个从本地库取（SQLite 无 N+1 代价），不走云端批量口。
  */
 export async function fetchProjectDirectory(p: ProjectResponse): Promise<{
   roleOptions: ProjectRoleOption[];
@@ -16,11 +19,19 @@ export async function fetchProjectDirectory(p: ProjectResponse): Promise<{
   const ids = [...new Set(roles.map((r) => r.character_ref_id))];
   const charById = new Map<string, Character>();
   if (ids.length) {
-    try {
-      const list = await characterApi.getMany(ids);
-      for (const c of list) charById.set(c.id, c);
-    } catch {
-      /* 批量失败时全部走占位名兜底 */
+    if (isTauriEnvironment()) {
+      const provider = await getStorageProvider();
+      const got = await Promise.all(ids.map((id) => provider.getCharacter(id)));
+      for (const r of got) {
+        if (r.ok) charById.set(r.data.id, storedCharacterToResponse(r.data));
+      }
+    } else {
+      try {
+        const list = await characterApi.getMany(ids);
+        for (const c of list) charById.set(c.id, c);
+      } catch {
+        /* 批量失败时全部走占位名兜底 */
+      }
     }
   }
   const roleOptions: ProjectRoleOption[] = roles.map((role) => {

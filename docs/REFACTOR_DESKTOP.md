@@ -250,7 +250,14 @@
       ① SQLite 转发全部 8 个 patch 字段；
       ② HTTP 实现只转发 `title`/`axs_source`，因此 `description`/`theme_tags`/`mechanism`/`genre`/`cover_image`/`is_meta` 在 **web 支被静默丢弃**；
       ③ 编辑器 `useProjectEditor.patchProjectMeta` 的入参类型是 `Pick<ProjectUpdate, "title"|"description"|"world_setting"|"rules">`，而 `ProjectMetaPatch` **根本没有** `worldSetting`/`rules` 两个字段——它们两支都不落库，界面却照样弹「已保存项目信息」。tsc 不报错的原因是把非字面量的 `patch` 变量直接传参，绕过了 excess-property 检查。
-      这正是本项目「界面说已保存必须改→存→重读」规则要消灭的那类缺陷，且契约套件天然查不到它（`world_setting`/`rules` 不是契约字段，跨实现对未约定属性的行为无人断言）。已登记为下一版首刀：先定语义（补齐契约与列 or 从 UI 入参删掉幻字段），再让三支在同一断言下对齐。
+      ③ 的键名不一致在源头消除而非下游加翻译层。证据：`pnpm gates` 退出码 0（typecheck tsc -b + 四套单测
+      + 令牌/纯净度/循环/行数棘轮/对比度），`pnpm e2e` 13/13（17.3s）；契约套件断言扩到全 patch
+      并新增「局部 patch 不得改写其余字段」，HTTP 支补 `metaPatchToUpdateBody` 等价用例，
+      该用例对旧实现实测为红（临时回退旧文件跑过一次，非推定）。
+      **仍未闭环的是编辑入口，不是存储**：`theme_tags`/`mechanism`/`genre`/`cover_image` 四栏
+      契约与库都支持写入，但 UI 只给了简介/世界观/规则三个输入口——
+      「标签与机制筛选在本地无数据可筛」这半句到今天仍然成立，因为没有人能填进去。
+      补这四个入口属功能新增，按铁律 3 不夹带进本刀，登记待做。
 - [x] 存档与成就本地化（v0.8：本地四步回路可存可读，后台写入失败改为可见）：`save_slots` / `player_achievements` 进 SQLite schema，桌面断网可存可读（当前离线仅优雅降级）
 - [x] ~~`packages/ui` 与宿主 UI 目录双份归一~~ —— **本条前提不成立，已核实**：`apps/web/src/shared/components/ui/index.ts` 本就是 `export * from "@axiforge/ui"` 加 4 个宿主绑定件；按文件基名与导出符号两处比对，与 packages/ui 的 40 个组件、85 个导出**零同名重复**，唯一的 `ImageUpload` 是刻意覆盖（网页 fetch / 桌面本地口）。已把该覆盖写成注释显式声明，不再需要「归一」这项工程
 - [ ] 验收：G1 清单为空且原文件已删；E2E 12 条原样全绿；离线存档 E2E/E13

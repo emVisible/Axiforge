@@ -147,7 +147,7 @@ state={resolveQueryState({ isLoading: loading && page === 0, error, count: items
 若直接用 `loading` 会把「翻页中」误判成整页重载。
 children 内保留可选链：面板给的是语义保证，不是类型收窄（道具页实测过这一点）。
 
-**新查出的真实缺陷（2026-09-24 复核宪章「本地工程元数据补齐」时），优先级高于上面的重构第一刀**：
+**【已结案 2026-09-24 · commit 9900874】工程元数据写入面三支分叉**：
 `updateProjectMeta` 三支实现口径不一致，且存在契约里没有的字段——
 ① `packages/editor-core/src/storage/types.ts` 的 `ProjectMetaPatch` 只有
 `title/axsSource/description/coverImage/themeTags/mechanism/genre/isMeta`；
@@ -158,10 +158,18 @@ children 内保留可选链：面板给的是语义保证，不是类型收窄�
 而 UI 照样弹「已保存项目信息」（调用口：`CutWorkspace.tsx` 的 `onProjectPatch`）。
 tsc 放过它是因为传的是非字面量变量，excess-property 检查不生效。
 
-先做语义裁决再动手：世界观设定/规则正文要不要成为本地一等字段（要 → 契约+schema v4+
-两支对齐+编辑口），还是 UI 本就不该提供（不要 → 从入参类型与表单删掉，别留幻字段）。
-判据：改→存→重读，且把「同一 patch 在 Memory/SQLite/HTTP 三实现在同一断言下等价」
-补进契约套件——契约套件目前只断言契约内字段，对未约定属性的跨实现分歧是盲的。
+裁决依据是取证而非偏好：后端 `narrative/models.py` 与 `schemas.py` 里 `world_setting`/`rules`
+是 projects 的一等列，且 `compiler.py` 会把 `world_setting` 编进 IR、玩家页设定面板消费它——
+所以走「补齐契约」而不是「删 UI 入参」。落地：`ProjectMeta`/`ProjectMetaPatch` 补两字段、
+SQLite `COLUMN_PATCHES` 加两列（幂等）、HTTP 侧 body 构造外提为 `httpDomains::metaPatchToUpdateBody`
+（顺带解掉自己撞上的 G1 棘轮越线）、UI 改用契约键 `worldSetting` 而不加翻译层、
+`ProjectUpdate.axs_source` 按后端 schema 放宽为可空（此前靠 `as ProjectUpdate` 掩盖）。
+证据：`pnpm gates` 退出码 0、`pnpm e2e` 13/13、新增用例对旧实现实测为红。
+
+**该刀的残留（下一个入口，属功能新增不是缺陷）**：`theme_tags`/`mechanism`/`genre`/`cover_image`
+四栏契约与本地库都已支持写入，但编辑器只给了简介/世界观/规则三个输入口——
+「标签与机制在本地无数据可筛」因此仍然成立，缺的是入口而非通路。做时注意：
+标签是数组、封面是素材引用（要经 `saveAsset` 拿 ref，不要塞裸路径），两者都不该另立第二套上传口。
 
 **其余入口按性价比排序**：
 1. 作者页 / 创作者概览 / 角色详情 / admin 端四态与观感巡检（未看过）

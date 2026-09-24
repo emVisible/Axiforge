@@ -60,7 +60,7 @@
 - [x] S3-T2 缺席域显式降级：版本/关系/传记/发现/全局搜索/概览在本地态给「需后端」可读态；**错误态必须抑制空态**（实测缺陷） | Acceptance: 断网打包态走查无「沉默失败」（截图为证）；错误/空态互斥有单测（`resolveQueryState` 四态互斥用例） | M3
 - [x] S3-T3 首屏路由收口：桌面态 `/` 与 `*` 落 `/studio/projects`，`/studio` index 不再落云端概览 | Acceptance: 打包 .app 冷启动首屏即本地工程列表（截图）；浏览器态仍默认 `/discover`（回归断言 E13） | M3
 - [x] S4-T1 CI 前端门禁：新增 job 跑 `tsc --noEmit` + `vitest run`（core/axs/editor-core/web）+ `oxlint` + dpdm 循环依赖 + `packages/*` 禁 react/dom 的 lint 断言；补 `@vitest/coverage-v8` 使 core 覆盖率可跑 | Acceptance: 步骤在本地以 `pnpm gates` 全链跑通、workflow YAML 通过 lint、CI 绿等首次 push 后确认（不 push 不谎称已绿）；宪章 G2/G4/Q9 的「CI 断言」指向真实步骤 | M4
-- [ ] S4-T2 决策落文：新建 ADR-026（素材本地化与 `.axsp` v2 容器），回写 `KERNEL_DESIGN.md` §2.5 方法表与 §一 依赖铁律的 CI 事实 | Acceptance: ADR-026 状态「已采纳」含备选与否决理由；KERNEL 方法表含 saveAsset/resolveAssetUrl | M4
+- [x] S4-T2 决策落文：新建 ADR-026（素材本地化与 `.axsp` v2 容器），回写 `KERNEL_DESIGN.md` §2.5 方法表与 §一 依赖铁律的 CI 事实 | Acceptance: ADR-026 状态「已采纳」含备选与否决理由、后果含未清偿欠账；KERNEL 方法表含 saveAsset/readAsset/范围语义；ADR 索引已登记 | M4
 - [ ] S4-T3 文档对账：宪章新增 Phase 6 段并回写勾选；Phase 2「素材落工程目录 + DB 存相对路径」虚假勾选纠偏；`BACKLOG_V1.md` 清除「`.axsp` 导出=明确不做」矛盾；README 结构段路径修正；e2e 头注释 E1–E11 | Acceptance: 逐文件 diff 可指认，且不再有文档声称已交付而代码未交付的项 | M4
 - [ ] S4-T4 收尾：G1–G9 门禁证据 + 附录检查单全勾 + 手动验收路径写入 §6 + 打 tag `desktop-v0.7` | Acceptance: `git tag --list desktop-v0.7` 非空且 `git show` 可见；门禁关键输出粘进宪章 Phase 6 | M4
 

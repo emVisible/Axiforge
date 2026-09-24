@@ -46,6 +46,7 @@ apps/nexus/.dev-port
 .coverage
 .coverage.*
 htmlcov/
+coverage/
 coverage.xml
 *.cover
 .hypothesis/

@@ -125,7 +125,7 @@ export default function EffectEditor({
                       placeholder="写入值"
                       className={cn(inputCompact, "w-full bg-surface")}
                     />
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       写入跨作品 IP 账本，供后续作品读取
                     </p>
                   </div>
@@ -190,7 +190,7 @@ export default function EffectEditor({
                         className={cn(inputCompact, "w-full bg-surface")}
                       />
                     )}
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       {roles.length === 0
                         ? "请先在剧本详情页关联角色"
                         : "选择剧本已关联的角色"}

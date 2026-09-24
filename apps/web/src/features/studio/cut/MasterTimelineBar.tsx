@@ -92,7 +92,7 @@ export default function MasterTimelineBar({
                 }}
               >
                 {widthPct > 8 && (
-                  <span className="absolute inset-x-1 top-1 truncate text-[9px] font-medium text-ink-muted">
+                  <span className="absolute inset-x-1 top-1 truncate text-3xs font-medium text-ink-muted">
                     {beat.title}
                   </span>
                 )}

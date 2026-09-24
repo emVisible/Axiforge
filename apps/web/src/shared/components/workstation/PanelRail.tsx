@@ -27,7 +27,7 @@ export default function PanelRail({
       title={title}
       aria-label={title}
       className={cn(
-        "flex shrink-0 items-center justify-center gap-1 border-border bg-panel text-[9px] font-medium uppercase tracking-wider text-ink-faint transition-colors hover:bg-panel-raised hover:text-ink-muted",
+        "flex shrink-0 items-center justify-center gap-1 border-border bg-panel text-3xs font-medium uppercase tracking-wider text-ink-faint transition-colors hover:bg-panel-raised hover:text-ink-muted",
         vertical
           ? "w-7 flex-col border-r px-0.5 py-3"
           : "h-7 w-full flex-row border-t px-3",

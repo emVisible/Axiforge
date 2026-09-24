@@ -1,4 +1,4 @@
-# Build Blueprint v1.1 | Status: confirmed v1.0 → executing v1.1
+# Build Blueprint v1.2 | Status: confirmed v1.0 → executing v1.2
 
 Version target: **v0.9** · Charter phase: **Phase 8 · 设计系统收口（UI 与视觉设计专项）**
 Tier: Standard（8 节 · 单一执行权威）
@@ -72,8 +72,8 @@ Tier: Standard（8 节 · 单一执行权威）
 - [x] S1-T1 写 `scripts/check-contrast.mjs`：解析 tokens.css 明暗两套变量，按语义配对算 WCAG 比值，低于 AA 即失败 | Acceptance: 门禁对当前主题跑出真实数字并**至少一条处于临界**（证明它不是恒绿）；人为把某色改浅一档 → 退出码 1，还原 → 0 | M1
 - [x] S1-T2 修门禁查出的对比度不足项（若明或暗任一配对不达 AA） | Acceptance: 全配对达标，改前/改后截图成对存档 | M1
 - [x] S1-T3 把对比度门禁接入 `pnpm gates` | Acceptance: `gates` 退出码单独取到 0，且移除该步会失败的负向验证做过一次 | M1
-- [ ] S2-T1 迁移 Outliner 的 17 处 `text-[9px]` | Acceptance: 该文件计数归零、棘轮收紧，改后截图确认无溢出与换行错位 | M2
-- [ ] S2-T2 迁移 Timeline 与图例类的剩余 `text-[9px]` | Acceptance: 全仓 `text-[9px]` 为 0；若某处挤破布局，按 fallback 减标签而非缩字，并在变更日志写明取舍 | M2
+- [x] S2-T1 迁移 Outliner 的 17 处 `text-[9px]` | Acceptance: 该文件计数归零、棘轮收紧，改后截图确认无溢出与换行错位 | M2
+- [x] S2-T2 迁移 Timeline 与图例类的剩余 `text-[9px]`，并连带清掉 Outliner 里 5 处更糟的 `text-[8px] text-ink-faint`（最小字号配最低对比度） | Acceptance: 全仓 `text-[9px]` 为 0；若某处挤破布局，按 fallback 减标签而非缩字，并在变更日志写明取舍 | M2
 - [ ] S2-T3 收口其余字号任意值（`text-[8px]` 等长尾） | Acceptance: 字号棘轮总数 ≤20 且无新增档位 | M2
 - [ ] S3-T1 迁移 apps/web 剩余 20 处 `transition-all` | Acceptance: 逐处按同一串里实际存在的 hover/active 类导出显式属性表；门禁该项总数 0 | M3
 - [ ] S3-T2 悬停与切换的观感核验（录屏或逐帧截图） | Acceptance: 至少覆盖卡片、按钮、侧栏、节点四处，改前后成对存档并写明哪些无法静态验证 | M3
@@ -114,6 +114,8 @@ Tier: Standard（8 节 · 单一执行权威）
 | 版本 | 时间 | 变更 | 偏差等级 |
 |------|------|------|----------|
 | v1.0 | 2026-09-24 | 依宪章 Phase 8 建立首版。起点是本轮刚修复的 Tailwind 源扫描缺陷——修复改变了前提，故明确「此前观感结论作废、在新基线重做」 | — |
+| v1.2 | 2026-09-24 | 字号收口达成 apps/web 与 packages/ui 内 **9px 与 8px 全清零**（共 45 处）。逐屏核验：Outliner 与时间轴改前/改后截图版式一致、无换行溢出，故未触发 fallback（不需要靠减标签来腾位）。棘轮 73 → 29 | L1 自动 |
+| v1.2 | 2026-09-24 | 一处计数口径的自我纠正：我先用 `grep apps/web/src packages/ui/src --include=*.tsx` 得到「剩 14 处」，与门禁报的 34 处不符。按门禁自身口径复算才对上——差额的 21 处在 **apps/admin**（我的 grep 根本没扫那个 app）。报数字前先对齐口径，别拿自己顺手写的 grep 当门禁的数 | L1 自动 |
 | v1.1 | 2026-09-24 | 首个里程碑交付即回改本文件的判据：C2 原写「逐对算比值」，实际还须查**桥接令牌在明暗两套里是否都存在**——上线前就发现 `--ax-ink-on-scrim` 只写在暗色块，亮色主题下是悬空引用（文字会掉回继承色）。这类缺陷肉眼只会看成「设计本来就这样」 | L1 自动 |
 | v1.1 | 2026-09-24 | 门禁查出 9 项真实不达标并全部修好：亮色次级文字 4.17→达线、占位提示 2.54/2.19→3.67/3.74、强调色 2.73/2.55→达线、暗色占位 2.66/2.71→达线。另修正门禁自身一处建模错误——「主色块上的文字」不该拿 `ink` 去配（那是 1.35:1 的假阳性），改用新增的 `--ax-on-brand` | L1 自动 |
 | v1.1 | 2026-09-24 | 门禁反向验证通过：把某令牌改浅一档 → 退出码 1；还原 → 0。并已接入 `pnpm gates`（现含 typecheck/unit/lint/purity/circular/size/contrast 七道） | L1 自动 |

@@ -145,7 +145,7 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
                   <span className="flex items-center gap-2">
                     <span className="font-medium text-ink">{r.targetTitle}</span>
                     {r.label && (
-                      <span className="rounded bg-brand/10 px-1 py-0.5 text-[9px] text-brand">
+                      <span className="rounded bg-brand/10 px-1 py-0.5 text-3xs text-brand">
                         {r.label}
                       </span>
                     )}

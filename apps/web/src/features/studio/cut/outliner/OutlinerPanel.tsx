@@ -161,12 +161,12 @@ export default function OutlinerPanel({
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-panel">
       <div className="shrink-0 border-b border-border px-3 py-2.5">
-        <p className="text-[9px] font-semibold uppercase tracking-widest text-ink-faint">
+        <p className="text-3xs font-semibold uppercase tracking-widest text-ink-faint">
           Outliner
         </p>
         <p className="truncate text-xs font-medium text-ink">{project.title}</p>
         {filterScene && (
-          <p className="mt-0.5 truncate text-[9px] text-accent-soft">
+          <p className="mt-0.5 truncate text-3xs text-accent-soft">
             筛选 · {filterScene.title}
           </p>
         )}
@@ -174,7 +174,7 @@ export default function OutlinerPanel({
           <button
             type="button"
             onClick={onOpenFlow}
-            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-[9px] text-ink-muted hover:text-ink"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-3xs text-ink-muted hover:text-ink"
           >
             <Network className="h-3 w-3" />
             结构
@@ -182,14 +182,14 @@ export default function OutlinerPanel({
           <button
             type="button"
             onClick={onOpenWriter}
-            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-[9px] text-ink-muted hover:text-ink"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-3xs text-ink-muted hover:text-ink"
           >
             <ScrollText className="h-3 w-3" />
             剧本
           </button>
           <Link
             to={routes.play(project.id)}
-            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-[9px] text-ink-muted hover:text-ink"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-3xs text-ink-muted hover:text-ink"
           >
             <Play className="h-3 w-3" />
             试玩
@@ -240,14 +240,14 @@ export default function OutlinerPanel({
                     setEditBeatTitle((node.data.title as string) || "");
                   }}
                 >
-                  <span className="font-mono text-[9px] text-ink-faint">
+                  <span className="font-mono text-3xs text-ink-faint">
                     {String(idx + 1).padStart(2, "0")}
                   </span>
                   <span className="min-w-0 truncate">
                     {(node.data.title as string) || "未命名"}
                   </span>
                   {!sceneFilterId && node.data.stage_title ? (
-                    <span className="ml-auto shrink-0 truncate text-[8px] text-ink-faint">
+                    <span className="ml-auto shrink-0 truncate text-3xs text-ink-faint">
                       {String(node.data.stage_title)}
                     </span>
                   ) : null}
@@ -345,7 +345,7 @@ export default function OutlinerPanel({
                       <button
                         type="button"
                         onClick={() => onRemoveRole(pr.id)}
-                        className="text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover/role:opacity-100"
+                        className="text-3xs text-ink-faint opacity-0 hover:text-red-400 group-hover/role:opacity-100"
                       >
                         移除
                       </button>
@@ -379,11 +379,11 @@ export default function OutlinerPanel({
                                 className="h-6 w-6 rounded object-cover"
                               />
                             ) : (
-                              <div className="flex h-6 w-6 items-center justify-center rounded bg-surface-raised text-[8px] text-ink-faint">
+                              <div className="flex h-6 w-6 items-center justify-center rounded bg-surface-raised text-3xs text-ink-faint">
                                 {key[0]}
                               </div>
                             )}
-                            <span className="max-w-[40px] truncate text-[8px] text-ink-faint">
+                            <span className="max-w-[40px] truncate text-3xs text-ink-faint">
                               {key}
                             </span>
                           </div>
@@ -427,7 +427,7 @@ export default function OutlinerPanel({
                 <button
                   type="button"
                   onClick={() => onRemoveItemRef(ref.id)}
-                  className="text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
+                  className="text-3xs text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
                 >
                   移除
                 </button>
@@ -453,7 +453,7 @@ export default function OutlinerPanel({
             {onProjectPatch ? (
               <>
                 <label className="block">
-                  <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-ink-faint">
+                  <span className="mb-0.5 block text-3xs uppercase tracking-wider text-ink-faint">
                     简介
                   </span>
                   <textarea
@@ -466,7 +466,7 @@ export default function OutlinerPanel({
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-ink-faint">
+                  <span className="mb-0.5 block text-3xs uppercase tracking-wider text-ink-faint">
                     世界观
                   </span>
                   <textarea
@@ -479,7 +479,7 @@ export default function OutlinerPanel({
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-ink-faint">
+                  <span className="mb-0.5 block text-3xs uppercase tracking-wider text-ink-faint">
                     规则
                   </span>
                   <textarea
@@ -501,7 +501,7 @@ export default function OutlinerPanel({
                 )}
                 {project.world_setting && (
                   <div>
-                    <p className="mb-0.5 text-[9px] uppercase tracking-wider text-ink-faint">
+                    <p className="mb-0.5 text-3xs uppercase tracking-wider text-ink-faint">
                       世界观
                     </p>
                     <p className="line-clamp-4 leading-relaxed">{project.world_setting}</p>
@@ -509,7 +509,7 @@ export default function OutlinerPanel({
                 )}
                 {project.rules && (
                   <div>
-                    <p className="mb-0.5 text-[9px] uppercase tracking-wider text-ink-faint">
+                    <p className="mb-0.5 text-3xs uppercase tracking-wider text-ink-faint">
                       规则
                     </p>
                     <p className="line-clamp-4 leading-relaxed">{project.rules}</p>
@@ -519,7 +519,7 @@ export default function OutlinerPanel({
             )}
             {nexusNotes.length > 0 && (
               <div>
-                <p className="mb-1 text-[9px] uppercase tracking-wider text-ink-faint">
+                <p className="mb-1 text-3xs uppercase tracking-wider text-ink-faint">
                   Nexus 策划备忘
                 </p>
                 <ul className="space-y-1.5">
@@ -530,7 +530,7 @@ export default function OutlinerPanel({
                     >
                       <p className="line-clamp-4 whitespace-pre-wrap">{entry.text}</p>
                       {entry.created_at && (
-                        <p className="mt-0.5 text-[8px] text-ink-faint">
+                        <p className="mt-0.5 text-3xs text-ink-faint">
                           {new Date(entry.created_at).toLocaleString("zh-CN")}
                         </p>
                       )}
@@ -555,7 +555,7 @@ export default function OutlinerPanel({
               {nexusBusy ? "发送中…" : "发送到 Nexus"}
             </button>
             {nexusHint && (
-              <p className="px-1 text-[9px] text-brand">{nexusHint}</p>
+              <p className="px-1 text-3xs text-brand">{nexusHint}</p>
             )}
             {onExportMarkdown && (
               <button
@@ -606,16 +606,16 @@ function SceneRow({
       >
         <span className="truncate">{scene.title}</span>
         {hint && (
-          <span className="ml-1 shrink-0 truncate text-[8px] text-ink-faint">{hint}</span>
+          <span className="ml-1 shrink-0 truncate text-3xs text-ink-faint">{hint}</span>
         )}
-        <span className="ml-auto font-mono text-[9px] text-ink-faint">
+        <span className="ml-auto font-mono text-3xs text-ink-faint">
           {scene.nodes?.length ?? 0}
         </span>
       </OutlinerRow>
       <button
         type="button"
         onClick={onDelete}
-        className="shrink-0 px-1 text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
+        className="shrink-0 px-1 text-3xs text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
       >
         ×
       </button>

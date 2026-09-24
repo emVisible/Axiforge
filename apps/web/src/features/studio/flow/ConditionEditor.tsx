@@ -157,7 +157,7 @@ export default function ConditionEditor({
                       placeholder="期望值"
                       className={cn(inputCompact, "w-full bg-surface")}
                     />
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       查询玩家在其它作品中留下的角色记忆（RN Codex）
                     </p>
                   </div>
@@ -240,7 +240,7 @@ export default function ConditionEditor({
                         className={cn(inputCompact, "w-full bg-surface")}
                       />
                     )}
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       {roles.length === 0
                         ? "请先在剧本详情页关联角色"
                         : "选择剧本已关联的角色"}

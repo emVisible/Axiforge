@@ -39,7 +39,7 @@ export default function OutlinerSection({
             {title}
           </span>
           {count != null && (
-            <span className="ml-auto font-mono text-[9px] text-ink-faint">{count}</span>
+            <span className="ml-auto font-mono text-3xs text-ink-faint">{count}</span>
           )}
         </button>
         {actions}

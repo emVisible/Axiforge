@@ -298,12 +298,12 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
           <span className="text-2xs font-medium tracking-wide text-ink-muted">
             指令轨 · 当前 Beat
             {onReorderTrack && (
-              <span className="ml-2 text-[9px] font-normal text-ink-faint">
+              <span className="ml-2 text-3xs font-normal text-ink-faint">
                 分轨内拖拽排序 · 右缘拖拽改时长
               </span>
             )}
             {!onReorderTrack && onReorder && (
-              <span className="ml-2 text-[9px] font-normal text-ink-faint">
+              <span className="ml-2 text-3xs font-normal text-ink-faint">
                 拖拽片段排序 · 右缘拖拽改时长
               </span>
             )}
@@ -339,7 +339,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
               className="flex shrink-0 items-end border-b border-border px-2 pb-1"
               style={{ height: RULER_H }}
             >
-              <span className="text-[9px] text-ink-faint">进度</span>
+              <span className="text-3xs text-ink-faint">进度</span>
             </div>
             {CUT_TRACKS.map((track) => (
               <div
@@ -350,7 +350,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 <span className="font-mono text-3xs font-semibold text-accent-soft">
                   {track.short}
                 </span>
-                <span className="ml-1.5 truncate text-[9px] text-ink-faint">
+                <span className="ml-1.5 truncate text-3xs text-ink-faint">
                   {track.label.split(" ")[0]}
                 </span>
               </div>
@@ -361,7 +361,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 style={{ height: TRACK_H }}
               >
                 <span className="font-mono text-3xs font-semibold text-pink-600 dark:text-pink-300">RN</span>
-                <span className="ml-1.5 truncate text-[9px] text-ink-faint">关系</span>
+                <span className="ml-1.5 truncate text-3xs text-ink-faint">关系</span>
               </div>
             )}
           </div>
@@ -419,7 +419,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                     className="absolute top-0 flex h-full flex-col justify-end"
                     style={{ left: t.left }}
                   >
-                    <span className="mb-0.5 -translate-x-1/2 font-mono text-[9px] text-ink-faint">
+                    <span className="mb-0.5 -translate-x-1/2 font-mono text-3xs text-ink-faint">
                       {formatNarrativeTime(t.ms)}
                     </span>
                     <div className="h-1.5 w-px bg-border-strong" />
@@ -447,14 +447,14 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                           className="flex h-6 w-full items-center gap-1.5 border-b border-border bg-surface-raised px-3 text-left transition-colors hover:bg-panel"
                         >
                           <span
-                            className={`text-[9px] text-ink-faint transition-transform ${collapsed ? "" : "rotate-90"}`}
+                            className={`text-3xs text-ink-faint transition-transform ${collapsed ? "" : "rotate-90"}`}
                           >
                             ▶
                           </span>
                           <span className="truncate text-3xs font-medium text-ink-muted">
                             {label}
                           </span>
-                          <span className="font-mono text-[9px] text-ink-faint">
+                          <span className="font-mono text-3xs text-ink-faint">
                             角色 · {group.indices.length}
                           </span>
                         </button>
@@ -530,7 +530,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                               <div
                                 key={`${e.type}-${e.key}-${idx}`}
                                 style={{ width: w, height: TRACK_H - 8 }}
-                                className={`inline-flex shrink-0 items-center justify-center rounded border px-1.5 text-[9px] font-medium leading-none ${effectColor(e.type)}`}
+                                className={`inline-flex shrink-0 items-center justify-center rounded border px-1.5 text-3xs font-medium leading-none ${effectColor(e.type)}`}
                                 title={`${e.type}: ${e.key} = ${String(e.value)}`}
                               >
                                 <span className="truncate">{label}</span>
@@ -672,7 +672,7 @@ function TrackRow({
               )}
               title={clipLabel(inst)}
             >
-              <span className="block truncate text-[9px] font-medium leading-tight opacity-90">
+              <span className="block truncate text-3xs font-medium leading-tight opacity-90">
                 {clipLabel(inst)}
               </span>
             </button>

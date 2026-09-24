@@ -576,7 +576,7 @@ export default function CutStudioView({
             <div className="shrink-0 border-b border-border bg-surface-raised px-3 py-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-medium uppercase tracking-wider text-ink-faint">
+                  <p className="text-3xs font-medium uppercase tracking-wider text-ink-faint">
                     当前片段
                   </p>
                   <p className="truncate text-2xs text-ink">

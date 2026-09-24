@@ -1,20 +1,11 @@
 {
-  "apps/web/src/features/studio/cut/outliner/OutlinerPanel.tsx": 22,
-  "apps/web/src/features/studio/cut/TimelineShell.tsx": 10,
   "apps/web/src/features/character/pages/StoryEditPage.tsx": 5,
   "apps/admin/src/components/ModerationPreviewPanel.tsx": 5,
-  "apps/web/src/features/studio/flow/StageLegend.tsx": 4,
   "apps/web/src/features/character/pages/StoryReadPage.tsx": 4,
   "apps/admin/src/components/ModerationContextSections.tsx": 4,
   "apps/admin/src/pages/ContentPage.tsx": 4,
   "apps/admin/src/layout/AdminLayout.tsx": 3,
-  "apps/web/src/features/studio/flow/ConditionEditor.tsx": 2,
-  "apps/web/src/features/studio/flow/EffectEditor.tsx": 2,
   "packages/ui/src/components/formStyles.ts": 2,
-  "apps/web/src/features/studio/components/ConditionSimulator.tsx": 1,
-  "apps/web/src/features/studio/cut/CutStudioView.tsx": 1,
-  "apps/web/src/features/studio/cut/MasterTimelineBar.tsx": 1,
-  "apps/web/src/features/studio/cut/outliner/OutlinerSection.tsx": 1,
   "apps/admin/src/components/ContentInspectPanel.tsx": 1,
   "apps/admin/src/pages/ReportsPage.tsx": 1
 }

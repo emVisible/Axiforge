@@ -48,7 +48,7 @@ export default function CardOverflowMenu({
           setOpen((v) => !v);
         }}
         className={cn(
-          "flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/70 opacity-0 transition-all hover:bg-black/55 hover:text-white group-hover:opacity-100",
+          "flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-ink-on-scrim/70 opacity-0 transition-all hover:bg-black/55 hover:text-ink-on-scrim group-hover:opacity-100",
           open && "opacity-100",
         )}
       >

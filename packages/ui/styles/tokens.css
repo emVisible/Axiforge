@@ -30,6 +30,7 @@
   --ax-canvas: #0e0e14;
   --ax-surface: #16161e;
   --ax-surface-raised: #1a1a22;
+  --ax-ink-on-scrim: #f2f0ec;
   --ax-panel: #14141c;
   --ax-panel-raised: #1e1e28;
   --ax-ink: #e8e8f0;
@@ -45,6 +46,17 @@
 }
 
 @theme {
+  /*
+   * 字阶的低端。此前 12px 以下没有任何有名分的档位，
+   * 于是全仓散落 168 处 text-[9px] / [10px] / [11px] 任意值——
+   * 三个微标签字号各写各的、没有语义，且 9px 对中文可读性不友好。
+   * 3xs/2xs 给它们一个可命名的落点；低于 3xs 不再提供，即「不许更小」。
+   */
+  --text-3xs: 0.625rem;
+  --text-3xs--line-height: 0.875rem;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
   --color-brand: var(--ax-brand);
   --color-brand-hover: var(--ax-brand-hover);
   --color-brand-muted: var(--ax-brand-muted);
@@ -56,6 +68,7 @@
   --color-ink: var(--ax-ink);
   --color-ink-muted: var(--ax-ink-muted);
   --color-ink-faint: var(--ax-ink-faint);
+  --color-ink-on-scrim: var(--ax-ink-on-scrim);
   --color-border: var(--ax-border);
   --color-border-strong: var(--ax-border-strong);
   --color-accent: var(--ax-accent);

@@ -56,32 +56,32 @@ function StoryNode({
         </span>
         <div className="flex shrink-0 items-center gap-1">
           {hasScript && (
-            <span className="rounded bg-sky-500/15 px-1 py-0.5 text-[9px] text-sky-400">
+            <span className="rounded bg-sky-500/15 px-1 py-0.5 text-3xs text-sky-400">
               演出
             </span>
           )}
           {hasConditions && (
-            <span className="rounded bg-violet-500/15 px-1 py-0.5 text-[9px] text-violet-400">
+            <span className="rounded bg-violet-500/15 px-1 py-0.5 text-3xs text-violet-400">
               条件
             </span>
           )}
           {hasEffects && (
-            <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] text-emerald-400">
+            <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-3xs text-emerald-400">
               效果
             </span>
           )}
           {isAnchor && (
-            <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[9px] text-amber-500">
+            <span className="rounded bg-amber-500/20 px-1 py-0.5 text-3xs text-amber-500">
               锚点
             </span>
           )}
           {speaker && (
-            <span className="rounded bg-brand-muted px-1 py-0.5 text-[9px] text-brand">
+            <span className="rounded bg-brand-muted px-1 py-0.5 text-3xs text-brand">
               {speaker}
             </span>
           )}
           {stageTitle && (
-            <span className="max-w-[72px] truncate rounded bg-panel px-1 py-0.5 text-[9px] text-ink-faint">
+            <span className="max-w-[72px] truncate rounded bg-panel px-1 py-0.5 text-3xs text-ink-faint">
               {stageTitle}
             </span>
           )}

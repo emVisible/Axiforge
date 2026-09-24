@@ -239,7 +239,7 @@ export default function ProjectListPage() {
             <div className="space-y-4">
               {allTags.length > 0 && (
                 <div>
-                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-ink-muted">
+                  <p className="mb-2 text-2xs font-medium uppercase tracking-wider text-ink-muted">
                     标签
                   </p>
                   <div className="flex flex-wrap gap-1.5">

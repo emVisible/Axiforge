@@ -22,11 +22,11 @@ export default function ItemCard({ item, onDelete }: Props) {
         {item.description || "暂无描述"}
       </p>
       <div className="flex flex-wrap gap-1.5">
-        <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] text-ink-muted">
+        <span className="rounded-full bg-canvas px-2 py-0.5 text-3xs text-ink-muted">
           {item.category}
         </span>
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] ${
+          className={`rounded-full px-2 py-0.5 text-3xs ${
             item.rarity === "传说"
               ? "bg-amber-50 text-amber-600"
               : item.rarity === "稀有"
@@ -39,7 +39,7 @@ export default function ItemCard({ item, onDelete }: Props) {
         {item.effects.slice(0, 2).map((e) => (
           <span
             key={e}
-            className="rounded-full bg-brand-muted px-2 py-0.5 text-[10px] text-brand"
+            className="rounded-full bg-brand-muted px-2 py-0.5 text-3xs text-brand"
           >
             {e}
           </span>

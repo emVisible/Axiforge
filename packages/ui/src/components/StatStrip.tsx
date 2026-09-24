@@ -23,14 +23,14 @@ export function StatStripItem({
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+        <p className="text-3xs font-medium uppercase tracking-wider text-ink-faint">
           {label}
         </p>
         <p className="text-lg font-semibold tabular-nums leading-tight text-ink">
           {value}
         </p>
         {hint && (
-          <p className="truncate text-[10px] text-ink-muted">{hint}</p>
+          <p className="truncate text-3xs text-ink-muted">{hint}</p>
         )}
       </div>
     </div>

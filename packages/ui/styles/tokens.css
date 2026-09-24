@@ -52,10 +52,14 @@
    * 三个微标签字号各写各的、没有语义，且 9px 对中文可读性不友好。
    * 3xs/2xs 给它们一个可命名的落点；低于 3xs 不再提供，即「不许更小」。
    */
+  /*
+   * 刻意**不**定义 --*-line-height：Tailwind 的 text-[10px] 只设 font-size，
+   * 若这里补上行高，「把 122 处任意值换成令牌」就会连带改动每处的行高，
+   * 迁移就不再是可证明的等价替换了。行高仍由各处 leading-* 或继承决定。
+   * 1rem = 16px（全站未覆写根字号），故 3xs 恰为 10px、2xs 恰为 11px。
+   */
   --text-3xs: 0.625rem;
-  --text-3xs--line-height: 0.875rem;
   --text-2xs: 0.6875rem;
-  --text-2xs--line-height: 1rem;
 
   --color-brand: var(--ax-brand);
   --color-brand-hover: var(--ax-brand-hover);

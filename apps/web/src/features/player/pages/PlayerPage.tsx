@@ -1315,7 +1315,7 @@ export default function PlayerPage() {
           <div className="bg-black/70 backdrop-blur-xl border border-white/5 rounded-2xl p-6">
             <div className="flex items-center gap-2 mb-3">
               {speakerExpression && (
-                <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-white/40 tracking-wide">
+                <span className="rounded-md bg-white/5 px-2 py-0.5 text-3xs text-white/40 tracking-wide">
                   {expressionLabel(speakerExpression)}
                 </span>
               )}

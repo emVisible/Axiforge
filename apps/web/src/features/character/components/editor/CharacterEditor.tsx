@@ -170,7 +170,7 @@ export default function CharacterEditor({
                   <span className="font-medium text-ink">
                     {layer.label}
                   </span>
-                  <span className="text-[10px] text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-3xs text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
                     {layer.distance}
                   </span>
                 </div>
@@ -229,7 +229,7 @@ export default function CharacterEditor({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-ink">立绘 / 表情差分</span>
-                  <span className="text-[10px] text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-3xs text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
                     演出资产
                   </span>
                 </div>

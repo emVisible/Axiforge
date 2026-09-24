@@ -115,7 +115,7 @@ export default function DiscoverProjectDetailPage() {
             </Button>
           </div>
           <ShareActions url={shareUrl} title={project.title} />
-          <p className="text-[10px] text-ink-faint">
+          <p className="text-3xs text-ink-faint">
             试玩直达：
             <a href={playUrl} className="ml-1 text-brand hover:underline">
               {playUrl.replace(/^https?:\/\//, "")}

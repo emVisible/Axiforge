@@ -80,7 +80,7 @@ export default function DiscoverTopicPage() {
                 ) : undefined
               }
               footer={
-                <span className="flex items-center gap-1 text-[10px] text-ink-muted">
+                <span className="flex items-center gap-1 text-3xs text-ink-muted">
                   <Play className="h-3 w-3" />
                   {p.play_count ?? 0}
                 </span>

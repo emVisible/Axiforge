@@ -39,7 +39,7 @@ export default function FlowNodePalette() {
       })}
       <div className="border-t border-border pt-4">
         <p className={cn(labelSm, "mb-2 px-1")}>操作提示</p>
-        <div className="space-y-2 text-[10px] text-ink-muted">
+        <div className="space-y-2 text-3xs text-ink-muted">
           <p>拖入节点到画布</p>
           <p>从端口拖线连接</p>
           <p>滚轮缩放画布</p>

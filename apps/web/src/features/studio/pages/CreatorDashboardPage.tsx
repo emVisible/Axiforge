@@ -64,7 +64,7 @@ function TrendChart({ trend }: { trend: CreatorDashboard["trend"] }) {
           return <circle key={p.date} cx={x} cy={y} r="3" fill="currentColor" />;
         })}
       </svg>
-      <div className="mt-2 flex justify-between text-[10px] text-ink-muted">
+      <div className="mt-2 flex justify-between text-3xs text-ink-muted">
         {trend.map((p) => (
           <span key={p.date}>{p.date}</span>
         ))}

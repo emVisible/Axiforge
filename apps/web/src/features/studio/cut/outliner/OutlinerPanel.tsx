@@ -209,10 +209,10 @@ export default function OutlinerPanel({
             value={beatQuery}
             onChange={(e) => setBeatQuery(e.target.value)}
             placeholder="筛选…"
-            className="mb-1.5 w-full rounded bg-surface-raised px-2 py-1 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+            className="mb-1.5 w-full rounded bg-surface-raised px-2 py-1 text-3xs text-ink outline-none placeholder:text-ink-faint"
           />
           {filteredBeats.length === 0 ? (
-            <p className="px-1 py-2 text-[10px] text-ink-faint">无 Beat</p>
+            <p className="px-1 py-2 text-3xs text-ink-faint">无 Beat</p>
           ) : (
             filteredBeats.map((node, idx) =>
               editingBeatId === node.id ? (
@@ -226,7 +226,7 @@ export default function OutlinerPanel({
                       if (e.key === "Enter") commitBeatRename(node.id);
                       if (e.key === "Escape") setEditingBeatId(null);
                     }}
-                    className="w-full rounded bg-surface-raised px-2 py-1 text-[11px] text-ink outline-none ring-1 ring-brand/40"
+                    className="w-full rounded bg-surface-raised px-2 py-1 text-2xs text-ink outline-none ring-1 ring-brand/40"
                   />
                 </div>
               ) : (
@@ -294,7 +294,7 @@ export default function OutlinerPanel({
                 }
               }}
               placeholder="新舞台…"
-              className="min-w-0 flex-1 rounded bg-surface-raised px-2 py-1 text-[10px] text-ink outline-none"
+              className="min-w-0 flex-1 rounded bg-surface-raised px-2 py-1 text-3xs text-ink outline-none"
             />
             <button
               type="button"
@@ -303,12 +303,12 @@ export default function OutlinerPanel({
                 void onAddScene(newSceneTitle.trim());
                 setNewSceneTitle("");
               }}
-              className="shrink-0 rounded bg-panel-raised px-2 py-1 text-[10px] text-ink disabled:opacity-40"
+              className="shrink-0 rounded bg-panel-raised px-2 py-1 text-3xs text-ink disabled:opacity-40"
             >
               +
             </button>
           </div>
-          <div className="mt-1.5 [&_input]:text-[10px]">
+          <div className="mt-1.5 [&_input]:text-3xs">
             <EntitySearchSelect
               fetcher={searchApi.scenes}
               onSelect={(item) => void onImportScene(item.id)}
@@ -325,7 +325,7 @@ export default function OutlinerPanel({
           onToggle={() => toggle("roles")}
         >
           {roles.length === 0 ? (
-            <p className="px-1 py-2 text-[10px] text-ink-faint">暂无角色</p>
+            <p className="px-1 py-2 text-3xs text-ink-faint">暂无角色</p>
           ) : (
             roles.map((role) => {
               const pr = projectRoles.find((r) => r.character_ref_id === role.characterRefId);
@@ -337,7 +337,7 @@ export default function OutlinerPanel({
                   <div className="flex items-center justify-between px-1.5 py-1">
                     <Link
                       to={routes.characters.detail(role.characterRefId)}
-                      className="min-w-0 truncate text-[11px] text-ink-muted hover:text-ink"
+                      className="min-w-0 truncate text-2xs text-ink-muted hover:text-ink"
                     >
                       {role.name}
                     </Link>
@@ -395,7 +395,7 @@ export default function OutlinerPanel({
               );
             })
           )}
-          <div className="mt-1.5 [&_input]:text-[10px]">
+          <div className="mt-1.5 [&_input]:text-3xs">
             <CharacterSearchSelect
               resetOnSelect
               onChange={(id, name) => void onAddRole(id, name)}
@@ -411,7 +411,7 @@ export default function OutlinerPanel({
           onToggle={() => toggle("assets")}
         >
           {itemRefs.length === 0 ? (
-            <p className="px-1 py-2 text-[10px] text-ink-faint">暂无道具引用</p>
+            <p className="px-1 py-2 text-3xs text-ink-faint">暂无道具引用</p>
           ) : (
             itemRefs.map((ref) => (
               <div
@@ -420,7 +420,7 @@ export default function OutlinerPanel({
               >
                 <Link
                   to={routes.item(ref.asset_id)}
-                  className="min-w-0 truncate text-[11px] text-ink-muted hover:text-ink"
+                  className="min-w-0 truncate text-2xs text-ink-muted hover:text-ink"
                 >
                   {ref.name}
                 </Link>
@@ -434,7 +434,7 @@ export default function OutlinerPanel({
               </div>
             ))
           )}
-          <div className="mt-1.5 [&_input]:text-[10px]">
+          <div className="mt-1.5 [&_input]:text-3xs">
             <EntitySearchSelect
               fetcher={searchApi.items}
               onSelect={(item) => void onAddItem(item.id)}
@@ -449,7 +449,7 @@ export default function OutlinerPanel({
           open={open.project}
           onToggle={() => toggle("project")}
         >
-          <div className="space-y-2 px-1 py-1 text-[10px] text-ink-muted">
+          <div className="space-y-2 px-1 py-1 text-3xs text-ink-muted">
             {onProjectPatch ? (
               <>
                 <label className="block">
@@ -462,7 +462,7 @@ export default function OutlinerPanel({
                     rows={2}
                     onBlur={(e) => void onProjectPatch({ description: e.target.value })}
                     placeholder="项目简介…"
-                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />
                 </label>
                 <label className="block">
@@ -475,7 +475,7 @@ export default function OutlinerPanel({
                     rows={3}
                     onBlur={(e) => void onProjectPatch({ world_setting: e.target.value })}
                     placeholder="世界观设定…"
-                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />
                 </label>
                 <label className="block">
@@ -488,7 +488,7 @@ export default function OutlinerPanel({
                     rows={3}
                     onBlur={(e) => void onProjectPatch({ rules: e.target.value })}
                     placeholder="玩法/叙事规则…"
-                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />
                 </label>
               </>
@@ -549,7 +549,7 @@ export default function OutlinerPanel({
               type="button"
               disabled={nexusBusy}
               onClick={() => void sendToNexus()}
-              className="rounded py-1 text-left text-[10px] text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
+              className="rounded py-1 text-left text-3xs text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
             >
               <Inbox className="mr-1 inline h-3 w-3" />
               {nexusBusy ? "发送中…" : "发送到 Nexus"}
@@ -561,7 +561,7 @@ export default function OutlinerPanel({
               <button
                 type="button"
                 onClick={onExportMarkdown}
-                className="rounded py-1 text-left text-[10px] text-ink-muted hover:bg-surface-raised hover:text-ink"
+                className="rounded py-1 text-left text-3xs text-ink-muted hover:bg-surface-raised hover:text-ink"
               >
                 <Link2 className="mr-1 inline h-3 w-3" />
                 导出 Markdown
@@ -571,7 +571,7 @@ export default function OutlinerPanel({
               <button
                 type="button"
                 onClick={onDeleteProject}
-                className="rounded py-1 text-left text-[10px] text-red-400/80 hover:bg-surface-raised"
+                className="rounded py-1 text-left text-3xs text-red-400/80 hover:bg-surface-raised"
               >
                 删除剧本
               </button>

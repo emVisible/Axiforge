@@ -341,7 +341,7 @@ export default function NodeInspectorPanel({
                     type="button"
                     onClick={() => onEdgeLabelChange(selectedEdge.id, l)}
                     className={cn(
-                      "rounded-lg border px-2.5 py-1.5 text-[11px] transition-all",
+                      "rounded-lg border px-2.5 py-1.5 text-2xs transition-all",
                       selectedEdge.label === l
                         ? "border-brand bg-brand text-white shadow-sm"
                         : "border-border text-ink-muted hover:border-ink-muted/30 hover:bg-canvas",
@@ -392,7 +392,7 @@ export default function NodeInspectorPanel({
               </p>
             </div>
             {!isNle && (
-            <div className="space-y-2 rounded-xl bg-canvas p-4 text-left text-[11px] text-ink-muted">
+            <div className="space-y-2 rounded-xl bg-canvas p-4 text-left text-2xs text-ink-muted">
               <p>
                 <strong>对话节点</strong> — 角色台词，连线分支
               </p>

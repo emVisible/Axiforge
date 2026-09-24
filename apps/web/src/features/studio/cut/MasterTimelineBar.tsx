@@ -38,10 +38,10 @@ export default function MasterTimelineBar({
   return (
     <div className="shrink-0 border-b border-border bg-surface">
       <div className="flex h-7 items-center justify-between px-3">
-        <span className="text-[10px] font-medium text-ink-muted">
+        <span className="text-3xs font-medium text-ink-muted">
           主时间轴 · 全片
         </span>
-        <span className="font-mono text-[10px] tabular-nums text-ink-faint">
+        <span className="font-mono text-3xs tabular-nums text-ink-faint">
           {formatNarrativeTime(globalMs)} / {formatNarrativeTime(master.totalMs)}
         </span>
       </div>

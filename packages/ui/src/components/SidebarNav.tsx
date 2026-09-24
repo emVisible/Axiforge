@@ -34,7 +34,7 @@ export function SidebarNavGroup({ label, children }: SidebarNavGroupProps) {
   return (
     <div className="flex flex-col gap-0.5">
       {label && (
-        <p className="px-2.5 pb-1.5 text-[10px] font-medium uppercase tracking-wider text-ink-faint">
+        <p className="px-2.5 pb-1.5 text-3xs font-medium uppercase tracking-wider text-ink-faint">
           {label}
         </p>
       )}

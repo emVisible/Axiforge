@@ -99,7 +99,7 @@ export default function AppHeader({
           )}
           <UserAccountMenu variant={brandVariant} />
           {showVersion && (
-            <span className="hidden font-mono text-[10px] text-ink-faint sm:inline">
+            <span className="hidden font-mono text-3xs text-ink-faint sm:inline">
               v1.5
             </span>
           )}

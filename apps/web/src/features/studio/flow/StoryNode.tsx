@@ -88,7 +88,7 @@ function StoryNode({
         </div>
       </div>
       {description && (
-        <div className="line-clamp-2 border-b border-border/60 bg-surface px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
+        <div className="line-clamp-2 border-b border-border/60 bg-surface px-3 py-2 text-2xs leading-relaxed text-ink-muted">
           {description}
         </div>
       )}
@@ -99,7 +99,7 @@ function StoryNode({
           id="output"
           className="!relative !bottom-auto !left-auto !right-auto !top-auto !h-3 !w-3 !translate-none !border-2 !border-surface !bg-brand"
         />
-        <span className="ml-1 text-[10px] text-ink-faint">输出</span>
+        <span className="ml-1 text-3xs text-ink-faint">输出</span>
       </div>
     </div>
   );

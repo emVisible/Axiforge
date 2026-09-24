@@ -149,7 +149,7 @@ export default function MiniAxsEditor({
         onClick={() => setCollapsed((v) => !v)}
         className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-surface-raised"
       >
-        <span className="flex items-center gap-1.5 text-[11px] font-medium text-ink">
+        <span className="flex items-center gap-1.5 text-2xs font-medium text-ink">
           <Code2 className="h-3.5 w-3.5 text-ink-faint" strokeWidth={1.75} />
           AXS 片段
           <span className="font-normal text-ink-faint">· {script.length} 条指令</span>
@@ -173,7 +173,7 @@ export default function MiniAxsEditor({
             />
           </div>
           {diagnostics.length > 0 && (
-            <div className="border-t border-border bg-surface-raised px-3 py-1.5 text-[10px] text-ink-faint">
+            <div className="border-t border-border bg-surface-raised px-3 py-1.5 text-3xs text-ink-faint">
               {diagnostics[0]?.message}
             </div>
           )}

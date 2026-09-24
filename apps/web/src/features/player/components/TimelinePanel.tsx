@@ -62,7 +62,7 @@ export default function TimelinePanel({
                 >
                   {beat.sceneTitle || scene?.title || "未命名场景"}
                   {beat.isEnding && beat.endingLabel && (
-                    <span className="ml-2 text-[10px] text-amber-400/60">
+                    <span className="ml-2 text-3xs text-amber-400/60">
                       [{beat.endingLabel}]
                     </span>
                   )}

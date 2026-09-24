@@ -56,7 +56,7 @@ export default function ShareActions({ url, title, className }: ShareActionsProp
       {showQr && (
         <div className="w-full rounded-xl border border-border bg-surface p-3">
           <img src={qrSrc} alt="分享二维码" className="mx-auto h-40 w-40 rounded-lg" />
-          <p className="mt-2 text-center text-[10px] text-ink-faint">扫码打开分享页</p>
+          <p className="mt-2 text-center text-3xs text-ink-faint">扫码打开分享页</p>
         </div>
       )}
     </div>

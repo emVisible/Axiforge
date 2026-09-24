@@ -115,7 +115,7 @@ export default function EntityCard({
         <div className="flex flex-wrap items-center gap-1.5">
           {badges}
           {meta && (
-            <span className={cn("ml-auto text-[10px]", t.meta)}>{meta}</span>
+            <span className={cn("ml-auto text-3xs", t.meta)}>{meta}</span>
           )}
         </div>
       )}

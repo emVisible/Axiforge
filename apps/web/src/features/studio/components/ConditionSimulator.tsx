@@ -69,7 +69,7 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
     <div className="space-y-3">
       <div>
         <label className={cn(labelSm, "block")}>模拟变量</label>
-        <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">
+        <p className="mt-1 text-2xs leading-relaxed text-ink-muted">
           填入假设的记忆/关系值，预览从本节点将走向哪条分支。角色用
           <code className="mx-1 rounded bg-canvas px-1">角色id.字段</code>
           形式（如 <code className="rounded bg-canvas px-1">c1.affection</code>）。
@@ -79,7 +79,7 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
       {vars.map((v, i) => (
         <div key={i} className="flex items-center gap-1.5">
           <select
-            className="rounded-md border border-border bg-surface px-1.5 py-1 text-[11px]"
+            className="rounded-md border border-border bg-surface px-1.5 py-1 text-2xs"
             value={v.scope}
             onChange={(e) => setVar(i, { scope: e.target.value as FakeVar["scope"] })}
           >
@@ -117,7 +117,7 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
         onClick={() =>
           setVars([...vars, { scope: "memory", key: "", value: "" }])
         }
-        className="rounded-lg border border-dashed border-border px-2.5 py-1 text-[11px] text-ink-muted hover:border-brand hover:text-brand"
+        className="rounded-lg border border-dashed border-border px-2.5 py-1 text-2xs text-ink-muted hover:border-brand hover:text-brand"
       >
         + 添加变量
       </button>

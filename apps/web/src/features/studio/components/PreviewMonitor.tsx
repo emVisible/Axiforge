@@ -208,11 +208,11 @@ export default function PreviewMonitor({
     <div className={shellClass}>
       {embedded && monitorLabel && (
         <div className="flex h-7 shrink-0 items-center justify-between border-b border-border bg-panel-raised px-3">
-          <span className="text-[10px] font-medium tracking-wide text-ink-muted">
+          <span className="text-3xs font-medium tracking-wide text-ink-muted">
             {monitorLabel}
           </span>
           {rtState && script.length > 0 && (
-            <span className="font-mono text-[10px] text-ink-faint">
+            <span className="font-mono text-3xs text-ink-faint">
               {Math.min(rtState.cursor + 1, script.length)}/{script.length}
             </span>
           )}
@@ -259,7 +259,7 @@ export default function PreviewMonitor({
                       className="max-h-[46vh] w-auto object-contain drop-shadow-2xl"
                     />
                   ) : (
-                    <div className="flex h-24 w-20 items-center justify-center rounded-xl border border-border bg-panel-raised text-center text-[10px] text-ink-faint">
+                    <div className="flex h-24 w-20 items-center justify-center rounded-xl border border-border bg-panel-raised text-center text-3xs text-ink-faint">
                       {role?.name || id}
                       {sp.expression ? `·${expressionLabel(sp.expression)}` : ""}
                     </div>
@@ -314,13 +314,13 @@ export default function PreviewMonitor({
         <div className="flex flex-wrap gap-1.5">
           {showingChoices && choiceButtons}
           {view?.waiting === "say" && (
-            <span className="text-[11px] text-ink-faint">点击舞台继续</span>
+            <span className="text-2xs text-ink-faint">点击舞台继续</span>
           )}
           {view?.waiting === "wait" && (
-            <span className="text-[11px] text-ink-faint">等待中…</span>
+            <span className="text-2xs text-ink-faint">等待中…</span>
           )}
           {rtState && script.length > 0 && (
-            <span className="text-[11px] text-ink-faint">
+            <span className="text-2xs text-ink-faint">
               指令 {Math.min(rtState.cursor + 1, script.length)}/{script.length}
             </span>
           )}

@@ -295,7 +295,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
     return (
       <div className="flex h-full min-h-0 flex-col bg-panel">
         <div className="flex h-8 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-3">
-          <span className="text-[11px] font-medium tracking-wide text-ink-muted">
+          <span className="text-2xs font-medium tracking-wide text-ink-muted">
             指令轨 · 当前 Beat
             {onReorderTrack && (
               <span className="ml-2 text-[9px] font-normal text-ink-faint">
@@ -309,7 +309,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
             )}
           </span>
           <div className="flex items-center gap-1">
-            <span className="mr-2 text-[10px] text-ink-faint">缩放</span>
+            <span className="mr-2 text-3xs text-ink-faint">缩放</span>
             <button
               type="button"
               onClick={() => onZoomChange(Math.max(0.5, zoom - 0.15))}
@@ -317,7 +317,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
             >
               <Minus className="h-3 w-3" />
             </button>
-            <span className="w-8 text-center font-mono text-[10px] text-ink-muted">
+            <span className="w-8 text-center font-mono text-3xs text-ink-muted">
               {Math.round(zoom * 100)}%
             </span>
             <button
@@ -347,7 +347,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 className="flex shrink-0 items-center border-b border-border px-2"
                 style={{ height: TRACK_H }}
               >
-                <span className="font-mono text-[10px] font-semibold text-accent-soft">
+                <span className="font-mono text-3xs font-semibold text-accent-soft">
                   {track.short}
                 </span>
                 <span className="ml-1.5 truncate text-[9px] text-ink-faint">
@@ -360,7 +360,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 className="flex shrink-0 items-center border-b border-border bg-pink-50/50 px-2 dark:bg-pink-950/20"
                 style={{ height: TRACK_H }}
               >
-                <span className="font-mono text-[10px] font-semibold text-pink-600 dark:text-pink-300">RN</span>
+                <span className="font-mono text-3xs font-semibold text-pink-600 dark:text-pink-300">RN</span>
                 <span className="ml-1.5 truncate text-[9px] text-ink-faint">关系</span>
               </div>
             )}
@@ -451,7 +451,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                           >
                             ▶
                           </span>
-                          <span className="truncate text-[10px] font-medium text-ink-muted">
+                          <span className="truncate text-3xs font-medium text-ink-muted">
                             {label}
                           </span>
                           <span className="font-mono text-[9px] text-ink-faint">

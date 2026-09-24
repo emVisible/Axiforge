@@ -76,7 +76,7 @@ export default function GalleryPanel({
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 bg-white/[0.02]">
                   {!isUnlocked && <Lock className="h-5 w-5 text-white/15" strokeWidth={1.5} />}
-                  <span className="max-w-[90%] truncate px-2 text-[10px] text-white/20">
+                  <span className="max-w-[90%] truncate px-2 text-3xs text-white/20">
                     {isUnlocked ? path.split("/").pop() : "？？？"}
                   </span>
                 </div>

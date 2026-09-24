@@ -94,11 +94,11 @@ export default function ProjectEditorPage() {
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-ink-muted/60">{rfNodes.length} 节点</span>
+                <span className="text-3xs text-ink-muted/60">{rfNodes.length} 节点</span>
               </>
             )}
             {editorMode !== "cut" && viewMode === "full" && (
-              <span className="text-[10px] text-ink-muted/60">
+              <span className="text-3xs text-ink-muted/60">
                 全剧本 · {rfNodes.length} 节点
               </span>
             )}

@@ -40,14 +40,14 @@ export default function EffectEditor({
         <button
           type="button"
           onClick={add}
-          className="text-[10px] font-medium text-brand hover:underline"
+          className="text-3xs font-medium text-brand hover:underline"
         >
           + 添加
         </button>
       </div>
       {effects.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-canvas/50 py-6 text-center">
-          <p className="text-[11px] text-ink-muted/60">无效果 — 纯叙事节点</p>
+          <p className="text-2xs text-ink-muted/60">无效果 — 纯叙事节点</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -72,7 +72,7 @@ export default function EffectEditor({
                     onChange={(ev) =>
                       update(i, { type: ev.target.value as EffectItem["type"] })
                     }
-                    className="cursor-pointer border-none bg-transparent text-[11px] font-medium outline-none"
+                    className="cursor-pointer border-none bg-transparent text-2xs font-medium outline-none"
                   >
                     {EFFECT_TYPES.map((et) => (
                       <option key={et.value} value={et.value}>
@@ -204,7 +204,7 @@ export default function EffectEditor({
                       placeholder="键名"
                       className={cn(flowSelectClass, "flex-1")}
                     />
-                    <span className="text-[11px] text-ink-muted">=</span>
+                    <span className="text-2xs text-ink-muted">=</span>
                     <input
                       value={e.value}
                       onChange={(ev) => update(i, { value: ev.target.value })}

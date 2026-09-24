@@ -44,14 +44,14 @@ export default function ConditionEditor({
         <button
           type="button"
           onClick={add}
-          className="text-[10px] font-medium text-brand hover:underline"
+          className="text-3xs font-medium text-brand hover:underline"
         >
           + 添加
         </button>
       </div>
       {conditions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-canvas/50 py-6 text-center">
-          <p className="text-[11px] text-ink-muted/60">无条件 — 始终可用</p>
+          <p className="text-2xs text-ink-muted/60">无条件 — 始终可用</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -79,7 +79,7 @@ export default function ConditionEditor({
                         type: e.target.value as ConditionItem["type"],
                       })
                     }
-                    className="cursor-pointer border-none bg-transparent text-[11px] font-medium outline-none"
+                    className="cursor-pointer border-none bg-transparent text-2xs font-medium outline-none"
                   >
                     {CONDITION_TYPES.map((ct) => (
                       <option key={ct.value} value={ct.value}>

@@ -27,7 +27,7 @@ export default function StageLegend({
 
   return (
     <div className="space-y-2 rounded-xl border border-border bg-surface p-2.5 shadow-sm">
-      <p className="px-0.5 text-[10px] font-medium text-ink-muted">舞台泳道</p>
+      <p className="px-0.5 text-3xs font-medium text-ink-muted">舞台泳道</p>
       <div className="space-y-1">
         {scenes.map((scene) => {
           const idx = stageColorIndex(scene.id, stageIds);
@@ -57,7 +57,7 @@ export default function StageLegend({
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: palette.dot }}
                 />
-                <span className="truncate text-[10px] text-ink">{scene.title}</span>
+                <span className="truncate text-3xs text-ink">{scene.title}</span>
                 <span className="ml-auto shrink-0 text-[9px] tabular-nums text-ink-muted">
                   {count}
                 </span>

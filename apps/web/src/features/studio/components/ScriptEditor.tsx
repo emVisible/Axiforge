@@ -159,7 +159,7 @@ export default function ScriptEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] leading-relaxed text-ink-muted">
+        <p className="text-2xs leading-relaxed text-ink-muted">
           演出脚本按顺序播放。填写后将取代下方「内容」的单句对话（ADR-009）。
         </p>
         <div className="flex shrink-0 items-center gap-2">
@@ -167,7 +167,7 @@ export default function ScriptEditor({
           <button
             type="button"
             onClick={() => setAiOpen(true)}
-            className="rounded-lg border border-brand/30 px-2 py-1 text-[10px] text-brand hover:bg-brand/10"
+            className="rounded-lg border border-brand/30 px-2 py-1 text-3xs text-brand hover:bg-brand/10"
           >
             AI 草稿
           </button>
@@ -176,10 +176,10 @@ export default function ScriptEditor({
 
       {aiOpen && (
         <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 space-y-2">
-          <p className="text-[11px] text-ink-muted">
-            粘贴散文/大纲。格式：<code className="text-[10px]">角色名：台词</code>、
-            <code className="text-[10px]">【旁白：…】</code>、
-            <code className="text-[10px]">{"> 选项A | 选项B"}</code>
+          <p className="text-2xs text-ink-muted">
+            粘贴散文/大纲。格式：<code className="text-3xs">角色名：台词</code>、
+            <code className="text-3xs">【旁白：…】</code>、
+            <code className="text-3xs">{"> 选项A | 选项B"}</code>
           </p>
           <Textarea
             rows={6}
@@ -187,7 +187,7 @@ export default function ScriptEditor({
             onChange={(e) => setProse(e.target.value)}
             placeholder={"【旁白：雨夜。】\n堰纱：……你为什么会来这里？\n> 我来帮你 | 只是路过"}
           />
-          {aiError && <p className="text-[11px] text-red-500">{aiError}</p>}
+          {aiError && <p className="text-2xs text-red-500">{aiError}</p>}
           <div className="flex flex-wrap gap-2">
             <Button size="sm" loading={aiBusy} onClick={() => runAiDraft("replace")}>
               替换脚本
@@ -223,7 +223,7 @@ export default function ScriptEditor({
           )}
         >
           <div className="mb-2 flex items-center justify-between">
-            <span className="rounded-md bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand">
+            <span className="rounded-md bg-brand/10 px-2 py-0.5 text-3xs font-medium text-brand">
               {i + 1}. {OP_LABEL[inst.op] || inst.op}
             </span>
             <div className="flex items-center gap-1 text-ink-muted">
@@ -546,7 +546,7 @@ export default function ScriptEditor({
             key={m.op}
             type="button"
             onClick={() => add(m.op)}
-            className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] text-ink-muted shadow-sm hover:border-brand hover:text-brand"
+            className="rounded-lg border border-border bg-surface px-2.5 py-1 text-2xs text-ink-muted shadow-sm hover:border-brand hover:text-brand"
           >
             + {m.label}
           </button>
@@ -589,7 +589,7 @@ function ChoiceOptionsEditor({
             </button>
           </div>
           <select
-            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-ink-muted"
+            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-2xs text-ink-muted"
             value={opt.to ?? ""}
             onChange={(e) => set(i, { ...opt, to: e.target.value || null })}
           >
@@ -605,7 +605,7 @@ function ChoiceOptionsEditor({
       <button
         type="button"
         onClick={() => onChange([...options, { label: "" }])}
-        className="rounded-lg border border-dashed border-border px-2.5 py-1 text-[11px] text-ink-muted hover:border-brand hover:text-brand"
+        className="rounded-lg border border-dashed border-border px-2.5 py-1 text-2xs text-ink-muted hover:border-brand hover:text-brand"
       >
         + 添加选项
       </button>

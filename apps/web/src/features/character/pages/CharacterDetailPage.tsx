@@ -492,7 +492,7 @@ export default function CharacterDetailPage() {
               </div>
             )}
             {/* 浏览量角标 */}
-            <span className="absolute -top-1.5 -right-1.5 px-2 py-0.5 text-[10px] bg-surface border border-border rounded-full shadow-sm text-ink-muted inline-flex items-center gap-0.5">
+            <span className="absolute -top-1.5 -right-1.5 px-2 py-0.5 text-3xs bg-surface border border-border rounded-full shadow-sm text-ink-muted inline-flex items-center gap-0.5">
               <Eye className="h-3 w-3" strokeWidth={1.75} />
               {(character.view_count ?? 0) > 999
                 ? `${((character.view_count ?? 0) / 1000).toFixed(1)}k`

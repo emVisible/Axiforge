@@ -161,7 +161,7 @@ export default function AuthorPage() {
                       ) : undefined
                     }
                     footer={
-                      <span className="flex items-center gap-2 text-[10px] text-ink-muted">
+                      <span className="flex items-center gap-2 text-3xs text-ink-muted">
                         <MessageCircle className="h-3 w-3" />
                         {p.comment_count}
                       </span>
@@ -197,7 +197,7 @@ export default function AuthorPage() {
                         ) : undefined
                       }
                       footer={
-                        <span className="flex items-center gap-2 text-[10px] text-ink-muted">
+                        <span className="flex items-center gap-2 text-3xs text-ink-muted">
                           <Eye className="h-3 w-3" />
                           {p.view_count}
                           <MessageCircle className="h-3 w-3" />

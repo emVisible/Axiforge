@@ -85,7 +85,7 @@ export default function SpriteEditor() {
               <button
                 type="button"
                 onClick={() => remove(key)}
-                className="text-[11px] text-ink-muted hover:text-red-500"
+                className="text-2xs text-ink-muted hover:text-red-500"
               >
                 删除该差分
               </button>
@@ -122,9 +122,9 @@ export default function SpriteEditor() {
               key={p}
               type="button"
               onClick={() => addKey(p)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[11px] text-ink-muted transition-colors hover:border-brand hover:text-brand"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-2xs text-ink-muted transition-colors hover:border-brand hover:text-brand"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded bg-panel text-[10px] font-semibold uppercase text-ink-faint">
+              <span className="flex h-5 w-5 items-center justify-center rounded bg-panel text-3xs font-semibold uppercase text-ink-faint">
                 {p.slice(0, 1)}
               </span>
               {p}

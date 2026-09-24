@@ -579,7 +579,7 @@ export default function CutStudioView({
                   <p className="text-[9px] font-medium uppercase tracking-wider text-ink-faint">
                     当前片段
                   </p>
-                  <p className="truncate text-[11px] text-ink">
+                  <p className="truncate text-2xs text-ink">
                     #{selectedIndex + 1} · {selectedClip.op} · {clipLabel(selectedClip)}
                   </p>
                 </div>

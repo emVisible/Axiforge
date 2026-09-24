@@ -159,7 +159,7 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
                   )
                 }
                 footer={
-                  <div className={`flex items-center gap-3 text-[11px] ${t.meta}`}>
+                  <div className={`flex items-center gap-3 text-2xs ${t.meta}`}>
                     {p.genre && <span>{p.genre}</span>}
                     <span className="flex items-center gap-1">
                       <Eye className="h-3 w-3" strokeWidth={1.75} />

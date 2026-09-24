@@ -79,7 +79,7 @@ export default function SaveSlotPanel({
                       {save ? "无预览" : "空"}
                     </div>
                   )}
-                  <span className="absolute left-2 top-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white/50">
+                  <span className="absolute left-2 top-2 rounded bg-black/50 px-2 py-0.5 text-3xs text-white/50">
                     {slotLabel(slot)}
                   </span>
                 </div>
@@ -92,7 +92,7 @@ export default function SaveSlotPanel({
                     </p>
                   )}
                   {save?.updated_at && (
-                    <p className="text-[10px] text-white/15">
+                    <p className="text-3xs text-white/15">
                       {new Date(save.updated_at).toLocaleString()}
                     </p>
                   )}

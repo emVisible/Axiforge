@@ -47,7 +47,7 @@ export default function TemplateSelector() {
               <h4 className="truncate text-sm font-medium text-ink group-hover:text-brand">
                 {t.name}
               </h4>
-              <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-muted">
+              <p className="mt-0.5 line-clamp-1 text-2xs text-ink-muted">
                 {t.summary}
               </p>
             </div>

@@ -27,7 +27,7 @@ interface KeyboardShortcutsModalProps {
 
 function KeyCap({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex min-w-[1.5rem] items-center justify-center rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink-muted">
+    <kbd className="inline-flex min-w-[1.5rem] items-center justify-center rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-3xs font-medium text-ink-muted">
       {children}
     </kbd>
   );

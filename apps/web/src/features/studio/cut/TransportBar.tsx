@@ -67,7 +67,7 @@ export default function TransportBar({
         </TransportBtn>
       </div>
 
-      <div className="font-mono text-[11px] tabular-nums text-ink-muted">
+      <div className="font-mono text-2xs tabular-nums text-ink-muted">
         <span className="text-ink">
           指令 {clipCount === 0 ? 0 : clipIndex + 1}/{clipCount}
         </span>
@@ -83,7 +83,7 @@ export default function TransportBar({
 
       <div className="h-4 w-px bg-border" />
 
-      <span className="min-w-0 truncate text-[11px] text-ink-muted">
+      <span className="min-w-0 truncate text-2xs text-ink-muted">
         {beatTitle ? (
           <>
             <span className="text-ink-muted">Beat · </span>

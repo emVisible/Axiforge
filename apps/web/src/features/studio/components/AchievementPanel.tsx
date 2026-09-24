@@ -75,7 +75,7 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
   return (
     <div className="space-y-3 p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] text-ink-muted">
+        <p className="text-2xs text-ink-muted">
           项目成就：Beat 完成时按条件自动解锁，也可用于分支 gating。
         </p>
         <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} loading={busy} onClick={add}>
@@ -100,7 +100,7 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
       {items.map((item) => (
         <div key={item.id} className="rounded-xl border border-border bg-surface p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1 text-[10px] font-medium text-brand">
+            <span className="flex items-center gap-1 text-3xs font-medium text-brand">
               <Star className="h-3 w-3" />
               {item.key}
             </span>

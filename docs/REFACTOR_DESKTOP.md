@@ -299,6 +299,28 @@
 
 **非目标**：不改功能语义、不加新界面能力。
 
+> **起手项（2026-09-24 实测截图发现，优先级高于本阶段其余条目）**
+>
+> 剪辑工作台右栏检查器的下拉控件呈现为**浏览器原生 select + 一枚脱离字段的 ⌄ 图标**，
+> 与全站设计语言明显脱节（同屏的输入框、按钮都是自定义样式，唯独这里露出系统控件）。
+> 组件源码 `packages/ui/src/components/Select.tsx` 是正确的：
+> `<div className="relative">` 包 `<select className="... appearance-none pr-10">`，
+> 再把 `ChevronDown` 以 `absolute right-3 top-1/2 -translate-y-1/2` 叠在字段内。
+> 调用方 `NodeInspectorPanel` 也确实用的就是它。
+>
+> **两个已被排除的假设**（勿重复走）：
+> ① 「Tailwind 没扫到 packages/ui，所以这些工具类没被产出」——已在 `apps/web/src/index.css`
+>    试加 `@source "../../packages/ui/src"` 并重新构建：产物 CSS 的 **hash 一字未变**，
+>    生产包截图与改动前逐像素相同。该改动已回退，不作为修复提交。
+> ② 「检查器自己写了裸 `<select>`」——已读源码排除。
+>
+> 下一步该查的方向：`inputBase` 与 `cn()` 的实际拼接结果（`appearance-none` 是否被
+> 后面的类覆盖）、`formStyles` 里是否另有同名类冲突、以及该字段是否被外层
+> `overflow` / `transform` 容器改变了绝对定位的包含块。
+> 证据截图：`/tmp/axiforge-evidence/ui-editor.png`（改前）与 `ui-prod.png`（生产包，相同）。
+> 本项完成后，Phase 8 的逐屏巡检才有可信基线——否则「设计令牌统一」会建立在一批
+> 实际没生效的样式之上。
+
 ---
 
 ### Phase 9 · 演出上限证明（v1.0 · 楔子1 成败判据）

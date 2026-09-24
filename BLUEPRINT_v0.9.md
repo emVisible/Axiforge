@@ -131,3 +131,32 @@ Tier: Standard（8 节 · 单一执行权威）
 | v1.1 | 2026-09-24 | 门禁查出 9 项真实不达标并全部修好：亮色次级文字 4.17→达线、占位提示 2.54/2.19→3.67/3.74、强调色 2.73/2.55→达线、暗色占位 2.66/2.71→达线。另修正门禁自身一处建模错误——「主色块上的文字」不该拿 `ink` 去配（那是 1.35:1 的假阳性），改用新增的 `--ax-on-brand` | L1 自动 |
 | v1.1 | 2026-09-24 | 门禁反向验证通过：把某令牌改浅一档 → 退出码 1；还原 → 0。并已接入 `pnpm gates`（现含 typecheck/unit/lint/purity/circular/size/contrast 七道） | L1 自动 |
 | v1.0 | 2026-09-24 | 我一度把任务 ID 前缀改成自造形态，理由是「避开与上一份执行权威的重复判定相撞」——那是**误记**：门禁是逐文件跑的，两份 Blueprint 之间不存在碰撞。改回规范形态，并把真正的约束（引用任务只能用标题词）写进任务清单下方 | L1 自动 |
+
+---
+
+## 9. 会话交接（预算将尽，未完成项的精确入口）
+
+**下一步第一刀（明确、低风险、已定位）**：把 discover 三个 tab 的三段并列 `&&` 换成
+`QueryStatePanel`。三处形状完全一致，判据写法已确定：
+
+```
+state={resolveQueryState({ isLoading: loading && page === 0, error, count: items.length })}
+```
+
+`page === 0` 这个限定不能丢——分页加载更多走的是 `loadingMore`，
+若直接用 `loading` 会把「翻页中」误判成整页重载。
+children 内保留可选链：面板给的是语义保证，不是类型收窄（道具页实测过这一点）。
+
+**其余入口按性价比排序**：
+1. 作者页 / 创作者概览 / 角色详情 / admin 端四态与观感巡检（未看过）
+2. v0.8 结转：`PlayerPage` 播放内核安全网 → 再分层（顺序不可颠倒，该文件零单测且已 1393 行）
+3. v0.8 结转：`useProjectEditor` 的 persistence 与 node-inspector 两域（9 个函数交错在 197–932 行）
+4. `packages/core` 覆盖率 83.47% 语句 / 72.02% 分支 → ≥90%（门禁标准不下调迁就现状）
+5. 随包 `.axsp` 元数据：重建会造出第二个真相源，**方案未定，不要贸然做**
+
+**等价性判据（拆巨石时必用，均已机械化）**：
+`node scripts/export-hook-surface.mjs <file>` 比对公开符号集 + E2E 13 条 + `pnpm gates`。
+
+**验证前置检查（本轮三次栽过，务必执行）**：
+先 `rm -rf apps/web/dist && pnpm --filter @axiforge/web build` 再看界面；
+`pnpm gates` 不含 build；退出码单独取；后端套件是 `cd backend && uv run pytest -q`。

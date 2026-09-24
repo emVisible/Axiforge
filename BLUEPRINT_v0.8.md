@@ -1,4 +1,4 @@
-# Build Blueprint v1.0 | Status: draft v1.0 → awaiting confirmation
+# Build Blueprint v1.1 | Status: confirmed v1.0 → executing v1.1
 
 Version target: **v0.8** · Charter phase: **Phase 7 · 巨石清偿与运行时一致性**（`docs/REFACTOR_DESKTOP.md`）
 Tier: Standard（8 节 · 单一执行权威）
@@ -72,12 +72,15 @@ Tier: Standard（8 节 · 单一执行权威）
 
 > 每行一个任务，`Acceptance:` 即该任务的唯一验收句。任务 ID 全文唯一（门禁脚本按出现次数计数）。
 
-- [ ] S1-T1 L4 契约扩展：`StorageProvider` 新增 item/scene 与 save/achievement 两组方法，含 `StoredAssetItem` / `StoredAssetScene` / `LocalSaveSlot` 类型与 scope 语义；字段以 backend 权威模型对齐（`AssetItemResponse` 声明了 `personality` 而 backend 道具模型未见同名列，先查实是漂移还是计算字段） | Acceptance: `pnpm typecheck` 通过；`packages/editor-core` 契约测试覆盖两组方法的存在性 | M1
-- [ ] S1-T2 SQLite schema 补表与迁移：`asset_items` / `asset_scenes` / `save_slots` / `player_achievements` 进 DDL，沿用 `COLUMN_PATCHES` 幂等补列机制处理已发布旧库 | Acceptance: 对「旧库（无新表）」与「空库」两种初始态各跑两次 `init()`，不报错且表数稳定一致 | M1
-- [ ] S1-T3 两个 Provider 落地实现：SQLite 侧读写本地表，HTTP 侧转发既有 REST 路径，二者语义等价 | Acceptance: 同一份契约测试文件对两个 Provider 各跑一遍全绿（单一测试源、双实现） | M1
-- [ ] S1-T4 道具与场景页接本地：`useAssets` 按环境分派，桌面断网可建/列/删 | Acceptance: 新增 e2e 用例在无后端进程条件下通过，页面显示本地数据 | M1
-- [ ] S1-T5 工程元数据补齐：`projects` 表补 `description` / `cover_image` / `theme_tags` / `mechanism` / `genre` / `is_meta`，播种携带真实值而非填空 | Acceptance: 桌面工程卡片断言含播种数据的描述文本，「暂无描述」在播种工程上不再出现 | M1
-- [ ] S1-T6 存档与成就本地化：播放页存读走本地，含 player_token 跨重启稳定性 | Acceptance: e2e 断网完成 存→列→读→删 四步 | M1
+- [x] S1-T1 L4 契约扩展：`StorageProvider` 新增 item/scene 与 save/achievement 两组方法，含 `StoredAssetItem` / `StoredAssetScene` / `LocalSaveSlot` 类型与 scope 语义；字段以 backend 权威模型对齐（`AssetItemResponse` 声明了 `personality` 而 backend 道具模型未见同名列，先查实是漂移还是计算字段） | Acceptance: `pnpm typecheck` 通过；`packages/editor-core` 契约测试覆盖两组方法的存在性 | M1
+- [x] S1-T2 SQLite schema 补表与迁移：`asset_items` / `asset_scenes` / `save_slots` / `player_achievements` 进 DDL，沿用 `COLUMN_PATCHES` 幂等补列机制处理已发布旧库 | Acceptance: 对「旧库（无新表）」与「空库」两种初始态各跑两次 `init()`，不报错且表数稳定一致 | M1
+- [x] S1-T3 两个 Provider 落地实现：SQLite 侧读写本地表，HTTP 侧转发既有 REST 路径，二者语义等价 | Acceptance: 同一份契约测试文件对两个 Provider 各跑一遍全绿（单一测试源、双实现） | M1
+- [ ] S1-T4 道具与场景页接本地：`useAssets` 按环境分派，桌面断网可建/列/删 | Acceptance: **验收句改判**——分派代码与「写→回读」已落地，但其原判据「e2e 在无后端条件下通过」不成立：Playwright 跑在浏览器态，`isTauriEnvironment()` 恒为 false，e2e 永远只走 HTTP 支。桌面支目前只有契约套件（双实现 128 例）为证，hook 层的分派接线尚无自动证据（vitest 环境为 node，无 hook 测试装置）。故本项保持未勾，待打包态实测或补 hook 装置 | M1
+- [ ] S1-T5 工程元数据补齐：`projects` 表补 `description` / `cover_image` / `theme_tags` / `mechanism` / `genre` / `is_meta`，播种携带真实值而非填空 | Acceptance: **部分达成**——本地列、读写、`projectMetaToResponse` 逐字段透传已完成（桌面自建工程编辑后卡片可显示真实描述）；「播种携带真实值」未达成，见随包重导出欠账 | M1
+- [ ] S1-T6 存档与成就本地化：播放页存读走本地，含 player_token 跨重启稳定性 | Acceptance: 契约层已绿；播放页 hook 层按环境分派并实测一次存→重开→读回 | M1
+- [ ] S1-T7 随包示范作补元数据：既播的 `.axsp` 早于新列生成，其 `project.json` 无描述/标签，播种后卡片仍「暂无描述」；须在联后端后重导出随包（打包 project.json 已整体序列化 meta，重导出即自动带上） | Acceptance: 重导出的随包在桌面首启后卡片显示真实描述与机制标签 | M1
+- [ ] S1-T8 契约单条读口：新增 `getItem(id)` / `getScene(id)`，替换 hook 层「拉全表再 find」的临时取巧 | Acceptance: 两个新方法的契约用例双实现绿，hook 层不再依赖清单过滤 | M1
+- [ ] S1-T9 G1 回归清偿：本轮新增使 `sqliteProvider.ts` 408→523、`memory.ts` →433、`httpStorageProvider.ts` →414，全部越过本阶段要清零的 400 行预算；须按域继续外提 | Acceptance: 三文件回到 ≤400 且 128+ 契约用例不减 | M1
 - [ ] S2-T1 四态共享渲染原语 `QueryStatePanel`：由既有 `resolveQueryState` 单点裁决，页面只传数据不写分支 | Acceptance: 角色页与剧本列表页迁移后 DOM 中「错误」与「空」文案不同屏；组件单测穷举四态互斥 | M2
 - [ ] S2-T2 UI 目录归一：`packages/ui` 定为权威，宿主目录仅保留 Tauri/DOM 绑定，重复组件删除 | Acceptance: 同名组件不再两处并存；`pnpm build` 通过；旧引用路径 grep 无残留 | M2
 - [ ] S3-T1 导出编辑器 hook 公开符号表并入库，作为拆分契约基线（防漏判） | Acceptance: 基线文件入库，符号数与巨石返回面逐个相等，成为后续两任务的比对输入 | M3
@@ -123,3 +126,7 @@ Tier: Standard（8 节 · 单一执行权威）
 |------|------|------|----------|
 | v1.0 | 2026-09-24 | 依宪章 Phase 7 建立首版；M1 前置为离线数据补齐（已交付产品的可见断裂），M3/M4 纯工程债随后 | — |
 | v1.0 | 2026-09-24 | 登记道具接口 `personality` 字段的契约漂移疑点为 R1，明确「先查实、只对齐不顺手修」 | L2 记录 |
+| v1.1 | 2026-09-24 | R1 查实结案：全仓扫描（backend/app 全部 .py + apps/packages 全部 .ts/.tsx，排除构建产物）显示该字段仅存在于道具类型声明的 3 行，无任何读写消费点，backend 亦无同名列 → 判为契约幽灵，按铁律 7 删除而非对齐进本地新契约 | L1 自动 |
+| v1.1 | 2026-09-24 | 共享契约套件立即发挥价值：一次跑出两个真实缺陷——存档 INSERT 列数与参数数不符（9 列 8 参，NOT NULL 直接失败）、内存实现的元信息补丁静默丢弃新字段。若无单一测试源双实现验收，后者只会在桌面实测时暴露 | L1 自动 |
+| v1.1 | 2026-09-24 | **偏差登记（不利）**：为控行数已把两个新域外提成独立模块，但三个 Provider 文件仍越过本阶段要清零的 400 行预算（SQLite 408→523、Memory 433、HTTP 414）。质量轮的地基指标被本轮自己恶化了，已列为独立清偿项，不以「本来就没达标」含糊过去 | L2 记录 |
+| v1.1 | 2026-09-24 | **验收句改判**：道具/场景接本地一项的原判据写成「e2e 无后端通过」，但 Playwright 恒在浏览器态，桌面分支根本不可达——该判据不可被满足而非未被满足。已把两项从已勾回退为未勾并写清剩余证据缺口（含示范作随包早于新列、须重导出） | L3 冻结后修正 |

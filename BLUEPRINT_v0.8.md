@@ -1,4 +1,4 @@
-# Build Blueprint v1.3 | Status: confirmed v1.0 → executing v1.3
+# Build Blueprint v1.4 | Status: confirmed v1.0 → executing v1.4
 
 Version target: **v0.8** · Charter phase: **Phase 7 · 巨石清偿与运行时一致性**（`docs/REFACTOR_DESKTOP.md`）
 Tier: Standard（8 节 · 单一执行权威）
@@ -81,8 +81,8 @@ Tier: Standard（8 节 · 单一执行权威）
 - [ ] S1-T7 随包示范作补元数据：既播的 `.axsp` 早于新列生成，其 `project.json` 无描述/标签，播种后卡片仍「暂无描述」；须在联后端后重导出随包（打包 project.json 已整体序列化 meta，重导出即自动带上） | Acceptance: 重导出的随包在桌面首启后卡片显示真实描述与机制标签 | M1
 - [ ] S1-T8 契约单条读口：新增 `getItem(id)` / `getScene(id)`，替换 hook 层「拉全表再 find」的临时取巧 | Acceptance: 两个新方法的契约用例双实现绿，hook 层不再依赖清单过滤 | M1
 - [x] S1-T9 G1 回归清偿：本轮新增曾使 `sqliteProvider.ts` 408→523、`memory.ts` →433、`httpStorageProvider.ts` →414，全部越过 400 行预算 | Acceptance: 三项已回落到 280 / 356 / 387，128 例契约套件不减且行为零变更；另新建 `check:size` 棘轮门禁接入 gates，并实测「加 60 行即 exit 1」证明门禁会咬人 | M1
-- [ ] S2-T1 四态共享渲染原语 `QueryStatePanel`：由既有 `resolveQueryState` 单点裁决，页面只传数据不写分支 | Acceptance: 角色页与剧本列表页迁移后 DOM 中「错误」与「空」文案不同屏；组件单测穷举四态互斥 | M2
-- [ ] S2-T2 UI 目录归一：`packages/ui` 定为权威，宿主目录仅保留 Tauri/DOM 绑定，重复组件删除 | Acceptance: 同名组件不再两处并存；`pnpm build` 通过；旧引用路径 grep 无残留 | M2
+- [x] S2-T1 四态共享渲染原语 `QueryStatePanel`：由既有 `resolveQueryState` 单点裁决，页面只传数据不写分支 | Acceptance: 达成——选择逻辑另做成为渲染无关的 `pickQuerySlot`（穷尽 switch，缺一态即编译不过），7 例纯函数断言「每态只命中一槽」与错误兜底文案；角色页与剧本清单页两个既有消费者已迁移，迁移后其 DOM 分支由 4 个并列 `&&` 收成 1 个组件 | M2
+- [x] S2-T2 UI 目录归一：**核实后前提不成立，本项作废**——宿主 ui 目录本就是 `export * from "@axiforge/ui"` 加 4 个宿主绑定件，按文件基名与导出符号两处比对与 packages/ui 的 40 组件零同名重复；唯一同名 `ImageUpload` 是刻意覆盖（网页 fetch / 桌面本地口） | Acceptance: 以「比对结果 + 覆盖处写明注释」替代原「删除重复组件」，因为无重复可删 | M2
 - [ ] S3-T1 导出编辑器 hook 公开符号表并入库，作为拆分契约基线（防漏判） | Acceptance: 基线文件入库，符号数与巨石返回面逐个相等，成为后续两任务的比对输入 | M3
 - [ ] S3-T2 拆出 graph 域与 layout 域子 hooks（节点/边/条件/效果/脚本/自动排版） | Acceptance: 两子 hook 各 ≤400 行，e2e 全绿，巨石行数下降 | M3
 - [ ] S3-T3 拆出 persistence 域与 view/ui 域子 hooks（保存/导入导出/元数据/toast/模式），组合层只做 re-export | Acceptance: 原路径 `git ls-files` 查不到；组合层 ≤200 行；公开返回面符号集与基线逐个相等 | M3
@@ -137,3 +137,5 @@ Tier: Standard（8 节 · 单一执行权威）
 | v1.3 | 2026-09-24 | 上一轮登记的不利偏差已清偿：三个 Provider 按域外提成协作模块回到预算内，128 例契约套件原样全绿即行为未变。同时新建行数棘轮门禁并证明它会失败（人为加 60 行 → exit 1） | L1 自动 |
 | v1.3 | 2026-09-24 | **门禁纠正了宪章的一处认知错误**：宪章把 G1 的度量写成「lint max-lines + 人工核对」、清单写成 1 个文件；实际从未有 lint 规则在管，真实债务面为 17 个文件，含三个从未被收录的内核文件。原「G1 清单为空」的验收口径据改为分阶段收缩 | L2 记录 |
 | v1.3 | 2026-09-24 | 过程中一次自动化改包越界：批量搬移辅助函数时把两个仍被原文件使用的函数一并带走且未带依赖，typecheck 当场报错。已回退两个文件后改为最小切片重做——再次印证「机械改包后必须看编译器，不能相信脚本的退出码」 | L1 自动 |
+| v1.4 | 2026-09-24 | 第二里程碑首项交付时把「互斥」从渲染约定升级为编译约束：状态词表、判定、择槽三件事分处三地各写一遍的风险，靠单一 `QueryState` 导出与穷尽 switch 消除 | L1 自动 |
+| v1.4 | 2026-09-24 | **宪章一条待办按事实作废**：「双份 UI 目录归一」所依据的重叠并不存在（零同名组件）。改判而非照做——照做等于凭空造工程 | L2 记录 |

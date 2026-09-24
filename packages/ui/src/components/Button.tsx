@@ -89,7 +89,7 @@ export default function Button(props: ButtonProps) {
     children,
     ...rest
   } = props;
-  const classes = `inline-flex items-center justify-center font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
+  const classes = `inline-flex items-center justify-center font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
   if (props.as === "link") {
     return (

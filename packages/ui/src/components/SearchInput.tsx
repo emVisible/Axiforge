@@ -46,7 +46,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <div
         className={cn(
-          "inline-flex max-w-full items-center rounded-full border transition-all duration-200",
+          "inline-flex max-w-full items-center rounded-full border transition-colors duration-200",
           searchWidthClasses[width],
           sizing.shell,
           theme.shell,

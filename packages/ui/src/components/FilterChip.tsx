@@ -25,7 +25,7 @@ export default function FilterChip({
         type="button"
         onClick={onClick}
         className={cn(
-          "rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200",
+          "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-200",
           active ? "shadow-sm" : "opacity-75 hover:opacity-100",
           className,
         )}
@@ -48,7 +48,7 @@ export default function FilterChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-200",
+        "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-200",
         active
           ? "border-brand bg-brand text-white shadow-sm shadow-brand/20"
           : "border-border bg-panel text-ink-muted hover:border-border-strong hover:text-ink",

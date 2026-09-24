@@ -34,9 +34,28 @@ const PATTERNS = [
 
 const SOURCE_EXT = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
-/** 字号任意值，如 text-[9px] / text-[10.5px] / max-sm:text-[11px] */
-const FONT_ARBITRARY = /(?:^|[\s"'`:])(?:[a-z-]+:)*text-\[[0-9.]+px\]/g;
-const FONT_BASELINE = path.join(root, "scripts", "ui-font-baseline.json");
+/**
+ * 棘轮规则表：逐文件计数，只准变短。
+ * - 字号任意值：12px 以下曾有 182 处散落，字阶已补 text-3xs/text-2xs，迁移一处降一处
+ * - transition-all：会连带动画 width/height/padding 等布局属性，密集界面里是真实的
+ *   掉帧与「不该动的东西跟着动」来源；正确写法是列出要动的属性（或 transition-colors）
+ */
+const RATCHETS = [
+  {
+    id: "fonts",
+    label: "字号任意值",
+    regex: /(?:^|[\s"'`:])(?:[a-z-]+:)*text-\[[0-9.]+px\]/g,
+    baseline: path.join(root, "scripts", "ui-font-baseline.json"),
+    hint: "改用 tokens.css 的 --text-3xs / --text-2xs（text-3xs / text-2xs）。",
+  },
+  {
+    id: "transitions",
+    label: "transition-all",
+    regex: /transition-all/g,
+    baseline: path.join(root, "scripts", "ui-transition-baseline.json"),
+    hint: "列出真正要动画的属性，或用 transition-colors / transition-opacity。",
+  },
+];
 
 function walk(dir, files = []) {
   for (const entry of readdirSync(dir)) {
@@ -72,63 +91,66 @@ for (const scanRoot of SCAN_ROOTS) {
   }
 }
 
-// ---- ② 字号任意值棘轮 ----
-let fontBaseline = {};
-try {
-  fontBaseline = JSON.parse(readFileSync(FONT_BASELINE, "utf8"));
-} catch {
-  console.error("[lint:colors] 缺 scripts/ui-font-baseline.json，先跑 --update-fonts 生成");
-  failed = true;
-}
-
-const fontWorsened = [];
-const fontShrank = [];
-const seenFiles = new Set();
-
-for (const scanRoot of SCAN_ROOTS) {
-  for (const file of walk(path.join(root, scanRoot))) {
-    const rel = path.relative(root, file);
-    seenFiles.add(rel);
-    const hits = (readFileSync(file, "utf8").match(FONT_ARBITRARY) || []).length;
-    const allowed = rel in fontBaseline ? fontBaseline[rel] : 0;
-    if (hits > allowed) fontWorsened.push(`${rel}: ${hits} 处 > 棘轮 ${allowed}`);
-    else if (hits < allowed) fontShrank.push(`${rel}: 实际 ${hits}，baseline 仍记 ${allowed}`);
-  }
-}
-
-if (process.argv.includes("--update-fonts")) {
+// ---- ② 棘轮规则：逐文件计数，只准变短 ----
+const collect = () => {
+  const out = [];
   for (const scanRoot of SCAN_ROOTS) {
-    for (const file of walk(path.join(root, scanRoot))) {
-      const rel = path.relative(root, file);
-      const hits = (readFileSync(file, "utf8").match(FONT_ARBITRARY) || []).length;
-      if (hits) fontBaseline[rel] = hits;
-      else delete fontBaseline[rel];
+    for (const file of walk(path.join(root, scanRoot))) out.push(path.relative(root, file));
+  }
+  return out;
+};
+const files = collect();
+const updateMode = process.argv.slice(2).find((a) => a.startsWith("--update"));
+
+for (const rule of RATCHETS) {
+  let baseline = {};
+  try {
+    baseline = JSON.parse(readFileSync(rule.baseline, "utf8"));
+  } catch {
+    if (!updateMode) {
+      console.error(`[lint:colors] 缺 ${path.relative(root, rule.baseline)}，先跑 --update=${rule.id} 生成`);
+      failed = true;
+      continue;
     }
   }
-  const sorted = Object.fromEntries(
-    Object.entries(fontBaseline).sort((a, b) => b[1] - a[1]),
-  );
-  writeFileSync(FONT_BASELINE, `${JSON.stringify(sorted, null, 2)}\n`);
-  const total = Object.values(sorted).reduce((a, b) => a + b, 0);
-  console.log(`[lint:colors] 字号棘轮已更新：${Object.keys(sorted).length} 个文件，共 ${total} 处`);
-  process.exit(0);
-}
 
-for (const rel of Object.keys(fontBaseline)) {
-  if (!seenFiles.has(rel)) fontShrank.push(`${rel}: 文件已不存在，应删行`);
-}
+  if (updateMode === `--update=${rule.id}` || updateMode === "--update=all") {
+    const next = {};
+    for (const rel of files) {
+      const hits = (readFileSync(path.join(root, rel), "utf8").match(rule.regex) || []).length;
+      if (hits) next[rel] = hits;
+    }
+    const sorted = Object.fromEntries(Object.entries(next).sort((a, b) => b[1] - a[1]));
+    writeFileSync(rule.baseline, `${JSON.stringify(sorted, null, 2)}\n`);
+    const total = Object.values(sorted).reduce((a, b) => a + b, 0);
+    console.log(`[lint:colors] ${rule.label}棘轮已更新：${Object.keys(sorted).length} 个文件，共 ${total} 处`);
+    continue;
+  }
+  /* 处于别的规则的更新模式时跳过本规则评估：此时 baseline 可能还不存在，
+     拿它来判违规会把全部文件报成越线，制造一次假警报 */
+  if (updateMode) continue;
 
-if (fontWorsened.length) {
-  failed = true;
-  console.error(
-    `[lint:colors] FAIL —— ${fontWorsened.length} 个文件新增字号任意值（棘轮：只准变短）`,
-  );
-  for (const v of fontWorsened) console.error(`  - ${v}`);
-  console.error("\n处置：改用 tokens.css 的 --text-3xs / --text-2xs（text-3xs / text-2xs）。");
-}
-if (fontShrank.length) {
-  console.log(`[lint:colors] 字号棘轮可收紧 ${fontShrank.length} 处（--update-fonts 锁定）`);
-  for (const t of fontShrank.slice(0, 6)) console.log(`  · ${t}`);
+  const worsened = [];
+  const shrinkable = [];
+  for (const rel of files) {
+    const hits = (readFileSync(path.join(root, rel), "utf8").match(rule.regex) || []).length;
+    const allowed = rel in baseline ? baseline[rel] : 0;
+    if (hits > allowed) worsened.push(`${rel}: ${hits} 处 > 棘轮 ${allowed}`);
+    else if (hits < allowed) shrinkable.push(`${rel}: 实际 ${hits}，baseline 仍记 ${allowed}`);
+  }
+  for (const rel of Object.keys(baseline)) {
+    if (!files.includes(rel)) shrinkable.push(`${rel}: 文件已不存在，应删行`);
+  }
+  if (worsened.length) {
+    failed = true;
+    console.error(`[lint:colors] FAIL —— ${rule.label}新增 ${worsened.length} 个文件越棘轮（只准变短）`);
+    for (const v of worsened) console.error(`  - ${v}`);
+    console.error(`\n处置：${rule.hint}`);
+  }
+  if (shrinkable.length) {
+    console.log(`[lint:colors] ${rule.label}棘轮可收紧 ${shrinkable.length} 处（--update=${rule.id} 锁定）`);
+    for (const t of shrinkable.slice(0, 6)) console.log(`  · ${t}`);
+  }
 }
 
 if (failed) {

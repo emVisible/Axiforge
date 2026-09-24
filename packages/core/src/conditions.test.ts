@@ -239,6 +239,56 @@ describe("applyEffects", () => {
   });
 });
 
+describe("relationship 关系维度（RN 闭环 S1-T3a）", () => {
+  it("apply 写入 relationships 三段桶且不修改入参", () => {
+    const vars = emptyVariables();
+    const next = applyEffects(vars, [
+      { type: "relationship", key: "yansha.player.trust", value: "high" },
+    ]);
+    expect(vars.relationships.yansha).toBeUndefined();
+    expect(next.relationships.yansha.player.trust).toBe("high");
+  });
+
+  it("evaluate 按 charA.charB.field 求值", () => {
+    let vars = emptyVariables();
+    vars = applyEffects(vars, [
+      { type: "relationship", key: "yansha.player.trust", value: "high" },
+    ]);
+    expect(
+      evaluateCondition(
+        { type: "relationship", key: "yansha.player.trust", operator: "eq", value: "high" },
+        vars,
+      ),
+    ).toBe(true);
+    expect(
+      evaluateCondition(
+        { type: "relationship", key: "yansha.player.trust", operator: "eq", value: "low" },
+        vars,
+      ),
+    ).toBe(false);
+  });
+
+  it("缺失桶时 eq 为 false、ne 为 true；畸形 key 跳过", () => {
+    const vars = emptyVariables();
+    expect(
+      evaluateCondition(
+        { type: "relationship", key: "a.b.trust", operator: "eq", value: "high" },
+        vars,
+      ),
+    ).toBe(false);
+    expect(
+      evaluateCondition(
+        { type: "relationship", key: "a.b.trust", operator: "ne", value: "high" },
+        vars,
+      ),
+    ).toBe(true);
+    const next = applyEffects(vars, [
+      { type: "relationship", key: "badkey", value: 1 },
+    ]);
+    expect(Object.keys(next.relationships)).toHaveLength(0);
+  });
+});
+
 describe("cloneVariables", () => {
   it("深拷贝 characters 子对象", () => {
     const vars: RuntimeVariables = { memory: {}, flags: {}, characters: { c1: { mood: "x" } }, relationships: {} };

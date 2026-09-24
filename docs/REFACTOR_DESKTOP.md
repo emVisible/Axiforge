@@ -116,6 +116,8 @@
 > **G1 偏差记录**：`hooks/useProjectEditor.ts`（1084 行，headless 状态内核）超出 400 行预算。
 > 理由：UI/逻辑分层优先落地（巨石已死，渲染文件全部达标）；该文件零 JSX、由 E2E 全程护航，
 > 域拆分（graph/persistence）随 Phase 2 StorageProvider 改造一并处理——届时持久化层本就要重切。
+> **G2/G4 偏差记录（v0.6 核验）**：`packages/core` 缺 `@vitest/coverage-v8` 依赖，覆盖率不可跑（史前状态，非本轮引入；editor-core 96.85%/93.38% 达标，axs round-trip 20/20 全绿）；
+> 仓内无 dpdm/madge 配置与 CI 步骤，G4“循环依赖=0”无自动化断言（史前缺失；本轮零新增跨包导入）。两者均记为已知缺口，不阻塞 v0.6（纯核验轮，未引入新耦合）。
 
 #### 1c StorageProvider 接口
 
@@ -217,13 +219,13 @@
 ## 附录 · 阶段收尾检查单（G10 执行件）
 
 ```
-[ ] G1–G9 全绿（或偏差已在本文件显式记录并说明理由）
-[ ] E2E 行为基线全绿（G3 六条起，按阶段递增）
-[ ] 手动验收路径走通，步骤写入交付说明
-[ ] 三层文档一致：ADR / 本文件 checkbox / docs/user
-[ ] 删除清单核销：本阶段承诺删除的旧路径已不存在
-[ ] 非目标未膨胀（对照阶段开头声明的非目标逐条复核）
-[ ] 打 tag desktop-v0.x
+[x] G1–G9 全绿（或偏差已在本文件显式记录并说明理由）—— v0.6：tsc 0 error；axs 20 / core 49（含 S1-T3a 新增 3 例） / editor-core 85 / web 29；oxlint 0 error（3 史前 warning）；golden 6/6；G2/G4 偏差见上
+[x] E2E 行为基线全绿（G3 六条起，按阶段递增）—— v0.6：11/11（E1-E11，14.7s）
+[x] 手动验收路径走通，步骤写入交付说明 —— v0.6：RN 闭环三步写入 BLUEPRINT_v0.6.md §6；自动化等价全绿（E11 + roundtrip + conditions 30 例），人类接受 E11 为等价证据放行
+[x] 三层文档一致：ADR / 本文件 checkbox / docs/user —— v0.6：ADR-024/025 均为已采纳；Phase1-5 checkbox 全勾；axs-syntax.md 含 @relation/relation. 与对等双视图表述
+[x] 删除清单核销：本阶段承诺删除的旧路径已不存在 —— v0.6：ProjectFlowPage.tsx 已删（pages/editor/ 四件套在位）；v0.6 本轮零产品代码新增，无新删除项
+[x] 非目标未膨胀（对照阶段开头声明的非目标逐条复核）—— v0.6：世界 tick / AI 运行时 / 跨作品继承 / 签名公证 / 自动更新 / Live2D / CRDT 均未引入（delta 仅 1 测试文件 + Blueprint + 本文件）
+[x] 打 tag desktop-v0.x —— v0.6：desktop-v0.6（见 git show）
 ```
 
 ## 风险与止损

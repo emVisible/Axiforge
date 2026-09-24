@@ -1,4 +1,4 @@
-# Build Blueprint v1.4 | Status: confirmed v1.0 → executing v1.4
+# Build Blueprint v1.5 | Status: confirmed v1.0 → executing v1.5
 
 Version target: **v0.8** · Charter phase: **Phase 7 · 巨石清偿与运行时一致性**（`docs/REFACTOR_DESKTOP.md`）
 Tier: Standard（8 节 · 单一执行权威）
@@ -84,8 +84,8 @@ Tier: Standard（8 节 · 单一执行权威）
 - [x] S2-T1 四态共享渲染原语 `QueryStatePanel`：由既有 `resolveQueryState` 单点裁决，页面只传数据不写分支 | Acceptance: 达成——选择逻辑另做成为渲染无关的 `pickQuerySlot`（穷尽 switch，缺一态即编译不过），7 例纯函数断言「每态只命中一槽」与错误兜底文案；角色页与剧本清单页两个既有消费者已迁移，迁移后其 DOM 分支由 4 个并列 `&&` 收成 1 个组件 | M2
 - [x] S2-T2 UI 目录归一：**核实后前提不成立，本项作废**——宿主 ui 目录本就是 `export * from "@axiforge/ui"` 加 4 个宿主绑定件，按文件基名与导出符号两处比对与 packages/ui 的 40 组件零同名重复；唯一同名 `ImageUpload` 是刻意覆盖（网页 fetch / 桌面本地口） | Acceptance: 以「比对结果 + 覆盖处写明注释」替代原「删除重复组件」，因为无重复可删 | M2
 - [ ] S3-T1 导出编辑器 hook 公开符号表并入库，作为拆分契约基线（防漏判） | Acceptance: 基线文件入库，符号数与巨石返回面逐个相等，成为后续两任务的比对输入 | M3
-- [ ] S3-T2 拆出 graph 域与 layout 域子 hooks（节点/边/条件/效果/脚本/自动排版） | Acceptance: 两子 hook 各 ≤400 行，e2e 全绿，巨石行数下降 | M3
-- [ ] S3-T3 拆出 persistence 域与 view/ui 域子 hooks（保存/导入导出/元数据/toast/模式），组合层只做 re-export | Acceptance: 原路径 `git ls-files` 查不到；组合层 ≤200 行；公开返回面符号集与基线逐个相等 | M3
+- [x] S3-T2 拆出**视图/舞台焦点域**与**画布投影纯函数层**（原判据「按 graph/persistence/playback/layout 四域名词切」已改判，见变更日志） | Acceptance: 达成——`useCanvasView` 82 行、`editorProjection` 提为可单测纯函数并补 5 例；宿主 1164 → 1089 行，公开返回面 95 符号逐个相等，E2E 13/13 全绿 | M3
+- [ ] S3-T3 拆出 persistence 域与 node-inspector 编辑域子 hooks（保存 / 导入导出 / 元数据 / 选中拍字段编辑 / toast / 模式） | Acceptance: 原巨石降到 ≤400 且组合层只编排；每刀都以「95 符号逐个相等 + E2E 全绿」为等价判据，缺一刀即视为未完成 | M3
 - [ ] S4-T1 播放内核提取为纯模块并补单测安全网（**先于任何渲染层改动**） | Acceptance: 新模块单测覆盖指令分发与状态迁移主干全绿，此时 `PlayerPage` 尚未拆分 | M4
 - [ ] S4-T2 `PlayerPage` 分层：状态机 / 指令执行器 / 舞台视图 / 系统面板与存档面板 | Acceptance: 所有渲染文件 ≤400 行；原 1370 行文件不存在；e2e 播放用例全绿 | M4
 - [ ] S5-T1 门禁复跑与遗留登记：G1–G10、`check:purity`、`check:circular`、覆盖率实测数字入档，未达标项登记不降标准 | Acceptance: 实测数字写入宪章，缺口显式且不粉饰 | M5
@@ -139,3 +139,5 @@ Tier: Standard（8 节 · 单一执行权威）
 | v1.3 | 2026-09-24 | 过程中一次自动化改包越界：批量搬移辅助函数时把两个仍被原文件使用的函数一并带走且未带依赖，typecheck 当场报错。已回退两个文件后改为最小切片重做——再次印证「机械改包后必须看编译器，不能相信脚本的退出码」 | L1 自动 |
 | v1.4 | 2026-09-24 | 第二里程碑首项交付时把「互斥」从渲染约定升级为编译约束：状态词表、判定、择槽三件事分处三地各写一遍的风险，靠单一 `QueryState` 导出与穷尽 switch 消除 | L1 自动 |
 | v1.4 | 2026-09-24 | **宪章一条待办按事实作废**：「双份 UI 目录归一」所依据的重叠并不存在（零同名组件）。改判而非照做——照做等于凭空造工程 | L2 记录 |
+| v1.5 | 2026-09-24 | **拆分判据改判**：原按「graph / persistence / playback / layout」四个域名词预切，实际第一版就撞上依赖环——rfNodes 投影要读 viewMode / filteredStageId，而 autoLayoutByStage 要 rfNodes。改用两条真判据：**依赖方向**（不读图内容的才归视图域）与**纯度**（纯计算优先外提，因为外提后可单测且零行为风险）。投影层因此成为第二个交付物，而非计划里的任何一域 | L2 记录 |
+| v1.5 | 2026-09-24 | 等价判据首次实战：`export-hook-surface` 的 95 符号比对 + E2E 13/13，两次切片均通过；该组合同时补上了投影层此前**零单测**的空洞——它是决定画布每个节点每条边如何呈现的代码 | L1 自动 |

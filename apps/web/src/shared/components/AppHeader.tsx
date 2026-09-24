@@ -6,6 +6,7 @@ import GlobalSearch from "@/shared/components/GlobalSearch";
 import UserAccountMenu from "@/shared/components/UserAccountMenu";
 import AppBrand from "@/shared/components/AppBrand";
 import { routes } from "@/shared/lib/routes";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import { useTheme } from "@/app/providers/ThemeProvider";
 import { cn } from "@/shared/components/ui";
 
@@ -65,7 +66,7 @@ export default function AppHeader({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          {showDiscoverLink && (
+          {showDiscoverLink && !isLocalOnlyDeployment() && (
             <Link to={routes.discover} className={`hidden sm:inline ${navLinkClass}`}>
               发现
             </Link>
@@ -80,7 +81,7 @@ export default function AppHeader({
               文档
             </Link>
           )}
-          {showSearch && <GlobalSearch />}
+          {showSearch && !isLocalOnlyDeployment() && <GlobalSearch />}
           {showThemeToggle && (
             <button
               type="button"

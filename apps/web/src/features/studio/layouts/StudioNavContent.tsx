@@ -13,6 +13,7 @@ import {
   type SidebarNavItem,
 } from "@/shared/components/ui";
 import { routes } from "@/shared/lib/routes";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import { cn } from "@/shared/components/ui";
 
 /** Cursor-style flat groups; all primary labels are two characters. */
@@ -40,8 +41,11 @@ export default function StudioNavContent({
   className = "",
   rail = false,
 }: StudioNavContentProps) {
+  // 概览是云端创作者数据面板：桌面离线态没有后端，入口直接不给（而非点进去报错）
+  const localOnly = isLocalOnlyDeployment();
+
   if (rail) {
-    const items = [OVERVIEW_ITEM, ...CREATION_ITEMS];
+    const items = localOnly ? CREATION_ITEMS : [OVERVIEW_ITEM, ...CREATION_ITEMS];
     return (
       <nav
         className={cn("flex flex-col items-center gap-0.5 py-2", className)}
@@ -56,9 +60,11 @@ export default function StudioNavContent({
 
   return (
     <SidebarNav className={cn("gap-5", className)}>
-      <SidebarNavGroup label="工作室">
-        <SidebarNavLink item={OVERVIEW_ITEM} />
-      </SidebarNavGroup>
+      {!localOnly && (
+        <SidebarNavGroup label="工作室">
+          <SidebarNavLink item={OVERVIEW_ITEM} />
+        </SidebarNavGroup>
+      )}
       <SidebarNavGroup label="创作">
         {CREATION_ITEMS.map((item) => (
           <SidebarNavLink key={item.key} item={item} />

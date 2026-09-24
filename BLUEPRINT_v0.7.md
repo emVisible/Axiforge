@@ -1,4 +1,4 @@
-# Build Blueprint v1.6 | Status: confirmed v1.0 → executing v1.6
+# Build Blueprint v1.7 | Status: confirmed v1.0 → executing v1.7
 > 日期 2026-09-24 · 分支 `desktop` · 基线 `e123f1a`（tag `desktop-v0.6`）· 关联 [ADR-024](docs/ADR/024-desktop-local-first.md) 决策 3/4、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)（新增 Phase 6）
 
 ## 1. Goals & Non-Goals
@@ -57,7 +57,7 @@
 - [x] S2-T2 导出/导入接真实字节：导出按 `manifest.assets` 收集本地文件入包并带上演员表；导入素材落盘（内容寻址 → ref 两端一致）、角色新建、引用重映射后再建工程 | Acceptance: `pnpm e2e` 新增 E12「导出带角色 → 导入新建角色且 characterId 重映射」断言绿（12 条基线）；壳内冒烟新增 v2 媒体入包断言 | M2
 - [x] S2-T3 首启播种：示范作 `.axsp` v2 随前端资源分发（`apps/web/public/seeds/`），`listProjects` 为空且无播种标记时自动导入一次 | Acceptance: 删本地库与素材目录后启动 .app → 工程列表出现三部示范作且可断网试玩；重复启动不二次播种（单测 + 壳内冒烟两步断言） | M2
 - [x] S3-T1 角色域 Provider 化：`MyCharactersPage`/`CharacterDetailPage`/`CharacterSearchSelect`/`useProjectDirectory` 在桌面态经 `listCharacters/getCharacter/saveCharacter`（契约已存在，属接线非新增） | Acceptance: 打包离线态角色列表与详情不再出现「加载角色失败」；web 态行为零变更 | M3
-- [ ] S3-T2 缺席域显式降级：版本/关系/传记/发现/全局搜索/概览在本地态给「需后端」可读态；**错误态必须抑制空态**（实测缺陷） | Acceptance: 断网打包态走查无「沉默失败」；错误/空态互斥有单测或组件用例 | M3
+- [x] S3-T2 缺席域显式降级：版本/关系/传记/发现/全局搜索/概览在本地态给「需后端」可读态；**错误态必须抑制空态**（实测缺陷） | Acceptance: 断网打包态走查无「沉默失败」（截图为证）；错误/空态互斥有单测（`resolveQueryState` 四态互斥用例） | M3
 - [x] S3-T3 首屏路由收口：桌面态 `/` 与 `*` 落 `/studio/projects`，`/studio` index 不再落云端概览 | Acceptance: 打包 .app 冷启动首屏即本地工程列表（截图）；浏览器态仍默认 `/discover`（回归断言 E13） | M3
 - [ ] S4-T1 CI 前端门禁：新增 job 跑 `tsc --noEmit` + `vitest run`（core/axs/editor-core/web）+ `oxlint` + dpdm 循环依赖 + `packages/*` 禁 react/dom 的 lint 断言；补 `@vitest/coverage-v8` 使 core 覆盖率可跑 | Acceptance: CI 上上述步骤可见且绿；宪章 G2/G4/Q9 的「CI 断言」指向真实步骤 | M4
 - [ ] S4-T2 决策落文：新建 ADR-026（素材本地化与 `.axsp` v2 容器），回写 `KERNEL_DESIGN.md` §2.5 方法表与 §一 依赖铁律的 CI 事实 | Acceptance: ADR-026 状态「已采纳」含备选与否决理由；KERNEL 方法表含 saveAsset/resolveAssetUrl | M4
@@ -106,3 +106,6 @@
 - v1.5 L1（2026-09-24）角色域接线落地：按裁决在 hook 层分派（我的清单 / 详情 / 创建 / 更新 + 工程角色目录），浏览器路径逐字不变。核查中发现**选角搜索组件绕过 hooks 直连 API**——只改 hooks 会留下离线缺口，已一并分派，并把「我的 ∪ 公开」按归属拆回两栏以保留原有排序。新增适配层单测 2 例、壳内冒烟角色域步骤（含归属隔离断言）。
 - v1.6 L2（2026-09-24）首屏路由收口时追出两个真缺陷：改完落点截图后列表仍是空的，顺着查——① `useProjects` 直连 HTTP，桌面离线根本取不到列表，宪章 Phase 1c「web 应用全部数据访问经 Provider」这条勾不成立（已在宪章原文下纠偏，不删记录）；② SQLite `createProject` 从不写 `author_id`，而列表按 author_id 过滤，于是**桌面里任何新建工程都不会出现在「我的」**——播种只是把这个既有缺陷照了出来。
 - v1.6 L2（2026-09-24）为此扩两处契约：`SqliteStorageProvider` 构造带建档者；`ProjectMeta` 补 `isPublic`（本地真实存在的列）。新增 `projectMetaToResponse` 适配层——本地库没有 description/theme_tags/mechanism 等列，适配层填**空值而非编造**，缺口登记为 Phase 7 的 schema 任务。桌面首屏实测截图已见三部【示范】工程。
+- v1.7 L2（2026-09-24）缺席域降级落地方式：判据收在 `shared/lib/deployment.ts` 一处（桌面 ⇒ 云能力缺席，因为壳目前无法指向后端）。侧栏「概览」、顶栏「发现」与全局搜索、列表页元剧本/模板/筛选、「去 Discover」入口、角色详情的关系·传记·版本·Fork·删除，本地态一律**不给入口**，而不是点进去看一条网络错误。打包壳截图逐项确认已消失。
+- v1.7 L2（2026-09-24）四态原语：验收要求「错误/空态互斥有单测」，逐页手写 `&&` 条件无法被测试，故新增 `resolveQueryState` 纯判定 + 4 条互斥用例；角色页与剧本列表页已接入该原语，道具/场景两页本轮以 `!error` 修正（行为已正确），**逐页迁移列入 Phase 8**。
+- 记录一条 DEV 噪声（不修）：壳内冒烟会在工程列表短暂造出「壳内冒烟」工程，跑完自删；若在冒烟中途杀进程会残留。release 构建不含该路径。

@@ -225,7 +225,7 @@
 - [x] M2-1 `.axsp` v2 容器：zip（manifest/project/**characters**/assets）+ v1 只读兼容 + `remapCharacterIds`
 - [x] M2-2 导出/导入接真实字节与演员表；E12 基线（12 条）
 - [x] M2-3 示范作随包分发与空库首启播种（`public/seeds/` + `seeded.json` 标记 + `SeedOutcome` 可观测；全新库实测 `seed=seeded:3`，二次启动 `skipped:non-empty`）
-- [ ] M3 桌面可达域收口：角色域 Provider 化、缺席域显式降级、错误态抑制空态、首屏路由落本地工程列表
+- [x] M3 桌面可达域收口：角色域 Provider 化（hook 层按环境分派，web 零变更）、缺席域显式降级（概览/发现/全局搜索/筛选/版本·关系·传记·Fork·删除不给入口）、错误态抑制空态（`resolveQueryState` 四态互斥 + 用例）、首屏落本地工程列表 —— 打包壳截图确认：三部【示范】工程在列、云端入口已消失
 - [ ] M4 门禁固定税（CI 前端门禁 + dpdm + coverage）+ ADR-026 + 三层文档对账
 
 **非目标**：不拆巨石（Phase 7 单列）、不做签名公证/自动更新（Phase 10）、不做音频素材入口。
@@ -253,6 +253,7 @@
 
 **目标**：让产品「像成品，不像工程」。本轮是纯设计轮，产出可对比的视觉证据。
 
+- [ ] 四态原语逐页迁移：`shared/lib/queryState.ts::resolveQueryState` 已建立并接入角色页与剧本列表页；道具/场景/发现各 tab/玩家页收敛到该原语（Phase 6 已逐页修正行为，此处统一形态）
 - [ ] 设计令牌审计：字阶（type scale）、间距韵律（4/8 基准）、圆角与阴影层级、色彩语义（禁硬编码，`check-ui-tokens.mjs` 覆盖面扩到全 apps）
 - [ ] 日夜双主题复检（ADR-023）：逐屏截图对比，修不可读对比度（WCAG AA 文本 4.5:1）
 - [ ] 四态全覆盖巡检：加载/空/错误/理想 每一屏都有设计且互斥（Phase 6 M3 发现的「错误态与空态同屏」类缺陷系统性排查）

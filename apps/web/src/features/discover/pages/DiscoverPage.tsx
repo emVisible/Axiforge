@@ -8,6 +8,8 @@ import DiscoverItemsTab from "@/features/discover/components/DiscoverItemsTab";
 import DiscoverScenesTab from "@/features/discover/components/DiscoverScenesTab";
 import DiscoverTopicsBar from "@/features/discover/components/DiscoverTopicsBar";
 import { PageHeader, SearchInput, SegmentedControl } from "@/shared/components/ui";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 
 type DiscoverTab = "projects" | "characters" | "items" | "scenes";
 
@@ -42,6 +44,16 @@ export default function DiscoverPage() {
   useEffect(() => {
     setSearch("");
   }, [tab]);
+
+  // 桌面离线直接输 URL 进来时，给一句准确说明而不是空白的作品街
+  if (isLocalOnlyDeployment()) {
+    return (
+      <>
+        <PageHeader dense title="发现" description="公开作品与创作者" />
+        <CloudFeatureNotice feature="发现页" />
+      </>
+    );
+  }
 
   return (
     <>

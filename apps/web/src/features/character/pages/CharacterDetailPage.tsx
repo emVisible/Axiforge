@@ -46,6 +46,7 @@ import { versionApi } from "@/shared/api/versions";
 import { characterApi } from "@/shared/api/characters";
 import { renderCharacterPrompt } from "@/shared/lib/promptRenderer";
 import { routes } from "@/shared/lib/routes";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 
 const layerTabs: {
   key: string;
@@ -138,6 +139,8 @@ export default function CharacterDetailPage() {
   const navigate = useNavigate();
   const { data: character, isLoading, error } = useCharacter(id!, { bumpView: true });
   const deleteCharacter = useDeleteCharacter();
+  /** 关系/传记/版本/Fork/删除依赖协作服务：桌面离线态不给入口（见 deployment.ts） */
+  const localOnly = isLocalOnlyDeployment();
   const forkCharacter = useForkCharacter();
 
   const [isForkOpen, setIsForkOpen] = useState(false);
@@ -145,8 +148,7 @@ export default function CharacterDetailPage() {
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
   const [isVersionOpen, setIsVersionOpen] = useState(false);
   const [activeLayer, setActiveLayer] = useState("anchor");
-  const [activeTab, setActiveTab] = useState<"info" | "relations" | "stories" | "sprites">(
-    "info",
+  const [activeTab, setActiveTab] = useState<"info" | "relations" | "stories" | "sprites">(    "info",
   );
   const [copiedId, setCopiedId] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -342,13 +344,15 @@ export default function CharacterDetailPage() {
       <div className="mb-6 rounded-2xl border border-border bg-surface p-8 group/card relative overflow-hidden">
         <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 opacity-0 translate-x-2 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-all duration-300 ease-out z-10">
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsVersionOpen(true)}
-              className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
-            >
-              <History className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {versionsCount} 个版本
-            </button>
+            {!localOnly && (
+              <button
+                onClick={() => setIsVersionOpen(true)}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+              >
+                <History className="h-3.5 w-3.5" strokeWidth={1.75} />
+                {versionsCount} 个版本
+              </button>
+            )}
             <button
               onClick={async () => {
                 const url = window.location.href;
@@ -381,23 +385,27 @@ export default function CharacterDetailPage() {
           >
             编辑
           </Button>
-          <Button
-            onClick={() => setIsForkOpen(true)}
-            variant="ghost"
-            size="sm"
-            icon={<GitFork className="h-3.5 w-3.5" strokeWidth={1.75} />}
-          >
-            Fork
-          </Button>
-          <Button
-            onClick={handleDelete}
-            variant="ghost"
-            size="sm"
-            className="text-ink-muted hover:text-red-500"
-            icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />}
-          >
-            删除
-          </Button>
+          {!localOnly && (
+            <Button
+              onClick={() => setIsForkOpen(true)}
+              variant="ghost"
+              size="sm"
+              icon={<GitFork className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            >
+              Fork
+            </Button>
+          )}
+          {!localOnly && (
+            <Button
+              onClick={handleDelete}
+              variant="ghost"
+              size="sm"
+              className="text-ink-muted hover:text-red-500"
+              icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            >
+              删除
+            </Button>
+          )}
           <div className="h-px bg-canvas my-0.5 w-8" />
           <div className="flex items-center gap-1">
             <button
@@ -573,7 +581,9 @@ export default function CharacterDetailPage() {
 
       {/* Tab */}
       <div className="flex gap-1 mb-6 bg-canvas p-1 rounded-xl">
-        {mainTabs.map(({ key, label, Icon }) => (
+        {mainTabs
+          .filter((t) => !localOnly || t.key === "info" || t.key === "sprites")
+          .map(({ key, label, Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}

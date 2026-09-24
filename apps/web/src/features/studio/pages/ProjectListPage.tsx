@@ -8,6 +8,8 @@ import {
   useDeleteProject,
 } from "@/shared/hooks/useProjects";
 import DiscoverBrowseLink from "@/features/discover/components/DiscoverBrowseLink";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
+import { resolveQueryState } from "@/shared/lib/queryState";
 import Shell from "@/shared/components/Shell";
 import {
   Badge,
@@ -100,6 +102,8 @@ export default function ProjectListPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tab, setTab] = useState<"my" | "template">("my");
+  /** 桌面离线态：标签/机制/类型/模板/发现入口都依赖云端元数据，直接不给（见 deployment.ts） */
+  const localOnly = isLocalOnlyDeployment();
   const [templates, setTemplates] = useState<ProjectResponse[]>([]);
   const [forkingId, setForkingId] = useState<string | null>(null);
   const [filterTags, setFilterTags] = useState<string[]>([]);
@@ -163,6 +167,8 @@ export default function ProjectListPage() {
   });
 
   const hasFilters = filterTags.length > 0 || filterMechanism || filterGenre;
+  /** 四态互斥：错误不得显示成「还没有剧本」（判定与用例见 shared/lib/queryState.ts） */
+  const state = resolveQueryState({ isLoading, error, count: filtered.length });
   const filterCount = [filterTags.length, filterMechanism, filterGenre].filter(
     Boolean,
   ).length;
@@ -190,7 +196,7 @@ export default function ProjectListPage() {
         description="创建和管理叙事剧本"
         action={
           <div className="flex items-center gap-2">
-            <DiscoverBrowseLink tab="projects" />
+            {!localOnly && <DiscoverBrowseLink tab="projects" />}
             <Button
               size="sm"
               variant="ghost"
@@ -284,40 +290,44 @@ export default function ProjectListPage() {
           ) : undefined
         }
       >
-        <FilterChip
-          label="元剧本"
-          active={filterMeta}
-          onClick={() => setFilterMeta(!filterMeta)}
-          className="inline-flex items-center gap-1"
-        />
-        <SegmentedControl
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "my", label: "我的" },
-            { value: "template", label: "模板" },
-          ]}
-        />
-        <Button
-          variant={showFilters || hasFilters ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-        >
-          筛选{filterCount > 0 ? ` (${filterCount})` : ""}
-        </Button>
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-500 hover:text-red-600"
-            onClick={() => {
-              setFilterTags([]);
-              setFilterMechanism("");
-              setFilterGenre("");
-            }}
-          >
-            清除
-          </Button>
+        {!localOnly && (
+          <>
+            <FilterChip
+              label="元剧本"
+              active={filterMeta}
+              onClick={() => setFilterMeta(!filterMeta)}
+              className="inline-flex items-center gap-1"
+            />
+            <SegmentedControl
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: "my", label: "我的" },
+                { value: "template", label: "模板" },
+              ]}
+            />
+            <Button
+              variant={showFilters || hasFilters ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              筛选{filterCount > 0 ? ` (${filterCount})` : ""}
+            </Button>
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-600"
+                onClick={() => {
+                  setFilterTags([]);
+                  setFilterMechanism("");
+                  setFilterGenre("");
+                }}
+              >
+                清除
+              </Button>
+            )}
+          </>
         )}
       </FilterToolbar>
 
@@ -387,13 +397,13 @@ export default function ProjectListPage() {
         )
       ) : (
         <>
-      {isLoading && (
+      {state === "loading" && (
         <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
       )}
-      {error && (
+      {state === "error" && (
         <ErrorDisplay message="剧本清单读取失败" onRetry={() => window.location.reload()} />
       )}
-      {!isLoading && !error && filtered.length === 0 && (
+      {state === "empty" && (
         <EmptyState
           icon={ScrollText}
           title={hasFilters || filterMeta ? "没有匹配的剧本" : "还没有剧本"}

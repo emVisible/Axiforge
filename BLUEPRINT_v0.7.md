@@ -1,4 +1,4 @@
-# Build Blueprint v1.8 | Status: confirmed v1.0 → executing v1.8
+# Build Blueprint v1.9 | Status: confirmed v1.0 → executing v1.9
 > 日期 2026-09-24 · 分支 `desktop` · 基线 `e123f1a`（tag `desktop-v0.6`）· 关联 [ADR-024](docs/ADR/024-desktop-local-first.md) 决策 3/4、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)（新增 Phase 6）
 
 ## 1. Goals & Non-Goals
@@ -61,7 +61,7 @@
 - [x] S3-T3 首屏路由收口：桌面态 `/` 与 `*` 落 `/studio/projects`，`/studio` index 不再落云端概览 | Acceptance: 打包 .app 冷启动首屏即本地工程列表（截图）；浏览器态仍默认 `/discover`（回归断言 E13） | M3
 - [x] S4-T1 CI 前端门禁：新增 job 跑 `tsc --noEmit` + `vitest run`（core/axs/editor-core/web）+ `oxlint` + dpdm 循环依赖 + `packages/*` 禁 react/dom 的 lint 断言；补 `@vitest/coverage-v8` 使 core 覆盖率可跑 | Acceptance: 步骤在本地以 `pnpm gates` 全链跑通、workflow YAML 通过 lint、CI 绿等首次 push 后确认（不 push 不谎称已绿）；宪章 G2/G4/Q9 的「CI 断言」指向真实步骤 | M4
 - [x] S4-T2 决策落文：新建 ADR-026（素材本地化与 `.axsp` v2 容器），回写 `KERNEL_DESIGN.md` §2.5 方法表与 §一 依赖铁律的 CI 事实 | Acceptance: ADR-026 状态「已采纳」含备选与否决理由、后果含未清偿欠账；KERNEL 方法表含 saveAsset/readAsset/范围语义；ADR 索引已登记 | M4
-- [ ] S4-T3 文档对账：宪章新增 Phase 6 段并回写勾选；Phase 2「素材落工程目录 + DB 存相对路径」虚假勾选纠偏；`BACKLOG_V1.md` 清除「`.axsp` 导出=明确不做」矛盾；README 结构段路径修正；e2e 头注释 E1–E11 | Acceptance: 逐文件 diff 可指认，且不再有文档声称已交付而代码未交付的项 | M4
+- [x] S4-T3 文档对账：宪章新增 Phase 6 段并回写勾选；Phase 2「素材落工程目录」虚假勾选纠偏；`BACKLOG_V1.md` 清除「`.axsp` 导出=明确不做」矛盾；README 结构段与脚本表按实态重写；`docs/user` 新增桌面版与工程包文档并加注册表完整性用例 | Acceptance: 逐文件 diff 可指认，不再有文档声称已交付而代码未交付的项；历史「已完成」表未被删改（纠偏以追加形式落地） | M4
 - [ ] S4-T4 收尾：G1–G9 门禁证据 + 附录检查单全勾 + 手动验收路径写入 §6 + 打 tag `desktop-v0.7` | Acceptance: `git tag --list desktop-v0.7` 非空且 `git show` 可见；门禁关键输出粘进宪章 Phase 6 | M4
 
 ## 6. Acceptance Criteria（手动验收路径）
@@ -111,3 +111,4 @@
 - 记录一条 DEV 噪声（不修）：壳内冒烟会在工程列表短暂造出「壳内冒烟」工程，跑完自删；若在冒烟中途杀进程会残留。release 构建不含该路径。
 - v1.8 L2（2026-09-24）门禁固化（M4 首步）：`pnpm gates`（tsc×4 → vitest×4 → oxlint+颜色令牌 → 内核纯净度 → dpdm 循环依赖）本地全链跑通，新增 `scripts/check-package-purity.mjs`（24 文件 0 违规）与 CI `frontend-gates` job；e2e 进 CI 需显式建 `axiforge_e2e` 库，已加步骤。**CI 绿要等首次 push 才能声称，本轮不 push 故只声明本地事实 + YAML lint 通过。**
 - v1.8 L2（2026-09-24）覆盖率一跑就露馅：`packages/core` 实测 **83.47% 语句 / 72.02% 分支**，低于 G2 的 ≥90%——此前因缺 `@vitest/coverage-v8` 根本跑不了，所以被当成达标。没有下调门禁迁就现状，差额登记为 Phase 7 测试债。
+- v1.9 L1（2026-09-24）文档对账：README 结构段与脚本表按实态重写（原文列的 `apps/web/apps/studio`、`backend/src/main.py` 均不存在）；`BACKLOG_V1` 移除与已交付冲突的「`.axsp` 导出=不做」条目——**纠偏以追加注记落地，中途误删的「已完成（v2.1）」表已恢复**；`docs/user` 新增桌面版与工程包页（含「已知限制」与能力边界），并补 `_nav.json` 与正文不漂移的完整性用例。

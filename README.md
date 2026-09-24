@@ -1,6 +1,10 @@
 # Axiforge
 
-Narrative simulation platform — character studio, script editor, lite player.
+角色优先的叙事创作平台：**桌面版是主产品**（离线优先，本地 SQLite + 本地素材），Web 版冻结为协作/发布服务（ADR-024）。
+
+创作端是「演出即所得」的三轨工作台（剪辑 / 剧本 / 结构），运行端是记得你的 RN Player，作品可导出为 `.axsp` 工程包交给别人。
+
+> 用户文档（含桌面版与 AXS 语法）：开发时访问 http://localhost:5174/docs ，源码在 `docs/user/`。
 
 ## Quick start
 
@@ -43,26 +47,42 @@ pnpm dev
 | `pnpm dev` | 并行启动 API + Web + Admin + Nexus |
 | `./dev.bash` | tmux：每个应用独立 session（`./dev.bash stop` 停止） |
 | `pnpm dev:web` / `dev:admin` / `dev:nexus` / `dev:api` | 单独启动某一服务 |
-| `pnpm build` | 构建前端 |
-| `pnpm test:api` | 运行后端集成测试 |
+| `pnpm dev:desktop` | 起 Tauri 壳（自动拉起 web dev server）；DEV 下会跑壳内存储冒烟 |
+| `pnpm build:desktop` | 产出 `Axiforge.app` 与 `.dmg`（未签名） |
+| `pnpm build` | 构建前端（web + admin） |
+| `pnpm gates` | **一条命令跑完前端门禁**：tsc×4 → vitest×4 → oxlint+颜色令牌 → 内核纯净度 → 循环依赖 |
+| `pnpm typecheck` / `test:unit` / `coverage` / `lint` | 上述门禁的分项 |
+| `pnpm check:purity` | 断言 `core`/`axs`/`editor-core` 零 React/DOM/网络/平台依赖 |
+| `pnpm check:circular` | dpdm 循环依赖 = 0 |
+| `pnpm e2e` | Playwright 行为基线（独立库 `axiforge_e2e`，自包含起服务） |
+| `pnpm test:api` | 后端集成测试 |
 | `pnpm setup` | 初始化 PostgreSQL 数据库与表 |
-| `pnpm db:up` | 启动 Docker PostgreSQL |
-| `pnpm db:down` | 停止 Docker PostgreSQL |
+| `pnpm db:up` / `db:down` | 启动 / 停止 Docker PostgreSQL |
 
 ## Structure
 
 ```
-apps/web/
-  apps/studio/       剧本 / 道具 / 场景 / Flow 编辑器
-  apps/player/       Lite VN Player
-  modules/character/ Character Studio（页面 + 组件）
-  components/ui/     App 专属 UI + @axiforge/ui 重导出
+packages/
+  core/            L0 叙事 IR + 引擎 + TS StoryCompiler（零 UI 依赖）
+  axs/             L1 AXS 文本语言 parser/printer（指令级行锚点）
+  editor-core/     L2–L4 内核：Draft/Transaction/Journal、投影、StorageProvider、.axsp 容器
+  ui/              设计令牌与共享组件（ImageUpload 等）
+apps/
+  web/             L5 宿主：Studio 三轨工作台 / Player / 角色工作台 / 发现页 / 文档站
+  desktop/         Tauri v2 壳（本地 SQLite + 本地素材目录 + asset 协议）
+  admin/           运营治理后台
+  nexus/           Electron 笔记应用（独立，不在 pnpm build 内）
 backend/
-  src/main.py        唯一 API 入口（main.py 为兼容 shim）
-  app/               FastAPI 路由 / 模型 / 服务
-packages/ui/       共享设计系统
-docs/              架构与重构文档
+  app/main.py      FastAPI 入口（backend/main.py 为兼容 shim）
+  app/domains/     character / narrative / assets / runtime / platform / llm / ginkgo / nexus
+docs/
+  REFACTOR_DESKTOP.md  desktop 分支执行宪章与阶段计划
+  KERNEL_DESIGN.md     L2–L4 内核构建规约
+  ADR/                 架构决策记录
+  user/                用户文档（开发时见 http://localhost:5174/docs）
 ```
+
+分层与依赖方向铁律见 `docs/KERNEL_DESIGN.md`；桌面化战略与阶段验收见 `docs/REFACTOR_DESKTOP.md`。
 
 ## Database
 

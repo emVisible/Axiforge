@@ -4,6 +4,7 @@
 
 ## 快速导航
 
+- **[桌面版与工程包](desktop/desktop-and-axsp)** — 离线创作、素材存放、`.axsp` 导出与导入、桌面版能力边界
 - **[AXS 语法参考](writing/axs-syntax)** — 在 Studio「剧本模式」中编写纯文本剧本的完整语法
 
 ## 关于 AXS

@@ -25,7 +25,6 @@ import type {
   ProjectResponse,
   ProjectSceneResponse,
   ProjectNodeResponse,
-  ProjectUpdate,
 } from "@/shared/types/project";
 import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
 import { useCanvasView } from "./useCanvasView";
@@ -50,6 +49,7 @@ import type {
   Edge as KernelEdge,
   NarrativeNode as KernelNode,
   Origin,
+  ProjectMetaPatch,
 } from "@axiforge/editor-core";
 import { draftFromProject } from "@/features/writer/lib/projection";
 import {
@@ -593,7 +593,7 @@ export function useProjectEditor(id: string) {
   );
 
   const patchProjectMeta = useCallback(
-    async (patch: Pick<ProjectUpdate, "title" | "description" | "world_setting" | "rules">) => {
+    async (patch: ProjectMetaPatch) => {
       if (!id) return;
       try {
         const p = providerRef.current;

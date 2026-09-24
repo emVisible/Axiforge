@@ -75,16 +75,16 @@ export function bundleToResponse(b: ProjectBundle): ProjectResponse {
   return {
     id: b.meta.id,
     title: b.meta.title,
-    description: "",
-    cover_image: null,
-    mechanism: null,
+    description: b.meta.description,
+    cover_image: b.meta.coverImage,
+    mechanism: b.meta.mechanism,
     style_reference: null,
-    theme_tags: [],
-    genre: null,
-    world_setting: null,
-    rules: null,
-    is_public: false,
-    is_meta: false,
+    theme_tags: [...b.meta.themeTags],
+    genre: b.meta.genre,
+    world_setting: b.meta.worldSetting,
+    rules: b.meta.rules,
+    is_public: b.meta.isPublic,
+    is_meta: b.meta.isMeta,
     view_count: 0,
     author_id: "",
     scenes,
@@ -111,7 +111,7 @@ export function bundleToCompilerInput(
   return {
     id: b.meta.id,
     title: b.meta.title,
-    worldSetting: null,
+    worldSetting: b.meta.worldSetting,
     playMeta: {},
     nodes: b.nodes.map((n) => ({
       id: n.id,
@@ -189,7 +189,7 @@ export function getStorageProvider(): Promise<StorageProvider> {
  *
  * v0.8 起描述/封面/机制/题材/标签/元作标记都是本地库的真实列（宪章 Phase 7），
  * 因此这里逐字段透传，不再填假值。仍然缺席的是：浏览计数、场景与角色计数、
- * fork 血统、世界观/规则正文与图结构——这些在卡片上本就不显示，留空是如实而非遮掩。
+ * fork 血统与图结构——这些在卡片上本就不显示，留空是如实而非遮掩。
  */
 export function projectMetaToResponse(m: ProjectMeta, authorId: string): ProjectResponse {
   return {
@@ -201,8 +201,8 @@ export function projectMetaToResponse(m: ProjectMeta, authorId: string): Project
     style_reference: null,
     theme_tags: [...m.themeTags],
     genre: m.genre,
-    world_setting: null,
-    rules: null,
+    world_setting: m.worldSetting,
+    rules: m.rules,
     is_public: m.isPublic,
     is_meta: m.isMeta,
     view_count: 0,

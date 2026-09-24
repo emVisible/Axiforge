@@ -231,6 +231,8 @@ export function runStorageContractSuite(
         genre: "悬疑",
         coverImage: "assets/cover.png",
         isMeta: true,
+        worldSetting: "近未来移动都市「交汇港」",
+        rules: "不得在白天点亮灯火",
       });
       expect(patched.ok).toBe(true);
 
@@ -242,9 +244,20 @@ export function runStorageContractSuite(
       expect(hit?.genre).toBe("悬疑");
       expect(hit?.coverImage).toBe("assets/cover.png");
       expect(hit?.isMeta).toBe(true);
+      expect(hit?.worldSetting).toBe("近未来移动都市「交汇港」");
+      expect(hit?.rules).toBe("不得在白天点亮灯火");
 
       const loaded = await p.loadProject(id);
       expect(loaded.ok && loaded.data.meta.description).toBe("一座会下沉的城");
+
+      // 局部 patch 不得连带改写其余字段：这是「已保存」提示之下的静默改写面
+      const renamed = await p.updateProjectMeta(id, { title: "改名" });
+      expect(renamed.ok).toBe(true);
+      const after = await p.listProjects();
+      const kept = after.ok ? after.data.find((m) => m.id === id) : undefined;
+      expect(kept?.title).toBe("改名");
+      expect(kept?.worldSetting).toBe("近未来移动都市「交汇港」");
+      expect(kept?.themeTags).toEqual(["末日", "密室"]);
     });
   });
 }

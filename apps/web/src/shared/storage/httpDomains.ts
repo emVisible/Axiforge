@@ -11,9 +11,11 @@
 import { itemApi, sceneAssetApi } from "@/shared/api/editor";
 import { playerApi, type SaveSlotResponse } from "@/shared/api/player";
 import { ginkgoApi, type AchievementDef, type PlayerAchievement } from "@/shared/api/ginkgo";
+import type { ProjectUpdate } from "@/shared/types/project";
 import type { AssetItemResponse, AssetSceneResponse } from "@/shared/types/asset";
 import type {
   LocalSaveSlot,
+  ProjectMetaPatch,
   SaveSlotInput,
   StoredAchievement,
   StoredAssetItem,
@@ -33,6 +35,26 @@ export function fail<T>(e: unknown, entity: string, id: string): StorageResult<T
     detail: `${entity} 请求失败${status ? ` (HTTP ${status})` : ""}`,
     cause: e,
   });
+}
+
+/**
+ * 契约态 patch → 传输态 body。未提到的键必须整个缺席：写成 null 等于替用户
+ * 覆写掉他没碰的那一栏。此前本函数只转发 title/axs_source，
+ * 其余元数据在 web 支被静默丢弃，而界面照样提示「已保存」。
+ */
+export function metaPatchToUpdateBody(patch: ProjectMetaPatch): ProjectUpdate {
+  return {
+    ...(patch.title !== undefined ? { title: patch.title } : {}),
+    ...(patch.axsSource !== undefined ? { axs_source: patch.axsSource } : {}),
+    ...(patch.description !== undefined ? { description: patch.description } : {}),
+    ...(patch.coverImage !== undefined ? { cover_image: patch.coverImage } : {}),
+    ...(patch.themeTags !== undefined ? { theme_tags: [...patch.themeTags] } : {}),
+    ...(patch.mechanism !== undefined ? { mechanism: patch.mechanism } : {}),
+    ...(patch.genre !== undefined ? { genre: patch.genre } : {}),
+    ...(patch.isMeta !== undefined ? { is_meta: patch.isMeta } : {}),
+    ...(patch.worldSetting !== undefined ? { world_setting: patch.worldSetting } : {}),
+    ...(patch.rules !== undefined ? { rules: patch.rules } : {}),
+  };
 }
 
 const toStoredItem = (r: AssetItemResponse): StoredAssetItem => ({

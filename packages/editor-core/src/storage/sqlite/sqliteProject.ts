@@ -32,6 +32,8 @@ interface ProjectRow {
   mechanism?: string | null;
   genre?: string | null;
   is_meta?: number | boolean | null;
+  world_setting?: string | null;
+  rules?: string | null;
 }
 
 /** projects 行 → ProjectMeta：JSON 列逐字段解码，缺列按「本地库尚未迁移」如实归零 */
@@ -49,11 +51,13 @@ function toProjectMeta(r: ProjectRow): StorageResult<ProjectMeta> {
     mechanism: r.mechanism ?? null,
     genre: r.genre ?? null,
     isMeta: asBool(r.is_meta),
+    worldSetting: r.world_setting ?? null,
+    rules: r.rules ?? null,
   });
 }
 
 const PROJECT_COLS = `id, title, updated_at, is_public, description, cover_image,
-  theme_tags, mechanism, genre, is_meta`;
+  theme_tags, mechanism, genre, is_meta, world_setting, rules`;
 
 export class SqliteProjectStore {
   constructor(
@@ -215,6 +219,8 @@ export class SqliteProjectStore {
       if (patch.mechanism !== undefined) { sets.push("mechanism = ?"); params.push(patch.mechanism); }
       if (patch.genre !== undefined) { sets.push("genre = ?"); params.push(patch.genre); }
       if (patch.isMeta !== undefined) { sets.push("is_meta = ?"); params.push(patch.isMeta ? 1 : 0); }
+      if (patch.worldSetting !== undefined) { sets.push("world_setting = ?"); params.push(patch.worldSetting); }
+      if (patch.rules !== undefined) { sets.push("rules = ?"); params.push(patch.rules); }
       params.push(id);
       const r = await this.backend.execute(
         `UPDATE projects SET ${sets.join(", ")} WHERE id = ?`, params,

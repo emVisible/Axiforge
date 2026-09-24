@@ -85,7 +85,7 @@ export interface ProjectUpdate {
   world_setting?: string | null;
   rules?: string | null;
   play_meta?: Record<string, unknown>;
-  axs_source?: string;
+  axs_source?: string | null;
   is_public?: boolean;
   is_meta?: boolean;
   allow_comments?: boolean;

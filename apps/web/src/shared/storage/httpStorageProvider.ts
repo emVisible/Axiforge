@@ -31,6 +31,7 @@ import {
   httpUnlockAchievement,
   httpWriteSave,
   toStoredCharacter,
+  metaPatchToUpdateBody,
 } from "./httpDomains";
 import type {
   AssetInput,
@@ -55,7 +56,6 @@ import { classifyAssetRef, err, filterByVisibility, ok } from "@axiforge/editor-
 import type {
   ProjectNodeResponse,
   ProjectResponse,
-  ProjectUpdate,
 } from "@/shared/types/project";
 
 /** 工程元数据：一处映射，list / create / bundle 三处共用，避免同一转换写三遍 */
@@ -71,6 +71,8 @@ function projectMetaOf(p: ProjectResponse): ProjectMeta {
     mechanism: p.mechanism ?? null,
     genre: p.genre ?? null,
     isMeta: Boolean(p.is_meta),
+    worldSetting: p.world_setting ?? null,
+    rules: p.rules ?? null,
   };
 }
 
@@ -146,10 +148,7 @@ export class HttpStorageProvider implements StorageProvider {
     patch: ProjectMetaPatch,
   ): Promise<StorageResult<void>> {
     try {
-      await projectApi.update(id, {
-        ...(patch.title !== undefined ? { title: patch.title } : {}),
-        ...(patch.axsSource !== undefined ? { axs_source: patch.axsSource } : {}),
-      } as ProjectUpdate);
+      await projectApi.update(id, metaPatchToUpdateBody(patch));
       return ok(undefined);
     } catch (e) {
       return fail(e, "project", id);

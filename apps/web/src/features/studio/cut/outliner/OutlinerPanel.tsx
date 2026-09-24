@@ -22,8 +22,8 @@ import type {
   ProjectResponse,
   ProjectRoleResponse,
   ProjectSceneResponse,
-  ProjectUpdate,
 } from "@/shared/types/project";
+import type { ProjectMetaPatch } from "@axiforge/editor-core";
 import type { ProjectRoleOption } from "../../flow/types";
 import { nexusApi } from "@/shared/api/nexus";
 import { getCreatorId } from "@/shared/lib/creatorId";
@@ -54,9 +54,7 @@ interface OutlinerPanelProps {
   onExportMarkdown?: () => void;
   onDeleteProject?: () => void;
   onBeatRename?: (nodeId: string, title: string) => void;
-  onProjectPatch?: (
-    patch: Pick<ProjectUpdate, "title" | "description" | "world_setting" | "rules">,
-  ) => void | Promise<void>;
+  onProjectPatch?: (patch: ProjectMetaPatch) => void | Promise<void>;
 }
 
 export default function OutlinerPanel({
@@ -473,7 +471,7 @@ export default function OutlinerPanel({
                     key={`world-${project.updated_at}`}
                     defaultValue={project.world_setting || ""}
                     rows={3}
-                    onBlur={(e) => void onProjectPatch({ world_setting: e.target.value })}
+                    onBlur={(e) => void onProjectPatch({ worldSetting: e.target.value })}
                     placeholder="世界观设定…"
                     className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />

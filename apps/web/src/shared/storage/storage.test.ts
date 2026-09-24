@@ -294,6 +294,48 @@ describe("HttpStorageProvider 素材口", () => {
     }
   });
 
+  it("updateProjectMeta 逐字段转发：全 patch 一个不丢，局部 patch 不带上没提的键", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const { restore } = stubFetch((_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return { ok: true, status: 200, json: async () => ({}) };
+    });
+    try {
+      const p = new HttpStorageProvider("c");
+      const all = await p.updateProjectMeta("p1", {
+        title: "改名",
+        description: "一座会下沉的城",
+        themeTags: ["末日"],
+        mechanism: "密室逃脱",
+        genre: "悬疑",
+        coverImage: "/uploads/cover.png",
+        isMeta: true,
+        worldSetting: "近未来移动都市",
+        rules: "不得在白天点灯",
+      });
+      expect(all.ok).toBe(true);
+      // 曾经只转发 title/axs_source，其余六项在 web 支被静默丢弃
+      expect(bodies[0]).toEqual({
+        title: "改名",
+        description: "一座会下沉的城",
+        theme_tags: ["末日"],
+        mechanism: "密室逃脱",
+        genre: "悬疑",
+        cover_image: "/uploads/cover.png",
+        is_meta: true,
+        world_setting: "近未来移动都市",
+        rules: "不得在白天点灯",
+      });
+
+      bodies.length = 0;
+      await p.updateProjectMeta("p1", { title: "只改名" });
+      // 没提到的键必须整个缺席：带上 null 等于覆写掉用户没打算改的字段
+      expect(bodies[0]).toEqual({ title: "只改名" });
+    } finally {
+      restore();
+    }
+  });
+
   it("空字节 → io 且不发请求；上传非 2xx → io；响应缺 url → corrupted", async () => {
     let requests = 0;
     const { restore } = stubFetch(() => {

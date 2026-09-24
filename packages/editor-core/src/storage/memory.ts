@@ -158,6 +158,8 @@ export class MemoryStorageProvider implements StorageProvider {
       mechanism: patch.mechanism !== undefined ? patch.mechanism : row.meta.mechanism,
       genre: patch.genre !== undefined ? patch.genre : row.meta.genre,
       isMeta: patch.isMeta ?? row.meta.isMeta,
+      worldSetting: patch.worldSetting !== undefined ? patch.worldSetting : row.meta.worldSetting,
+      rules: patch.rules !== undefined ? patch.rules : row.meta.rules,
     };
     return ok(undefined);
   }

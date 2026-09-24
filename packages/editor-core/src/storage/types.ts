@@ -51,6 +51,12 @@ export interface ProjectMeta {
   readonly mechanism: string | null;
   readonly genre: string | null;
   readonly isMeta: boolean;
+  /**
+   * 世界观与规则正文：云端本有列，且 `world_setting` 会进编译器、
+   * 在玩家页设定面板显示——缺席它，桌面态那一栏就是永久空白。
+   */
+  readonly worldSetting: string | null;
+  readonly rules: string | null;
 }
 
 export interface StoredNode {
@@ -140,6 +146,8 @@ export const emptyProjectMetadata = (): Omit<
   mechanism: null,
   genre: null,
   isMeta: false,
+  worldSetting: null,
+  rules: null,
 });
 
 export interface CreateProjectInput {  readonly title: string;
@@ -155,6 +163,8 @@ export interface ProjectMetaPatch {
   readonly mechanism?: string | null;
   readonly genre?: string | null;
   readonly isMeta?: boolean;
+  readonly worldSetting?: string | null;
+  readonly rules?: string | null;
 }
 
 /**

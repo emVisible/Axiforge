@@ -197,6 +197,16 @@ const COLUMN_PATCHES: readonly {
     column: "is_meta",
     ddl: "ALTER TABLE projects ADD COLUMN is_meta INTEGER NOT NULL DEFAULT 0",
   },
+  {
+    table: "projects",
+    column: "world_setting",
+    ddl: "ALTER TABLE projects ADD COLUMN world_setting TEXT",
+  },
+  {
+    table: "projects",
+    column: "rules",
+    ddl: "ALTER TABLE projects ADD COLUMN rules TEXT",
+  },
 ];
 
 /** 依序执行迁移（幂等：IF NOT EXISTS + 缺列才 ALTER） */

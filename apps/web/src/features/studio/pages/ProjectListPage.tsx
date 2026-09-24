@@ -15,6 +15,7 @@ import {
   CardGrid,
   EmptyState,
   EntityCard,
+  ErrorDisplay,
   FilterChip,
   FilterToolbar,
   Input,
@@ -110,7 +111,7 @@ export default function ProjectListPage() {
   const [filterMeta, setFilterMeta] = useState(false);
   const navigate = useNavigate();
 
-  const { data: projects, isLoading } = useProjects(
+  const { data: projects, isLoading, error } = useProjects(
     tab === "my" ? { author_id: getCreatorId() } : undefined,
   );
   const createProject = useCreateProject();
@@ -389,7 +390,10 @@ export default function ProjectListPage() {
       {isLoading && (
         <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
       )}
-      {!isLoading && filtered.length === 0 && (
+      {error && (
+        <ErrorDisplay message="剧本清单读取失败" onRetry={() => window.location.reload()} />
+      )}
+      {!isLoading && !error && filtered.length === 0 && (
         <EmptyState
           icon={ScrollText}
           title={hasFilters || filterMeta ? "没有匹配的剧本" : "还没有剧本"}

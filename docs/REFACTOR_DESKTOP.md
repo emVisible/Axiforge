@@ -238,6 +238,8 @@
 
 - [ ] `PlayerPage.tsx`（1370 行）→ IR 渲染器分层：播放状态机（纯逻辑入 `packages/core` 或 editor-core L2 同级）、指令执行器、舞台视图、系统菜单/存档面板；渲染文件全部 ≤400 行
 - [ ] `useProjectEditor.ts`（1163 行）→ 域拆分：graph 映射 / persistence / playback / layout 四模块（宪章 1b G1 偏差记录的欠账，Phase 2 时承诺未兑现）
+- [ ] 道具与场景资产域本地化：`asset_items` / `asset_scenes` / `project_asset_refs` 未进 SQLite schema，桌面侧栏这两页离线只能报「读取失败」（Phase 6 已把错误态显式化，不再伪装成空态）
+- [ ] 四态原语：把 loading/error/empty 的互斥收敛成一个共享查询态组件（Phase 6 已逐页修 4 处「错误态与空态同屏」碰撞），Phase 8 设计巡检以该原语为验收工具
 - [ ] 本地工程元数据补齐：SQLite `projects` 表只有 id/title/is_public/axs_source/author_id/时间戳，缺 `description`/`cover_image`/`theme_tags`/`mechanism`/`genre`/`is_meta` 等列——桌面工程卡片因此一律显示「暂无描述」，标签与机制筛选在本地无数据可筛（Phase 6 播种实测暴露；适配层刻意填空值而非编造）
 - [ ] 存档与成就本地化：`save_slots` / `player_achievements` 进 SQLite schema，桌面断网可存可读（当前离线仅优雅降级）
 - [ ] `packages/ui` 与 `apps/web/src/shared/components/ui` 双份 UI 目录归一（一处权威，另一处只做宿主绑定）

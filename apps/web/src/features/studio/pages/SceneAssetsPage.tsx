@@ -15,6 +15,7 @@ import {
   CardGrid,
   EmptyState,
   EntityCard,
+  ErrorDisplay,
   Input,
   Modal,
   ModalActions,
@@ -82,7 +83,7 @@ export default function SceneAssetsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  const { data: scenes, isLoading } = useSceneAssets({ author_id: getCreatorId() });
+  const { data: scenes, isLoading, error } = useSceneAssets({ author_id: getCreatorId() });
   const createScene = useCreateSceneAsset();
   const qc = useQueryClient();
 
@@ -258,7 +259,10 @@ export default function SceneAssetsPage() {
       {isLoading && (
         <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
       )}
-      {!isLoading && !scenes?.length && (
+      {error && (
+        <ErrorDisplay message="场景清单读取失败" onRetry={() => window.location.reload()} />
+      )}
+      {!isLoading && !error && !scenes?.length && (
         <EmptyState
           icon={MapPin}
           title="还没有场景"

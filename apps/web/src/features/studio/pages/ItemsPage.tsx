@@ -10,6 +10,7 @@ import {
   CardGrid,
   EmptyState,
   EntityCard,
+  ErrorDisplay,
   FilterChip,
   FilterToolbar,
   Input,
@@ -95,7 +96,7 @@ export default function ItemsPage() {
   const [form, setForm] = useState(emptyForm);
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const { data: items, isLoading } = useItems({ author_id: getCreatorId() });
+  const { data: items, isLoading, error } = useItems({ author_id: getCreatorId() });
   const createItem = useCreateItem();
   const deleteItem = useDeleteItem();
 
@@ -339,7 +340,10 @@ export default function ItemsPage() {
       {isLoading && (
         <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
       )}
-      {!isLoading && !filteredItems.length && (
+      {error && (
+        <ErrorDisplay message="道具清单读取失败" onRetry={() => window.location.reload()} />
+      )}
+      {!isLoading && !error && !filteredItems.length && (
         <EmptyState
           icon={Package}
           title={categoryFilter ? "该分类下暂无道具" : "还没有道具"}

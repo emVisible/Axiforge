@@ -89,7 +89,7 @@ export default function MyCharactersPage() {
           onRetry={() => window.location.reload()}
         />
       )}
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && !error && filtered.length === 0 && (
         <EmptyState
           title={search ? "没有匹配的角色" : "你还没有创建角色"}
           description={search ? "试试其他关键词" : "开始创建你的第一个角色吧"}

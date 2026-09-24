@@ -27,8 +27,8 @@ import type {
   ProjectNodeResponse,
   ProjectUpdate,
 } from "@/shared/types/project";
-import type { CutLayoutApi } from "../cut/CutStudioView";
 import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
+import { useCanvasView } from "./useCanvasView";
 import { exportProjectMarkdown } from "../lib/exportProjectMarkdown";
 import { routes } from "@/shared/lib/routes";
 import {
@@ -107,7 +107,6 @@ function flowNodeOf(
 }
 
 export type EditorMode = "cut" | "flow" | "writer";
-export type CanvasViewMode = "full" | "stage";
 
 export function useProjectEditor(id: string) {
   const navigate = useNavigate();
@@ -166,20 +165,31 @@ export function useProjectEditor(id: string) {
   const [axsDirty, setAxsDirty] = useState(false);
   const [allProjectNodes, setAllProjectNodes] = useState<ProjectNodeResponse[]>([]);
   const [writerScrollLine, setWriterScrollLine] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<CanvasViewMode>(
-    sceneId ? "stage" : "full",
-  );
-  const [activeStageId, setActiveStageId] = useState<string | null>(null);
-  const [filteredStageId, setFilteredStageId] = useState<string | null>(null);
-  const [fitViewTrigger, setFitViewTrigger] = useState(0);
-  const [focusStageId, setFocusStageId] = useState<string | null>(null);
-  const [stageFocusTrigger, setStageFocusTrigger] = useState(0);
-  const cutLayoutApiRef = useRef<CutLayoutApi | null>(null);
-  const [cutSceneFilter, setCutSceneFilter] = useState<string | null>(sceneId);
+  const clearSelection = useCallback(() => {
+    setSelectedId(null);
+    setSelectedEdgeId(null);
+  }, []);
 
-  useEffect(() => {
-    if (sceneId) setCutSceneFilter(sceneId);
-  }, [sceneId]);
+  /** 视图与舞台焦点域已外提；rfNodes 投影读它的 viewMode / filteredStageId，故调用点须在其之前 */
+  const {
+    viewMode,
+    activeStageId,
+    setActiveStageId,
+    filteredStageId,
+    setFilteredStageId,
+    fitViewTrigger,
+    setFitViewTrigger,
+    focusStageId,
+    setFocusStageId,
+    stageFocusTrigger,
+    setStageFocusTrigger,
+    cutLayoutApiRef,
+    cutSceneFilter,
+    setCutSceneFilter,
+    switchViewMode,
+    handleFocusStage,
+    handleToggleStageFilter,
+  } = useCanvasView({ sceneId, hasProject: !!project, clearSelection });
 
   const rolesMap = useMemo(
     () => Object.fromEntries(projectRoles.map((r) => [r.name, r.characterRefId])),
@@ -1023,17 +1033,6 @@ export function useProjectEditor(id: string) {
     [selectedNode, dispatch, editOrigin],
   );
 
-  const handleFocusStage = useCallback((stageId: string) => {
-    setFocusStageId(stageId);
-    setStageFocusTrigger((t) => t + 1);
-    setFilteredStageId(stageId);
-  }, []);
-
-  const handleToggleStageFilter = useCallback((stageId: string) => {
-    setFilteredStageId((prev) => (prev === stageId ? null : stageId));
-    setFocusStageId(stageId);
-  }, []);
-
   const autoLayoutByStage = useCallback(() => {
     if (!project?.scenes?.length) return;
     const laid = layoutNodesByStage(rfNodes, project.scenes);
@@ -1053,14 +1052,6 @@ export function useProjectEditor(id: string) {
     [],
   );
 
-  const switchViewMode = (mode: CanvasViewMode) => {
-    if (mode === viewMode || !project) return;
-    setViewMode(mode);
-    setSelectedId(null);
-    setSelectedEdgeId(null);
-    setFilteredStageId(null);
-    setFocusStageId(null);
-  };
   return {
     project,
     projectLoading,

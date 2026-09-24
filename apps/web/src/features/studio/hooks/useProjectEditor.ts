@@ -29,6 +29,11 @@ import type {
 } from "@/shared/types/project";
 import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
 import { useCanvasView } from "./useCanvasView";
+import {
+  flowNodeOf,
+  projectRfEdges,
+  projectRfNodes,
+} from "./editorProjection";
 import { exportProjectMarkdown } from "../lib/exportProjectMarkdown";
 import { routes } from "@/shared/lib/routes";
 import {
@@ -42,7 +47,6 @@ import { sanitizeScript } from "@/features/studio/cut/timelineUtils";
 import { useDraftJournal } from "./useDraftJournal";
 import { fetchProjectDirectory } from "./useProjectDirectory";
 import type {
-  Draft,
   Edge as KernelEdge,
   NarrativeNode as KernelNode,
   Origin,
@@ -56,55 +60,6 @@ import {
 } from "@/shared/storage";
 import type { StorageProvider } from "@axiforge/editor-core";
 
-
-/** Draft 节点 → React Flow 节点投影（data 形状与旧 nodeResponseToFlowNode 逐字段一致） */
-function flowNodeOf(
-  draft: Draft,
-  id: string,
-  dragPositions: Map<string, { x: number; y: number }>,
-  selected: boolean,
-  scenes: ProjectSceneResponse[] = [],
-  dimmed = false,
-): Node | null {
-  const n = draft.nodes.get(id);
-  if (!n) return null;
-  const nd = n.narrative;
-  const tc = nd.trigger_condition as Record<string, unknown> | null;
-  const ef = (nd.effects as unknown as Record<string, unknown>[]) || [];
-  const script = (nd.script as Instruction[]) || [];
-  const props = (nd.props as string[]) || [];
-  const palette = STAGE_PALETTE[stageColorIndex(n.stageId, scenes.map((x) => x.id))];
-  return {
-    id: n.id,
-    type: "custom",
-    position: dragPositions.get(n.id) ?? n.position,
-    selected,
-    style: dimmed ? { opacity: 0.3 } : undefined,
-    data: {
-      title: nd.title || "未命名",
-      description: nd.description || "",
-      is_anchor: Boolean(nd.is_anchor),
-      is_ending: Boolean(nd.is_ending),
-      ending_label: (nd.ending_label as string) || "",
-      speaker: nd.speaker || "",
-      dialogue: nd.dialogue || "",
-      narration: nd.narration || "",
-      script,
-      has_conditions: Boolean((tc as { conditions?: unknown[] } | null)?.conditions?.length),
-      has_effects: Boolean(ef.length),
-      has_script: Boolean(script.length),
-      trigger_condition: tc,
-      effects: ef,
-      props,
-      has_props: Boolean(props.length),
-      stage_id: n.stageId,
-      stage_title: scenes.find((x) => x.id === n.stageId)?.title ?? null,
-      stage_border: palette.border,
-      stage_header: palette.header,
-      stage_dot: palette.dot,
-    },
-  };
-}
 
 export type EditorMode = "cut" | "flow" | "writer";
 
@@ -198,46 +153,26 @@ export function useProjectEditor(id: string) {
 
   const scenesList = useMemo(() => project?.scenes || [], [project]);
 
-  /** React Flow 节点投影：Draft + 拖拽临时层 + 选择/聚焦装饰 */
-  const rfNodes: Node[] = useMemo(() => {
-    const stageScoped = viewMode === "stage" && currentScene;
-    return [...draft.nodes.values()]
-      .filter((n) => (stageScoped ? n.stageId === currentScene!.id : true))
-      .map((n) =>
-        flowNodeOf(
-          draft,
-          n.id,
-          dragPositions,
-          selectedId === n.id,
-          scenesList,
-          Boolean(filteredStageId && n.stageId !== filteredStageId),
-        )!,
-      );
-  }, [draft, dragPositions, selectedId, filteredStageId, viewMode, currentScene, scenesList]);
+  /** React Flow 节点投影：计算在 editorProjection.ts，这里只决定何时重算（依赖数组逐字未改） */
+  const rfNodes: Node[] = useMemo(
+    () =>
+      projectRfNodes({
+        draft,
+        dragPositions,
+        selectedId,
+        filteredStageId,
+        viewMode,
+        currentScene,
+        scenesList,
+      }),
+    [draft, dragPositions, selectedId, filteredStageId, viewMode, currentScene, scenesList],
+  );
 
   /** React Flow 边投影（悬停高亮由 FlowCanvas 装饰） */
-  const rfEdges: Edge[] = useMemo(() => {
-    const stageScoped = viewMode === "stage" && currentScene;
-    const visible = stageScoped
-      ? new Set(
-          [...draft.nodes.values()]
-            .filter((n) => n.stageId === currentScene!.id)
-            .map((n) => n.id),
-        )
-      : null;
-    return draft.edges
-      .filter((e) => !visible || (visible.has(e.source) && visible.has(e.target)))
-      .map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: "output",
-        markerEnd: { type: MarkerType.ArrowClosed },
-        style: { stroke: flowEdgeStroke, strokeWidth: 2 },
-        label: e.label || "",
-        selected: selectedEdgeId === e.id,
-      }));
-  }, [draft, viewMode, currentScene, selectedEdgeId]);
+  const rfEdges: Edge[] = useMemo(
+    () => projectRfEdges({ draft, viewMode, currentScene, selectedEdgeId }),
+    [draft, viewMode, currentScene, selectedEdgeId],
+  );
 
   const selectedEdge: Edge | null = useMemo(
     () => (selectedEdgeId ? rfEdges.find((e) => e.id === selectedEdgeId) ?? null : null),

@@ -1,6 +1,6 @@
 {
   "apps/web/src/features/player/pages/PlayerPage.tsx": 1393,
-  "apps/web/src/features/studio/hooks/useProjectEditor.ts": 1155,
+  "apps/web/src/features/studio/hooks/useProjectEditor.ts": 1090,
   "apps/web/src/features/character/pages/CharacterDetailPage.tsx": 735,
   "apps/web/src/features/studio/cut/TimelineShell.tsx": 713,
   "apps/web/src/features/studio/cut/CutStudioView.tsx": 659,

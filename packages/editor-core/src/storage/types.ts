@@ -88,6 +88,19 @@ export interface StoredCharacter {
   readonly name: string;
   readonly characterData: Record<string, unknown>; // 六层模型 JSON（ADR-001）
   readonly imagePath: string | null;
+  /** 显式字段而非可选：缺失≠false，五义在此一处定死 */
+  readonly isPublic: boolean;
+  readonly authorId: string | null;
+}
+
+/**
+ * 角色清单取数范围。语义 = 「我的（给 authorId 时）∪ 公开（includePublic 时）」，
+ * 两者都不给 = 全部公开（协作服务的默认对外视角，与今天 /characters 公开列表一致）。
+ */
+export interface CharacterScope {
+  readonly authorId?: string | null;
+  readonly includePublic?: boolean;
+  readonly search?: string;
 }
 
 export interface CreateProjectInput {
@@ -170,7 +183,8 @@ export interface StorageProvider {
     roleId: string,
   ): Promise<StorageResult<void>>;
 
-  listCharacters(): Promise<StorageResult<StoredCharacter[]>>;
+  /** 角色清单（范围语义见 CharacterScope；无匹配=空数组，非错误） */
+  listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>>;
 
   getCharacter(id: string): Promise<StorageResult<StoredCharacter>>;
 

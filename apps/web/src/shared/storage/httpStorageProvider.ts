@@ -13,6 +13,7 @@ import { characterApi } from "@/shared/api/characters";
 import { collectProjectNodes } from "@/features/writer/lib/projection";
 import type {
   AssetInput,
+  CharacterScope,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -23,7 +24,7 @@ import type {
   StoredAsset,
   StoredCharacter,
 } from "@axiforge/editor-core";
-import { classifyAssetRef, err, ok } from "@axiforge/editor-core";
+import { classifyAssetRef, err, filterCharacters, ok } from "@axiforge/editor-core";
 import type {
   ProjectNodeResponse,
   ProjectResponse,
@@ -40,8 +41,26 @@ function fail<T>(e: unknown, entity: string, id: string): StorageResult<T> {
   });
 }
 
-function toBundle(p: ProjectResponse): ProjectBundle {
-  const nodes = collectProjectNodes(p.nodes, p.scenes || []);
+/** 传输态 Character → 存储态 StoredCharacter（字段显式映射，缺省即声明缺省） */
+function toStoredCharacter(c: {
+  id: string | number;
+  name: string;
+  character_data?: unknown;
+  image_path?: string | null;
+  author_id?: string | null;
+  is_public?: boolean | null;
+}): StoredCharacter {
+  return {
+    id: String(c.id),
+    name: c.name,
+    characterData: (c.character_data ?? {}) as Record<string, unknown>,
+    imagePath: c.image_path ?? null,
+    isPublic: c.is_public ?? false,
+    authorId: c.author_id ?? null,
+  };
+}
+
+function toBundle(p: ProjectResponse): ProjectBundle {  const nodes = collectProjectNodes(p.nodes, p.scenes || []);
   return {
     meta: { id: String(p.id), title: p.title, updatedAt: p.updated_at },
     axsSource: p.axs_source ?? null,
@@ -176,31 +195,39 @@ export class HttpStorageProvider implements StorageProvider {
     }
   }
 
-  async listCharacters(): Promise<StorageResult<StoredCharacter[]>> {
+  /**
+   * 范围取数：我的走 listUser，公开走 listPublic（带 search），
+   * 两者都取时按 id 合并去重——与桌面实现共用同一「我的 ∪ 公开」语义。
+   */
+  async listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>> {
     try {
-      const list = await characterApi.listUser(this.creatorId);
-      return ok(
-        list.map((c) => ({
-          id: String(c.id),
-          name: c.name,
-          characterData: (c.character_data ?? {}) as unknown as Record<string, unknown>,
-          imagePath: c.image_path ?? null,
-        })),
-      );
+      const authorId = scope?.authorId ?? null;
+      const includePublic = scope?.includePublic ?? authorId === null;
+      const merged = new Map<string, StoredCharacter>();
+
+      if (authorId !== null) {
+        const mine = await characterApi.listUser(authorId);
+        for (const c of mine) merged.set(String(c.id), toStoredCharacter(c));
+      }
+      if (includePublic) {
+        const page = await characterApi.listPublic({
+          limit: 200,
+          ...(scope?.search ? { search: scope.search } : {}),
+        });
+        for (const c of page.items ?? []) {
+          const key = String(c.id);
+          if (!merged.has(key)) merged.set(key, toStoredCharacter(c));
+        }
+      }
+      return ok(filterCharacters([...merged.values()], scope));
     } catch (e) {
-      return fail(e, "characters", this.creatorId);
+      return fail(e, "characters", scope?.authorId ?? this.creatorId);
     }
   }
 
   async getCharacter(id: string): Promise<StorageResult<StoredCharacter>> {
     try {
-      const c = await characterApi.get(id);
-      return ok({
-        id: String(c.id),
-        name: c.name,
-        characterData: (c.character_data ?? {}) as unknown as Record<string, unknown>,
-        imagePath: c.image_path ?? null,
-      });
+      return ok(toStoredCharacter(await characterApi.get(id)));
     } catch (e) {
       return fail(e, "character", id);
     }
@@ -220,7 +247,8 @@ export class HttpStorageProvider implements StorageProvider {
       const created = await characterApi.create({
         character_data: character.characterData as never,
         image_path: character.imagePath ?? undefined,
-        author_id: this.creatorId,
+        author_id: character.authorId ?? this.creatorId,
+        is_public: character.isPublic,
       } as never);
       return ok({ id: String(created.id) });
     } catch (e) {

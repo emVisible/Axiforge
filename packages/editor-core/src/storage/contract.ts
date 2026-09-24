@@ -110,33 +110,54 @@ export function runStorageContractSuite(
       expect(r.ok).toBe(false);
     });
 
-    it("角色库：save（空 id 创建并返回服务端 id）→ upsert 覆盖 → list/get", async () => {
+    it("角色库：创建 → upsert 覆盖 → 范围可见性（我的 / 仅公开 / 他人不可见）", async () => {
       const p = await makeProvider();
       const created = await p.saveCharacter({
         id: "",
         name: "凛",
         characterData: { anchor: { name: "凛" } },
         imagePath: null,
+        isPublic: false,
+        authorId: "u-contract",
       });
       expect(created.ok).toBe(true);
       if (!created.ok) return;
       expect(created.data.id).toBeTruthy();
 
-      // 以返回 id upsert 覆盖
       const updated = await p.saveCharacter({
         id: created.data.id,
         name: "凛二",
         characterData: {},
         imagePath: "/x.png",
+        isPublic: false,
+        authorId: "u-contract",
       });
       expect(updated.ok && updated.data.id).toBe(created.data.id);
 
-      const list = await p.listCharacters();
-      expect(list.ok && list.data).toHaveLength(1);
-      expect(list.ok && list.data[0]!.name).toBe("凛二");
+      const mine = await p.listCharacters({ authorId: "u-contract" });
+      expect(mine.ok && mine.data).toHaveLength(1);
+      expect(mine.ok && mine.data[0]!.name).toBe("凛二");
+
+      const others = await p.listCharacters({ authorId: "u-other" });
+      expect(others.ok && others.data).toHaveLength(0);
+
+      const publicOnly = await p.listCharacters();
+      expect(publicOnly.ok && publicOnly.data).toHaveLength(0);
+
+      await p.saveCharacter({
+        id: created.data.id,
+        name: "凛二",
+        characterData: {},
+        imagePath: "/x.png",
+        isPublic: true,
+        authorId: "u-contract",
+      });
+      const shared = await p.listCharacters();
+      expect(shared.ok && shared.data).toHaveLength(1);
 
       const got = await p.getCharacter(created.data.id);
       expect(got.ok && got.data.imagePath).toBe("/x.png");
+      expect(got.ok && got.data.isPublic).toBe(true);
       const miss = await p.getCharacter("ghost");
       expect(miss.ok).toBe(false);
     });

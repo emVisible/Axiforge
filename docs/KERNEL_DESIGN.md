@@ -136,8 +136,21 @@ export type StorageResult<T> =
 - `loadProject(id)` 失败 → 返回 `{ ok:false, error }`，调用方（L5）负责渲染四态中的错误态并允许重试——Provider 不弹 toast、不重试内部逻辑（重试是策略，归调用方）
 - 空值五义显式区分（axiom 1.4）：工程不存在=`not_found`；字段缺失=领域内 `null`；解析失败=`corrupted`；磁盘/网络故障=`io`
 
-**接口方法**（v0，双消费者：HTTP 实现 + Memory 实现）：
-`listProjects / createProject / loadProject / deleteProject / updateProjectMeta / saveNarrative / addRole / removeRole / listCharacters / getCharacter / saveCharacter`。
+**接口方法**（v1，三实现：Memory / HTTP / SQLite）：
+`listProjects / createProject / loadProject / deleteProject / updateProjectMeta / saveNarrative / addRole / removeRole`；
+角色域 `listCharacters(scope?) / getCharacter / saveCharacter`；
+素材域 `saveAsset(input) / readAsset(ref)`。
+
+> **v1 变更（2026-09-24，随桌面 Phase 6）**：
+> - `StoredCharacter` 补 `isPublic` / `authorId` 为**必填**字段——缺失不是 false，五义在此一处定死；
+>   必填的意义是让每个实现与每份夹具都被迫显式表态，浏览器态与桌面态因此不会漂移。
+> - `listCharacters(scope?)` 的范围语义 = 「我的（给 authorId）∪ 公开（includePublic）」，
+>   两者都不给即「仅公开」；实现在 `storage/characters.ts::filterCharacters` 一处定义，
+>   HTTP 实现按同一语义合并 listUser/listPublic。
+> - `saveAsset/readAsset` 承载素材字节：ref 形态由实现决定（桌面 `assets/<摘要>.<ext>`、
+>   服务端 `/uploads/...`），契约只保证「同内容→同 ref、ref 可读回等价字节」。
+> - 引用→显示 URL 的规则在 `storage/assets.ts::resolveAssetUrl`（纯函数，注入根目录与
+>   平台转换器）；文件系统与 Tauri asset 协议经 `AssetStore` 端口注入，内核零平台依赖。
 
 > 状态（2026-08-26）：契约已落地 `packages/editor-core/src/storage.ts`，
 > 契约测试套件 `storage/contract.test.ts` 是一切实现的验收标准（Memory 实现先行，SQLite 随 Phase 2）。

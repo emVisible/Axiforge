@@ -99,6 +99,8 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
       name: "堰纱",
       characterData: { sprites: { smile: sprite.data.ref } },
       imagePath: portrait.data.ref,
+      isPublic: false,
+      authorId: "e2e-author",
     });
     if (!saved.ok) throw new Error("character failed");
     const charId = saved.data.id;
@@ -133,23 +135,32 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
     expect(imported.ok).toBe(true);
     if (!imported.ok) return;
 
-    const chars = await dst.listCharacters();
-    expect(chars.ok && chars.data).toHaveLength(1);
-    if (!chars.ok) return;
-    const newId = chars.data[0]!.id;
-    expect(chars.data[0]!.name).toBe("堰纱");
-    expect(newId).not.toBe(charId);
-
+    // 新工程的角色引用即导入后的新角色（无范围 list 只看公开，故按引用取回）
     const load = await dst.loadProject(imported.data.id);
     expect(load.ok).toBe(true);
     if (!load.ok) return;
+    const newId = load.data.roles[0]!.characterRefId;
+    expect(newId).toBeTruthy();
+    expect(newId).not.toBe(charId);
+
+    const importedChar = await dst.getCharacter(newId);
+    expect(importedChar.ok).toBe(true);
+    if (!importedChar.ok) return;
+    expect(importedChar.data.name).toBe("堰纱");
+    // 归属改判接收方、公开位不继承导出者
+    expect(importedChar.data.isPublic).toBe(false);
+    expect(importedChar.data.authorId).not.toBe("e2e-author");
+
     const script = (load.data.nodes[0]!.narrativeData as { script: { characterId?: string }[] })
       .script;
     expect(script[0]!.characterId).toBe(newId);
-    expect(load.data.roles.map((r) => r.characterRefId)).toEqual([newId]);
+
+    // 导入未把私有角色变成公开：无范围（仅公开）看不到它
+    const publicView = await dst.listCharacters();
+    expect(publicView.ok && publicView.data).toHaveLength(0);
 
     // 角色立绘引用与素材字节随包到达（ref 内容寻址，两端同路径）
-    expect(chars.data[0]!.imagePath).toBe(portrait.data.ref);
+    expect(importedChar.data.imagePath).toBe(portrait.data.ref);
     const back = await dst.readAsset(portrait.data.ref);
     expect(back.ok && Array.from(back.data)).toEqual([4, 5]);
     const backSprite = await dst.readAsset(sprite.data.ref);
@@ -165,6 +176,8 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
       name: "旅人",
       characterData: {},
       imagePath: null,
+      isPublic: false,
+      authorId: "a1",
     });
     if (!char.ok) throw new Error("character failed");
     await src.addRole(created.data.id, { characterRefId: char.data.id });
@@ -177,17 +190,28 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
       name: "我自己的角色",
       characterData: { anchor: { tone: "冷" } },
       imagePath: null,
+      isPublic: false,
+      authorId: "me",
     });
     if (!mine.ok) throw new Error("seed failed");
-    await importProjectFromAxsp(dst, packed.data);
+    const imported = await importProjectFromAxsp(dst, packed.data);
+    expect(imported.ok).toBe(true);
+    if (!imported.ok) return;
 
-    const chars = await dst.listCharacters();
-    expect(chars.ok && chars.data.map((c) => c.name).sort()).toEqual([
-      "我自己的角色",
-      "旅人",
-    ]);
+    // 我自己的角色没被覆盖，也没被导入项挤掉
+    const mineList = await dst.listCharacters({ authorId: "me" });
+    expect(mineList.ok && mineList.data.map((c) => c.name)).toEqual(["我自己的角色"]);
     const stillMine = await dst.getCharacter(mine.data.id);
     expect(stillMine.ok && stillMine.data.name).toBe("我自己的角色");
+
+    // 导入的角色是另一条新档案（按新工程的角色引用取回）
+    const load = await dst.loadProject(imported.data.id);
+    expect(load.ok).toBe(true);
+    if (!load.ok) return;
+    const importedId = load.data.roles[0]!.characterRefId;
+    expect(importedId).not.toBe(mine.data.id);
+    const importedChar = await dst.getCharacter(importedId);
+    expect(importedChar.ok && importedChar.data.name).toBe("旅人");
   });
 });
 

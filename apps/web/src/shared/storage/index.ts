@@ -222,8 +222,16 @@ export async function importProjectFromAxsp(
   }
 
   const idMap: Record<string, string> = {};
+  const owner = getCreatorId();
   for (const c of characters) {
-    const created = await provider.saveCharacter({ ...c, id: "" });
+    // 归属改判给接收方、公开位不继承：否则导入的角色在「我的角色」里查不到，
+    // 也不该由导出者决定它在别人机器上是否公开。
+    const created = await provider.saveCharacter({
+      ...c,
+      id: "",
+      authorId: owner,
+      isPublic: false,
+    });
     if (!created.ok) return created;
     idMap[c.id] = created.data.id;
   }

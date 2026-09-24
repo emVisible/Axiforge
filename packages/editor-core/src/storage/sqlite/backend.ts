@@ -71,7 +71,8 @@ export const SCHEMA_MIGRATIONS: readonly string[] = [
     name TEXT NOT NULL,
     character_data TEXT NOT NULL DEFAULT '{}',
     image_path TEXT,
-    author_id TEXT
+    author_id TEXT,
+    is_public INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_nodes_project ON project_nodes(project_id);
   CREATE INDEX IF NOT EXISTS idx_edges_project ON project_edges(project_id);
@@ -85,9 +86,32 @@ export const SCHEMA_MIGRATIONS: readonly string[] = [
   `,
 ];
 
-/** 依序执行迁移（幂等：IF NOT EXISTS） */
+/**
+ * 旧库补列：`CREATE TABLE IF NOT EXISTS` 不会给已存在的表加列，
+ * 已发布过 v0.6 的机器上 characters 就没有 is_public —— 迁移必须自己补齐。
+ */
+const COLUMN_PATCHES: readonly {
+  table: string;
+  column: string;
+  ddl: string;
+}[] = [
+  {
+    table: "characters",
+    column: "is_public",
+    ddl: "ALTER TABLE characters ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0",
+  },
+];
+
+/** 依序执行迁移（幂等：IF NOT EXISTS + 缺列才 ALTER） */
 export async function applyMigrations(backend: SqlBackend): Promise<void> {
   for (const ddl of SCHEMA_MIGRATIONS) {
     await backend.execute(ddl);
+  }
+  for (const patch of COLUMN_PATCHES) {
+    const rows = await backend.select<{ n: number }>(
+      `SELECT count(*) AS n FROM pragma_table_info(?) WHERE name = ?`,
+      [patch.table, patch.column],
+    );
+    if ((rows[0]?.n ?? 0) === 0) await backend.execute(patch.ddl);
   }
 }

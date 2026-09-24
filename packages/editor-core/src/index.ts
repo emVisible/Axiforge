@@ -10,6 +10,7 @@ export * from "./projection/axs";
 export * from "./projection/canvas";
 export * from "./storage/types";
 export * from "./storage/assets";
+export * from "./storage/characters";
 export * from "./storage/memory";
 export * from "./storage/sqlite/backend";
 export * from "./storage/sqlite/sqliteProvider";

@@ -1,4 +1,4 @@
-# Build Blueprint v1.3 | Status: confirmed v1.0 → executing v1.3
+# Build Blueprint v1.4 | Status: confirmed v1.0 → executing v1.4
 > 日期 2026-09-24 · 分支 `desktop` · 基线 `e123f1a`（tag `desktop-v0.6`）· 关联 [ADR-024](docs/ADR/024-desktop-local-first.md) 决策 3/4、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)（新增 Phase 6）
 
 ## 1. Goals & Non-Goals
@@ -85,6 +85,7 @@
 - **R3 验收边界（诚实交代）**：Playwright 驱动不了 WKWebView，M1/M2 的壳内路径无法进 e2e。自动化只覆盖纯函数与契约层（单测 + E12），壳内以打包手动走查为准——不假装能自动化。
 - **R4**：示范作当前零素材引用（`seed_showcase.py` 无 image/sprite），故播种成功**不能**证明素材显示，C1 必须人工导入一张图才算过。
 - **R5**：`.axsp` v2 改格式是对外契约变更，须同 PR 落 ADR-026 + 用户文档（铁律 9）；v1 只读兼容若被跳过即 L3。
+- **R6（M3 开工前已查明的约束）**：角色页取数走 TanStack Query hooks（`shared/hooks/useCharacters.ts` → `characterApi.*`），组件消费的是**传输态 DTO**（含 `is_public` / `author_id` / 分页筛选），而契约里的 `StoredCharacter` 只有 `id/name/characterData/imagePath`。因此「角色域 Provider 化」不是改调用点，而是要先给契约补字段（isPublic/authorId）并让 `listCharacters` 支持范围筛选（我的/公开），否则会把在线态的搜索与公开库语义做窄——属 L2 契约变更，动它必须同批回写 KERNEL_DESIGN §2.5。
 - **止损**：M1 若卡在壳权限/协议（>2 天），M2/M3/M4 仍可独立交付（播种可退化为空库首屏 + 明确提示，容器 v2 与素材解耦），主线不动。
 
 ## 8. Change Log
@@ -100,3 +101,4 @@
 - v1.3 L2（2026-09-24）播种任务·三处实态修正：① 清单来源改用播种端点自身返回的 `projects`——首版走 discover，实测把 dev 库里 50 个历史 `is_public` 测试工程（「编译剧本」「差分剧本」）一起灌进新用户首启；② `capabilities` 缺 `fs:allow-exists`，`fs.exists` 直接 forbidden；③ Tauri fs scope 默认不匹配隐藏文件，标记名从 `.seeded` 改为 `seeded.json`。
 - v1.3 L2（2026-09-24）播种可观测性：首版用 `.catch(() => 0)` 吞掉一切异常，导致「没播种」与「不需要播种」不可区分——正是本轮要消灭的沉默失败。改为结构化 `SeedOutcome`（seeded/skipped/failed），纳入冒烟步骤并写进 PASS 行；标记读不到时按 failed 上报而非当作已播过。
 - v1.3 L1（2026-09-24）工具化：`apiClient` 支持 `setApiBase`（构建期脚本在 Node 里跑真实请求所需；浏览器默认同源相对路径逐字不变）；三部示范作 `.axsp` + `manifest.json` 作为刻意提交的构建产物入库。
+- v1.4 L2（2026-09-24）角色域前置·契约扩宽（§7 R6 兑现）：`StoredCharacter` 补必填 `isPublic`/`authorId`；`listCharacters(scope?)` 语义定为「我的 ∪ 公开」，实现在 `storage/characters.ts::filterCharacters` 一处收口，HTTP 实现按同语义合并 listUser/listPublic；SQLite 加 `is_public` 列并带**缺列才 ALTER** 的幂等迁移（旧库 `CREATE TABLE IF NOT EXISTS` 不会补列）。连带修正导入语义：角色归属改判接收方、公开位不继承导出者——否则导入的角色在接收方「我的角色」里查不到。`KERNEL_DESIGN §2.5` 同批回写。

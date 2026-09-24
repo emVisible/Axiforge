@@ -8,9 +8,11 @@
  * - 失败语义：SQL 异常 → io；载入 JSON 解析失败 → corrupted
  */
 
+import { filterCharacters } from "../characters";
 import type {
   AssetInput,
   AssetStore,
+  CharacterScope,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -46,6 +48,16 @@ interface ProjectRow {
   title: string;
   updated_at: string;
   axs_source: string | null;
+}
+
+interface CharacterRow {
+  id: string;
+  name: string;
+  character_data: string;
+  image_path: string | null;
+  author_id: string | null;
+  /** 旧库补列前可能取不到；sql.js 与 sqlx 的布尔表示不同，故联合类型显式处理 */
+  is_public?: number | boolean | null;
 }
 
 export class SqliteStorageProvider implements StorageProvider {
@@ -285,18 +297,25 @@ export class SqliteStorageProvider implements StorageProvider {
     }
   }
 
-  async listCharacters(): Promise<StorageResult<StoredCharacter[]>> {
+  async listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>> {
     try {
-      const rows = await this.backend.select<{
-        id: string; name: string; character_data: string; image_path: string | null;
-      }>(`SELECT id, name, character_data, image_path FROM characters`);
+      const rows = await this.backend.select<CharacterRow>(
+        `SELECT id, name, character_data, image_path, author_id, is_public FROM characters`,
+      );
       const out: StoredCharacter[] = [];
       for (const r of rows) {
         const cd = parseJson<Record<string, unknown>>(r.character_data, "character.character_data", r.id, {});
         if (!cd.ok) return { ok: false, error: cd.error };
-        out.push({ id: r.id, name: r.name, characterData: cd.data, imagePath: r.image_path });
+        out.push({
+          id: r.id,
+          name: r.name,
+          characterData: cd.data,
+          imagePath: r.image_path,
+          isPublic: r.is_public === 1 || r.is_public === true,
+          authorId: r.author_id ?? null,
+        });
       }
-      return ok(out);
+      return ok(filterCharacters(out, scope));
     } catch (cause) {
       return err({ code: "io", detail: "listCharacters 查询失败", cause });
     }
@@ -304,14 +323,22 @@ export class SqliteStorageProvider implements StorageProvider {
 
   async getCharacter(id: string): Promise<StorageResult<StoredCharacter>> {
     try {
-      const rows = await this.backend.select<{
-        id: string; name: string; character_data: string; image_path: string | null;
-      }>(`SELECT id, name, character_data, image_path FROM characters WHERE id = ?`, [id]);
+      const rows = await this.backend.select<CharacterRow>(
+        `SELECT id, name, character_data, image_path, author_id, is_public FROM characters WHERE id = ?`,
+        [id],
+      );
       if (!rows.length) return err({ code: "not_found", entity: "character", id });
       const r = rows[0]!;
       const cd = parseJson<Record<string, unknown>>(r.character_data, "character.character_data", r.id, {});
       if (!cd.ok) return cd;
-      return ok({ id: r.id, name: r.name, characterData: cd.data, imagePath: r.image_path });
+      return ok({
+        id: r.id,
+        name: r.name,
+        characterData: cd.data,
+        imagePath: r.image_path,
+        isPublic: r.is_public === 1 || r.is_public === true,
+        authorId: r.author_id ?? null,
+      });
     } catch (cause) {
       return err({ code: "io", detail: "getCharacter 查询失败", cause });
     }
@@ -328,13 +355,13 @@ export class SqliteStorageProvider implements StorageProvider {
       );
       if (exists.length) {
         await this.backend.execute(
-          `UPDATE characters SET name = ?, character_data = ?, image_path = ? WHERE id = ?`,
-          [character.name, cd, character.imagePath, id],
+          `UPDATE characters SET name = ?, character_data = ?, image_path = ?, author_id = ?, is_public = ? WHERE id = ?`,
+          [character.name, cd, character.imagePath, character.authorId, character.isPublic ? 1 : 0, id],
         );
       } else {
         await this.backend.execute(
-          `INSERT INTO characters (id, name, character_data, image_path) VALUES (?, ?, ?, ?)`,
-          [id, character.name, cd, character.imagePath],
+          `INSERT INTO characters (id, name, character_data, image_path, author_id, is_public) VALUES (?, ?, ?, ?, ?, ?)`,
+          [id, character.name, cd, character.imagePath, character.authorId, character.isPublic ? 1 : 0],
         );
       }
       return ok({ id });

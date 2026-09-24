@@ -76,7 +76,7 @@ describe("SqliteStorageProvider io 错误路径", () => {
       p.removeRole("g", "r"),
       p.listCharacters(),
       p.getCharacter("g"),
-      p.saveCharacter({ id: "", name: "x", characterData: {}, imagePath: null }),
+      p.saveCharacter({ id: "", name: "x", characterData: {}, imagePath: null, isPublic: false, authorId: null }),
     ]);
     for (const r of results) {
       expect(r.ok).toBe(false);

@@ -16,8 +16,10 @@ import {
   contentKey,
   extensionFor,
 } from "./assets";
+import { filterCharacters } from "./characters";
 import type {
   AssetInput,
+  CharacterScope,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -167,8 +169,8 @@ export class MemoryStorageProvider implements StorageProvider {
     return ok(undefined);
   }
 
-  async listCharacters(): Promise<StorageResult<StoredCharacter[]>> {
-    return ok([...this.characters.values()]);
+  async listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>> {
+    return ok(filterCharacters([...this.characters.values()], scope));
   }
 
   async getCharacter(id: string): Promise<StorageResult<StoredCharacter>> {

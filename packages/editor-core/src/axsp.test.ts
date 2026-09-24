@@ -41,6 +41,8 @@ const cast: StoredCharacter[] = [
     name: "凛",
     characterData: { sprites: { smile: "assets/lin-smile.png", sad: "/uploads/legacy.png" } },
     imagePath: "assets/lin.png",
+    isPublic: false,
+    authorId: "author-1",
   },
 ];
 
@@ -296,7 +298,7 @@ describe("collectAssetRefs", () => {
     expect(collectAssetRefs({ ...bundle, nodes: [] })).toEqual([]);
     expect(
       collectAssetRefs(bundle, [
-        { id: "c", name: "n", characterData: {}, imagePath: null },
+        { id: "c", name: "n", characterData: {}, imagePath: null, isPublic: false, authorId: null },
       ]).sort(),
     ).toEqual(["assets/bg/station.png", "assets/bgm/main.mp3"]);
   });

@@ -49,7 +49,14 @@ describe("Memory 附加分支", () => {
 
   it("saveCharacter 空 id 走创建臂（服务端分配）", async () => {
     const p = new MemoryStorageProvider();
-    const r = await p.saveCharacter({ id: "", name: "新角色", characterData: {}, imagePath: null });
+    const r = await p.saveCharacter({
+      id: "",
+      name: "新角色",
+      characterData: {},
+      imagePath: null,
+      isPublic: false,
+      authorId: "u1",
+    });
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.id).toMatch(/^char-/);
   });

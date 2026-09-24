@@ -56,6 +56,8 @@ async function createProjectWithAsset(
     name: "容器角色",
     characterData: {},
     imagePath: ref,
+    isPublic: false,
+    authorId: "desktop-smoke",
   });
   if (!char.ok) throw new Error("容器冒烟：角色建档失败");
   await p.addRole(created.data.id, { characterRefId: char.data.id });

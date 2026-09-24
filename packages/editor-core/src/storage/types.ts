@@ -40,6 +40,8 @@ export interface ProjectMeta {
   readonly id: string;
   readonly title: string;
   readonly updatedAt: string;
+  /** 本地库真实存在的列；云端元数据（描述/标签/机制/封面）SQLite schema 尚无对应列，见宪章 Phase 7 */
+  readonly isPublic: boolean;
 }
 
 export interface StoredNode {

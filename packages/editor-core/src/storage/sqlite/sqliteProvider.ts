@@ -48,6 +48,7 @@ interface ProjectRow {
   title: string;
   updated_at: string;
   axs_source: string | null;
+  is_public?: number | boolean | null;
 }
 
 interface CharacterRow {
@@ -65,6 +66,11 @@ export class SqliteStorageProvider implements StorageProvider {
     private readonly backend: SqlBackend,
     /** 素材字节存储（桌面=Tauri fs；缺省=本实现不接素材，saveAsset 返回 io） */
     private readonly assetStore?: AssetStore,
+    /**
+     * 本地建档者。工程与角色需要归属，否则「我的」列表永远为空
+     * （桌面首启实测：播种成功但工程列表空——因为 author_id 一直是 NULL）。
+     */
+    private readonly authorId: string | null = null,
   ) {}
 
   async init(): Promise<void> {
@@ -74,9 +80,16 @@ export class SqliteStorageProvider implements StorageProvider {
   async listProjects(): Promise<StorageResult<ProjectMeta[]>> {
     try {
       const rows = await this.backend.select<ProjectRow>(
-        `SELECT id, title, updated_at FROM projects ORDER BY updated_at DESC`,
+        `SELECT id, title, updated_at, is_public FROM projects ORDER BY updated_at DESC`,
       );
-      return ok(rows.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updated_at })));
+      return ok(
+        rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          updatedAt: r.updated_at,
+          isPublic: r.is_public === 1 || r.is_public === true,
+        })),
+      );
     } catch (cause) {
       return err({ code: "io", detail: "listProjects 查询失败", cause });
     }
@@ -90,8 +103,8 @@ export class SqliteStorageProvider implements StorageProvider {
     const endId = uuid();
     try {
       await this.backend.execute(
-        `INSERT INTO projects (id, title, updated_at, created_at) VALUES (?, ?, ?, ?)`,
-        [id, input.title, now, now],
+        `INSERT INTO projects (id, title, updated_at, created_at, author_id, is_public) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, input.title, now, now, this.authorId, input.isPublic ? 1 : 0],
       );
       await this.backend.execute(
         `INSERT INTO project_scenes (id, project_id, title, sort_order) VALUES (?, ?, ?, 0)`,
@@ -115,7 +128,7 @@ export class SqliteStorageProvider implements StorageProvider {
          VALUES (?, ?, ?, ?, ?)`,
         [`${startId}-${endId}`, id, startId, endId, "开始"],
       );
-      return ok({ id, title: input.title, updatedAt: now });
+      return ok({ id, title: input.title, updatedAt: now, isPublic: input.isPublic ?? false });
     } catch (cause) {
       return err({ code: "io", detail: "createProject 写入失败", cause });
     }
@@ -124,7 +137,7 @@ export class SqliteStorageProvider implements StorageProvider {
   async loadProject(id: string): Promise<StorageResult<ProjectBundle>> {
     try {
       const rows = await this.backend.select<ProjectRow>(
-        `SELECT id, title, updated_at, axs_source FROM projects WHERE id = ?`,
+        `SELECT id, title, updated_at, axs_source, is_public FROM projects WHERE id = ?`,
         [id],
       );
       if (!rows.length) return err({ code: "not_found", entity: "project", id });
@@ -173,7 +186,12 @@ export class SqliteStorageProvider implements StorageProvider {
       );
 
       return ok({
-        meta: { id: row.id, title: row.title, updatedAt: row.updated_at },
+        meta: {
+          id: row.id,
+          title: row.title,
+          updatedAt: row.updated_at,
+          isPublic: row.is_public === 1 || row.is_public === true,
+        },
         axsSource: row.axs_source,
         nodes,
         edges,

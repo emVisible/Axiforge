@@ -95,7 +95,12 @@ export class MemoryStorageProvider implements StorageProvider {
 
   async createProject(input: CreateProjectInput): Promise<StorageResult<ProjectMeta>> {
     const id = this.nextId("proj");
-    const meta: ProjectMeta = { id, title: input.title, updatedAt: nowIso() };
+    const meta: ProjectMeta = {
+      id,
+      title: input.title,
+      updatedAt: nowIso(),
+      isPublic: input.isPublic ?? false,
+    };
     const { scenes, nodes, edges } = bootstrapScenesAndNodes();
     this.projects.set(id, {
       meta,
@@ -237,7 +242,7 @@ export class MemoryStorageProvider implements StorageProvider {
       label: e.label ?? null,
     }));
     this.projects.set(id, {
-      meta: { id, title, updatedAt: nowIso() },
+      meta: { id, title, updatedAt: nowIso(), isPublic: false },
       axsSource: null,
       nodes: new Map(nodes.map((n) => [n.id, n])),
       edges,

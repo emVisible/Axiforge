@@ -123,6 +123,7 @@
 
 - [x] 定义接口：listProjects / loadProject / saveNarrative / saveRoles / saveCharacters / …（已由 Phase2 L4契约 `packages/editor-core/src/storage.ts` 完成）
 - [x] HTTP 实现（包装现有 api 层），web 应用全部数据访问经 Provider（`HttpStorageProvider` + Provider 工厂，Phase2）
+  - **纠偏（2026-09-24，Phase 6 实测）**：本条「全部数据访问经 Provider」当时并不成立——工程列表（`useProjects`）、角色搜索、素材上传仍直连 HTTP。桌面打包离线实测表现为「播种成功但首屏空列表」。Phase 6 M3 已把 `useProjects`/角色 hooks/上传口接入 Provider，此处按实态改写，不删原记录。
 - [x] 内存版 mock 实现跑通 E2E 子集（证明接口完整、UI 不直连 HTTP）（`MemoryStorageProvider` + 契约测试，Phase2）
 - [x] 失败语义成文：每方法「如果失败，返回什么，调用方会怎样」（铁律 8）（`storage.ts` 判别联合 + contract.ts，Phase2）
 
@@ -237,6 +238,7 @@
 
 - [ ] `PlayerPage.tsx`（1370 行）→ IR 渲染器分层：播放状态机（纯逻辑入 `packages/core` 或 editor-core L2 同级）、指令执行器、舞台视图、系统菜单/存档面板；渲染文件全部 ≤400 行
 - [ ] `useProjectEditor.ts`（1163 行）→ 域拆分：graph 映射 / persistence / playback / layout 四模块（宪章 1b G1 偏差记录的欠账，Phase 2 时承诺未兑现）
+- [ ] 本地工程元数据补齐：SQLite `projects` 表只有 id/title/is_public/axs_source/author_id/时间戳，缺 `description`/`cover_image`/`theme_tags`/`mechanism`/`genre`/`is_meta` 等列——桌面工程卡片因此一律显示「暂无描述」，标签与机制筛选在本地无数据可筛（Phase 6 播种实测暴露；适配层刻意填空值而非编造）
 - [ ] 存档与成就本地化：`save_slots` / `player_achievements` 进 SQLite schema，桌面断网可存可读（当前离线仅优雅降级）
 - [ ] `packages/ui` 与 `apps/web/src/shared/components/ui` 双份 UI 目录归一（一处权威，另一处只做宿主绑定）
 - [ ] 验收：G1 清单为空且原文件已删；E2E 12 条原样全绿；离线存档 E2E/E13

@@ -11,7 +11,7 @@ import {
 } from "./helpers";
 
 /**
- * E1–E12 行为基线（Phase 1a 起逐步扩充，宪章 G3）。
+ * E1–E13 行为基线（Phase 1a 起逐步扩充，宪章 G3）。
  * 这些断言钉住「行为」而非实现；Phase 1b 拆巨石后必须原样通过。
  */
 
@@ -557,6 +557,21 @@ test("E11 FX轨：memory/relationship 效果在 RN 轨可视化", async ({ page,
   // 效果色块：记忆与关系标签
   await expect(page.getByText(/记忆·score/).first()).toBeVisible();
   await expect(page.getByText(/关系·yansha/).first()).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// E13 首屏落点：浏览器态仍默认云端发现页（桌面改落本地工程列表的回归护栏）
+// ---------------------------------------------------------------------------
+
+test("E13 首屏：浏览器访问 / 落 /discover，未知路由同样回落", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForURL(/\/discover/, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: /发现|作品/ }).first()).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await page.goto("/no-such-route");
+  await page.waitForURL(/\/discover/, { timeout: 10_000 });
 });
 
 // ---------------------------------------------------------------------------

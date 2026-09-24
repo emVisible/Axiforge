@@ -62,7 +62,12 @@ function toStoredCharacter(c: {
 
 function toBundle(p: ProjectResponse): ProjectBundle {  const nodes = collectProjectNodes(p.nodes, p.scenes || []);
   return {
-    meta: { id: String(p.id), title: p.title, updatedAt: p.updated_at },
+    meta: {
+      id: String(p.id),
+      title: p.title,
+      updatedAt: p.updated_at,
+      isPublic: Boolean(p.is_public),
+    },
     axsSource: p.axs_source ?? null,
     nodes: nodes.map((n: ProjectNodeResponse) => ({
       id: String(n.id),
@@ -96,6 +101,7 @@ export class HttpStorageProvider implements StorageProvider {
           id: String(p.id),
           title: p.title,
           updatedAt: p.updated_at,
+          isPublic: Boolean(p.is_public),
         })),
       );
     } catch (e) {
@@ -109,7 +115,12 @@ export class HttpStorageProvider implements StorageProvider {
         title: input.title,
         is_public: input.isPublic ?? false,
       });
-      return ok({ id: String(p.id), title: p.title, updatedAt: p.updated_at });
+      return ok({
+        id: String(p.id),
+        title: p.title,
+        updatedAt: p.updated_at,
+        isPublic: Boolean(p.is_public),
+      });
     } catch (e) {
       return fail(e, "project", input.title);
     }

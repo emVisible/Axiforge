@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { UserProvider } from "@/app/providers/UserContext";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import { LoadingSpinner } from "@/shared/components/ui";
+import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
 
 // 布局常驻（体积小、跨路由共享）
 import StudioLayout from "@/features/studio/layouts/StudioLayout";
@@ -15,6 +16,15 @@ const CreatorDashboardPage = lazy(() => import("@/features/studio/pages/CreatorD
 const ProjectListPage = lazy(() => import("@/features/studio/pages/ProjectListPage"));
 const ProjectCreatePage = lazy(() => import("@/features/studio/pages/ProjectCreatePage"));
 const ProjectEditorPage = lazy(() => import("@/features/studio/pages/editor/ProjectEditorPage"));
+
+/**
+ * 首屏落点按运行环境直接判定（ADR-024：桌面优先，云能力可选）。
+ * 桌面若落在 /discover 或云端概览，断网首屏就是一个拉不到数据的空页——
+ * 实测过：released .app 冷启动即红字。
+ */
+const IS_DESKTOP = isTauriEnvironment();
+const APP_HOME = IS_DESKTOP ? "/studio/projects" : "/discover";
+const STUDIO_INDEX = IS_DESKTOP ? "projects" : "dashboard";
 
 function ProjectFlowLegacyRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -83,7 +93,7 @@ export default function App() {
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/studio" element={<StudioLayout />}>
-              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route index element={<Navigate to={STUDIO_INDEX} replace />} />
               <Route path="dashboard" element={<CreatorDashboardPage />} />
               <Route path="projects" element={<ProjectListPage />} />
               <Route path="projects/new" element={<ProjectCreatePage />} />
@@ -132,8 +142,8 @@ export default function App() {
               <Route path="/docs/*" element={<DocArticlePage />} />
             </Route>
 
-            <Route path="/" element={<Navigate to="/discover" replace />} />
-            <Route path="*" element={<Navigate to="/discover" replace />} />
+            <Route path="/" element={<Navigate to={APP_HOME} replace />} />
+            <Route path="*" element={<Navigate to={APP_HOME} replace />} />
           </Routes>
         </Suspense>
         </BrowserRouter>

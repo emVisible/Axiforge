@@ -12,7 +12,7 @@ import {
 import type { ProjectBundle, StorageResult, StoredCharacter } from "./storage/types";
 
 const bundle: ProjectBundle = {
-  meta: { id: "proj-1", title: "导出工程", updatedAt: "2026-08-26T00:00:00Z" },
+  meta: { id: "proj-1", title: "导出工程", updatedAt: "2026-08-26T00:00:00Z", isPublic: false },
   axsSource: "# 开始\n旁白：x\n",
   nodes: [
     {

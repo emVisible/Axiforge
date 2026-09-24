@@ -11,20 +11,43 @@ import { projectApi } from "@/shared/api/editor";
 import { getApiBase } from "@/shared/api/client";
 import { characterApi } from "@/shared/api/characters";
 import { collectProjectNodes } from "@/features/writer/lib/projection";
+import {
+  httpClearSave,
+  httpDeleteAchievement,
+  httpDeleteItem,
+  httpDeleteScene,
+  httpGetSave,
+  httpListAchievements,
+  httpListItems,
+  httpListSaves,
+  httpListScenes,
+  httpListUnlocked,
+  httpSaveAchievement,
+  httpSaveItem,
+  httpSaveScene,
+  httpUnlockAchievement,
+  httpWriteSave,
+} from "./httpDomains";
 import type {
   AssetInput,
-  CharacterScope,
   CreateProjectInput,
+  LocalSaveSlot,
   NarrativePayload,
   ProjectBundle,
   ProjectMeta,
   ProjectMetaPatch,
+  SaveSlotInput,
   StorageProvider,
   StorageResult,
+  StoredAchievement,
   StoredAsset,
+  StoredAssetItem,
+  StoredAssetScene,
   StoredCharacter,
+  UnlockedAchievement,
+  VisibilityScope,
 } from "@axiforge/editor-core";
-import { classifyAssetRef, err, filterCharacters, ok } from "@axiforge/editor-core";
+import { classifyAssetRef, err, filterByVisibility, ok } from "@axiforge/editor-core";
 import type {
   ProjectNodeResponse,
   ProjectResponse,
@@ -60,14 +83,26 @@ function toStoredCharacter(c: {
   };
 }
 
-function toBundle(p: ProjectResponse): ProjectBundle {  const nodes = collectProjectNodes(p.nodes, p.scenes || []);
+/** 工程元数据：一处映射，list / create / bundle 三处共用，避免同一转换写三遍 */
+function projectMetaOf(p: ProjectResponse): ProjectMeta {
   return {
-    meta: {
-      id: String(p.id),
-      title: p.title,
-      updatedAt: p.updated_at,
-      isPublic: Boolean(p.is_public),
-    },
+    id: String(p.id),
+    title: p.title,
+    updatedAt: p.updated_at,
+    isPublic: Boolean(p.is_public),
+    description: p.description ?? "",
+    coverImage: p.cover_image ?? null,
+    themeTags: p.theme_tags ?? [],
+    mechanism: p.mechanism ?? null,
+    genre: p.genre ?? null,
+    isMeta: Boolean(p.is_meta),
+  };
+}
+
+function toBundle(p: ProjectResponse): ProjectBundle {
+  const nodes = collectProjectNodes(p.nodes, p.scenes || []);
+  return {
+    meta: projectMetaOf(p),
     axsSource: p.axs_source ?? null,
     nodes: nodes.map((n: ProjectNodeResponse) => ({
       id: String(n.id),
@@ -96,14 +131,7 @@ export class HttpStorageProvider implements StorageProvider {
   async listProjects(): Promise<StorageResult<ProjectMeta[]>> {
     try {
       const list = await projectApi.list({ author_id: this.creatorId });
-      return ok(
-        list.map((p) => ({
-          id: String(p.id),
-          title: p.title,
-          updatedAt: p.updated_at,
-          isPublic: Boolean(p.is_public),
-        })),
-      );
+      return ok(list.map(projectMetaOf));
     } catch (e) {
       return fail(e, "projects", this.creatorId);
     }
@@ -115,12 +143,7 @@ export class HttpStorageProvider implements StorageProvider {
         title: input.title,
         is_public: input.isPublic ?? false,
       });
-      return ok({
-        id: String(p.id),
-        title: p.title,
-        updatedAt: p.updated_at,
-        isPublic: Boolean(p.is_public),
-      });
+      return ok(projectMetaOf(p));
     } catch (e) {
       return fail(e, "project", input.title);
     }
@@ -210,7 +233,7 @@ export class HttpStorageProvider implements StorageProvider {
    * 范围取数：我的走 listUser，公开走 listPublic（带 search），
    * 两者都取时按 id 合并去重——与桌面实现共用同一「我的 ∪ 公开」语义。
    */
-  async listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>> {
+  async listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>> {
     try {
       const authorId = scope?.authorId ?? null;
       const includePublic = scope?.includePublic ?? authorId === null;
@@ -230,7 +253,7 @@ export class HttpStorageProvider implements StorageProvider {
           if (!merged.has(key)) merged.set(key, toStoredCharacter(c));
         }
       }
-      return ok(filterCharacters([...merged.values()], scope));
+      return ok(filterByVisibility([...merged.values()], scope));
     } catch (e) {
       return fail(e, "characters", scope?.authorId ?? this.creatorId);
     }
@@ -300,5 +323,92 @@ export class HttpStorageProvider implements StorageProvider {
     } catch (e) {
       return err({ code: "io", detail: "素材读取请求失败", cause: e });
     }
+  }
+
+  // ---------- 四个新域：实现体在 httpDomains.ts（守 G1 行数预算） ----------
+
+  listItems(scope?: VisibilityScope): Promise<StorageResult<StoredAssetItem[]>> {
+    return httpListItems(scope);
+  }
+
+  saveItem(item: StoredAssetItem): Promise<StorageResult<{ id: string }>> {
+    return httpSaveItem(item, this.creatorId);
+  }
+
+  deleteItem(id: string): Promise<StorageResult<void>> {
+    return httpDeleteItem(id);
+  }
+
+  listScenes(scope?: VisibilityScope): Promise<StorageResult<StoredAssetScene[]>> {
+    return httpListScenes(scope);
+  }
+
+  saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>> {
+    return httpSaveScene(scene, this.creatorId);
+  }
+
+  deleteScene(id: string): Promise<StorageResult<void>> {
+    return httpDeleteScene(id);
+  }
+
+  listSaves(
+    projectId: string,
+    playerToken: string,
+  ): Promise<StorageResult<LocalSaveSlot[]>> {
+    return httpListSaves(projectId, playerToken);
+  }
+
+  getSave(
+    projectId: string,
+    playerToken: string,
+    slot = 0,
+  ): Promise<StorageResult<LocalSaveSlot>> {
+    return httpGetSave(projectId, playerToken, slot);
+  }
+
+  writeSave(
+    projectId: string,
+    playerToken: string,
+    input: SaveSlotInput,
+  ): Promise<StorageResult<LocalSaveSlot>> {
+    return httpWriteSave(projectId, playerToken, input);
+  }
+
+  clearSave(
+    projectId: string,
+    playerToken: string,
+    slot = 0,
+  ): Promise<StorageResult<void>> {
+    return httpClearSave(projectId, playerToken, slot);
+  }
+
+  listAchievements(projectId: string): Promise<StorageResult<StoredAchievement[]>> {
+    return httpListAchievements(projectId);
+  }
+
+  saveAchievement(
+    projectId: string,
+    achievement: StoredAchievement,
+  ): Promise<StorageResult<StoredAchievement>> {
+    return httpSaveAchievement(projectId, achievement);
+  }
+
+  deleteAchievement(projectId: string, id: string): Promise<StorageResult<void>> {
+    return httpDeleteAchievement(projectId, id);
+  }
+
+  unlockAchievement(
+    projectId: string,
+    playerToken: string,
+    key: string,
+  ): Promise<StorageResult<void>> {
+    return httpUnlockAchievement(projectId, playerToken, key);
+  }
+
+  listUnlocked(
+    projectId: string,
+    playerToken: string,
+  ): Promise<StorageResult<UnlockedAchievement[]>> {
+    return httpListUnlocked(projectId, playerToken);
   }
 }

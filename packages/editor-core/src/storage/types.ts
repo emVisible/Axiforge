@@ -40,8 +40,17 @@ export interface ProjectMeta {
   readonly id: string;
   readonly title: string;
   readonly updatedAt: string;
-  /** 本地库真实存在的列；云端元数据（描述/标签/机制/封面）SQLite schema 尚无对应列，见宪章 Phase 7 */
   readonly isPublic: boolean;
+  /**
+   * 云端本有的工程元数据，v0.8 起本地表同批补齐（宪章 Phase 7）。
+   * 一律必填：缺失≠空串/空数组，五义在契约一处定死。
+   */
+  readonly description: string;
+  readonly coverImage: string | null;
+  readonly themeTags: readonly string[];
+  readonly mechanism: string | null;
+  readonly genre: string | null;
+  readonly isMeta: boolean;
 }
 
 export interface StoredNode {
@@ -96,23 +105,56 @@ export interface StoredCharacter {
 }
 
 /**
- * 角色清单取数范围。语义 = 「我的（给 authorId 时）∪ 公开（includePublic 时）」，
- * 两者都不给 = 全部公开（协作服务的默认对外视角，与今天 /characters 公开列表一致）。
+ * 全局资产池三兄弟（角色 / 道具 / 场景）的共同形状：
+ * filterByVisibility 只依赖这四个字段，故一处约束而非三处复制。
  */
-export interface CharacterScope {
+export interface VisibleRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly isPublic: boolean;
+  readonly authorId: string | null;
+}
+
+/**
+ * 可见范围。语义 = 「我的（给 authorId 时）∪ 公开（includePublic 时）」，
+ * 两者都不给 = 全部公开（协作服务的默认对外视角）。
+ * 角色 / 道具 / 场景共用此一处定义：同一语义不得有两套词汇。
+ */
+export interface VisibilityScope {
   readonly authorId?: string | null;
   readonly includePublic?: boolean;
   readonly search?: string;
 }
 
-export interface CreateProjectInput {
-  readonly title: string;
+/**
+ * 工程尚无元数据时的取值，一处定义。
+ * 六个空值若在多处各写一遍，「本地新建」与「导入」两条路径就会漂移。
+ */
+export const emptyProjectMetadata = (): Omit<
+  ProjectMeta,
+  "id" | "title" | "updatedAt" | "isPublic"
+> => ({
+  description: "",
+  coverImage: null,
+  themeTags: [],
+  mechanism: null,
+  genre: null,
+  isMeta: false,
+});
+
+export interface CreateProjectInput {  readonly title: string;
   readonly isPublic?: boolean;
 }
 
 export interface ProjectMetaPatch {
   readonly title?: string;
   readonly axsSource?: string | null;
+  readonly description?: string;
+  readonly coverImage?: string | null;
+  readonly themeTags?: readonly string[];
+  readonly mechanism?: string | null;
+  readonly genre?: string | null;
+  readonly isMeta?: boolean;
 }
 
 /**
@@ -140,6 +182,81 @@ export interface StoredAsset {
 export interface AssetStore {
   write(input: AssetInput): Promise<StorageResult<StoredAsset>>;
   read(ref: string): Promise<StorageResult<Uint8Array>>;
+}
+
+// ------------------------------------------------------------
+// 全局资产池 / 运行时状态（v0.8 · 宪章 Phase 7 本地化）
+// ------------------------------------------------------------
+
+/**
+ * 道具与场景是**全局资产池**（backend assets/models.py 注释「全局资产池」）：
+ * 不挂 project_id，归属由 authorId 决定，工程侧只存引用。
+ * 本地表因此与 characters 同构，而不是 project_* 子表。
+ */
+export interface StoredAssetItem {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly category: string;
+  readonly rarity: string;
+  readonly mechanismTags: readonly string[];
+  readonly effects: readonly string[];
+  readonly imagePath: string | null;
+  readonly isPublic: boolean;
+  readonly authorId: string | null;
+  readonly updatedAt: string;
+}
+
+export interface StoredAssetScene {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly location: string | null;
+  readonly atmosphere: string | null;
+  readonly era: string | null;
+  readonly worldSetting: string | null;
+  readonly rules: string | null;
+  readonly tags: readonly string[];
+  readonly nodeTemplates: readonly Record<string, unknown>[];
+  readonly imagePath: string | null;
+  readonly isPublic: boolean;
+  readonly authorId: string | null;
+  readonly updatedAt: string;
+}
+
+/** 玩家身份：匿名 token，跨重启稳定（不是账号） */
+export interface LocalSaveSlot {
+  readonly slot: number;
+  readonly state: Record<string, unknown>;
+  readonly summary: string | null;
+  readonly beatId: string | null;
+  /** 本地素材 ref，交给 resolveAssetUrl 显示；非后端 thumb_path */
+  readonly thumbRef: string | null;
+  readonly updatedAt: string;
+}
+
+export interface SaveSlotInput {
+  readonly slot?: number;
+  readonly state: Record<string, unknown>;
+  readonly summary?: string | null;
+  readonly beatId?: string | null;
+  readonly thumbRef?: string | null;
+}
+
+/** 成就定义：per project（backend ginkgo/models.py） */
+export interface StoredAchievement {
+  readonly id: string;
+  readonly key: string;
+  readonly title: string;
+  readonly description: string;
+  readonly icon: string;
+  readonly condition: Record<string, unknown>;
+}
+
+/** 已解锁记录按 key 关联，不按 id：重导入工程会产生新 id，key 才是稳定语义 */
+export interface UnlockedAchievement {
+  readonly key: string;
+  readonly unlockedAt: string;
 }
 
 // ------------------------------------------------------------
@@ -185,8 +302,8 @@ export interface StorageProvider {
     roleId: string,
   ): Promise<StorageResult<void>>;
 
-  /** 角色清单（范围语义见 CharacterScope；无匹配=空数组，非错误） */
-  listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>>;
+  /** 角色清单（范围语义见 VisibilityScope；无匹配=空数组，非错误） */
+  listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>>;
 
   getCharacter(id: string): Promise<StorageResult<StoredCharacter>>;
 
@@ -210,6 +327,78 @@ export interface StorageProvider {
    * 失败语义：ref 非法/含越界→not_found；文件缺失→not_found；读取故障→io。
    */
   readAsset(ref: string): Promise<StorageResult<Uint8Array>>;
+
+  // ---------- 道具（全局资产池，范围语义同角色） ----------
+
+  listItems(scope?: VisibilityScope): Promise<StorageResult<StoredAssetItem[]>>;
+
+  /** upsert，返回权威 id（客户端不得假设入参 id 生效） */
+  saveItem(item: StoredAssetItem): Promise<StorageResult<{ id: string }>>;
+
+  /** 不存在→not_found */
+  deleteItem(id: string): Promise<StorageResult<void>>;
+
+  // ---------- 场景（全局资产池） ----------
+
+  listScenes(scope?: VisibilityScope): Promise<StorageResult<StoredAssetScene[]>>;
+
+  saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>>;
+
+  deleteScene(id: string): Promise<StorageResult<void>>;
+
+  // ---------- 运行时存档（per project × playerToken × slot） ----------
+
+  listSaves(
+    projectId: string,
+    playerToken: string,
+  ): Promise<StorageResult<LocalSaveSlot[]>>;
+
+  /** 该槽从未写过→not_found（区别于「内容为空」） */
+  getSave(
+    projectId: string,
+    playerToken: string,
+    slot?: number,
+  ): Promise<StorageResult<LocalSaveSlot>>;
+
+  /** 覆写式 upsert：同一 (project, token, slot) 后写覆盖前写 */
+  writeSave(
+    projectId: string,
+    playerToken: string,
+    input: SaveSlotInput,
+  ): Promise<StorageResult<LocalSaveSlot>>;
+
+  /** 删不存在的槽→not_found */
+  clearSave(
+    projectId: string,
+    playerToken: string,
+    slot?: number,
+  ): Promise<StorageResult<void>>;
+
+  // ---------- 成就（定义 per project；解锁记录 per playerToken） ----------
+
+  listAchievements(projectId: string): Promise<StorageResult<StoredAchievement[]>>;
+
+  saveAchievement(
+    projectId: string,
+    achievement: StoredAchievement,
+  ): Promise<StorageResult<StoredAchievement>>;
+
+  deleteAchievement(
+    projectId: string,
+    id: string,
+  ): Promise<StorageResult<void>>;
+
+  /** 幂等：重复解锁不产生第二条记录、不改变 unlockedAt */
+  unlockAchievement(
+    projectId: string,
+    playerToken: string,
+    key: string,
+  ): Promise<StorageResult<void>>;
+
+  listUnlocked(
+    projectId: string,
+    playerToken: string,
+  ): Promise<StorageResult<UnlockedAchievement[]>>;
 }
 
 // ------------------------------------------------------------

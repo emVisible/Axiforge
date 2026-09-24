@@ -39,6 +39,56 @@ describe("SqliteStorageProvider 初始化", () => {
     if (!after.ok) throw new Error("reload failed");
     expect(after.data.nodes.length).toBe(nodeCount);
   });
+
+  /**
+   * 已发布过 v0.7 的机器上，本地库既没有四张新表、projects 也没有元数据列。
+   * CREATE TABLE IF NOT EXISTS 不会给既有表补列，所以「旧库升级」必须被单独测一次，
+   * 而不是只在空库上验证。
+   */
+  it("旧库升级：v0.7 形状的库经两次 init 补齐表与列，既有数据不丢", async () => {
+    const backend = await SqlJsBackend.create();
+    await backend.execute(`
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, is_public INTEGER NOT NULL DEFAULT 0,
+        axs_source TEXT, author_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE characters (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, character_data TEXT NOT NULL DEFAULT '{}',
+        image_path TEXT, author_id TEXT
+      );
+      INSERT INTO projects (id, title, is_public, created_at, updated_at)
+      VALUES ('legacy-1', '旧工程', 0, '2026-09-01T00:00:00Z', '2026-09-01T00:00:00Z');
+    `);
+
+    const p = new SqliteStorageProvider(backend);
+    await p.init();
+    await p.init(); // 第二次必须无副作用
+
+    const list = await p.listProjects();
+    expect(list.ok).toBe(true);
+    if (!list.ok) return;
+    expect(list.data.length).toBe(1);
+    expect(list.data[0]?.title).toBe("旧工程");
+    expect(list.data[0]?.description).toBe(""); // 补列后旧行为空串，而非 undefined
+    expect(list.data[0]?.themeTags).toEqual([]);
+
+    const tables = await backend.select<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'table'`,
+    );
+    for (const t of ["asset_items", "asset_scenes", "save_slots", "achievements", "player_achievements"]) {
+      expect(tables.some((r) => r.name === t)).toBe(true);
+    }
+
+    // 旧库上直接写入四个新域：不报错才算真补齐
+    const item = await p.saveItem({
+      id: "", name: "旧库道具", description: "", category: "日常", rarity: "普通",
+      mechanismTags: [], effects: [], imagePath: null,
+      isPublic: true, authorId: "a", updatedAt: "",
+    });
+    expect(item.ok).toBe(true);
+    const save = await p.writeSave("legacy-1", "tok-legacy", { state: { ok: true } });
+    expect(save.ok).toBe(true);
+  });
 });
 
 runStorageContractSuite("SQLite(sql.js)", async () => {

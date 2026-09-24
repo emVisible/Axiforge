@@ -63,7 +63,6 @@ export interface AssetItemCreate {
   category?: string;
   rarity?: string;
   mechanism_tags?: string[];
-  personality?: Record<string, number>;
   effects?: string[];
   image_path?: string | null;
   author_id?: string;
@@ -75,7 +74,6 @@ export interface AssetItemUpdate {
   description?: string;
   category?: string;
   rarity?: string;
-  personality?: Record<string, number>;
   mechanism_tags?: string[];
   effects?: string[];
   image_path?: string | null;
@@ -91,7 +89,6 @@ export interface AssetItemResponse {
   effects: string[];
   mechanism_tags: string[];
   image_path: string | null;
-  personality: Record<string, number>;
   author_id: string;
   is_public: boolean;
   view_count: number;

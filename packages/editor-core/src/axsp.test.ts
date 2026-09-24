@@ -10,9 +10,16 @@ import {
   unpackAxspV1,
 } from "./axsp";
 import type { ProjectBundle, StorageResult, StoredCharacter } from "./storage/types";
+import { emptyProjectMetadata } from "./storage/types";
 
 const bundle: ProjectBundle = {
-  meta: { id: "proj-1", title: "导出工程", updatedAt: "2026-08-26T00:00:00Z", isPublic: false },
+  meta: {
+    id: "proj-1",
+    title: "导出工程",
+    updatedAt: "2026-08-26T00:00:00Z",
+    isPublic: false,
+    ...emptyProjectMetadata(),
+  },
   axsSource: "# 开始\n旁白：x\n",
   nodes: [
     {

@@ -8,40 +8,44 @@
  * - 失败语义：SQL 异常 → io；载入 JSON 解析失败 → corrupted
  */
 
-import { filterCharacters } from "../characters";
+import { filterByVisibility } from "../visibility";
+import { deleteById, listItems, listScenes, saveItem, saveScene } from "./assetPool";
+import {
+  clearSave,
+  getSave,
+  listAchievements,
+  listSaves,
+  listUnlocked,
+  saveAchievement,
+  unlockAchievement,
+  writeSave,
+  deleteAchievement,
+} from "./runtimeLocal";
+import { asBool, nowIso, parseJson, uuid } from "./rows";
 import type {
   AssetInput,
   AssetStore,
-  CharacterScope,
   CreateProjectInput,
+  LocalSaveSlot,
   NarrativePayload,
   ProjectBundle,
   ProjectMeta,
   ProjectMetaPatch,
+  SaveSlotInput,
   StorageProvider,
   StorageResult,
+  StoredAchievement,
   StoredAsset,
+  StoredAssetItem,
+  StoredAssetScene,
   StoredCharacter,
   StoredEdge,
   StoredNode,
+  UnlockedAchievement,
+  VisibilityScope,
 } from "../types";
-import { err, ok } from "../types";
+import { emptyProjectMetadata, err, ok } from "../types";
 import { applyMigrations, type SqlBackend, type SqlStmt } from "./backend";
-
-const nowIso = () => new Date().toISOString();
-const uuid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-function parseJson<T>(text: unknown, entity: string, id: string, fallback: T): StorageResult<T> {
-  if (typeof text !== "string") return ok(fallback);
-  try {
-    return ok(JSON.parse(text) as T);
-  } catch (cause) {
-    return err({ code: "corrupted", entity, id, detail: "JSON 解析失败", cause });
-  }
-}
 
 interface ProjectRow {
   id: string;
@@ -49,7 +53,34 @@ interface ProjectRow {
   updated_at: string;
   axs_source: string | null;
   is_public?: number | boolean | null;
+  description?: string | null;
+  cover_image?: string | null;
+  theme_tags?: string | null;
+  mechanism?: string | null;
+  genre?: string | null;
+  is_meta?: number | boolean | null;
 }
+
+/** projects 行 → ProjectMeta：JSON 列逐字段解码，缺列按「本地库尚未迁移」如实归零 */
+function toProjectMeta(r: ProjectRow): StorageResult<ProjectMeta> {
+  const tags = parseJson<string[]>(r.theme_tags, "project.theme_tags", r.id, []);
+  if (!tags.ok) return tags;
+  return ok({
+    id: r.id,
+    title: r.title,
+    updatedAt: r.updated_at,
+    isPublic: asBool(r.is_public),
+    description: r.description ?? "",
+    coverImage: r.cover_image ?? null,
+    themeTags: tags.data,
+    mechanism: r.mechanism ?? null,
+    genre: r.genre ?? null,
+    isMeta: asBool(r.is_meta),
+  });
+}
+
+const PROJECT_COLS = `id, title, updated_at, is_public, description, cover_image,
+  theme_tags, mechanism, genre, is_meta`;
 
 interface CharacterRow {
   id: string;
@@ -57,7 +88,7 @@ interface CharacterRow {
   character_data: string;
   image_path: string | null;
   author_id: string | null;
-  /** 旧库补列前可能取不到；sql.js 与 sqlx 的布尔表示不同，故联合类型显式处理 */
+  /** 旧库补列前可能取不到；sql.js 与 sqlx 的布尔表示不同，故显式归一 */
   is_public?: number | boolean | null;
 }
 
@@ -80,16 +111,15 @@ export class SqliteStorageProvider implements StorageProvider {
   async listProjects(): Promise<StorageResult<ProjectMeta[]>> {
     try {
       const rows = await this.backend.select<ProjectRow>(
-        `SELECT id, title, updated_at, is_public FROM projects ORDER BY updated_at DESC`,
+        `SELECT ${PROJECT_COLS} FROM projects ORDER BY updated_at DESC`,
       );
-      return ok(
-        rows.map((r) => ({
-          id: r.id,
-          title: r.title,
-          updatedAt: r.updated_at,
-          isPublic: r.is_public === 1 || r.is_public === true,
-        })),
-      );
+      const out: ProjectMeta[] = [];
+      for (const r of rows) {
+        const meta = toProjectMeta(r);
+        if (!meta.ok) return meta;
+        out.push(meta.data);
+      }
+      return ok(out);
     } catch (cause) {
       return err({ code: "io", detail: "listProjects 查询失败", cause });
     }
@@ -128,7 +158,13 @@ export class SqliteStorageProvider implements StorageProvider {
          VALUES (?, ?, ?, ?, ?)`,
         [`${startId}-${endId}`, id, startId, endId, "开始"],
       );
-      return ok({ id, title: input.title, updatedAt: now, isPublic: input.isPublic ?? false });
+      return ok({
+        id,
+        title: input.title,
+        updatedAt: now,
+        isPublic: input.isPublic ?? false,
+        ...emptyProjectMetadata(),
+      });
     } catch (cause) {
       return err({ code: "io", detail: "createProject 写入失败", cause });
     }
@@ -137,11 +173,13 @@ export class SqliteStorageProvider implements StorageProvider {
   async loadProject(id: string): Promise<StorageResult<ProjectBundle>> {
     try {
       const rows = await this.backend.select<ProjectRow>(
-        `SELECT id, title, updated_at, axs_source, is_public FROM projects WHERE id = ?`,
+        `SELECT ${PROJECT_COLS}, axs_source FROM projects WHERE id = ?`,
         [id],
       );
       if (!rows.length) return err({ code: "not_found", entity: "project", id });
       const row = rows[0]!;
+      const meta = toProjectMeta(row);
+      if (!meta.ok) return meta;
 
       const nodeRows = await this.backend.select<{
         id: string; stage_id: string | null; editor_data: string;
@@ -186,12 +224,7 @@ export class SqliteStorageProvider implements StorageProvider {
       );
 
       return ok({
-        meta: {
-          id: row.id,
-          title: row.title,
-          updatedAt: row.updated_at,
-          isPublic: row.is_public === 1 || row.is_public === true,
-        },
+        meta: meta.data,
         axsSource: row.axs_source,
         nodes,
         edges,
@@ -223,6 +256,12 @@ export class SqliteStorageProvider implements StorageProvider {
       const params: unknown[] = [nowIso()];
       if (patch.title !== undefined) { sets.push("title = ?"); params.push(patch.title); }
       if (patch.axsSource !== undefined) { sets.push("axs_source = ?"); params.push(patch.axsSource); }
+      if (patch.description !== undefined) { sets.push("description = ?"); params.push(patch.description); }
+      if (patch.coverImage !== undefined) { sets.push("cover_image = ?"); params.push(patch.coverImage); }
+      if (patch.themeTags !== undefined) { sets.push("theme_tags = ?"); params.push(JSON.stringify(patch.themeTags)); }
+      if (patch.mechanism !== undefined) { sets.push("mechanism = ?"); params.push(patch.mechanism); }
+      if (patch.genre !== undefined) { sets.push("genre = ?"); params.push(patch.genre); }
+      if (patch.isMeta !== undefined) { sets.push("is_meta = ?"); params.push(patch.isMeta ? 1 : 0); }
       params.push(id);
       const r = await this.backend.execute(
         `UPDATE projects SET ${sets.join(", ")} WHERE id = ?`, params,
@@ -315,7 +354,7 @@ export class SqliteStorageProvider implements StorageProvider {
     }
   }
 
-  async listCharacters(scope?: CharacterScope): Promise<StorageResult<StoredCharacter[]>> {
+  async listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>> {
     try {
       const rows = await this.backend.select<CharacterRow>(
         `SELECT id, name, character_data, image_path, author_id, is_public FROM characters`,
@@ -333,7 +372,7 @@ export class SqliteStorageProvider implements StorageProvider {
           authorId: r.author_id ?? null,
         });
       }
-      return ok(filterCharacters(out, scope));
+      return ok(filterByVisibility(out, scope));
     } catch (cause) {
       return err({ code: "io", detail: "listCharacters 查询失败", cause });
     }
@@ -404,5 +443,81 @@ export class SqliteStorageProvider implements StorageProvider {
       return err({ code: "io", detail: "未配置素材存储（AssetStore 未注入）" });
     }
     return this.assetStore.read(ref);
+  }
+
+  // ---------- 全局资产池 / 运行时状态：实现体在 assetPool 与 runtimeLocal ----------
+
+  listItems(scope?: VisibilityScope) {
+    return listItems(this.backend, scope);
+  }
+
+  saveItem(item: StoredAssetItem) {
+    return saveItem(this.backend, item, this.authorId);
+  }
+
+  deleteItem(id: string) {
+    return deleteById(this.backend, "asset_items", "item", id);
+  }
+
+  listScenes(scope?: VisibilityScope) {
+    return listScenes(this.backend, scope);
+  }
+
+  saveScene(scene: StoredAssetScene) {
+    return saveScene(this.backend, scene, this.authorId);
+  }
+
+  deleteScene(id: string) {
+    return deleteById(this.backend, "asset_scenes", "scene", id);
+  }
+
+  listSaves(projectId: string, playerToken: string): Promise<StorageResult<LocalSaveSlot[]>> {
+    return listSaves(this.backend, projectId, playerToken);
+  }
+
+  getSave(projectId: string, playerToken: string, slot = 0): Promise<StorageResult<LocalSaveSlot>> {
+    return getSave(this.backend, projectId, playerToken, slot);
+  }
+
+  writeSave(
+    projectId: string,
+    playerToken: string,
+    input: SaveSlotInput,
+  ): Promise<StorageResult<LocalSaveSlot>> {
+    return writeSave(this.backend, projectId, playerToken, input);
+  }
+
+  clearSave(projectId: string, playerToken: string, slot = 0): Promise<StorageResult<void>> {
+    return clearSave(this.backend, projectId, playerToken, slot);
+  }
+
+  listAchievements(projectId: string): Promise<StorageResult<StoredAchievement[]>> {
+    return listAchievements(this.backend, projectId);
+  }
+
+  saveAchievement(
+    projectId: string,
+    achievement: StoredAchievement,
+  ): Promise<StorageResult<StoredAchievement>> {
+    return saveAchievement(this.backend, projectId, achievement);
+  }
+
+  deleteAchievement(projectId: string, id: string): Promise<StorageResult<void>> {
+    return deleteAchievement(this.backend, projectId, id);
+  }
+
+  unlockAchievement(
+    projectId: string,
+    playerToken: string,
+    key: string,
+  ): Promise<StorageResult<void>> {
+    return unlockAchievement(this.backend, projectId, playerToken, key);
+  }
+
+  listUnlocked(
+    projectId: string,
+    playerToken: string,
+  ): Promise<StorageResult<UnlockedAchievement[]>> {
+    return listUnlocked(this.backend, projectId, playerToken);
   }
 }

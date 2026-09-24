@@ -100,6 +100,33 @@ export interface ProjectMetaPatch {
   readonly axsSource?: string | null;
 }
 
+/**
+ * 素材字节与落位结果（ADR-024 决策 3：素材是本地文件，DB 只存引用）。
+ * ref 形态由实现决定（桌面 `assets/<摘要>.<ext>` / 服务端 `/uploads/...`），
+ * 契约只保证：同一内容 → 同一 ref；ref 可 readAsset 回等价字节。
+ */
+export interface AssetInput {
+  readonly name: string;
+  readonly mime: string;
+  readonly bytes: Uint8Array;
+}
+
+export interface StoredAsset {
+  readonly ref: string;
+  readonly mime: string;
+  readonly size: number;
+}
+
+/**
+ * 素材字节存储端口——由 L5 注入（桌面=Tauri fs，测试=内存 stub）。
+ * 存在的原因：摘要算法与文件系统都是平台能力，内核不得持有；
+ * 与 SqlBackend 端口同构，不是新的抽象层。
+ */
+export interface AssetStore {
+  write(input: AssetInput): Promise<StorageResult<StoredAsset>>;
+  read(ref: string): Promise<StorageResult<Uint8Array>>;
+}
+
 // ------------------------------------------------------------
 // 契约
 // ------------------------------------------------------------
@@ -154,6 +181,19 @@ export interface StorageProvider {
   saveCharacter(
     character: StoredCharacter,
   ): Promise<StorageResult<{ id: string }>>;
+
+  /**
+   * 写入素材字节并返回可引用 ref（同内容幂等：重复写返回同一 ref）。
+   * 失败语义：空字节→io；平台写盘/上传故障→io；mime 不支持由实现以 io/detail 报告。
+   * 调用方（L5）负责呈现失败并允许重试——Provider 不弹提示。
+   */
+  saveAsset(input: AssetInput): Promise<StorageResult<StoredAsset>>;
+
+  /**
+   * 按 ref 读回字节（`.axsp` 导出打包与桌面重解析素材用）。
+   * 失败语义：ref 非法/含越界→not_found；文件缺失→not_found；读取故障→io。
+   */
+  readAsset(ref: string): Promise<StorageResult<Uint8Array>>;
 }
 
 // ------------------------------------------------------------

@@ -46,6 +46,7 @@ export { default as ErrorDisplay } from "./ErrorDisplay";
 export { default as EmptyState } from "./EmptyState";
 export { default as Skeleton } from "./Skeleton";
 export { default as ImageUpload } from "./ImageUpload";
+export { uploadToServer } from "./ImageUpload";
 export { default as SearchSelect } from "./SearchSelect";
 export { default as ToggleInput } from "./ToggleInput";
 export { default as TabBar } from "./TabBar";

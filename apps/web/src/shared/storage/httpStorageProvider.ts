@@ -11,6 +11,7 @@ import { projectApi } from "@/shared/api/editor";
 import { characterApi } from "@/shared/api/characters";
 import { collectProjectNodes } from "@/features/writer/lib/projection";
 import type {
+  AssetInput,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -18,9 +19,10 @@ import type {
   ProjectMetaPatch,
   StorageProvider,
   StorageResult,
+  StoredAsset,
   StoredCharacter,
 } from "@axiforge/editor-core";
-import { err, ok } from "@axiforge/editor-core";
+import { classifyAssetRef, err, ok } from "@axiforge/editor-core";
 import type {
   ProjectNodeResponse,
   ProjectResponse,
@@ -222,6 +224,41 @@ export class HttpStorageProvider implements StorageProvider {
       return ok({ id: String(created.id) });
     } catch (e) {
       return fail(e, "character", character.id || "(new)");
+    }
+  }
+
+  /** 素材走服务端上传口（web 冻结线行为）：ref = 服务端返回的 /uploads/... 绝对路径 */
+  async saveAsset(input: AssetInput): Promise<StorageResult<StoredAsset>> {
+    if (input.bytes.byteLength === 0) {
+      return err({ code: "io", detail: "素材字节为空" });
+    }
+    try {
+      const form = new FormData();
+      form.append("file", new Blob([input.bytes as BlobPart], { type: input.mime }), input.name);
+      const res = await fetch("/api/v1/upload", { method: "POST", body: form });
+      if (!res.ok) {
+        return err({ code: "io", detail: `素材上传失败 (HTTP ${res.status})` });
+      }
+      const data = (await res.json()) as { url?: string };
+      if (!data.url) return err({ code: "corrupted", entity: "asset", detail: "上传响应缺 url" });
+      return ok({ ref: data.url, mime: input.mime, size: input.bytes.byteLength });
+    } catch (e) {
+      return err({ code: "io", detail: "素材上传请求失败", cause: e });
+    }
+  }
+
+  async readAsset(ref: string): Promise<StorageResult<Uint8Array>> {
+    if (classifyAssetRef(ref) !== "direct") {
+      return err({ code: "not_found", entity: "asset", id: ref });
+    }
+    try {
+      const res = await fetch(ref);
+      if (!res.ok) {
+        return err({ code: "not_found", entity: "asset", id: ref });
+      }
+      return ok(new Uint8Array(await res.arrayBuffer()));
+    } catch (e) {
+      return err({ code: "io", detail: "素材读取请求失败", cause: e });
     }
   }
 }

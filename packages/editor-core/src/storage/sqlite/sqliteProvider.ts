@@ -9,6 +9,8 @@
  */
 
 import type {
+  AssetInput,
+  AssetStore,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -16,6 +18,7 @@ import type {
   ProjectMetaPatch,
   StorageProvider,
   StorageResult,
+  StoredAsset,
   StoredCharacter,
   StoredEdge,
   StoredNode,
@@ -46,7 +49,11 @@ interface ProjectRow {
 }
 
 export class SqliteStorageProvider implements StorageProvider {
-  constructor(private readonly backend: SqlBackend) {}
+  constructor(
+    private readonly backend: SqlBackend,
+    /** 素材字节存储（桌面=Tauri fs；缺省=本实现不接素材，saveAsset 返回 io） */
+    private readonly assetStore?: AssetStore,
+  ) {}
 
   async init(): Promise<void> {
     await applyMigrations(this.backend);
@@ -334,5 +341,23 @@ export class SqliteStorageProvider implements StorageProvider {
     } catch (cause) {
       return err({ code: "io", detail: "saveCharacter 失败", cause });
     }
+  }
+
+  /**
+   * 素材不经 SQL 存储：字节归文件系统（ADR-024 决策 3），DB 只出现 ref 字符串
+   * （活在 narrative_data / characters.image_path 里）。故此处纯委派注入端口。
+   */
+  async saveAsset(input: AssetInput): Promise<StorageResult<StoredAsset>> {
+    if (!this.assetStore) {
+      return err({ code: "io", detail: "未配置素材存储（AssetStore 未注入）" });
+    }
+    return this.assetStore.write(input);
+  }
+
+  async readAsset(ref: string): Promise<StorageResult<Uint8Array>> {
+    if (!this.assetStore) {
+      return err({ code: "io", detail: "未配置素材存储（AssetStore 未注入）" });
+    }
+    return this.assetStore.read(ref);
   }
 }

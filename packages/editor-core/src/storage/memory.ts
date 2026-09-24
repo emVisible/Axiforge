@@ -10,7 +10,14 @@
 
 import { createDraft } from "../document";
 import type { Draft } from "../types";
+import {
+  assetRefFor,
+  classifyAssetRef,
+  contentKey,
+  extensionFor,
+} from "./assets";
 import type {
+  AssetInput,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -18,6 +25,7 @@ import type {
   ProjectMetaPatch,
   StorageProvider,
   StorageResult,
+  StoredAsset,
   StoredCharacter,
   StoredEdge,
   StoredNode,
@@ -68,6 +76,7 @@ function bootstrapScenesAndNodes(): {
 export class MemoryStorageProvider implements StorageProvider {
   private projects = new Map<string, ProjectRow>();
   private characters = new Map<string, StoredCharacter>();
+  private assets = new Map<string, Uint8Array>();
   private seq = 0;
 
   private nextId(prefix: string): string {
@@ -174,6 +183,28 @@ export class MemoryStorageProvider implements StorageProvider {
     const id = character.id || this.nextId("char");
     this.characters.set(id, { ...character, id });
     return ok({ id });
+  }
+
+  async saveAsset(input: AssetInput): Promise<StorageResult<StoredAsset>> {
+    if (input.bytes.byteLength === 0) {
+      return err({ code: "io", detail: "素材字节为空" });
+    }
+    const ref = assetRefFor(
+      contentKey(input.bytes),
+      extensionFor(input.name, input.mime),
+    );
+    this.assets.set(ref, input.bytes.slice());
+    return ok({ ref, mime: input.mime, size: input.bytes.byteLength });
+  }
+
+  async readAsset(ref: string): Promise<StorageResult<Uint8Array>> {
+    const kind = classifyAssetRef(ref);
+    if (kind === "empty" || kind === "invalid") {
+      return err({ code: "not_found", entity: "asset", id: String(ref) });
+    }
+    const bytes = this.assets.get(ref.trim());
+    if (!bytes) return err({ code: "not_found", entity: "asset", id: ref });
+    return ok(bytes.slice());
   }
 
   // ---- 测试辅助：Draft 视图 ----

@@ -141,6 +141,49 @@ export function runStorageContractSuite(
       expect(miss.ok).toBe(false);
     });
 
+    it("素材：saveAsset → readAsset 字节等价；同内容去重同 ref；异内容异 ref", async () => {
+      const p = await makeProvider();
+      const bytes = new Uint8Array([1, 2, 3, 4]);
+      const saved = await p.saveAsset({ name: "a.png", mime: "image/png", bytes });
+      expect(saved.ok).toBe(true);
+      if (!saved.ok) return;
+      expect(saved.data.ref).toBeTruthy();
+      expect(saved.data.size).toBe(4);
+
+      const read = await p.readAsset(saved.data.ref);
+      expect(read.ok).toBe(true);
+      if (read.ok) expect(Array.from(read.data)).toEqual([1, 2, 3, 4]);
+
+      const again = await p.saveAsset({ name: "改名.png", mime: "image/png", bytes });
+      expect(again.ok && again.data.ref).toBe(saved.data.ref);
+
+      const other = await p.saveAsset({
+        name: "b.png",
+        mime: "image/png",
+        bytes: new Uint8Array([9, 9]),
+      });
+      expect(other.ok && other.data.ref).not.toBe(saved.data.ref);
+    });
+
+    it("素材：空字节 → io；缺失/越界 ref → not_found（失败语义先填空）", async () => {
+      const p = await makeProvider();
+      const empty = await p.saveAsset({
+        name: "e.png",
+        mime: "image/png",
+        bytes: new Uint8Array([]),
+      });
+      expect(empty.ok).toBe(false);
+      if (!empty.ok) expect(empty.error.code).toBe("io");
+
+      const miss = await p.readAsset("assets/nope.png");
+      expect(miss.ok).toBe(false);
+      if (!miss.ok) expect(miss.error.code).toBe("not_found");
+
+      const traversal = await p.readAsset("assets/../../etc/passwd");
+      expect(traversal.ok).toBe(false);
+      if (!traversal.ok) expect(traversal.error.code).toBe("not_found");
+    });
+
     it("deleteProject：删除后 list/load 均消失，重复删除 not_found", async () => {
       const p = await makeProvider();
       const created = await p.createProject({ title: "将删" });

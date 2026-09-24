@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createMemoryAssetStore } from "../assets";
 import { SqlJsBackend } from "./sqljs.backend";
 import { SqliteStorageProvider } from "./sqliteProvider";
 import { runStorageContractSuite } from "../contract";
@@ -42,7 +43,7 @@ describe("SqliteStorageProvider 初始化", () => {
 
 runStorageContractSuite("SQLite(sql.js)", async () => {
   const backend = await SqlJsBackend.create();
-  const provider = new SqliteStorageProvider(backend);
+  const provider = new SqliteStorageProvider(backend, createMemoryAssetStore());
   await provider.init();
   return provider;
 });

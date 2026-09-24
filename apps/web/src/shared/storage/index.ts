@@ -11,6 +11,8 @@ import type { ProjectBundle } from "@axiforge/editor-core";
 import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
 import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
+import { TauriAssetStore } from "./tauriAssetStore";
+import { setLocalAssetRoot } from "./assetContext";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import type {
   ProjectEdgeResponse,
@@ -148,10 +150,13 @@ export async function loadStoryOffline(projectId: string): Promise<StoryPackage>
 
 export async function createStorageProvider(): Promise<StorageProvider> {
   if (isTauriEnvironment()) {
-    const provider = new SqliteStorageProvider(new TauriSqlBackend());
+    const assets = await TauriAssetStore.create();
+    setLocalAssetRoot(assets.rootDir);
+    const provider = new SqliteStorageProvider(new TauriSqlBackend(), assets);
     await provider.init();
     return provider;
   }
+  setLocalAssetRoot(null);
   return new HttpStorageProvider(getCreatorId());
 }
 

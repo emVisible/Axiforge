@@ -299,27 +299,28 @@
 
 **非目标**：不改功能语义、不加新界面能力。
 
-> **起手项（2026-09-24 实测截图发现，优先级高于本阶段其余条目）**
+> **起手项（2026-09-24 实测截图发现 → 同日已修复）**
 >
-> 剪辑工作台右栏检查器的下拉控件呈现为**浏览器原生 select + 一枚脱离字段的 ⌄ 图标**，
-> 与全站设计语言明显脱节（同屏的输入框、按钮都是自定义样式，唯独这里露出系统控件）。
-> 组件源码 `packages/ui/src/components/Select.tsx` 是正确的：
-> `<div className="relative">` 包 `<select className="... appearance-none pr-10">`，
-> 再把 `ChevronDown` 以 `absolute right-3 top-1/2 -translate-y-1/2` 叠在字段内。
-> 调用方 `NodeInspectorPanel` 也确实用的就是它。
+> 剪辑台右栏下拉曾呈现**浏览器原生外观 + 一枚脱离字段的 ⌄**。组件源码与调用方都是正确的，
+> 真正原因在构建层：`apps/web/src/index.css` 只有 `@import "tailwindcss"`，而 **Tailwind v4 的
+> 自动源扫描不覆盖 `apps/web` 之外的 workspace 包**，于是凡**只在 packages/ui 出现**的工具类
+> （`appearance-none` / `right-3` / `top-1/2` / `pr-10` …）一律不进产物 CSS——组件代码正确、
+> 页面却掉回浏览器默认样式。`absolute`、`pointer-events-none` 看着正常，只是因为 apps/web 恰好也用了。
 >
-> **两个已被排除的假设**（勿重复走）：
-> ① 「Tailwind 没扫到 packages/ui，所以这些工具类没被产出」——已在 `apps/web/src/index.css`
->    试加 `@source "../../packages/ui/src"` 并重新构建：产物 CSS 的 **hash 一字未变**，
->    生产包截图与改动前逐像素相同。该改动已回退，不作为修复提交。
-> ② 「检查器自己写了裸 `<select>`」——已读源码排除。
+> 修复 `@source "../../../packages/ui/src";`。A/B 各自 `rm -rf dist` 全新构建：
+> hash `index-C3-IQ7pF.css` → `index-BPPCzzhg.css`，体积 **90,043 → 103,863 字节（+13.8KB）**，
+> 上述四类工具类由「0 次」变为存在；无头浏览器截图确认箭头落回字段内、原生外观消失。
+> 回归：E2E 13/13 全绿，`pnpm gates` 退出码 0。
 >
-> 下一步该查的方向：`inputBase` 与 `cn()` 的实际拼接结果（`appearance-none` 是否被
-> 后面的类覆盖）、`formStyles` 里是否另有同名类冲突、以及该字段是否被外层
-> `overflow` / `transform` 容器改变了绝对定位的包含块。
-> 证据截图：`/tmp/axiforge-evidence/ui-editor.png`（改前）与 `ui-prod.png`（生产包，相同）。
-> 本项完成后，Phase 8 的逐屏巡检才有可信基线——否则「设计令牌统一」会建立在一批
-> 实际没生效的样式之上。
+> **本条同时是一次方法自纠**。上一轮我曾把该根因记为「已排除」，理由是「加了 @source 后 hash 未变」——
+> 那个对照本身无效，错了两处：① 相对路径少写一层（从 `apps/web/src` 出发 `../../` 只到 `apps/`，
+> 解到不存在的 `apps/packages/…`，而 Tailwind 对不存在的源**静默忽略**，看起来就像「加了没用」）；
+> ② 我比较的两次构建**都在改动之后**，从未取得真正的改前基线。
+> 教训：**宣布假设被证伪之前，先验证对照组本身成立**——路径按解析结果核实、产物各自全新构建、
+> 比较必须有一侧是真基线。被误标「已排除」的修复，代价是缺陷会带着「我们查过了」的标签活下来。
+>
+> 由此推论：Phase 8 之前所有「设计令牌统一」的观感结论都不可信，因为共享库的一部分样式从未生效。
+> 逐屏巡检需在新基线上重做一遍。
 
 ---
 

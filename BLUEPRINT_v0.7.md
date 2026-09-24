@@ -62,7 +62,7 @@
 - [x] S4-T1 CI 前端门禁：新增 job 跑 `tsc --noEmit` + `vitest run`（core/axs/editor-core/web）+ `oxlint` + dpdm 循环依赖 + `packages/*` 禁 react/dom 的 lint 断言；补 `@vitest/coverage-v8` 使 core 覆盖率可跑 | Acceptance: 步骤在本地以 `pnpm gates` 全链跑通、workflow YAML 通过 lint、CI 绿等首次 push 后确认（不 push 不谎称已绿）；宪章 G2/G4/Q9 的「CI 断言」指向真实步骤 | M4
 - [x] S4-T2 决策落文：新建 ADR-026（素材本地化与 `.axsp` v2 容器），回写 `KERNEL_DESIGN.md` §2.5 方法表与 §一 依赖铁律的 CI 事实 | Acceptance: ADR-026 状态「已采纳」含备选与否决理由、后果含未清偿欠账；KERNEL 方法表含 saveAsset/readAsset/范围语义；ADR 索引已登记 | M4
 - [x] S4-T3 文档对账：宪章新增 Phase 6 段并回写勾选；Phase 2「素材落工程目录」虚假勾选纠偏；`BACKLOG_V1.md` 清除「`.axsp` 导出=明确不做」矛盾；README 结构段与脚本表按实态重写；`docs/user` 新增桌面版与工程包文档并加注册表完整性用例 | Acceptance: 逐文件 diff 可指认，不再有文档声称已交付而代码未交付的项；历史「已完成」表未被删改（纠偏以追加形式落地） | M4
-- [ ] S4-T4 收尾：G1–G9 门禁证据 + 附录检查单全勾 + 手动验收路径写入 §6 + 打 tag `desktop-v0.7` | Acceptance: `git tag --list desktop-v0.7` 非空且 `git show` 可见；门禁关键输出粘进宪章 Phase 6 | M4
+- [~] S4-T4 收尾：G1–G9 门禁证据 + 附录检查单全勾 + 手动验收路径写入 + 打 tag `desktop-v0.7` | Acceptance: 证据已写入宪章 Phase 6 检查单（G2 如实记未达标）；**tag 与 push 按授权分级待人类批准**；release .app 视觉截图与「导入立绘」原生面板点击两项待人类验证 | M4
 
 ## 6. Acceptance Criteria（手动验收路径）
 

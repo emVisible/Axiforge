@@ -10,13 +10,13 @@ import {
   CardGrid,
   EmptyState,
   EntityCard,
-  ErrorDisplay,
   FilterChip,
   FilterToolbar,
   Input,
   Modal,
   ModalActions,
   PageHeader,
+  QueryStatePanel,
   Select,
   Textarea,
   WorkflowGuide,
@@ -24,6 +24,7 @@ import {
 import type { AssetItemResponse } from "@/shared/types/asset";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import { ITEM_WORKFLOW } from "@/shared/lib/workflowSteps";
+import { resolveQueryState } from "@/shared/lib/queryState";
 
 const ITEM_CATEGORIES = ["日常", "魔幻", "科技", "关键道具"];
 const ITEM_RARITIES = ["普通", "稀有", "传说"];
@@ -337,24 +338,24 @@ export default function ItemsPage() {
         </div>
       </Modal>
 
-      {isLoading && (
-        <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
-      )}
-      {error && (
-        <ErrorDisplay message="道具清单读取失败" onRetry={() => window.location.reload()} />
-      )}
-      {!isLoading && !error && !filteredItems.length && (
-        <EmptyState
-          icon={Package}
-          title={categoryFilter ? "该分类下暂无道具" : "还没有道具"}
-          description="创建第一个道具"
-        >
-          {!categoryFilter && (
-            <WorkflowGuide steps={ITEM_WORKFLOW} compact className="max-w-2xl" />
-          )}
-        </EmptyState>
-      )}
-      {filteredItems.length > 0 && (
+      <QueryStatePanel
+        state={resolveQueryState({ isLoading, error, count: filteredItems.length })}
+        error={error}
+        errorTitle="道具清单读取失败"
+        onRetry={() => window.location.reload()}
+        loading={<p className="py-10 text-center text-sm text-ink-muted">加载中...</p>}
+        empty={
+          <EmptyState
+            icon={Package}
+            title={categoryFilter ? "该分类下暂无道具" : "还没有道具"}
+            description="创建第一个道具"
+          >
+            {!categoryFilter && (
+              <WorkflowGuide steps={ITEM_WORKFLOW} compact className="max-w-2xl" />
+            )}
+          </EmptyState>
+        }
+      >
         <CardGrid>
           {filteredItems.map((item) => (
             <ItemCard
@@ -366,7 +367,7 @@ export default function ItemsPage() {
             />
           ))}
         </CardGrid>
-      )}
+      </QueryStatePanel>
     </Shell>
   );
 }

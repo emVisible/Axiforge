@@ -59,5 +59,6 @@ export { StatStrip, StatStripItem } from "./StatStrip";
 export { default as CommentThread } from "./CommentThread";
 export type { CommentNode, CommentSort } from "./CommentThread";
 export { default as ConfirmDialog } from "./ConfirmDialog";
+export { default as QueryStatePanel } from "./QueryStatePanel";
 export { ToastProvider, useToast } from "./Toast";
 export * from "./formStyles";

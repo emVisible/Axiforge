@@ -17,13 +17,13 @@ import {
   CardGrid,
   EmptyState,
   EntityCard,
-  ErrorDisplay,
   FilterChip,
   FilterToolbar,
   Input,
   Modal,
   ModalActions,
   PageHeader,
+  QueryStatePanel,
   SegmentedControl,
   Select,
   WorkflowGuide,
@@ -396,42 +396,38 @@ export default function ProjectListPage() {
           </CardGrid>
         )
       ) : (
-        <>
-      {state === "loading" && (
-        <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
-      )}
-      {state === "error" && (
-        <ErrorDisplay message="剧本清单读取失败" onRetry={() => window.location.reload()} />
-      )}
-      {state === "empty" && (
-        <EmptyState
-          icon={ScrollText}
-          title={hasFilters || filterMeta ? "没有匹配的剧本" : "还没有剧本"}
-          description={
-            hasFilters || filterMeta
-              ? "试试调整筛选条件"
-              : "创建第一个叙事剧本"
+        <QueryStatePanel
+          state={state}
+          error={error}
+          errorTitle="剧本清单读取失败"
+          onRetry={() => window.location.reload()}
+          loading={<p className="py-10 text-center text-sm text-ink-muted">加载中...</p>}
+          empty={
+            <EmptyState
+              icon={ScrollText}
+              title={hasFilters || filterMeta ? "没有匹配的剧本" : "还没有剧本"}
+              description={
+                hasFilters || filterMeta ? "试试调整筛选条件" : "创建第一个叙事剧本"
+              }
+            >
+              {!hasFilters && !filterMeta && (
+                <WorkflowGuide steps={PROJECT_WORKFLOW} compact className="max-w-2xl" />
+              )}
+            </EmptyState>
           }
         >
-          {!hasFilters && !filterMeta && (
-            <WorkflowGuide steps={PROJECT_WORKFLOW} compact className="max-w-2xl" />
-          )}
-        </EmptyState>
-      )}
-      {filtered.length > 0 && (
-        <CardGrid>
-          {filtered.map((p) => (
-            <ProjectCard
-              key={p.id}
-              project={p}
-              onDelete={() => {
-                if (confirm("删除？")) deleteProject.mutate(p.id);
-              }}
-            />
-          ))}
-        </CardGrid>
-      )}
-        </>
+          <CardGrid>
+            {filtered.map((proj) => (
+              <ProjectCard
+                key={proj.id}
+                project={proj}
+                onDelete={() => {
+                  if (confirm("删除？")) deleteProject.mutate(proj.id);
+                }}
+              />
+            ))}
+          </CardGrid>
+        </QueryStatePanel>
       )}
     </Shell>
   );

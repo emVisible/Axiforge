@@ -1,11 +1,13 @@
 /**
- * 查询态四态归一（宪章 Q4「加载/空/错误/理想 四态齐全」的可判定形态）。
+ * 从 TanStack Query 的原始信号折成一个互斥态。
  *
- * 实测缺陷：桌面离线态角色页同时渲染「加载角色失败」与「你还没有创建角色」——
- * 把「取不到」显示成「你没有」，用户会以为数据丢了。四态若靠各页自己写 `&&`
- * 条件就会反复出现这种碰撞，因此收敛成一个**互斥**的纯判定：一次只可能是一个态。
+ * 状态词表与选择逻辑在 @axiforge/ui 的 queryState（那里还挂着 QueryStatePanel），
+ * 本文件只保留「怎么从 isLoading/error/count 判定」这一件事——
+ * 词表若在两处各写一遍，就会有第三处开始各说各话。
  */
-export type QueryState = "loading" | "error" | "empty" | "ready";
+import type { QueryState } from "@axiforge/ui";
+
+export type { QueryState };
 
 export function resolveQueryState(input: {
   isLoading?: boolean;

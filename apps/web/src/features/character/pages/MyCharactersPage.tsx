@@ -6,10 +6,9 @@ import Shell from "@/shared/components/Shell";
 import {
   Button,
   EmptyState,
-  ErrorDisplay,
   FilterToolbar,
-  LoadingSpinner,
   PageHeader,
+  QueryStatePanel,
   WorkflowGuide,
 } from "@/shared/components/ui";
 import { routes } from "@/shared/lib/routes";
@@ -85,47 +84,42 @@ export default function MyCharactersPage() {
         </p>
       )}
 
-      {state === "loading" && <LoadingSpinner />}
-      {state === "error" && (
-        <ErrorDisplay
-          message="加载角色失败"
-          onRetry={() => window.location.reload()}
-        />
-      )}
-      {state === "empty" && (
-        <EmptyState
-          title={search ? "没有匹配的角色" : "你还没有创建角色"}
-          description={search ? "试试其他关键词" : "开始创建你的第一个角色吧"}
-          action={
-            search ? undefined : { label: "创建角色", to: routes.characters.create }
-          }
-        >
-          {!search && (
-            <WorkflowGuide steps={CHARACTER_WORKFLOW} compact className="max-w-2xl" />
+      <QueryStatePanel
+        state={state}
+        error={error}
+        errorTitle="加载角色失败"
+        onRetry={() => window.location.reload()}
+        empty={
+          <EmptyState
+            title={search ? "没有匹配的角色" : "你还没有创建角色"}
+            description={search ? "试试其他关键词" : "开始创建你的第一个角色吧"}
+            action={
+              search ? undefined : { label: "创建角色", to: routes.characters.create }
+            }
+          >
+            {!search && (
+              <WorkflowGuide steps={CHARACTER_WORKFLOW} compact className="max-w-2xl" />
+            )}
+          </EmptyState>
+        }
+      >
+        <CharacterGrid characters={visible} showStatus />
+        <div className="mt-8 text-center">
+          {hasMore && (
+            <Button
+              variant="secondary"
+              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            >
+              加载更多（{filtered.length - visibleCount} 个剩余）
+            </Button>
           )}
-        </EmptyState>
-      )}
-
-      {visible.length > 0 && (
-        <>
-          <CharacterGrid characters={visible} showStatus />
-          <div className="mt-8 text-center">
-            {hasMore && (
-              <Button
-                variant="secondary"
-                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-              >
-                加载更多（{filtered.length - visibleCount} 个剩余）
-              </Button>
-            )}
-            {!hasMore && filtered.length > PAGE_SIZE && (
-              <p className="text-sm text-ink-muted/50">
-                已显示全部 {filtered.length} 个角色
-              </p>
-            )}
-          </div>
-        </>
-      )}
+          {!hasMore && filtered.length > PAGE_SIZE && (
+            <p className="text-sm text-ink-muted/50">
+              已显示全部 {filtered.length} 个角色
+            </p>
+          )}
+        </div>
+      </QueryStatePanel>
     </Shell>
   );
 }

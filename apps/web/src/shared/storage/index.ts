@@ -186,24 +186,25 @@ export function getStorageProvider(): Promise<StorageProvider> {
 
 /**
  * 工程元信息 → 传输态 ProjectResponse（桌面离线列表用）。
- * 本地 SQLite 只存了 id/title/可见性/时间戳——描述、标签、机制、章节与角色计数
- * 在本地库里没有对应列（宪章 Phase 7 的 schema 欠账），因此这里给的是**空**而不是编造值：
- * 卡片会显示「暂无描述」，标签与机制筛选在桌面态由调用方隐藏。
+ *
+ * v0.8 起描述/封面/机制/题材/标签/元作标记都是本地库的真实列（宪章 Phase 7），
+ * 因此这里逐字段透传，不再填假值。仍然缺席的是：浏览计数、场景与角色计数、
+ * fork 血统、世界观/规则正文与图结构——这些在卡片上本就不显示，留空是如实而非遮掩。
  */
 export function projectMetaToResponse(m: ProjectMeta, authorId: string): ProjectResponse {
   return {
     id: m.id,
     title: m.title,
-    description: "",
-    cover_image: null,
-    mechanism: null,
+    description: m.description,
+    cover_image: m.coverImage,
+    mechanism: m.mechanism,
     style_reference: null,
-    theme_tags: [],
-    genre: null,
+    theme_tags: [...m.themeTags],
+    genre: m.genre,
     world_setting: null,
     rules: null,
     is_public: m.isPublic,
-    is_meta: false,
+    is_meta: m.isMeta,
     view_count: 0,
     author_id: authorId,
     scenes: [],

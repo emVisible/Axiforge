@@ -44,7 +44,7 @@
 
 | # | 门禁 | 标准 | 检查方式 |
 |---|------|------|------|
-| G1 | 文件行数预算 | 新建文件 ≤400 行；存量巨石随所属阶段清零后删除原文件（当前清单：`ProjectFlowPage.tsx` ~1507 行 → Phase 1 清零） | lint max-lines + 人工核对 |
+| G1 | 文件行数预算 | 新建文件 ≤400 行；存量超限文件按**当前长度设棘轮，只准变短**（`scripts/file-size-baseline.json` 登记 17 个，随所属阶段清零后删行） | `scripts/check-file-size.mjs`（已入 `pnpm gates`；已实测越线即 exit 1） |
 | G2 | 测试覆盖率 | `packages/core` 与 `packages/editor-core` ≥90%（行+分支）；`packages/axs` round-trip 保持全绿 | vitest coverage |
 | G3 | E2E 行为基线 | 动刀前 ≥6 条 Playwright 关键路径全绿并存档基线（清单见 Phase 1a），此后每阶段结束仍须全绿 | playwright test |
 | G4 | 循环依赖 | =0（含 apps↔packages 方向） | dpdm CI 步骤 |
@@ -239,6 +239,8 @@
 
 **目标**：G1 预算清零 + 播放内核解耦。铁律 3 单维度：本轮只拆不加。
 
+> 行数一律以 `scripts/file-size-baseline.json` 为唯一来源，本阶段清单不再手抄具体数字（下列条目里的行数是立项时的快照，会随修改失真）。
+
 - [ ] `PlayerPage.tsx`（1370 行）→ IR 渲染器分层：播放状态机（纯逻辑入 `packages/core` 或 editor-core L2 同级）、指令执行器、舞台视图、系统菜单/存档面板；渲染文件全部 ≤400 行
 - [ ] `useProjectEditor.ts`（1163 行）→ 域拆分：graph 映射 / persistence / playback / layout 四模块（宪章 1b G1 偏差记录的欠账，Phase 2 时承诺未兑现）
 - [x] 道具与场景资产域本地化（v0.8：契约 + schema v3 + 分派口 + 双支单测）：`asset_items` / `asset_scenes` / `project_asset_refs` 未进 SQLite schema，桌面侧栏这两页离线只能报「读取失败」（Phase 6 已把错误态显式化，不再伪装成空态）
@@ -263,9 +265,15 @@
 > 本阶段清单未勾的两个理由：
 > ① 随包示范作早于新列生成，重导出（须联后端）前卡片仍显示「暂无描述」；桌面**自建**工程的
 >    元数据读写与显示链路已通。
-> ② **本轮恶化了 G1 自身**：为控行数已把新域外提成独立模块，但三个 Provider 仍越线
->    （SQLite 408→523、Memory 433、HTTP 414），播放页也净增 22 行（失败提示可见化的代价）。
->    不以「本来就没达标」含糊过去，已登记为独立清偿项。
+> ② **本轮一度恶化 G1，已清偿**：三个 Provider 曾涨到 523 / 433 / 414，现按域外提为
+>    `SqliteProjectStore` / `MemoryPools` / `httpDomains` 协作模块，回落到 280 / 356 / 387，
+>    行为零变更（128 例契约套件原样全绿）。播放页净增 22 行是失败可见化的代价，仍列为拆分对象。
+>
+> 清偿过程中新建了行数棘轮门禁并接入 `pnpm gates`，同时**纠正本文件一处长期错误认知**：
+> G1 原先写「lint max-lines + 人工核对」且把清单写成 1 个文件——实际从未有 lint 规则在管这件事，
+> 真实债务面是 **17 个文件**，含 `packages/core/src/engine.ts`(568)、`compiler.ts`(439)
+> 与 `packages/axs/src/parse.ts`(587) 三个从未被 G1 收录的内核文件。
+> 「Phase 7 验收 = G1 清单为空」因此比原估的大得多，已按棘轮改为分阶段收缩而非一次性清零。
 >
 > 已闭合的原判据缺陷：四个离线域的分派口（道具/场景、存档、成就定义）各留一个注入点，
 > 使桌面本地支在 node 测试下真正可执行——此前「e2e 无后端通过」那条判据在浏览器态**结构上不可达**。

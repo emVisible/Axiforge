@@ -1,4 +1,4 @@
-# Build Blueprint v1.5 | Status: confirmed v1.0 → executing v1.5
+# Build Blueprint v1.6 | Status: confirmed v1.0 → executing v1.6
 
 Version target: **v0.8** · Charter phase: **Phase 7 · 巨石清偿与运行时一致性**（`docs/REFACTOR_DESKTOP.md`）
 Tier: Standard（8 节 · 单一执行权威）
@@ -79,7 +79,7 @@ Tier: Standard（8 节 · 单一执行权威）
 - [ ] S1-T5 工程元数据补齐：`projects` 表补 `description` / `cover_image` / `theme_tags` / `mechanism` / `genre` / `is_meta`，播种携带真实值而非填空 | Acceptance: **部分达成**——本地列、读写、`projectMetaToResponse` 逐字段透传已完成（桌面自建工程编辑后卡片可显示真实描述）；「播种携带真实值」未达成，见随包重导出欠账 | M1
 - [x] S1-T6 存档与成就本地化：**先抽口再分派**——播放页原先 9 处直连 `playerApi` / `ginkgoApi`，其中 4 处 `.catch(() => {})` 静默吞失败。抽出带环境分派的持久化模块并把失败显式化后，播放页与成就面板改调该模块 | Acceptance: 本地支 11 例双支单测绿（存档四步 / 覆写不追加 / 未写过→null / 底层失败 ok:false / 成就整条编辑回路 / 远端支仍打 REST）；后台写入失败落到一条 role=status 可见提示，手动存档失败不再关闭面板；成就面板读取失败不再渲染成「还没有成就定义」 | M1
 - [ ] S1-T7 随包示范作补元数据：既播的 `.axsp` 早于新列生成，其 `project.json` 无描述/标签，播种后卡片仍「暂无描述」；须在联后端后重导出随包（打包 project.json 已整体序列化 meta，重导出即自动带上） | Acceptance: 重导出的随包在桌面首启后卡片显示真实描述与机制标签 | M1
-- [ ] S1-T8 契约单条读口：新增 `getItem(id)` / `getScene(id)`，替换 hook 层「拉全表再 find」的临时取巧 | Acceptance: 两个新方法的契约用例双实现绿，hook 层不再依赖清单过滤 | M1
+- [x] S1-T8 契约单条读口：新增 `getItem(id)` / `getScene(id)`，替换 hook 层「拉全表再 find」的临时取巧 | Acceptance: 达成——三实现齐备（Memory / SQLite / HTTP），契约用例双实现断言读回等价与 not_found；`authorId` 死参数一并删除。加用例后 contract.ts 与 types.ts 双双越过棘轮，按域拆为 records.ts 与 contractPools.ts 而非上调天花板，用例数 130 不变即两 runner 都在跑 | M1
 - [x] S1-T9 G1 回归清偿：本轮新增曾使 `sqliteProvider.ts` 408→523、`memory.ts` →433、`httpStorageProvider.ts` →414，全部越过 400 行预算 | Acceptance: 三项已回落到 280 / 356 / 387，128 例契约套件不减且行为零变更；另新建 `check:size` 棘轮门禁接入 gates，并实测「加 60 行即 exit 1」证明门禁会咬人 | M1
 - [x] S2-T1 四态共享渲染原语 `QueryStatePanel`：由既有 `resolveQueryState` 单点裁决，页面只传数据不写分支 | Acceptance: 达成——选择逻辑另做成为渲染无关的 `pickQuerySlot`（穷尽 switch，缺一态即编译不过），7 例纯函数断言「每态只命中一槽」与错误兜底文案；角色页与剧本清单页两个既有消费者已迁移，迁移后其 DOM 分支由 4 个并列 `&&` 收成 1 个组件 | M2
 - [x] S2-T2 UI 目录归一：**核实后前提不成立，本项作废**——宿主 ui 目录本就是 `export * from "@axiforge/ui"` 加 4 个宿主绑定件，按文件基名与导出符号两处比对与 packages/ui 的 40 组件零同名重复；唯一同名 `ImageUpload` 是刻意覆盖（网页 fetch / 桌面本地口） | Acceptance: 以「比对结果 + 覆盖处写明注释」替代原「删除重复组件」，因为无重复可删 | M2
@@ -141,3 +141,5 @@ Tier: Standard（8 节 · 单一执行权威）
 | v1.4 | 2026-09-24 | **宪章一条待办按事实作废**：「双份 UI 目录归一」所依据的重叠并不存在（零同名组件）。改判而非照做——照做等于凭空造工程 | L2 记录 |
 | v1.5 | 2026-09-24 | **拆分判据改判**：原按「graph / persistence / playback / layout」四个域名词预切，实际第一版就撞上依赖环——rfNodes 投影要读 viewMode / filteredStageId，而 autoLayoutByStage 要 rfNodes。改用两条真判据：**依赖方向**（不读图内容的才归视图域）与**纯度**（纯计算优先外提，因为外提后可单测且零行为风险）。投影层因此成为第二个交付物，而非计划里的任何一域 | L2 记录 |
 | v1.5 | 2026-09-24 | 等价判据首次实战：`export-hook-surface` 的 95 符号比对 + E2E 13/13，两次切片均通过；该组合同时补上了投影层此前**零单测**的空洞——它是决定画布每个节点每条边如何呈现的代码 | L1 自动 |
+| v1.6 | 2026-09-24 | 棘轮门禁第二次实战生效：这次拦的是**我自己当轮写大的文件**（契约加完用例后 429 / 420 行）。处置是按域拆分（records.ts、contractPools.ts）而不是调高 baseline——门禁用「用例数 130 不变」自证拆分没丢覆盖 | L1 自动 |
+| v1.6 | 2026-09-24 | 单条读口补齐后，宿主不再「拉全表再 find」：这既是性能问题也是语义问题（找不到 与 列表为空 原本混为一谈）。顺带删掉因此失去用途的 authorId 参数 | L1 自动 |

@@ -245,7 +245,12 @@
 - [ ] `useProjectEditor.ts`（1164 → **1089 行**，v0.8 M3 进行中）→ 域拆分。判据已从「按四域名词预切」改为两条真判据：**依赖方向**（不读图内容者归视图域）与**纯度**（纯计算先外提，可单测且零行为风险）。已交付 `useCanvasView` 与 `editorProjection`（后者补上投影层此前零单测的空洞）；余 persistence 与 node-inspector 两域（宪章 1b G1 偏差记录的欠账，Phase 2 时承诺未兑现）
 - [x] 道具与场景资产域本地化（v0.8：契约 + schema v3 + 分派口 + 双支单测）：`asset_items` / `asset_scenes` / `project_asset_refs` 未进 SQLite schema，桌面侧栏这两页离线只能报「读取失败」（Phase 6 已把错误态显式化，不再伪装成空态）
 - [x] 四态原语：`packages/ui` 新增 `QueryStatePanel` + `pickQuerySlot`（穷尽 switch，缺一态即编译不过），状态词表与判定分离，宿主 `resolveQueryState` 复用同一词表；已迁移角色页与剧本清单页两个既有消费者，其余页面按 Phase 8 逐屏巡检迁移
-- [ ] 本地工程元数据补齐：SQLite `projects` 表只有 id/title/is_public/axs_source/author_id/时间戳，缺 `description`/`cover_image`/`theme_tags`/`mechanism`/`genre`/`is_meta` 等列——桌面工程卡片因此一律显示「暂无描述」，标签与机制筛选在本地无数据可筛（Phase 6 播种实测暴露；适配层刻意填空值而非编造）
+- [~] 本地工程元数据补齐 —— **原文前提的一半已不成立，按实测改判**：原文写「SQLite `projects` 表只有 id/title/is_public/axs_source/author_id/时间戳，缺 `description`/`cover_image`/`theme_tags`/`mechanism`/`genre`/`is_meta` 等列」。这六列**已随 v0.8 schema v3 进入本地库**（`sqlite/backend.ts` 的 `COLUMN_PATCHES` 带「缺列才 ALTER」的幂等迁移），`projectMetaToResponse` 已逐字段透传而非填空值，契约套件断言 `themeTags` 写→读往返。故「一律显示暂无描述」不再成立。
+      **写入面未闭环，且 2026-09-24 复核时查出一处真实缺陷（三支实现口径不一致）**：
+      ① SQLite 转发全部 8 个 patch 字段；
+      ② HTTP 实现只转发 `title`/`axs_source`，因此 `description`/`theme_tags`/`mechanism`/`genre`/`cover_image`/`is_meta` 在 **web 支被静默丢弃**；
+      ③ 编辑器 `useProjectEditor.patchProjectMeta` 的入参类型是 `Pick<ProjectUpdate, "title"|"description"|"world_setting"|"rules">`，而 `ProjectMetaPatch` **根本没有** `worldSetting`/`rules` 两个字段——它们两支都不落库，界面却照样弹「已保存项目信息」。tsc 不报错的原因是把非字面量的 `patch` 变量直接传参，绕过了 excess-property 检查。
+      这正是本项目「界面说已保存必须改→存→重读」规则要消灭的那类缺陷，且契约套件天然查不到它（`world_setting`/`rules` 不是契约字段，跨实现对未约定属性的行为无人断言）。已登记为下一版首刀：先定语义（补齐契约与列 or 从 UI 入参删掉幻字段），再让三支在同一断言下对齐。
 - [x] 存档与成就本地化（v0.8：本地四步回路可存可读，后台写入失败改为可见）：`save_slots` / `player_achievements` 进 SQLite schema，桌面断网可存可读（当前离线仅优雅降级）
 - [x] ~~`packages/ui` 与宿主 UI 目录双份归一~~ —— **本条前提不成立，已核实**：`apps/web/src/shared/components/ui/index.ts` 本就是 `export * from "@axiforge/ui"` 加 4 个宿主绑定件；按文件基名与导出符号两处比对，与 packages/ui 的 40 个组件、85 个导出**零同名重复**，唯一的 `ImageUpload` 是刻意覆盖（网页 fetch / 桌面本地口）。已把该覆盖写成注释显式声明，不再需要「归一」这项工程
 - [ ] 验收：G1 清单为空且原文件已删；E2E 12 条原样全绿；离线存档 E2E/E13

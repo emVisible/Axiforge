@@ -147,6 +147,22 @@ state={resolveQueryState({ isLoading: loading && page === 0, error, count: items
 若直接用 `loading` 会把「翻页中」误判成整页重载。
 children 内保留可选链：面板给的是语义保证，不是类型收窄（道具页实测过这一点）。
 
+**新查出的真实缺陷（2026-09-24 复核宪章「本地工程元数据补齐」时），优先级高于上面的重构第一刀**：
+`updateProjectMeta` 三支实现口径不一致，且存在契约里没有的字段——
+① `packages/editor-core/src/storage/types.ts` 的 `ProjectMetaPatch` 只有
+`title/axsSource/description/coverImage/themeTags/mechanism/genre/isMeta`；
+② `apps/web/src/shared/storage/httpStorageProvider.ts` 只转发 `title`/`axs_source`，
+其余六项在 web 支**静默丢弃**（桌面支的 SQLite 全转发，两支行为分叉）；
+③ `apps/web/src/features/studio/hooks/useProjectEditor.ts` 的 `patchProjectMeta`
+入参类型写着 `world_setting`/`rules`，这两个字段**契约根本不存在**，两支都不落库，
+而 UI 照样弹「已保存项目信息」（调用口：`CutWorkspace.tsx` 的 `onProjectPatch`）。
+tsc 放过它是因为传的是非字面量变量，excess-property 检查不生效。
+
+先做语义裁决再动手：世界观设定/规则正文要不要成为本地一等字段（要 → 契约+schema v4+
+两支对齐+编辑口），还是 UI 本就不该提供（不要 → 从入参类型与表单删掉，别留幻字段）。
+判据：改→存→重读，且把「同一 patch 在 Memory/SQLite/HTTP 三实现在同一断言下等价」
+补进契约套件——契约套件目前只断言契约内字段，对未约定属性的跨实现分歧是盲的。
+
 **其余入口按性价比排序**：
 1. 作者页 / 创作者概览 / 角色详情 / admin 端四态与观感巡检（未看过）
 2. v0.8 结转：`PlayerPage` 播放内核安全网 → 再分层（顺序不可颠倒，该文件零单测且已 1393 行）

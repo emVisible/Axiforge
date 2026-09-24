@@ -248,6 +248,10 @@ export class MemoryStorageProvider implements StorageProvider {
     return this.pools.saveItem(item);
   }
 
+  getItem(id: string): Promise<StorageResult<StoredAssetItem>> {
+    return this.pools.getItem(id);
+  }
+
   deleteItem(id: string): Promise<StorageResult<void>> {
     return this.pools.deleteItem(id);
   }
@@ -258,6 +262,10 @@ export class MemoryStorageProvider implements StorageProvider {
 
   saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>> {
     return this.pools.saveScene(scene);
+  }
+
+  getScene(id: string): Promise<StorageResult<StoredAssetScene>> {
+    return this.pools.getScene(id);
   }
 
   deleteScene(id: string): Promise<StorageResult<void>> {

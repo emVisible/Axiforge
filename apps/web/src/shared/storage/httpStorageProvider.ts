@@ -17,7 +17,9 @@ import {
   httpDeleteAchievement,
   httpDeleteItem,
   httpDeleteScene,
+  httpGetItem,
   httpGetSave,
+  httpGetScene,
   httpListAchievements,
   httpListItems,
   httpListSaves,
@@ -308,6 +310,10 @@ export class HttpStorageProvider implements StorageProvider {
     return httpSaveItem(item, this.creatorId);
   }
 
+  getItem(id: string): Promise<StorageResult<StoredAssetItem>> {
+    return httpGetItem(id);
+  }
+
   deleteItem(id: string): Promise<StorageResult<void>> {
     return httpDeleteItem(id);
   }
@@ -318,6 +324,10 @@ export class HttpStorageProvider implements StorageProvider {
 
   saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>> {
     return httpSaveScene(scene, this.creatorId);
+  }
+
+  getScene(id: string): Promise<StorageResult<StoredAssetScene>> {
+    return httpGetScene(id);
   }
 
   deleteScene(id: string): Promise<StorageResult<void>> {

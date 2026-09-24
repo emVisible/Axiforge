@@ -9,7 +9,7 @@
  */
 
 import { filterByVisibility } from "../visibility";
-import { deleteById, listItems, listScenes, saveItem, saveScene } from "./assetPool";
+import { deleteById, getItem, getScene, listItems, listScenes, saveItem, saveScene } from "./assetPool";
 import {
   clearSave,
   getSave,
@@ -212,6 +212,10 @@ export class SqliteStorageProvider implements StorageProvider {
     return saveItem(this.backend, item, this.authorId);
   }
 
+  getItem(id: string): Promise<StorageResult<StoredAssetItem>> {
+    return getItem(this.backend, id);
+  }
+
   deleteItem(id: string) {
     return deleteById(this.backend, "asset_items", "item", id);
   }
@@ -222,6 +226,10 @@ export class SqliteStorageProvider implements StorageProvider {
 
   saveScene(scene: StoredAssetScene) {
     return saveScene(this.backend, scene, this.authorId);
+  }
+
+  getScene(id: string): Promise<StorageResult<StoredAssetScene>> {
+    return getScene(this.backend, id);
   }
 
   deleteScene(id: string) {

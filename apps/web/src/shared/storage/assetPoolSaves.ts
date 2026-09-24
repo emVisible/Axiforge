@@ -77,11 +77,10 @@ export async function readItems(filters?: PoolFilters): Promise<AssetItemRespons
   return scoped.map(storedItemToResponse);
 }
 
-export async function readItem(id: string, authorId: string): Promise<AssetItemResponse> {
+export async function readItem(id: string): Promise<AssetItemResponse> {
   if (!assetPoolDeps.isLocal()) return itemApi.get(id);
   const p = await assetPoolDeps.provider();
-  const rows = unwrap(await p.listItems({ authorId, includePublic: true }), "道具读取");
-  return storedItemToResponse(pick(rows, id, "道具"));
+  return storedItemToResponse(unwrap(await p.getItem(id), "道具读取"));
 }
 
 const NEW_ITEM: Omit<StoredAssetItem, "name" | "authorId"> = {
@@ -168,11 +167,10 @@ export async function readScenes(filters?: PoolFilters): Promise<AssetSceneRespo
   return rows.map(storedSceneToResponse);
 }
 
-export async function readScene(id: string, authorId: string): Promise<AssetSceneResponse> {
+export async function readScene(id: string): Promise<AssetSceneResponse> {
   if (!assetPoolDeps.isLocal()) return sceneAssetApi.get(id);
   const p = await assetPoolDeps.provider();
-  const rows = unwrap(await p.listScenes({ authorId, includePublic: true }), "场景读取");
-  return storedSceneToResponse(pick(rows, id, "场景"));
+  return storedSceneToResponse(unwrap(await p.getScene(id), "场景读取"));
 }
 
 const NEW_SCENE: Omit<StoredAssetScene, "name" | "authorId"> = {

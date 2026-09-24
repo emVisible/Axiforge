@@ -47,6 +47,11 @@ export class MemoryPools {
     return ok({ id });
   }
 
+  async getItem(id: string): Promise<StorageResult<StoredAssetItem>> {
+    const hit = this.items.get(id);
+    return hit ? ok(hit) : err({ code: "not_found", entity: "item", id });
+  }
+
   async deleteItem(id: string): Promise<StorageResult<void>> {
     return this.items.delete(id)
       ? ok(undefined)
@@ -61,6 +66,11 @@ export class MemoryPools {
     const id = scene.id || this.nextId("scene");
     this.scenes.set(id, { ...scene, id, updatedAt: new Date().toISOString() });
     return ok({ id });
+  }
+
+  async getScene(id: string): Promise<StorageResult<StoredAssetScene>> {
+    const hit = this.scenes.get(id);
+    return hit ? ok(hit) : err({ code: "not_found", entity: "scene", id });
   }
 
   async deleteScene(id: string): Promise<StorageResult<void>> {

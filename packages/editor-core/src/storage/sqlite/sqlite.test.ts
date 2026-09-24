@@ -3,6 +3,7 @@ import { createMemoryAssetStore } from "../assets";
 import { SqlJsBackend } from "./sqljs.backend";
 import { SqliteStorageProvider } from "./sqliteProvider";
 import { runStorageContractSuite } from "../contract";
+import { runStoragePoolContractSuite } from "../contractPools";
 
 describe("SqliteStorageProvider 初始化", () => {
   it("迁移幂等：重复 apply 不抛错", async () => {
@@ -91,12 +92,15 @@ describe("SqliteStorageProvider 初始化", () => {
   });
 });
 
-runStorageContractSuite("SQLite(sql.js)", async () => {
+const makeSqlite = async () => {
   const backend = await SqlJsBackend.create();
   const provider = new SqliteStorageProvider(backend, createMemoryAssetStore());
   await provider.init();
   return provider;
-});
+};
+
+runStorageContractSuite("SQLite(sql.js)", makeSqlite);
+runStoragePoolContractSuite("SQLite(sql.js)", makeSqlite);
 
 import type { SqlBackend } from "./backend";
 

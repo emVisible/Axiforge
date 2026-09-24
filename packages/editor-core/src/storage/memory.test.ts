@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createDraft } from "../document";
 import { MemoryStorageProvider } from "./memory";
 import { runStorageContractSuite } from "./contract";
+import { runStoragePoolContractSuite } from "./contractPools";
 import type { StoredNode } from "./types";
 
 runStorageContractSuite("Memory", () => new MemoryStorageProvider());
+runStoragePoolContractSuite("Memory", () => new MemoryStorageProvider());
 
 describe("Memory 实现的附加语义", () => {
   it("seedProject：Draft 快照可注入为工程（迁移/夹具通道）", async () => {

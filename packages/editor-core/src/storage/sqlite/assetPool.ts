@@ -128,6 +128,56 @@ export async function saveItem(
   }
 }
 
+export async function getItem(
+  backend: SqlBackend,
+  id: string,
+): Promise<StorageResult<StoredAssetItem>> {
+  try {
+    const rows = await backend.select<ItemRow>(
+      `SELECT ${ITEM_COLS} FROM asset_items WHERE id = ?`, [id],
+    );
+    if (!rows.length) return err({ code: "not_found", entity: "item", id });
+    const r = rows[0]!;
+    const tags = parseJson<string[]>(r.mechanism_tags, "item.mechanism_tags", r.id, []);
+    if (!tags.ok) return tags;
+    const effects = parseJson<string[]>(r.effects, "item.effects", r.id, []);
+    if (!effects.ok) return effects;
+    return ok({
+      id: r.id, name: r.name, description: r.description ?? "", category: r.category,
+      rarity: r.rarity, mechanismTags: tags.data, effects: effects.data,
+      imagePath: r.image_path, isPublic: asBool(r.is_public),
+      authorId: r.author_id ?? null, updatedAt: r.updated_at,
+    });
+  } catch (cause) {
+    return err({ code: "io", detail: "getItem 查询失败", cause });
+  }
+}
+
+export async function getScene(
+  backend: SqlBackend,
+  id: string,
+): Promise<StorageResult<StoredAssetScene>> {
+  try {
+    const rows = await backend.select<SceneRow>(
+      `SELECT ${SCENE_COLS} FROM asset_scenes WHERE id = ?`, [id],
+    );
+    if (!rows.length) return err({ code: "not_found", entity: "scene", id });
+    const r = rows[0]!;
+    const tags = parseJson<string[]>(r.tags, "scene.tags", r.id, []);
+    if (!tags.ok) return tags;
+    const tpl = parseJson<Record<string, unknown>[]>(r.node_templates, "scene.node_templates", r.id, []);
+    if (!tpl.ok) return tpl;
+    return ok({
+      id: r.id, name: r.name, description: r.description ?? "", location: r.location,
+      atmosphere: r.atmosphere, era: r.era, worldSetting: r.world_setting, rules: r.rules,
+      tags: tags.data, nodeTemplates: tpl.data, imagePath: r.image_path,
+      isPublic: asBool(r.is_public), authorId: r.author_id ?? null, updatedAt: r.updated_at,
+    });
+  } catch (cause) {
+    return err({ code: "io", detail: "getScene 查询失败", cause });
+  }
+}
+
 export async function deleteById(
   backend: SqlBackend,
   table: "asset_items" | "asset_scenes",

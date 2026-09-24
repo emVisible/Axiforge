@@ -184,80 +184,16 @@ export interface AssetStore {
   read(ref: string): Promise<StorageResult<Uint8Array>>;
 }
 
-// ------------------------------------------------------------
-// 全局资产池 / 运行时状态（v0.8 · 宪章 Phase 7 本地化）
-// ------------------------------------------------------------
+import type {
+  LocalSaveSlot,
+  SaveSlotInput,
+  StoredAchievement,
+  StoredAssetItem,
+  StoredAssetScene,
+  UnlockedAchievement,
+} from "./records";
 
-/**
- * 道具与场景是**全局资产池**（backend assets/models.py 注释「全局资产池」）：
- * 不挂 project_id，归属由 authorId 决定，工程侧只存引用。
- * 本地表因此与 characters 同构，而不是 project_* 子表。
- */
-export interface StoredAssetItem {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  readonly category: string;
-  readonly rarity: string;
-  readonly mechanismTags: readonly string[];
-  readonly effects: readonly string[];
-  readonly imagePath: string | null;
-  readonly isPublic: boolean;
-  readonly authorId: string | null;
-  readonly updatedAt: string;
-}
-
-export interface StoredAssetScene {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  readonly location: string | null;
-  readonly atmosphere: string | null;
-  readonly era: string | null;
-  readonly worldSetting: string | null;
-  readonly rules: string | null;
-  readonly tags: readonly string[];
-  readonly nodeTemplates: readonly Record<string, unknown>[];
-  readonly imagePath: string | null;
-  readonly isPublic: boolean;
-  readonly authorId: string | null;
-  readonly updatedAt: string;
-}
-
-/** 玩家身份：匿名 token，跨重启稳定（不是账号） */
-export interface LocalSaveSlot {
-  readonly slot: number;
-  readonly state: Record<string, unknown>;
-  readonly summary: string | null;
-  readonly beatId: string | null;
-  /** 本地素材 ref，交给 resolveAssetUrl 显示；非后端 thumb_path */
-  readonly thumbRef: string | null;
-  readonly updatedAt: string;
-}
-
-export interface SaveSlotInput {
-  readonly slot?: number;
-  readonly state: Record<string, unknown>;
-  readonly summary?: string | null;
-  readonly beatId?: string | null;
-  readonly thumbRef?: string | null;
-}
-
-/** 成就定义：per project（backend ginkgo/models.py） */
-export interface StoredAchievement {
-  readonly id: string;
-  readonly key: string;
-  readonly title: string;
-  readonly description: string;
-  readonly icon: string;
-  readonly condition: Record<string, unknown>;
-}
-
-/** 已解锁记录按 key 关联，不按 id：重导入工程会产生新 id，key 才是稳定语义 */
-export interface UnlockedAchievement {
-  readonly key: string;
-  readonly unlockedAt: string;
-}
+export * from "./records";
 
 // ------------------------------------------------------------
 // 契约
@@ -336,6 +272,10 @@ export interface StorageProvider {
   saveItem(item: StoredAssetItem): Promise<StorageResult<{ id: string }>>;
 
   /** 不存在→not_found */
+  /** 单条读取（不存在→not_found）。有清单读口不等于有单条读口：
+   *  缺它时调用方只能「拉全表再 find」，随库增长线性变慢且绕过了 not_found 语义 */
+  getItem(id: string): Promise<StorageResult<StoredAssetItem>>;
+
   deleteItem(id: string): Promise<StorageResult<void>>;
 
   // ---------- 场景（全局资产池） ----------
@@ -343,6 +283,8 @@ export interface StorageProvider {
   listScenes(scope?: VisibilityScope): Promise<StorageResult<StoredAssetScene[]>>;
 
   saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>>;
+
+  getScene(id: string): Promise<StorageResult<StoredAssetScene>>;
 
   deleteScene(id: string): Promise<StorageResult<void>>;
 

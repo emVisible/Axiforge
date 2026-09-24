@@ -14,6 +14,5 @@
   "packages/editor-core/src/document.ts": 432,
   "apps/web/src/features/studio/cut/timelineUtils.ts": 424,
   "apps/web/src/features/character/pages/StoryEditPage.tsx": 419,
-  "apps/web/src/features/studio/flow/NodeInspectorPanel.tsx": 418,
-  "packages/editor-core/src/storage/types.ts": 414
+  "apps/web/src/features/studio/flow/NodeInspectorPanel.tsx": 418
 }

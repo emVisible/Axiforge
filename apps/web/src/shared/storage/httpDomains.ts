@@ -147,6 +147,14 @@ export async function httpSaveItem(
   }
 }
 
+export async function httpGetItem(id: string): Promise<StorageResult<StoredAssetItem>> {
+  try {
+    return ok(toStoredItem(await itemApi.get(id)));
+  } catch (e) {
+    return fail(e, "item", id);
+  }
+}
+
 export async function httpDeleteItem(id: string): Promise<StorageResult<void>> {
   try {
     await itemApi.delete(id);
@@ -184,6 +192,14 @@ export async function httpSaveScene(
     return ok({ id: String(created.id) });
   } catch (e) {
     return fail(e, "scene", scene.id || "(new)");
+  }
+}
+
+export async function httpGetScene(id: string): Promise<StorageResult<StoredAssetScene>> {
+  try {
+    return ok(toStoredScene(await sceneAssetApi.get(id)));
+  } catch (e) {
+    return fail(e, "scene", id);
   }
 }
 

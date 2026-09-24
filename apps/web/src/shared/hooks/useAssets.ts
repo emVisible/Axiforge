@@ -46,7 +46,7 @@ export const useSceneAssets = (params?: { author_id?: string; search?: string })
 export const useSceneAsset = (id: string) =>
   useQuery({
     queryKey: SCENE_ASSET_KEYS.detail(id),
-    queryFn: () => readScene(id, getCreatorId()),
+    queryFn: () => readScene(id),
     enabled: !!id,
   });
 
@@ -89,7 +89,7 @@ export const useItems = (params?: { author_id?: string; category?: string; searc
 export const useItem = (id: string) =>
   useQuery({
     queryKey: ITEM_KEYS.detail(id),
-    queryFn: () => readItem(id, getCreatorId()),
+    queryFn: () => readItem(id),
     enabled: !!id,
   });
 

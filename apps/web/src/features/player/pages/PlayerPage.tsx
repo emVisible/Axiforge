@@ -27,7 +27,15 @@ import {
   type RuntimeState,
   type StoryView,
 } from "@axiforge/core";
-import { ginkgoApi } from "@/shared/api/ginkgo";
+import {
+  clearSave as clearSaveSlot,
+  getSave as readActiveSave,
+  listSaves as readSaveSlots,
+  syncCodex,
+  unlockAchievement,
+  writeSave as writeSaveSlot,
+  type SyncOutcome,
+} from "@/shared/storage/playerSaves";
 import { playerApi, type SaveSlotResponse, stateForSave } from "@/shared/api/player";
 import { getPlayerToken } from "@/shared/lib/playerToken";
 import { projectApi } from "@/shared/api/editor";
@@ -153,6 +161,18 @@ export default function PlayerPage() {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [galleryTab, setGalleryTab] = useState<"cg" | "music">("cg");
   const [saveSlots, setSaveSlots] = useState<SaveSlotResponse[]>([]);
+  /**
+   * 后台写入（自动存档 / 解锁 / 清档）的失败提示。
+   * 这些调用原先写作 `.catch(() => {})`——存不上与「本来就没什么可存」在界面上完全同形。
+   */
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const reportSyncFailure = useCallback((r: SyncOutcome) => {
+    if (r.ok) return;
+    setSyncNotice(
+      `本地进度未能保存（${r.via === "local" ? "桌面" : "服务端"}：${r.detail}）`,
+    );
+    window.setTimeout(() => setSyncNotice(null), 6000);
+  }, []);
   const [activeTerm, setActiveTerm] = useState<{
     term: string;
     definition: string;
@@ -296,10 +316,10 @@ export default function PlayerPage() {
     });
     const token = getPlayerToken();
     for (const a of list) {
-      ginkgoApi.unlock(pid, token, a.key).catch(() => {});
+      void unlockAchievement(pid, token, a.key).then(reportSyncFailure);
     }
     window.setTimeout(() => setAchievementToast(null), 4000);
-  }, []);
+  }, [reportSyncFailure]);
 
   // 应用一帧：折叠演出指令进舞台 + 触发音频
   const applyView = useCallback(
@@ -359,14 +379,14 @@ export default function PlayerPage() {
       const codex = await fetchCodex(story.codexScope);
       // 有可续玩的存档 → 先给出选择，不自动开播
       try {
-        const save = await playerApi.getSave(projectId, playerToken);
+        const save = await readActiveSave(projectId, playerToken);
         if (save?.state?.status === "active" && save.state.currentBeatId) {
           setSaveOffer(save);
           setStatus("ready");
           return;
         }
       } catch {
-        // 无存档，忽略
+        // 读取存档失败不阻塞开播：没有可读的进度就当从头开始
       }
       beginStory(story, codex);
       setStatus("ready");
@@ -403,8 +423,8 @@ export default function PlayerPage() {
     setSaveOffer(null);
     const codex = await fetchCodex(pkg.codexScope);
     beginStory(pkg, codex);
-    if (projectId) playerApi.clearSave(projectId, playerToken).catch(() => {});
-  }, [pkg, beginStory, projectId, playerToken, fetchCodex]);
+    if (projectId) void clearSaveSlot(projectId, playerToken).then(reportSyncFailure);
+  }, [pkg, beginStory, projectId, playerToken, fetchCodex, reportSyncFailure]);
 
   // Codex 独立同步（跨作品记忆不落存档槽）
   useEffect(() => {
@@ -413,13 +433,10 @@ export default function PlayerPage() {
     if (json === codexSyncRef.current) return;
     const t = setTimeout(() => {
       codexSyncRef.current = json;
-      playerApi
-        .putCodex({
-          player_token: playerToken,
-          ledger: rtState.codex,
-          source_project_id: projectId,
-        })
-        .catch(() => {});
+      void syncCodex(projectId, playerToken, rtState.codex).then((r) => {
+        if (r.via === "skipped-offline") return;
+        reportSyncFailure(r);
+      });
     }, 800);
     return () => clearTimeout(t);
   }, [rtState?.codex, projectId, playerToken, saveOffer]);
@@ -433,23 +450,19 @@ export default function PlayerPage() {
       pkg.scenes.find((s) => s.id === beat?.sceneId)?.backgroundImage ||
       null;
     const t = setTimeout(() => {
-      if (rtState.status === "ended") {
-        playerApi.clearSave(projectId, playerToken, AUTO_SAVE_SLOT).catch(() => {});
-      } else {
-        playerApi
-          .putSave(projectId, {
-            player_token: playerToken,
+      const r = rtState.status === "ended"
+        ? clearSaveSlot(projectId, playerToken, AUTO_SAVE_SLOT)
+        : writeSaveSlot(projectId, playerToken, {
             state: stateForSave(rtState),
             summary: buildSummary(view),
-            beat_id: rtState.currentBeatId,
-            thumb_path: thumbPath,
+            beatId: rtState.currentBeatId,
+            thumbRef: thumbPath,
             slot: AUTO_SAVE_SLOT,
-          })
-          .catch(() => {});
-      }
+          });
+      void r.then(reportSyncFailure);
     }, 600);
     return () => clearTimeout(t);
-  }, [rtState, view, projectId, playerToken, saveOffer, stage.background, pkg]);
+  }, [rtState, view, projectId, playerToken, saveOffer, stage.background, pkg, reportSyncFailure]);
 
   // ---------- 推进 / 选择 ----------
   const doProceed = useCallback(() => {
@@ -571,7 +584,7 @@ export default function PlayerPage() {
   const refreshSaveSlots = useCallback(async () => {
     if (!projectId) return;
     try {
-      const list = await playerApi.listSaves(projectId, playerToken);
+      const list = await readSaveSlots(projectId, playerToken);
       setSaveSlots(list);
     } catch {
       setSaveSlots([]);
@@ -595,17 +608,17 @@ export default function PlayerPage() {
         stage.background ||
         pkg.scenes.find((s) => s.id === beat?.sceneId)?.backgroundImage ||
         null;
-      await playerApi.putSave(projectId, {
-        player_token: playerToken,
+      const written = await writeSaveSlot(projectId, playerToken, {
         state: stateForSave(rtState),
         summary: buildSummary(view),
-        beat_id: rtState.currentBeatId,
-        thumb_path: thumb,
+        beatId: rtState.currentBeatId,
+        thumbRef: thumb,
         slot,
       });
-      setOverlay(null);
+      reportSyncFailure(written);
+      if (written.ok) setOverlay(null);
     },
-    [projectId, rtState, pkg, stage.background, playerToken, view],
+    [projectId, rtState, pkg, stage.background, playerToken, view, reportSyncFailure],
   );
 
   const manualLoad = useCallback(
@@ -633,10 +646,11 @@ export default function PlayerPage() {
   const deleteSaveSlot = useCallback(
     async (slot: number) => {
       if (!projectId) return;
-      await playerApi.clearSave(projectId, playerToken, slot);
+      const cleared = await clearSaveSlot(projectId, playerToken, slot);
+      reportSyncFailure(cleared);
       await refreshSaveSlots();
     },
-    [projectId, playerToken, refreshSaveSlots],
+    [projectId, playerToken, refreshSaveSlots, reportSyncFailure],
   );
 
   const replayVoice = useCallback(
@@ -1363,6 +1377,14 @@ export default function PlayerPage() {
               <p className="text-xs text-white/70">{achievementToast.title}</p>
             </div>
           </div>
+        </div>
+      )}
+      {syncNotice && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 animate-fade-in rounded-xl border border-red-400/40 bg-black/85 px-4 py-2 text-xs text-red-200 shadow-lg backdrop-blur-md"
+        >
+          {syncNotice}
         </div>
       )}
     </div>

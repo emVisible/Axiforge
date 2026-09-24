@@ -115,7 +115,7 @@ export default function AddRelationDialog({
                       key={preset.name}
                       type="button"
                       onClick={() => handleSelectPreset(preset)}
-                      className={`rounded-full border px-3 py-1.5 text-xs transition-all ${
+                      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                         relationName === preset.name && !isCustom
                           ? "border-brand bg-brand text-white"
                           : "border-border text-ink-muted hover:border-border"

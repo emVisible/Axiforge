@@ -24,7 +24,7 @@ function StoryNode({
   return (
     <div
       className={cn(
-        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-xl border-2 bg-surface shadow-sm transition-all duration-200",
+        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-xl border-2 bg-surface shadow-sm transition-[border-color,box-shadow] duration-200",
         selected
           ? "border-brand shadow-lg shadow-brand/15"
           : cn(stageBorder, "hover:border-border-strong"),

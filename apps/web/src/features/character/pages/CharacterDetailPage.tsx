@@ -342,7 +342,7 @@ export default function CharacterDetailPage() {
 
       <BackLink to={routes.characters.mine}>我的角色</BackLink>
       <div className="mb-6 rounded-2xl border border-border bg-surface p-8 group/card relative overflow-hidden">
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 opacity-0 translate-x-2 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-all duration-300 ease-out z-10">
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 opacity-0 translate-x-2 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-[opacity,transform] duration-300 ease-out z-10">
           <div className="flex items-center gap-1">
             {!localOnly && (
               <button
@@ -587,7 +587,7 @@ export default function CharacterDetailPage() {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${activeTab === key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
           >
             <Icon className="h-4 w-4" strokeWidth={1.75} />
             {label}
@@ -603,7 +603,7 @@ export default function CharacterDetailPage() {
               <button
                 key={key}
                 onClick={() => setActiveLayer(key)}
-                className={`flex flex-col items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${activeLayer === key ? color + " shadow-sm" : "border-border text-ink-muted hover:bg-canvas"}`}
+                className={`flex flex-col items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 border ${activeLayer === key ? color + " shadow-sm" : "border-border text-ink-muted hover:bg-canvas"}`}
               >
                 <Icon className="mb-1 h-5 w-5" strokeWidth={1.75} />
                 <span className="text-xs">{label}</span>

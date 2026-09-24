@@ -1,4 +1,4 @@
-# Build Blueprint v1.2 | Status: confirmed v1.0 → executing v1.2
+# Build Blueprint v1.3 | Status: confirmed v1.0 → executing v1.3
 
 Version target: **v0.9** · Charter phase: **Phase 8 · 设计系统收口（UI 与视觉设计专项）**
 Tier: Standard（8 节 · 单一执行权威）
@@ -75,7 +75,7 @@ Tier: Standard（8 节 · 单一执行权威）
 - [x] S2-T1 迁移 Outliner 的 17 处 `text-[9px]` | Acceptance: 该文件计数归零、棘轮收紧，改后截图确认无溢出与换行错位 | M2
 - [x] S2-T2 迁移 Timeline 与图例类的剩余 `text-[9px]`，并连带清掉 Outliner 里 5 处更糟的 `text-[8px] text-ink-faint`（最小字号配最低对比度） | Acceptance: 全仓 `text-[9px]` 为 0；若某处挤破布局，按 fallback 减标签而非缩字，并在变更日志写明取舍 | M2
 - [ ] S2-T3 收口其余字号任意值（`text-[8px]` 等长尾） | Acceptance: 字号棘轮总数 ≤20 且无新增档位 | M2
-- [ ] S3-T1 迁移 apps/web 剩余 20 处 `transition-all` | Acceptance: 逐处按同一串里实际存在的 hover/active 类导出显式属性表；门禁该项总数 0 | M3
+- [x] S3-T1 迁移 apps/web 与组件库剩余 26 处 `transition-all` | Acceptance: 逐处按同一串里实际存在的 hover/active 类导出显式属性表；门禁该项总数 0 | M3
 - [ ] S3-T2 悬停与切换的观感核验（录屏或逐帧截图） | Acceptance: 至少覆盖卡片、按钮、侧栏、节点四处，改前后成对存档并写明哪些无法静态验证 | M3
 - [ ] S4-T1 四态巡检：把仍手写四分支的页面收敛到 `QueryStatePanel` | Acceptance: 巡检表逐屏打勾；每屏断言错误态与空态不同时出现 | M4
 - [ ] S4-T2 日夜双主题逐屏复检 | Acceptance: 每屏两套主题各一张截图，无不可读文本、无色块断层 | M4
@@ -114,6 +114,8 @@ Tier: Standard（8 节 · 单一执行权威）
 | 版本 | 时间 | 变更 | 偏差等级 |
 |------|------|------|----------|
 | v1.0 | 2026-09-24 | 依宪章 Phase 8 建立首版。起点是本轮刚修复的 Tailwind 源扫描缺陷——修复改变了前提，故明确「此前观感结论作废、在新基线重做」 | — |
+| v1.3 | 2026-09-24 | 动效收口完成，全仓 `transition-all` 归零。每处的属性表是从同一串里实际存在的 hover/active/内联样式**推导**而非套模板：进度条的宽度由 `style={{width}}` 驱动，若按「按钮类就用 transition-colors」的直觉去改，那条动画会直接消失。产物 CSS 复核到 `transition-property:width,background-color` 等五条真实存在 | L1 自动 |
+| v1.3 | 2026-09-24 | 证据边界如实标注：静态截图证明不了「过渡本身正确」，本项只能证明**意图已被正确编码进 CSS**、且功能未回归（gates + E2E 全绿）。真正的观感核验（悬停是否仍顺滑、有无该动没动）需要录屏或人眼，仍留在逐屏巡检里未打勾 | L2 记录 |
 | v1.2 | 2026-09-24 | 字号收口达成 apps/web 与 packages/ui 内 **9px 与 8px 全清零**（共 45 处）。逐屏核验：Outliner 与时间轴改前/改后截图版式一致、无换行溢出，故未触发 fallback（不需要靠减标签来腾位）。棘轮 73 → 29 | L1 自动 |
 | v1.2 | 2026-09-24 | 一处计数口径的自我纠正：我先用 `grep apps/web/src packages/ui/src --include=*.tsx` 得到「剩 14 处」，与门禁报的 34 处不符。按门禁自身口径复算才对上——差额的 21 处在 **apps/admin**（我的 grep 根本没扫那个 app）。报数字前先对齐口径，别拿自己顺手写的 grep 当门禁的数 | L1 自动 |
 | v1.1 | 2026-09-24 | 首个里程碑交付即回改本文件的判据：C2 原写「逐对算比值」，实际还须查**桥接令牌在明暗两套里是否都存在**——上线前就发现 `--ax-ink-on-scrim` 只写在暗色块，亮色主题下是悬空引用（文字会掉回继承色）。这类缺陷肉眼只会看成「设计本来就这样」 | L1 自动 |

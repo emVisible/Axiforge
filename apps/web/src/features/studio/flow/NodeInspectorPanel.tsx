@@ -126,7 +126,7 @@ export default function NodeInspectorPanel({
                   type="button"
                   onClick={() => onActivePanelChange(tab.key)}
                   className={cn(
-                    "inline-flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium transition-all",
+                    "inline-flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors",
                     activePanel === tab.key
                       ? isNle
                         ? "border-b-2 border-accent-soft bg-panel-raised text-ink"
@@ -269,7 +269,7 @@ export default function NodeInspectorPanel({
                   onClick={onPreviewScript}
                   disabled={script.length === 0}
                   className={cn(
-                    "flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all",
+                    "flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors",
                     script.length === 0
                       ? "cursor-not-allowed bg-canvas text-ink-muted/50"
                       : "bg-brand/10 text-brand hover:bg-brand/20",
@@ -341,7 +341,7 @@ export default function NodeInspectorPanel({
                     type="button"
                     onClick={() => onEdgeLabelChange(selectedEdge.id, l)}
                     className={cn(
-                      "rounded-lg border px-2.5 py-1.5 text-2xs transition-all",
+                      "rounded-lg border px-2.5 py-1.5 text-2xs transition-colors",
                       selectedEdge.label === l
                         ? "border-brand bg-brand text-white shadow-sm"
                         : "border-border text-ink-muted hover:border-ink-muted/30 hover:bg-canvas",

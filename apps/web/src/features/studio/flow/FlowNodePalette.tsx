@@ -30,7 +30,7 @@ export default function FlowNodePalette() {
             onDragStart={(e) => {
               e.dataTransfer.setData("application/reactflow", item.label);
             }}
-            className={`cursor-grab rounded-xl border-2 border-dashed px-4 py-3 text-center text-xs transition-all hover:border-solid active:cursor-grabbing ${item.color}`}
+            className={`cursor-grab rounded-xl border-2 border-dashed px-4 py-3 text-center text-xs transition-colors hover:border-solid active:cursor-grabbing ${item.color}`}
           >
             <DragIcon className="mx-auto mb-1 h-4 w-4" strokeWidth={1.75} />
             {item.label}

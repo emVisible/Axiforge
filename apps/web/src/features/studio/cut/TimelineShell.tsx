@@ -665,7 +665,7 @@ function TrackRow({
               }}
               style={{ width: w, height: TRACK_H - 6 }}
               className={cn(
-                "cursor-grab overflow-hidden rounded-sm border px-1.5 text-left transition-all hover:brightness-110 hover:shadow-sm active:cursor-grabbing",
+                "cursor-grab overflow-hidden rounded-sm border px-1.5 text-left transition-[filter,box-shadow] hover:brightness-110 hover:shadow-sm active:cursor-grabbing",
                 clipColor(inst),
                 active && "ring-2 ring-accent-soft ring-offset-1 ring-offset-panel",
                 dragging && "opacity-60",

@@ -1,14 +1,1 @@
-{
-  "apps/web/src/features/studio/flow/NodeInspectorPanel.tsx": 3,
-  "apps/web/src/features/character/components/editor/CharacterEditor.tsx": 3,
-  "apps/web/src/features/character/pages/CharacterDetailPage.tsx": 3,
-  "packages/ui/src/components/formStyles.ts": 3,
-  "apps/web/src/features/studio/components/PreviewMonitor.tsx": 1,
-  "apps/web/src/features/studio/cut/TimelineShell.tsx": 1,
-  "apps/web/src/features/studio/flow/FlowNodePalette.tsx": 1,
-  "apps/web/src/features/studio/flow/StoryNode.tsx": 1,
-  "apps/web/src/features/character/components/AddRelationDialog.tsx": 1,
-  "apps/web/src/features/character/components/PromptExport.tsx": 1,
-  "apps/web/src/features/character/components/RelationList.tsx": 1,
-  "apps/web/src/features/character/components/TemplateSelector.tsx": 1
-}
+{}

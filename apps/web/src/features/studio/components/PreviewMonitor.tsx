@@ -250,7 +250,7 @@ export default function PreviewMonitor({
               return (
                 <div
                   key={id}
-                  className={`absolute bottom-[64px] flex flex-col items-center transition-all duration-300 ${POSITION_CLASS[sp.position] || POSITION_CLASS.center} ${active ? "opacity-100" : "opacity-50"}`}
+                  className={`absolute bottom-[64px] flex flex-col items-center transition-[left,opacity,transform] duration-300 ${POSITION_CLASS[sp.position] || POSITION_CLASS.center} ${active ? "opacity-100" : "opacity-50"}`}
                 >
                   {img ? (
                     <img

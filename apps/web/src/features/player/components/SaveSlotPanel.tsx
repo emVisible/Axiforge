@@ -55,7 +55,7 @@ export default function SaveSlotPanel({
           return (
             <div
               key={slot}
-              className={`relative overflow-hidden rounded-xl border transition-all ${
+              className={`relative overflow-hidden rounded-xl border transition-colors ${
                 currentSlot === slot
                   ? "border-white/20 bg-white/[0.06]"
                   : "border-white/5 bg-white/[0.02]"

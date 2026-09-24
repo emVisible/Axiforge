@@ -979,12 +979,12 @@ export default function PlayerPage() {
             return (
               <div
                 key={id}
-                className={`absolute bottom-[150px] transition-all duration-300 ${POSITION_CLASS[position] || POSITION_CLASS.center}`}
+                className={`absolute bottom-[150px] transition-[left,opacity,transform] duration-300 ${POSITION_CLASS[position] || POSITION_CLASS.center}`}
               >
                 <img
                   src={src}
                   alt={charById[id]?.name || ""}
-                  className={`max-h-[62vh] w-auto object-contain drop-shadow-2xl transition-all duration-300 ${active ? "opacity-100" : "opacity-55 saturate-[0.7]"}`}
+                  className={`max-h-[62vh] w-auto object-contain drop-shadow-2xl transition-[opacity,filter] duration-300 ${active ? "opacity-100" : "opacity-55 saturate-[0.7]"}`}
                 />
               </div>
             );
@@ -1355,7 +1355,7 @@ export default function PlayerPage() {
                   key={choice.index}
                   onClick={() => doChoose(choice.index)}
                   disabled={choice.disabled}
-                  className={`w-full text-left px-5 py-3.5 rounded-xl border transition-all duration-300 ${choice.disabled ? "bg-white/[0.02] border-white/5 text-white/10 cursor-not-allowed" : "bg-white/[0.03] border-white/5 text-white/60 hover:bg-white/[0.06] hover:border-white/10 hover:text-white/80"}`}
+                  className={`w-full text-left px-5 py-3.5 rounded-xl border transition-colors duration-300 ${choice.disabled ? "bg-white/[0.02] border-white/5 text-white/10 cursor-not-allowed" : "bg-white/[0.03] border-white/5 text-white/60 hover:bg-white/[0.06] hover:border-white/10 hover:text-white/80"}`}
                 >
                   <span className="text-white/15 text-xs font-mono mr-3">
                     {choice.index + 1}.

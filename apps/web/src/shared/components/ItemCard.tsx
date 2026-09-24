@@ -8,12 +8,12 @@ interface Props {
 
 export default function ItemCard({ item, onDelete }: Props) {
   return (
-    <div className="group rounded-xl border border-border bg-surface p-5 transition-all hover:shadow-md">
+    <div className="group rounded-xl border border-border bg-surface p-5 transition-[border-color,box-shadow] hover:shadow-md">
       <div className="mb-2 flex items-start justify-between">
         <h3 className="text-sm font-semibold text-ink">{item.name}</h3>
         <button
           onClick={onDelete}
-          className="text-xs text-ink-muted opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+          className="text-xs text-ink-muted opacity-0 transition-[opacity,color] hover:text-red-500 group-hover:opacity-100"
         >
           ×
         </button>

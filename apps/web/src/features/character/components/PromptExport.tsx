@@ -109,7 +109,7 @@ export default function PromptExport({
               setMode(key);
               setContent("");
             }}
-            className={`px-4 py-2 rounded-xl border-2 text-sm transition-all ${
+            className={`px-4 py-2 rounded-xl border-2 text-sm transition-colors ${
               mode === key
                 ? "border-brand bg-brand-muted"
                 : "border-border hover:border-ink-muted/30"

@@ -80,37 +80,68 @@ def prose_to_script(
     return script
 
 
+_NARRATION_ESCAPE = re.compile(r"^[@>#\\]")
+
+
+def _narration_line(text: str) -> str:
+    """旁白发射：含换行或以 @ > # \\ 开头时必须反斜杠转义，否则会被读成指令。"""
+    return f"\\{text}" if ("\n" in text or _NARRATION_ESCAPE.match(text)) else text
+
+
 def script_to_axs(
     title: str,
     script: List[Dict[str, Any]],
     *,
     default_speaker: str = "旁白",
 ) -> str:
-    """把 Instruction dict 列表打印为 AXS 源文本。"""
-    lines = [f"# {title.strip() or '未命名'}", ""]
+    """把 Instruction dict 列表打印为 canonical AXS 源文本（ADR-027）。
+
+    形态必须逐字节对齐 `packages/axs/src/print.ts`：标题行紧接正文（无空行）、
+    舞台指令用 `@` 前缀、选项统一排在拍末而非出现在书写位置。
+    `【背景】` 一类中文括号只作为**输入**速记保留（见 `_STAGE_RE`），不再是产物。
+    """
+    body: List[str] = [f"# {title.strip() or '未命名'}"]
+    choices: List[str] = []
+
     for item in script:
         op = item.get("op")
         if op == "say":
             speaker = item.get("speaker") or default_speaker
-            lines.append(f"{speaker}: {item.get('text', '')}")
+            body.append(f"{speaker}: {item.get('text', '')}")
         elif op == "narration":
-            lines.append(f"*{item.get('text', '')}*")
+            body.append(_narration_line(str(item.get("text", ""))))
         elif op == "bg":
-            lines.append(f"【背景 {item.get('image', 'default')}】")
+            line = f"@bg {item.get('image', 'default')}"
+            if item.get("transition"):
+                line += f" {item['transition']}"
+            body.append(line)
         elif op == "bgm":
-            lines.append(f"【音乐 {item.get('track', '')}】")
+            line = f"@bgm {item.get('track') or ''}".rstrip()
+            if item.get("loop"):
+                line = f"{line} loop".strip()
+            body.append(line)
+        elif op == "transition":
+            line = f"@transition {item.get('kind', 'fade')}"
+            if item.get("ms") is not None:
+                line += f" {item['ms']}"
+            body.append(line)
+        elif op == "fx":
+            line = f"@fx {item.get('effect', 'flash')}"
+            if item.get("ms") is not None:
+                line += f" {item['ms']}"
+            body.append(line)
         elif op == "choice":
             for opt in item.get("options", []):
                 label = opt.get("label", "") if isinstance(opt, dict) else str(opt)
-                if label:
-                    lines.append(f"> {label}")
-        elif op == "transition":
-            lines.append(f"【转场 {item.get('kind', 'fade')}】")
-        elif op == "fx":
-            lines.append(f"【特效 {item.get('effect', 'flash')}】")
+                if not label:
+                    continue
+                to = opt.get("to") if isinstance(opt, dict) else None
+                choices.append(f"> {label} -> {to}" if to else f"> {label}")
         elif item.get("text"):
-            lines.append(str(item["text"]))
-    return "\n".join(lines).strip() + "\n"
+            body.append(_narration_line(str(item["text"])))
+
+    body.extend(choices)
+    return "\n".join(body).rstrip() + "\n"
 
 
 def prose_to_axs(
@@ -122,23 +153,6 @@ def prose_to_axs(
 ) -> str:
     script = prose_to_script(prose, role_names)
     return script_to_axs(title, script, default_speaker=default_speaker)
-
-
-def axs_to_script(
-    axs: str,
-    role_names: Optional[List[str]] = None,
-) -> List[Dict[str, Any]]:
-    """把 AXS 源文本解析为 Instruction dict 列表。"""
-    normalized: List[str] = []
-    for raw in axs.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("*") and line.endswith("*") and len(line) > 2:
-            normalized.append(line[1:-1])
-        else:
-            normalized.append(line)
-    return prose_to_script("\n".join(normalized), role_names)
 
 
 def suggest_character_layers(

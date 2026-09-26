@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Instruction, InstructionOp, ChoiceOption } from "@axiforge/core";
 import { Input, Select, Textarea, cn, labelSm, Button } from "@/shared/components/ui";
-import { aiApi } from "@/shared/api/ai";
+import { aiApi, applyDraft } from "@/shared/api/ai";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
 import { getCreatorId } from "@/shared/lib/creatorId";
 
@@ -113,11 +113,11 @@ export default function ScriptEditor({
         author_id: getCreatorId(),
       });
       setAiSource(res.source);
-      onChange(mode === "replace" ? res.script : [...script, ...res.script]);
+      onChange(applyDraft(res, script, mode));
       setAiOpen(false);
       setProse("");
-    } catch {
-      setAiError("生成失败，请检查格式后重试");
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "生成失败，请检查格式后重试");
     } finally {
       setAiBusy(false);
     }

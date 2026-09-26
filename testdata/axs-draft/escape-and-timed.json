@@ -1,0 +1,10 @@
+{
+  "name": "escape-and-timed",
+  "title": "转场",
+  "role_names": [],
+  "default_speaker": "旁白",
+  "prose": "【转场 fade】\n【特效 flash】\n@这不是指令的一行",
+  "axs": "# 转场\n@transition fade 500\n@fx flash 600\n\\@这不是指令的一行\n",
+  "expected_ops": ["transition", "fx", "narration"],
+  "note": "转场/特效的 ms 是规则引擎现值（500/600），本轮不参数化；以 @ 开头的旁白必须反斜杠转义，否则会被当未知指令"
+}

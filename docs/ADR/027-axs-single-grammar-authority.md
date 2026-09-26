@@ -32,6 +32,8 @@ v1.0「演绎内核」的对象是「散文/粗写 → AXS 演出脚本」这条
 
 ## AXS 方言对照表（逐指令，行号可点验）
 
+> 本表记录的是**决策时**的实态（ADR 的惯例是保留判断依据的原貌，不改写历史）。M1 落地后，「`ai_draft` 写」一列的 `【】` 形态已停止产出，回读列的 `axs_to_script` 已删除；「`ai_draft` 读」的输入侧速记按决策 1 **原样保留**。
+
 规范出处：[ADR-016](./016-axs-narrative-language.md) `:21,27,28`。解析 `packages/axs/src/parse.ts`，发射 `packages/axs/src/print.ts`，规则引擎 `backend/app/domains/narrative/ai_draft.py`，提示词 `backend/app/domains/llm/prompts.py`。
 
 | 语义 | canonical（解析 / 发射） | `ai_draft` 读 → 写 | `prompts` 教给模型 | 差异后果 |
@@ -81,5 +83,5 @@ v1.0「演绎内核」的对象是「散文/粗写 → AXS 演出脚本」这条
 
 1. `ai_draft.py` 的方言只有 5 种舞台形态（背景/音乐/旁白/转场/特效），canonical 有 12 条指令。`@se` `@voice` `@wait` `@camera` `@show` `@hide` `@move` 与 `->` 跳转在规则路径上**完全缺席**——其中 `@camera`（镜头语言）正是「演出上限」最吃的一层。M1 不承诺离线也能出镜头，这部分要等 TS 内核补齐。
 2. 现存硬编码语义：`bgm` 的 `loop=True`（`:48`）、`transition` 的 `ms=500`（`:52`）、`fx` 的 `ms=600`（`:54`）。迁移时默认**保留现值**，不同步参数化——否则一次方言修复会顺带改演出语义（铁律 3 单维度变更）。
-3. 若存量 `.axs` 文本或随包 `.axsp` 里已有依赖 `【】` 的写法，它们在 canonical 下本来就被当旁白，故停发方言**不改变既有读取结果**；但该前提要在改发射器前实测确认（扫描面须显式交代）。
+3. **存量内容是否依赖 `【】`：已实测，不依赖**。扫描面 `backend/app`、`apps/web/src`、`apps/web/public/seeds/*`：`ai_draft.py` 只剩 `_STAGE_RE`（输入侧，刻意保留）与一行说明文字；`ScriptEditor`/`storyToAxs`/`promptRenderer` 的 `【】` 全部是**输入**速记或 UI 文案；三个随包 `.axsp` 内层各 2 处 `【` 均为工程标题「【示范】…」而非舞台指令。停发方言因此不改变任何既有读取结果。
 4. 全角冒号导致的静默旁白仍是作者体验陷阱，按决策 1 不靠放宽解析解决，另立 lint 诊断欠账。

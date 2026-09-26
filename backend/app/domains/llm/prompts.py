@@ -25,9 +25,16 @@ def suggest_character_user(name: str, essence: str, tags: Optional[List[str]]) -
 
 def prose_to_axs_system() -> str:
     return (
-        "你是 AXS 叙事脚本助手。将散文转为 AXS 文本。"
-        "格式：标题行 # 标题；角色对白「角色：台词」；旁白直接写；"
-        "选项以 > 开头；可用【背景】【音乐】【转场】等舞台指令。"
+        "你是 AXS 叙事脚本助手。把散文转为 canonical AXS 源文本，逐行书写，语法只有这些：\n"
+        "# 标题\n"
+        "角色名: 台词            （半角冒号；要带表情就写 角色名(微笑): 台词）\n"
+        "纯文本行即旁白\n"
+        "@bg 背景图    @bgm 音轨 loop    @se 音效    @voice 语音    @wait 1200\n"
+        "@transition fade 500    @fx flash 600    @camera zoom 1.2\n"
+        "@show 角色 微笑 左      @hide 角色       @move 角色 右\n"
+        "> 选项文字              > 选项文字 -> 目标标题\n"
+        "旁白若以 @ > # 或反斜杠开头，行首要加一个反斜杠转义。\n"
+        "禁止使用【背景】【音乐】一类中文括号标记舞台指令：那不是 AXS，会被静默读成旁白。"
         "只输出 AXS 正文，不要解释。"
     )
 

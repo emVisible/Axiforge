@@ -4,7 +4,7 @@
   "apps/web/src/features/character/pages/CharacterDetailPage.tsx": 735,
   "apps/web/src/features/studio/cut/TimelineShell.tsx": 713,
   "apps/web/src/features/studio/cut/CutStudioView.tsx": 659,
-  "apps/web/src/features/studio/cut/outliner/OutlinerPanel.tsx": 625,
+  "apps/web/src/features/studio/cut/outliner/OutlinerPanel.tsx": 623,
   "apps/web/src/features/studio/components/ScriptEditor.tsx": 615,
   "packages/axs/src/parse.ts": 587,
   "apps/web/src/features/character/components/RelationGraph.tsx": 572,

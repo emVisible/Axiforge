@@ -298,6 +298,9 @@ class ProseToScriptRequest(BaseModel):
 class ProseToScriptResponse(BaseModel):
     script: List[Dict[str, Any]]
     source: str = "rules"
+    # 模型路径不在 Python 解析 AXS 文本（ADR-027）：canonical 文本随此返回，由前端 parseAxs 解析
+    axs: str = ""
+    needs_parse: bool = False
 
 
 class ProseToAxsRequest(BaseModel):

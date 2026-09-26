@@ -23,7 +23,7 @@
 | 云端模块 | 消费者 | 桌面现状 | 类 |
 |---|---|---|---|
 | `stories`（角色传记） | 5 个页面/组件 | **S13-1 已本地化 2026-09-26**：进 L4 契约 + SQLite schema v4 `character_stories`，`useStories` 改走 `storySaves` 分派口 | **A** |
-| `search` | OutlinerPanel、GlobalSearch | 编排台「从舞台库导入 / 搜索道具」仍 `searchApi.*`，而本地资产池早已存在 | **C** |
+| `search` | OutlinerPanel、GlobalSearch | 编排台「从舞台库导入 / 搜索道具」仍 `searchApi.*`。**不是漏接**：导入要落的 `location/atmosphere/scene_ref_id` 本地 `project_scenes` 没有列，检索先本地化会得到"搜得到、点不动"的半条腿。见宪章 S13-2b/2c | **C**（阻塞于本地表列，非分派口） |
 | `llm` | LlmStatusBadge | 桌面每次开编辑器发一次必败 `/llm/health`，且把"没问到"渲染成"已降级" | **C→已修** |
 | `editor`（道具/场景/工程） | 19 处 | 主链路已分派；本轮修好 `ItemDetailPage`、`useProjectDirectory`、`useProjectOutliner` 三处绕开 `readItem()` 的直连 | **C→已修** |
 | `creator`（创作数据面板） | 6 处 | `/studio/dashboard` 直达路由仍起查询；判据已下沉到 hook 的 `enabled` | **C→已修** |
@@ -47,8 +47,13 @@
 
 2. **编排台的资产导入/搜索（`search`）**。
    本地资产池（道具/场景）v0.8 就建好了，"从池子里挑一个道具挂进这一拍"在桌面是**有意义且应该可用**的操作。
-   建议：把 `EntitySearchSelect` 的 `fetcher` 换成分派口（本地走 `p.listItems/listScenes` + `filterByVisibility`，
-   浏览器保持 `searchApi`）。同一条改动能顺手把 `nexus`、`ai` 两处待核项一起定掉。
+   ~~建议：把 `EntitySearchSelect` 的 `fetcher` 换成分派口~~ —— **这条建议在 S13-2a 实测中被推翻，别再照做**：
+   只换 `fetcher` 得到的是"搜得到候选、点下去必败"，比原来"输入即永久转圈"并不更好。真正的阻塞在**导入的落点**：
+   本地 `project_scenes` 只有 `(id,project_id,title,sort_order)`，`location/atmosphere/scene_ref_id` 无处存也读不回，
+   而道具引用的 `project_asset_refs` 表压根不存在（bundle 读回恒为 `asset_refs: []`）。
+   顺序必须是：**补列/建表 → 打通读路径 → 改写入调用 → 最后才换 fetcher**。已按此拆成宪章 S13-2b / S13-2c。
+   顺带一处反直觉的收获：编排台的角色加入/移出**根本不用写本地实现**——L4 契约里 `addRole/removeRole`
+   两端早就齐了，缺的只是调用方绕开了 provider。本地化有时只是改一行调用。
 
 3. **`player` / `PromptExport` 等待核项**。
    它们的共同点是"有真实数据时才挂载"，E14/E15 结构上测不到。**先把可测性补上**（给编辑器数据链路开注入点、

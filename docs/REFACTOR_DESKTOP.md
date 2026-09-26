@@ -449,7 +449,15 @@
 
 - [x] S13-1 传记本地化：`stories` 进 L4 契约（list/get/save/delete，挂角色之下）+ SQLite 建表 + Memory/SQLite 共用契约断言 + 前端分派口。**它是创作主数据，不是云社交功能，没有"判死"这个选项**
   —— 已交付 2026-09-26：`StoredStory` + 四方法进契约（`wordCount` 由实现重算，客户端送值不作数）；SQLite schema v4 建 `character_stories`；契约套件的传记用例同时跑在 Memory 与 SQLite 上（editor-core 130→132）；前端 `storySaves` 分派口，`useStories` 五处调用全部改线、`storyApi` 残留 0。E15 加两条传记路由（13→15 条），并已见过它红：把分派口的本地判断强制为假后，红在 `/api/v1/characters/no-such-character/stories/no-such-story`。已知两端差异：HTTP 清单端点服务端裁掉 `content`，本地清单带正文——调用方不得把清单正文当权威
-- [ ] S13-2 编排台资产检索/导入改走分派口（本地资产池 v0.8 已具备），并清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14 结构上测不到」的待核项
+- [x] S13-2a 编排台（剪辑台侧栏）：新建/删除舞台 + 角色加入/移出 在桌面可用
+  —— 已交付 2026-09-26。**先记下这一刀查出来的事实，它们比改动本身贵**：
+  1. 编排台在桌面**可达且没有任何守卫**（`/studio/projects/:id` → `ProjectEditorPage` → 默认 cut 模式 → `CutWorkspace` → `CutStudioView` → `OutlinerPanel`），而它六个写操作此前 100% 直连 HTTP——整个侧栏在桌面上是一个按钮都按不动的。
+  2. `addRole`/`removeRole` **在 L4 契约里早就有两端实现了**（SQLite 与 HTTP 各一份），缺的只是调用方没接上。所以"本地化=写新代码"这个默认预期在这一项上是错的，答案是改一处调用。
+  3. 新契约 `addProjectScene`/`removeProjectScene`。删舞台的语义必须显式兑现：PG 侧靠 `stage_id ON DELETE SET NULL`（`narrative/models.py:154`），而本地 `project_nodes.stage_id` **没有 FK 约束**，所以要在删行之前自己 UPDATE——契约套件里那条"删的是舞台不是戏"的断言就是钉这一点的，且已见过它红（把 UPDATE 改成恒等自赋值，SQLite 支立刻红）。
+  4. 浏览器支的一次**有意松动**：改走 provider 后 `addScene` 不再显式送 `source:"inline"`、`addRole` 不再送 `importance:0`，两者都等于 Pydantic 默认值（`schemas.py:98`、`schemas.py:188`）。语义等价，但请求体不再逐字相同——这是 web 冻结线的一处例外，记在此处而不是留给下一个人猜。
+- [ ] S13-2b 编排台「从舞台库导入」本地化：契约 `addProjectScene` 现在只带 `title`，因为本地 `project_scenes` 只有 `(id,project_id,title,sort_order)` 四列，而 `StoredScene`/`ProjectBundle.scenes` 也就是 `{id,title}`，`shared/storage/index.ts:41` 把本地行适配成 `ProjectSceneResponse` 时 `source/scene_ref_id/description` 全是硬编码。**导入要落地必须先给 project_scenes 补列并打通读路径**——`OutlinerPanel.tsx:158` 的舞台副标题与 `exportProjectMarkdown.ts:14-15` 的「地点/氛围」都读这三个字段，写进去读不回来比暂时不能导入更糟。舞台库检索（`/search/scenes`）与它同属这一刀，不要单独提前做。
+- [ ] S13-2c 编排台道具引用本地化：本地**没有 `project_asset_refs` 表**，且 bundle 读回恒为 `asset_refs: []`（`shared/storage/index.ts:92,212`）。只补写不补读会让加进去的道具在下次刷新时凭空消失，所以建表、读路径与 `addItemRef/removeItemRef` 改线必须同批落地。道具检索（`/search/items`）同属这一刀。
+- [ ] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
 - [ ] S13-5 验收基线搬家：把 13 条 e2e 覆盖的行为在「注入内存本地库」或壳内冒烟下重建，CI 改为以桌面构建为主目标；这一步做完才允许浏览器 run mode 降级为纯测试宿主

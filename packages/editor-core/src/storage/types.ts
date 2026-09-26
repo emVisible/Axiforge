@@ -238,6 +238,23 @@ export interface StorageProvider {
     payload: NarrativePayload,
   ): Promise<StorageResult<void>>;
 
+  /**
+   * 工程内舞台的新增（剪辑台「+ 新舞台」「从舞台库导入」）。
+   * 本地舞台模型本来就只有 `{id,title}`（见 StoredScene 与 ProjectBundle.scenes），
+   * 故 HTTP 侧可带的 description/location/atmosphere 在桌面不入库——不是省了，
+   * 是本地读路径无论如何都给不出这些字段，两端形状以本地能兑现的那份为准。
+   */
+  addProjectScene(
+    id: string,
+    scene: { title: string },
+  ): Promise<StorageResult<{ id: string }>>;
+
+  /** 删舞台不删节点：节点只是不再归属任何舞台（对齐 PG `stage_id ON DELETE SET NULL`） */
+  removeProjectScene(
+    id: string,
+    sceneId: string,
+  ): Promise<StorageResult<void>>;
+
   /** 重复 characterRefId→duplicate 语义由实现以 io/detail 报告（v0 不单列错误码） */
   addRole(
     id: string,

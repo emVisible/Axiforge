@@ -44,6 +44,7 @@ import type {
 import { emptyProjectMetadata, err, ok } from "./types";
 import { MemoryPools } from "./memoryPools";
 import { MemoryStories } from "./memoryStories";
+import { bootstrapScenesAndNodes } from "./memorySeed";
 
 interface ProjectRow {
   meta: ProjectMeta;
@@ -55,34 +56,6 @@ interface ProjectRow {
 }
 
 const nowIso = () => new Date().toISOString();
-
-function bootstrapScenesAndNodes(): {
-  scenes: StoredScene[];
-  nodes: StoredNode[];
-  edges: StoredEdge[];
-} {
-  const scenes: StoredScene[] = [{ id: "scene-main", title: "主场景" }];
-  const nodes: StoredNode[] = [
-    {
-      id: "node-start",
-      stageId: "scene-main",
-      editorData: { position: { x: 120, y: 80 } },
-      narrativeData: { title: "开始", narration: "故事从这里开始...", is_anchor: true },
-      sortOrder: 0,
-    },
-    {
-      id: "node-end",
-      stageId: "scene-main",
-      editorData: { position: { x: 420, y: 80 } },
-      narrativeData: { title: "结束", script: [] },
-      sortOrder: 1,
-    },
-  ];
-  const edges: StoredEdge[] = [
-    { id: "node-start-node-end", source: "node-start", target: "node-end", label: "开始" },
-  ];
-  return { scenes, nodes, edges };
-}
 
 export class MemoryStorageProvider implements StorageProvider {
   /** 注入自身能力给资产池域，避免把 projects/nextId 变成公开的跨模块契约 */
@@ -178,6 +151,30 @@ export class MemoryStorageProvider implements StorageProvider {
     row.edges = [...payload.edges];
     row.axsSource = payload.axsSource;
     row.meta = { ...row.meta, updatedAt: nowIso() };
+    return ok(undefined);
+  }
+
+  async addProjectScene(
+    id: string,
+    scene: { title: string },
+  ): Promise<StorageResult<{ id: string }>> {
+    const row = this.projects.get(id);
+    if (!row) return err({ code: "not_found", entity: "project", id });
+    const sceneId = this.nextId("scene");
+    row.scenes = [...row.scenes, { id: sceneId, title: scene.title }];
+    return ok({ id: sceneId });
+  }
+
+  async removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
+    const row = this.projects.get(id);
+    if (!row) return err({ code: "not_found", entity: "project", id });
+    if (!row.scenes.some((s) => s.id === sceneId)) {
+      return err({ code: "not_found", entity: "scene", id: sceneId });
+    }
+    row.scenes = row.scenes.filter((s) => s.id !== sceneId);
+    row.nodes = new Map(
+      [...row.nodes].map(([k, n]) => [k, n.stageId === sceneId ? { ...n, stageId: null } : n]),
+    );
     return ok(undefined);
   }
 

@@ -105,6 +105,14 @@ export class SqliteStorageProvider implements StorageProvider {
     return this.projectStore.saveNarrative(id, payload);
   }
 
+  addProjectScene(id: string, scene: { title: string }): Promise<StorageResult<{ id: string }>> {
+    return this.projectStore.addProjectScene(id, scene);
+  }
+
+  removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
+    return this.projectStore.removeProjectScene(id, sceneId);
+  }
+
   addRole(id: string, role: { characterRefId: string }): Promise<StorageResult<void>> {
     return this.projectStore.addRole(id, role);
   }

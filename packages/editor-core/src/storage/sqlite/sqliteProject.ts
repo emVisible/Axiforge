@@ -271,6 +271,51 @@ export class SqliteProjectStore {
     }
   }
 
+  async addProjectScene(
+    id: string,
+    scene: { title: string },
+  ): Promise<StorageResult<{ id: string }>> {
+    try {
+      const exists = await this.backend.select<{ id: string }>(
+        `SELECT id FROM projects WHERE id = ?`, [id],
+      );
+      if (!exists.length) return err({ code: "not_found", entity: "project", id });
+      const sceneId = uuid();
+      await this.backend.execute(
+        `INSERT INTO project_scenes (id, project_id, title, sort_order) VALUES (?, ?, ?,
+          (SELECT COUNT(*) FROM project_scenes WHERE project_id = ?))`,
+        [sceneId, id, scene.title, id],
+      );
+      return ok({ id: sceneId });
+    } catch (cause) {
+      return err({ code: "io", detail: "addProjectScene 失败", cause });
+    }
+  }
+
+  async removeProjectScene(
+    id: string,
+    sceneId: string,
+  ): Promise<StorageResult<void>> {
+    try {
+      // 本地 project_nodes.stage_id 没有 FK 约束，PG 的 ON DELETE SET NULL
+      // 必须在删行之前显式兑现，否则删一次舞台就把节点挂到不存在的 stage_id 上。
+      await this.backend.execute(
+        `UPDATE project_nodes SET stage_id = NULL WHERE project_id = ? AND stage_id = ?`,
+        [id, sceneId],
+      );
+      const removed = await this.backend.execute(
+        `DELETE FROM project_scenes WHERE id = ? AND project_id = ?`,
+        [sceneId, id],
+      );
+      if (!removed.rowsAffected) {
+        return err({ code: "not_found", entity: "scene", id: sceneId });
+      }
+      return ok(undefined);
+    } catch (cause) {
+      return err({ code: "io", detail: "removeProjectScene 失败", cause });
+    }
+  }
+
   async addRole(
     id: string,
     role: { characterRefId: string },

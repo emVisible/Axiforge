@@ -187,6 +187,27 @@ export class HttpStorageProvider implements StorageProvider {
     }
   }
 
+  async addProjectScene(
+    id: string,
+    scene: { title: string },
+  ): Promise<StorageResult<{ id: string }>> {
+    try {
+      const created = await projectApi.addScene(id, { title: scene.title });
+      return ok({ id: String(created.id) });
+    } catch (e) {
+      return fail(e, "project", id);
+    }
+  }
+
+  async removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
+    try {
+      await projectApi.deleteScene(id, sceneId);
+      return ok(undefined);
+    } catch (e) {
+      return fail(e, "scene", sceneId);
+    }
+  }
+
   async addRole(
     id: string,
     role: { characterRefId: string },

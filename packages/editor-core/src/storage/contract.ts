@@ -329,6 +329,52 @@ export function runStorageContractSuite(
       expect(empty.ok && empty.data).toEqual([]);
     });
   });
+
+  describe("工程舞台增删（Phase 13 S13-2a：剪辑台在桌面要能建幕、删幕）", () => {
+    it("新增给权威 id 并进 bundle；删舞台留节点，stageId 归 null", async () => {
+      const p = await makeProvider();
+      const created = await p.createProject({ title: "舞台" });
+      if (!created.ok) throw new Error("create failed");
+      const id = created.data.id;
+
+      const added = await p.addProjectScene(id, { title: "第二幕" });
+      expect(added.ok).toBe(true);
+      if (!added.ok) return;
+
+      const afterAdd = await p.loadProject(id);
+      if (!afterAdd.ok) throw new Error("load failed");
+      expect(afterAdd.data.scenes.map((s) => s.title)).toContain("第二幕");
+      const first = afterAdd.data.nodes[0];
+      expect(first).toBeDefined();
+
+      await p.saveNarrative(id, {
+        axsSource: null,
+        nodes: [
+          { ...first!, stageId: added.data.id },
+          { id: "n-keep", stageId: null, editorData: {}, narrativeData: {}, sortOrder: 1 },
+        ],
+        edges: [],
+      });
+
+      const removed = await p.removeProjectScene(id, added.data.id);
+      expect(removed.ok).toBe(true);
+
+      const afterDelete = await p.loadProject(id);
+      if (!afterDelete.ok) throw new Error("load failed");
+      expect(afterDelete.data.scenes.map((s) => s.id)).not.toContain(added.data.id);
+      // 删的是舞台，不是戏：两拍都还在，只是不再归属任何舞台
+      expect(afterDelete.data.nodes.length).toBe(2);
+      expect(afterDelete.data.nodes.every((n) => n.stageId === null)).toBe(true);
+
+      const again = await p.removeProjectScene(id, added.data.id);
+      if (!again.ok) expect(again.error.code).toBe("not_found");
+      else throw new Error("重复删除舞台必须可见地失败");
+
+      const foreign = await p.removeProjectScene("no-such-project", added.data.id);
+      if (!foreign.ok) expect(foreign.error.code).toBe("not_found");
+      else throw new Error("往不存在的工程里删舞台必须失败");
+    });
+  });
 }
 
 type StoredRoleLike = { characterRefId: string };

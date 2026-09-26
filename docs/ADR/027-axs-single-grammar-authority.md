@@ -6,25 +6,29 @@
 
 ## 背景
 
-v1.0「演绎内核」要做的是把散文/粗写转成 AXS 演出脚本的 AI 通路接进产品。取证时发现后端这套能力**几乎已经建完**：`AiProvider` 定义了 `prose_to_axs`（`backend/app/domains/llm/provider.py:23`），`rules` / `ollama` / `openai_compat` 三个 provider 全部实现了它，`llm/service.py:72` 还带 `_run_with_fallback` 的来源归因。缺的只有路由——`llm/router.py` 目前只有 `@router.get("/health")` 一条。
+v1.0「演绎内核」的对象是「散文/粗写 → AXS 演出脚本」这条 AI 通路。
 
-也就是说，「接上就能用」看起来只差一个端点。但**它产出的不是 AXS**：
+**先记一处自我纠正**：本 ADR 初稿断言「后端 AI 能力齐备但产品里摸不到，`llm/router.py` 只有 `/health`」——**错了**。真实通路在 narrative 路由上：`@editor_ai_router.post("/prose-to-script")`（`backend/app/domains/narrative/router.py:358`）与 `"/prose-to-axs"`（`:371`），前缀 `/api/v1/editor/ai`，由 `apps/web/src/shared/api/ai.ts:6,20` 封装，并有**两个活的用户入口**：`ScriptEditor.tsx:110`（AI 草稿，替换/追加脚本）与 `StoryEditPage.tsx:125`（传记 → AXS 草稿）。误判起因是扫描面只取了 `llm/` 目录，没扫 `narrative/router.py`。
+
+所以问题不是「通路没接」，而是**通路早已接通、产物却是另一种语言**：
 
 | 事实 | 证据 |
 |---|---|
 | canonical 语法由 ADR-016 规定为 `@` 前缀指令，且明确「纯文本行 → 旁白」 | `docs/ADR/016-axs-narrative-language.md:21,27,28`；该文件内 `【` 出现 **0 次** |
-| `packages/axs` 的实现与 ADR-016 一致 | `parse.ts:234-318`（12 条指令）、`print.ts:85-140`；`parse.ts` 内 `【` 出现 **0 次** |
-| 规则引擎发射的却是中文括号方言 | `ai_draft.py:99` `【背景 x】`、`:101` `【音乐 x】`、`:108` `【转场 fade】`、`:110` `【特效 flash】` |
-| 提示词还**教模型**输出这套未授权方言 | `prompts.py:30`「可用【背景】【音乐】【转场】等舞台指令」 |
-| 且它是第二个 AXS 解析器 | `ai_draft.py:127-141` `axs_to_script()` 自剥 `*…*`（`:137-138`）、自跳 `#`（`:135-136`）、复用散文正则 |
+| `packages/axs` 的实现与 ADR-016 一致 | `parse.ts:234-318`（12 条指令）、`print.ts:85-140`；`parse.ts` 与 `print.ts` 内 `【` 各 **0 次** |
+| **Python 侧完全不认识 canonical 语法** | 扫描面 `backend/app/**/*.py`，grep `@bg` / `@show` / `startswith("@")` **零命中** |
+| 规则引擎把舞台指令发射成中文括号形态，并以「AXS」名义交回前端 | `ai_draft.py:99` `【背景 x】`、`:101` `【音乐 x】`、`:108` `【转场 fade】`、`:110` `【特效 flash】`；`StoryEditPage.tsx:133` 将其放进「AXS 草稿」面板、`:142` 提供复制到剪贴板 |
+| 提示词教模型输出该方言，是为了让 Python 自己能读回来 | `prompts.py:30`；回读发生在 `llm/service.py:105-107`——**仅当 source ≠ rules** 时用 `axs_to_script()` 解析模型文本 |
+| `axs_to_script()` 是第二个解析器 | `ai_draft.py:127-141`：自剥 `*…*`（`:137-138`）、自跳 `#`（`:135-136`）、复用散文正则 |
 
-关键的后果不是「解析失败」，而是**静默降级**。canonical 解析器的分派顺序是：`@` 前缀走指令（`parse.ts:540`）、`\` 前缀走转义旁白（`:553`）、含 ASCII 冒号走对白（`:559`），**其余一律当旁白文本**（`:568`）。因此：
+根因因此比「方言不统一」更具体：**Python 没有 canonical AXS 解析器**，于是 `【】` 被造出来充当「模型 ↔ Python」的私有交换格式——提示词教它、`axs_to_script` 读它、`script_to_axs` 写它，自成一个闭环。缺陷出在这个闭环**越过了边界**：同一份文本以「AXS 草稿」的名义交给用户，而产品真正用的 AXS（`parseAxs`，见 `MiniAxsEditor.tsx:28`）读不了它。
 
-- `【背景 教堂】` → 变成旁白，字面的中文括号被读给玩家听；
-- `角色：台词`（提示词教的全角冒号，对白正则 `parse.ts:334` 只认 ASCII）→ 整行变旁白，**说话人丢失**；
-- `*旁白文本*`（`ai_draft.py:97` 的旁白发射形态）→ 星号留在正文里。
+必须分清两侧，否则会误伤合法用法：
 
-三条都不产生 diagnostic。把这条通路接出入口，等于往作者的文本真相源里持续灌入会静默变形的脏文本。
+- **输入侧的 `【旁白：…】` 是散文速记，正当，本 ADR 不废除。** `ScriptEditor.tsx:179-188` 的帮助文案标题写的是「粘贴散文/大纲。格式：…」，教的正是 `_STAGE_RE`（`ai_draft.py:10`）与 `_SPEAKER_RE`（`:9`）能读的输入；`biographyToProse`（`apps/web/src/features/writer/lib/storyToAxs.ts:4-5`）把传记 markdown 转成同一种输入。
+- **输出侧的 `【】` 才是缺陷**：它以 AXS 之名产出，却不是 AXS。
+
+后果不是「解析失败」而是**静默降级**。canonical 的分派兜底是：`@` 前缀走指令（`parse.ts:540`）、`\` 前缀走转义旁白（`:553`）、含 ASCII 冒号走对白（`:559`）、**其余一律当旁白**（`:568`）。于是用户若把「AXS 草稿」原样粘进文本轨：`【背景 教堂】` 变成读给玩家听的旁白；`角色：台词`（提示词教的全角冒号，对白正则 `:334` 只认 ASCII）连说话人一起丢；`*旁白文本*`（`ai_draft.py:97`）星号留在正文。**三条都不产生 diagnostic**，能过所有测试。
 
 ## AXS 方言对照表（逐指令，行号可点验）
 
@@ -54,9 +58,9 @@ v1.0「演绎内核」要做的是把散文/粗写转成 AXS 演出脚本的 AI 
 
 ## 决策
 
-**1. canonical 语法的唯一权威 = ADR-016 的规范文本 + `packages/axs` 的实现。** `ai_draft.py` 停止产出 `【】` 方言，`prompts.py` 改教 canonical 语法。方言不进入 canonical 解析器。
+**1. canonical 语法的唯一权威 = ADR-016 的规范文本 + `packages/axs` 的实现。** `ai_draft.py` 的**输出侧**停止产出 `【】` 方言，`prompts.py` 改教 canonical 语法；方言不进入 canonical 解析器。**输入侧的 `【旁白：…】` 散文速记原样保留**（UI 帮助文案与 `biographyToProse` 依赖它）——本 ADR 废除的是「`【】` 享有 AXS 身份」，不是「作者可以用括号写舞台提示」。
 
-**2. 演绎内核的真相源落在 TS，Python 只保留远程模型适配壳。** 散文→指令序列的规则实现归 `packages/axs`；`axs_to_script()` 这个第二解析器废除。双端等价由**一份共享 golden 向量**（`testdata/axs-draft/*.json`：输入散文 → 期望 canonical 文本）约束，两端 runner 各跑同一批——沿用编译器 TS/Python golden 已验证过的机制形态（`packages/core` golden 6/6）。向量只描述「输入→输出」，任何一端不得把向量内容当实现复制。
+**2. 演绎内核的真相源落在 TS，Python 只保留远程模型适配壳。** 散文→指令序列的规则实现归 `packages/axs`。附带一条**硬依赖**：`llm/service.py:105-107` 那条「用 `axs_to_script()` 把模型文本读回 IR」的路径必须同时废除——因为 Python 读不了 canonical（零 `@` 指令认知），若只改发射器，LLM 路径会**静默把所有指令读成旁白**，比现状更糟。正确的替换是端点返回 canonical 文本，由前端 `parseAxs` 解析（这已经是产品自己的解析器，`MiniAxsEditor.tsx:28` 在用）。`axs_to_script()` 随之删除。双端等价由**一份共享 golden 向量**（`testdata/axs-draft/*.json`：输入散文 → 期望 canonical 文本）约束，两端 runner 各跑同一批——沿用编译器 TS/Python golden 已验证过的机制形态（`packages/core` golden 6/6）。向量只描述「输入→输出」，任何一端不得把向量内容当实现复制。
 
 **3. AI 产物只进建议面，作者采纳才落文**，采纳动作经既有 Transaction/Journal（单步 undo 回到采纳前字节）。理由：ADR-016 承诺文本是真相源，而宪章要求「文本可为真相源时须写明冲突策略」。
 

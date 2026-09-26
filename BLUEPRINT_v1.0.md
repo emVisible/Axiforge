@@ -1,4 +1,4 @@
-# Build Blueprint v1.1 | Status: confirmed（人类令「按计划开始执行」）→ executing v1.1
+# Build Blueprint v1.2 | Status: confirmed → executing（M1，取证阶段已推翻 §1 一条自判）
 
 > 日期 2026-09-25 · 分支 `desktop` · 基线 `af8ef81`（tag `desktop-v0.7` 之后）· 主题 **演绎内核：AXS 单一语法 + 创作端 AI 辅助**
 > 关联 [ADR-024](docs/ADR/024-desktop-local-first.md)、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)、[ROADMAP_FINAL.md](docs/ROADMAP_FINAL.md) M3
@@ -10,9 +10,11 @@
 
 **取证结论（全部指到源码，非推定）**
 
-1. **AI 内核在后端几乎已经建完，但产品里摸不到。** `AiProvider` 协议定义了 `suggest_character_layers` 与 `prose_to_axs`（`llm/provider.py:14,23`）；`rules` / `ollama` / `openai_compat` 三个 provider **都实现了** `prose_to_axs`；`llm/service.py:72` 的 `prose_to_axs_with_source` 还带 `_run_with_fallback` 的来源归因。而 `llm/router.py` 只有 `@router.get("/health")` 一条路由——前端 `llmApi` 也只有 `health()`。
-2. **仓库里存在三套互不兼容的 AXS 方言，而 AI 通路输出的不是 canonical 那一套。** canonical 由 `packages/axs` 定义：`@bg` / `@bgm … loop` / `@se` / `@voice` / `@wait ms` / `@transition kind ms` / `@fx` / `@camera` / `@show 角色 [表情]` / `@hide` / `@move`（见 `packages/axs/src/print.ts:85-116`），且 `【` 在 `parse.ts` 里出现 **0 次**。但 `narrative/ai_draft.py:97-110` 的发射器写的是 `【背景 x】` `【音乐 x】` `【转场 fade】` `【特效 flash】`；`llm/prompts.py:30` 还**教模型**输出 `【背景】【音乐】【转场】`；同一发射器的对白写 `speaker: 台词`（半角）而提示词写 `角色：台词`（全角）。
-   → 推论：**今天把这条通路接出入口，产物会被编辑器语法层拒收**，等于往作者手写的真相源里灌不可解析文本。
+1. **【执行「发射器改造」前置取证时自我纠正】AI 通路不是「摸不到」，而是早已接通并摆在了用户面前。** 端点是 `@editor_ai_router.post("/prose-to-script")` 与 `"/prose-to-axs"`（`backend/app/domains/narrative/router.py:358,371`，前缀 `/api/v1/editor/ai`），前端封装在 `shared/api/ai.ts:6,20`，两个活入口：`ScriptEditor.tsx:110`（AI 草稿 → 替换/追加脚本）与 `StoryEditPage.tsx:125`（传记 → 「AXS 草稿」面板 + `:142` 复制到剪贴板）。**本文件初稿写的「`llm/router.py` 只有 /health、产品里摸不到」是扫描面取窄造成的误判**（只看了 `llm/` 目录，没扫 `narrative/router.py`），已在 ADR-027 同步纠正。三个 provider 都实现了 `prose_to_axs`、`llm/service.py:72` 带来源归因——这部分结论不变。
+2. **仓库里存在三套互不兼容的 AXS 方言，而 AI 通路输出的不是 canonical 那一套。** canonical 由 `packages/axs` 定义：`@bg` / `@bgm … loop` / `@se` / `@voice` / `@wait ms` / `@transition kind ms` / `@fx` / `@camera` / `@show 角色 [表情]` / `@hide` / `@move`（见 `packages/axs/src/print.ts:85-140`），且 `【` 在 `parse.ts` 与 `print.ts` 里各出现 **0 次**，ADR-016 内也是 0 次。但 `narrative/ai_draft.py:97-110` 的发射器写的是 `【背景 x】` `【音乐 x】` `【转场 fade】` `【特效 flash】`；`llm/prompts.py:30` 还**教模型**输出 `【背景】【音乐】【转场】`；同一发射器的对白写 `speaker: 台词`（半角）而提示词写 `角色：台词`（全角）。
+   → 根因比「方言不统一」更具体：**Python 完全不认识 canonical**（扫描面 `backend/app/**/*.py`，grep `@bg` / `@show` / `startswith("@")` 零命中），于是 `【】` 被造出来充当「模型 ↔ Python」的私有交换格式——`prompts.py:30` 教它、`axs_to_script()`（`ai_draft.py:127-141`，第二解析器，仅在 `service.py:105-107` 且 source≠rules 时回读）读它、`script_to_axs` 写它，自成一闭环。越过边界的那一刻——以「AXS 草稿」的名义交给用户——才是缺陷。
+   → 后果是**静默降级而非报错**：canonical 的兜底把任何非 `@`、非 `\`、不含 ASCII 冒号的行一律当旁白（`parse.ts:540/553/559/568`），零 diagnostic。用户把草稿粘进文本轨即变形：`【背景 教堂】` 变旁白、全角冒号的对白丢说话人、`*旁白*` 星号留在正文。
+   → **输入侧要分清，别误伤**：`ScriptEditor.tsx:179-188` 里的 `【旁白：…】` 是「粘贴散文/大纲」的**输入速记**，`biographyToProse`（`storyToAxs.ts:4-5`）同理。这是正当用法，本版不废除——废除的是 `【】` 的 **AXS 身份**。
 3. **AXS 的表达力不缺。** 演出指令集 12 条齐备（上一条），示范作与 golden 机制（编译器 TS/Python golden 6/6）也在。所以「更进演绎」不需要扩语法，需要的是**语法单一真相源 + 一条能把内容填进去的通路**。
 4. **桌面态连模型要过 CORS 这一关。** `tauri.conf.json` 的 `csp: null`，`capabilities/default.json` 无任何 http 权限；webview 直连本机 Ollama 属跨源，Ollama 默认白名单放行 `http://localhost:*` 而不含 `tauri://localhost`。已选路径是「文档要求用户自配 `OLLAMA_ORIGINS`」，代价是首启体验不确定——所以下限必须由 rules 兜底守住。
 
@@ -66,14 +68,15 @@
 ## 5. Task List
 
 - [x] S1-T1 写「AXS 方言对照表」并立 ADR-027：逐指令列 canonical / `ai_draft` 发射 / `prompts` 教给模型的三种写法，每行指到源码行号 | Acceptance: ADR 状态「已采纳」含备选与否决理由；表内每条差异都有文件:行号可点验 | M1
-- [ ] S1-T2 把规则引擎的舞台指令输出改为 canonical 形态（`@bg` `@bgm … loop` `@transition kind ms` `@show 角色 [表情]` `@hide`），对白分隔符按 `packages/axs` 实际接受的写法统一 | Acceptance: 新增断言用**共享向量**验产物被语法层接受，不用 Python 自己那套解析自证；旧 `【】` 形态在扫描面内计数为 0 | M1
+- [ ] S1-T2 把规则引擎的舞台指令输出改为 canonical 形态（`@bg` `@bgm … loop` `@transition kind ms` `@show 角色 [表情]` `@hide`），对白分隔符按 `packages/axs` 实际接受的写法统一；**发射侧与「端点回读改造」那一项必须同批落地**——Python 读不了 canonical，只改发射器会让 LLM 路径把所有指令静默读成旁白 | Acceptance: 新增断言用**共享向量**验产物被语法层接受，不用 Python 自己那套解析自证；输出侧的 `【】` 形态在扫描面内计数为 0，而输入侧的散文速记（UI 帮助文案与 `biographyToProse`）**保持不变且有用例守住** | M1
 - [ ] S1-T3 重写 `prose_to_axs_system`：只教 canonical 语法并附一段已通过 parse 的示例 | Acceptance: 提示词文本内不再出现 `【`/全角冒号示例；示例本身进 golden 用例并通过 | M1
 - [ ] S1-T4 新增门禁 `scripts/check-axs-draft-grammar.mjs`：对 AI 通路样本集断言 parse 成功率 100% 且 `parse→print→parse` 幂等 | Acceptance: 先做反向实验——塞入一行 `【音乐 x】` 必须退出码 1，还原后 0；退出码单独取 | M1
+- [ ] S1-T5 废除 Python 侧的模型文本回读：`prose_to_script_with_source` 不再用第二解析器把 AXS 文本读回 IR，端点返回 canonical 文本，由前端 `parseAxs` 解析（复用产品自己的解析器） | Acceptance: `axs_to_script` 在扫描面 `backend/app/**` 内零引用后删除；`ScriptEditor` 的 AI 草稿在 rules 与 mock LLM 两种 source 下都产出合法指令序列，且**diagnostic 可见而非静默**；`ProseToScriptResponse` 契约变更同步更新其测试与 `docs/user` | M1
 - [ ] S2-T1 在 `packages/axs` 实现 `draftFromProse()`（散文 → 指令序列 → canonical AXS 文本），作为规则路径唯一真相源 | Acceptance: 单测覆盖切句、说话人归属、旁白、选项、舞台指令推断五类；零网络零 DOM 依赖 | M2
 - [ ] S2-T2 建共享向量 `testdata/axs-draft/*.json` 与两端 runner（TS 进 vitest、Python 进 pytest） | Acceptance: 同一批向量名与条数在两处一致；任一端偏离即红；两端退出码各自独立可取 | M2
 - [ ] S2-T3 Python 规则路径收敛：`ai_draft.prose_to_axs` 不再持有独立切句规则，改为与向量同源的单一实现 | Acceptance: 写明扫描面（`backend/app/domains/**`）后 grep 证明第二套切句规则表已不存在；pytest 全绿 | M2
 - [ ] S3-T1 前端 provider 分派做成可注入 deps（沿用 `playerSavesDeps` 已验证形状），使 rules / 本地模型 / 在线三支在 node 测试下均可执行 | Acceptance: 三支同一测试源各有断言；不出现「桌面支只写在代码里、结构上永不被测」的形态 | M3
-- [ ] S3-T2 `llm/router.py` 补出真实生成端点，返回 `{axs, source, degraded?}` | Acceptance: 端点契约测试通过；`/health` 现有行为与 `LlmStatusBadge` 消费字段零变更 | M3
+- [ ] S3-T2 端点从「私有方言」转「canonical + 归因」：`/api/v1/editor/ai/prose-to-axs` 与 `prose-to-script` 的产物改为 canonical 文本，响应补 `degraded` 原因字段（端点本身**已存在且有活入口**，本项是改造不是新建） | Acceptance: 两端点契约测试更新并绿；`/health` 现有行为与 `LlmStatusBadge` 消费字段零变更；`StoryEditPage` 的「AXS 草稿」粘进 `AxsCodeEditor` 后 parse 零 diagnostic | M3
 - [ ] S3-T3 失败与缺席显式化：模型不可达 / 超时 / CORS 拒绝 → 自动落 rules，并携带 `source="rules"` 与降级原因 | Acceptance: 模拟断网与无 Ollama 两场景仍拿到合法 AXS 且原因可见；错误不被渲染成空建议 | M3
 - [ ] S3-T4 用户文档与运维口径：`OLLAMA_ORIGINS` 配置要求、失败症状、离线可得的降级形态 | Acceptance: `docs/user` 新增可复现小节；README 配置/脚本表同步；docRegistry 用例不漂移 | M3
 - [ ] S4-T1 建议面 API：产物只进建议结构，不写 `.axs` | Acceptance: 机械断言「改→生成→不采纳→重读」后文本字节不变 | M4
@@ -105,3 +108,4 @@
 
 - v1.0 draft（2026-09-25）：人类给出「支持演绎模式」的宽指令，经两轮前沿问答锁定语义（AXS 语法层创作端 AI 辅助，非运行时即兴）、内核落点（TS 真相源 + 双端 golden）、冲突策略（只出建议、采纳才落文）、离线下限（rules 必须独立成拍）、模型接入路径（webview fetch + 文档要求 OLLAMA_ORIGINS）。取证发现本版的真正阻塞项是三套 AXS 方言并存（`parse.ts` 内 `【` 计数 0 vs `ai_draft.py:97-110` 与 `prompts.py:30` 的 `【】` 形态），以及后端 AI 能力齐备却只有 `/health` 一条路由。据此把 M1 定为方言统一而非接模型。待人类确认后转 confirmed 进 Forge。
 - v1.1 首项任务结案（2026-09-25）：对照表与 ADR-027 落盘（`docs/ADR/027-axs-single-grammar-authority.md`，已登记进 `docs/ADR/README.md`）。执行时把 §1 的判断**收紧了两处**：① 危险不是「解析失败」而是「静默降级」——canonical 的分派兜底把任何非 `@`、非 `\`、不含 ASCII 冒号的行当旁白（`parse.ts:540/553/559/568`），所以 `【背景 教堂】` 会被原样读给玩家听、全角冒号的对白会丢说话人，且**不产生任何 diagnostic**；② 规则引擎只覆盖 12 条 canonical 指令中的 5 条，`@camera`/`@show`/`@hide`/`@move` 整层不可生成——镜头语言正是「演出上限」最吃的那层，故 M1 不承诺离线也能出镜头。ADR 另立两条欠账：Python 侧 `axs_to_script()` 是第二解析器（须废除）、全角冒号应给 lint 诊断而非放宽解析（本轮不做）。发射器行号在提交前用 grep 逐个复核过（narration `:125-126`、choice `:127-130`、拍标题 `:141-153`），初稿曾按位置推算而偏一到两行。
+- v1.2 发射器改造的前置取证（2026-09-25）：**推翻本文件 §1 第 1 条自己写下的结论**。原写「AI 通路摸不到、`llm/router.py` 只有 /health」，实测端点一直在 narrative 路由上（`/api/v1/editor/ai/prose-to-script` 与 `prose-to-axs`，`router.py:358,371`），并有 `ScriptEditor.tsx:110` 与 `StoryEditPage.tsx:125` 两个活入口——误判成因是扫描面只取了 `llm/` 目录。缺陷因此从「接上会变形」升级为「**已经在用户眼前，粘贴即变形**」。同批查出根因：Python 对 canonical 零认知（`backend/app/**/*.py` grep `@bg` / `@show` / `startswith("@")` 零命中），`【】` 是为「模型 ↔ Python」造的私有交换格式，`axs_to_script` 是它的回读器。三条连带调整：① 新增「废除 Python 侧模型文本回读、改由前端 `parseAxs` 解析」一项（M1，且与发射器改造**必须同批**，否则 LLM 路径会把指令静默读成旁白，比现状更糟）；② 「端点」那一项从「新建」改写为「改造既有端点 + 补降级归因」；③ ADR-027 明确**只废 `【】` 的 AXS 身份，不废输入侧散文速记**（UI 帮助文案与 `biographyToProse` 属正当用法，另加用例守住）。过程失误一并记录：插入新增项时误覆盖了「内核入 TS」那一行任务，已读回原文恢复。

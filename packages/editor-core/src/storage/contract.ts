@@ -260,6 +260,75 @@ export function runStorageContractSuite(
       expect(kept?.themeTags).toEqual(["末日", "密室"]);
     });
   });
+
+  describe("角色传记（Phase 13 S13-1：桌面无后端也要读写传记）", () => {
+    it("建 → 列表 → 单条读 → 改 → 删；wordCount 由实现方重算；跨角色读不到", async () => {
+      const p = await makeProvider();
+      const owner = await p.saveCharacter({
+        id: "",
+        name: "凛",
+        characterData: { anchor: { name: "凛" } },
+        imagePath: null,
+        isPublic: false,
+        authorId: "u-contract",
+      });
+      if (!owner.ok) throw new Error("角色创建失败");
+      const stranger = await p.saveCharacter({
+        id: "",
+        name: "邻",
+        characterData: { anchor: { name: "邻" } },
+        imagePath: null,
+        isPublic: false,
+        authorId: "u-other",
+      });
+      if (!stranger.ok) throw new Error("第二角色创建失败");
+      const cid = owner.data.id;
+
+      const created = await p.saveStory({
+        id: "",
+        characterId: cid,
+        title: "序章",
+        content: "她来了。\n又走了。",
+        wordCount: 999,
+        sortOrder: 1,
+        updatedAt: "",
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+      const sid = created.data.id;
+
+      const list = await p.listStories(cid);
+      expect(list.ok && list.data.map((s) => s.title)).toEqual(["序章"]);
+      // 入参写 999 也必须被实现方算的真实值覆盖：两端各信一份就是两个字数互相说谎
+      expect(list.ok && list.data[0]?.wordCount).toBe(2);
+
+      if (!list.ok) throw new Error("列表读取失败");
+      const patched = await p.saveStory({
+        ...list.data[0]!,
+        title: "序章·改",
+        sortOrder: 0,
+      });
+      expect(patched.ok && patched.data.id).toBe(sid);
+
+      const got = await p.getStory(cid, sid);
+      expect(got.ok && got.data.title).toBe("序章·改");
+      expect(got.ok && got.data.sortOrder).toBe(0);
+
+      // 归属即隔离：换角色读同一条按 not_found，不做「知道 id 就能读」
+      const foreign = await p.getStory(stranger.data.id, sid);
+      if (!foreign.ok) expect(foreign.error.code).toBe("not_found");
+      else throw new Error("跨角色不应读到他人传记");
+
+      const removed = await p.deleteStory(cid, sid);
+      expect(removed.ok).toBe(true);
+      const again = await p.deleteStory(cid, sid);
+      if (!again.ok) expect(again.error.code).toBe("not_found");
+      else throw new Error("删除不存在传记必须报错，不能演成成功");
+
+      const empty = await p.listStories(cid);
+      expect(empty.ok && empty.data).toEqual([]);
+    });
+  });
 }
 
 type StoredRoleLike = { characterRefId: string };

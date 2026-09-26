@@ -1,5 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { storyApi } from '@/shared/api/stories';
+import {
+  createStory,
+  readStories,
+  readStory,
+  removeStory,
+  updateStory,
+} from '@/shared/storage/storySaves';
 import type { StoryCreate, StoryUpdate } from '@/shared/types/story';
 
 export const STORY_KEYS = {
@@ -10,7 +16,7 @@ export const STORY_KEYS = {
 export const useStories = (characterId: string) => {
   return useQuery({
     queryKey: STORY_KEYS.all(characterId),
-    queryFn: () => storyApi.list(characterId),
+    queryFn: () => readStories(characterId),
     enabled: !!characterId,
   });
 };
@@ -18,7 +24,7 @@ export const useStories = (characterId: string) => {
 export const useStory = (characterId: string, storyId: string) => {
   return useQuery({
     queryKey: STORY_KEYS.detail(characterId, storyId),
-    queryFn: () => storyApi.get(characterId, storyId),
+    queryFn: () => readStory(characterId, storyId),
     enabled: !!characterId && !!storyId,
   });
 };
@@ -26,7 +32,7 @@ export const useStory = (characterId: string, storyId: string) => {
 export const useCreateStory = (characterId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: StoryCreate) => storyApi.create(characterId, data),
+    mutationFn: (data: StoryCreate) => createStory(characterId, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: STORY_KEYS.all(characterId) }),
   });
 };
@@ -35,7 +41,7 @@ export const useUpdateStory = (characterId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ storyId, data }: { storyId: string; data: StoryUpdate }) =>
-      storyApi.update(characterId, storyId, data),
+      updateStory(characterId, storyId, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: STORY_KEYS.all(characterId) }),
   });
 };
@@ -43,7 +49,7 @@ export const useUpdateStory = (characterId: string) => {
 export const useDeleteStory = (characterId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (storyId: string) => storyApi.delete(characterId, storyId),
+    mutationFn: (storyId: string) => removeStory(characterId, storyId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: STORY_KEYS.all(characterId) }),
   });
 };

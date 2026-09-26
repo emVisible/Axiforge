@@ -32,6 +32,7 @@ import type {
   StoredAsset,
   StoredAssetItem,
   StoredAssetScene,
+  StoredStory,
   StoredCharacter,
   StoredEdge,
   StoredNode,
@@ -42,6 +43,7 @@ import type {
 } from "./types";
 import { emptyProjectMetadata, err, ok } from "./types";
 import { MemoryPools } from "./memoryPools";
+import { MemoryStories } from "./memoryStories";
 
 interface ProjectRow {
   meta: ProjectMeta;
@@ -88,6 +90,8 @@ export class MemoryStorageProvider implements StorageProvider {
     (id) => this.projects.has(id),
     (prefix) => this.nextId(prefix),
   );
+
+  private readonly stories = new MemoryStories((prefix) => this.nextId(prefix));
 
   private projects = new Map<string, ProjectRow>();
   private characters = new Map<string, StoredCharacter>();
@@ -272,6 +276,22 @@ export class MemoryStorageProvider implements StorageProvider {
 
   deleteScene(id: string): Promise<StorageResult<void>> {
     return this.pools.deleteScene(id);
+  }
+
+  listStories(characterId: string): Promise<StorageResult<StoredStory[]>> {
+    return this.stories.listStories(characterId);
+  }
+
+  saveStory(story: StoredStory): Promise<StorageResult<{ id: string }>> {
+    return this.stories.saveStory(story);
+  }
+
+  getStory(characterId: string, id: string): Promise<StorageResult<StoredStory>> {
+    return this.stories.getStory(characterId, id);
+  }
+
+  deleteStory(characterId: string, id: string): Promise<StorageResult<void>> {
+    return this.stories.deleteStory(characterId, id);
   }
 
   listSaves(projectId: string, playerToken: string): Promise<StorageResult<LocalSaveSlot[]>> {

@@ -48,6 +48,9 @@ const LOCAL_UNAVAILABLE_ROUTES = [
   "/play/no-such-project",
   "/studio/items/no-such-item",
   "/studio/characters/no-such-character",
+  // S13-1 传记本地化后新增：页面在本地库必然失败时也不许回去打 storyApi
+  "/studio/characters/no-such-character/stories/no-such-story",
+  "/studio/characters/no-such-character/stories/no-such-story/edit",
 ];
 
 async function visitWithLocalStoreFailing(page: Page, route: string): Promise<string[]> {

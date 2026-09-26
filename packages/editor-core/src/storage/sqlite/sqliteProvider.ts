@@ -10,6 +10,7 @@
 
 import { filterByVisibility } from "../visibility";
 import { deleteById, getItem, getScene, listItems, listScenes, saveItem, saveScene } from "./assetPool";
+import { deleteStory, getStory, listStories, saveStory } from "./stories";
 import {
   clearSave,
   getSave,
@@ -38,6 +39,7 @@ import type {
   StoredAsset,
   StoredAssetItem,
   StoredAssetScene,
+  StoredStory,
   StoredCharacter,
   UnlockedAchievement,
   VisibilityScope,
@@ -234,6 +236,22 @@ export class SqliteStorageProvider implements StorageProvider {
 
   deleteScene(id: string) {
     return deleteById(this.backend, "asset_scenes", "scene", id);
+  }
+
+  listStories(characterId: string): Promise<StorageResult<StoredStory[]>> {
+    return listStories(this.backend, characterId);
+  }
+
+  saveStory(story: StoredStory) {
+    return saveStory(this.backend, story);
+  }
+
+  getStory(characterId: string, id: string): Promise<StorageResult<StoredStory>> {
+    return getStory(this.backend, characterId, id);
+  }
+
+  deleteStory(characterId: string, id: string) {
+    return deleteStory(this.backend, characterId, id);
   }
 
   listSaves(projectId: string, playerToken: string): Promise<StorageResult<LocalSaveSlot[]>> {

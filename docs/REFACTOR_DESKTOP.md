@@ -447,7 +447,8 @@
 
 **切片（有序）**
 
-- [ ] S13-1 传记本地化：`stories` 进 L4 契约（list/get/save/delete，挂角色之下）+ SQLite 建表 + Memory/SQLite 共用契约断言 + 前端分派口。**它是创作主数据，不是云社交功能，没有"判死"这个选项**
+- [x] S13-1 传记本地化：`stories` 进 L4 契约（list/get/save/delete，挂角色之下）+ SQLite 建表 + Memory/SQLite 共用契约断言 + 前端分派口。**它是创作主数据，不是云社交功能，没有"判死"这个选项**
+  —— 已交付 2026-09-26：`StoredStory` + 四方法进契约（`wordCount` 由实现重算，客户端送值不作数）；SQLite schema v4 建 `character_stories`；契约套件的传记用例同时跑在 Memory 与 SQLite 上（editor-core 130→132）；前端 `storySaves` 分派口，`useStories` 五处调用全部改线、`storyApi` 残留 0。E15 加两条传记路由（13→15 条），并已见过它红：把分派口的本地判断强制为假后，红在 `/api/v1/characters/no-such-character/stories/no-such-story`。已知两端差异：HTTP 清单端点服务端裁掉 `content`，本地清单带正文——调用方不得把清单正文当权威
 - [ ] S13-2 编排台资产检索/导入改走分派口（本地资产池 v0.8 已具备），并清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14 结构上测不到」的待核项
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底

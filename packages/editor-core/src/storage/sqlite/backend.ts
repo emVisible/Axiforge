@@ -147,9 +147,20 @@ export const SCHEMA_MIGRATIONS: readonly string[] = [
     unlocked_at TEXT NOT NULL,
     PRIMARY KEY (project_id, player_token, achievement_key)
   );
+  /* schema v4（宪章 Phase 13 S13-1）：角色传记进本地库——后端退场后它是创作主数据，
+     不是可判死的云功能。character_id 硬隔离：跨角色读写一律 not_found */
+  CREATE TABLE IF NOT EXISTS character_stories (
+    id TEXT PRIMARY KEY,
+    character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
   CREATE INDEX IF NOT EXISTS idx_items_author ON asset_items(author_id);
   CREATE INDEX IF NOT EXISTS idx_scenes_author ON asset_scenes(author_id);
   CREATE INDEX IF NOT EXISTS idx_ach_project ON achievements(project_id);
+  CREATE INDEX IF NOT EXISTS idx_stories_character ON character_stories(character_id);
   `,
 ];
 

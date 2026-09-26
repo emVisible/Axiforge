@@ -42,6 +42,35 @@ export interface StoredAssetScene {
   readonly updatedAt: string;
 }
 
+/**
+ * 角色传记（Phase 13 S13-1）。它属于**创作主数据**而非云社交功能，
+ * 所以后端退场后必须有本地实现，否则「角色没有传记」＝功能消失。
+ * 与 `ProjectMeta` 同一裁决：只保留本地真实存在的字段，
+ * 服务端的 `created_at` 不进契约（列表与编辑态都只消费 `updatedAt`），
+ * 留空位比多一个无人使用的字段诚实。
+ */
+export interface StoredStory {
+  readonly id: string;
+  readonly characterId: string;
+  readonly title: string;
+  readonly content: string;
+  /** 由实现方从 content 计算，不接受调用方传入——避免两份字数互相说谎 */
+  readonly wordCount: number;
+  readonly sortOrder: number;
+  readonly updatedAt: string;
+}
+
+/**
+ * 字数规则逐字继承 `backend/app/domains/character/story_service.py:15`
+ * （换行转空格后按空白切分计数）。它对中文会严重低估——但三个实现各算一套更糟，
+ * 要改就连后端一起改。放这里是因为 Memory 与 SQLite 都是它的消费者，
+ * 任何一方依赖另一方都会让两个实现之间长出耦合。
+ */
+export function storyWordCount(content: string): number {
+  if (!content) return 0;
+  return content.replace(/\n/g, " ").split(/\s+/).filter(Boolean).length;
+}
+
 /** 玩家身份：匿名 token，跨重启稳定（不是账号） */
 export interface LocalSaveSlot {
   readonly slot: number;

@@ -22,7 +22,7 @@
 
 | 云端模块 | 消费者 | 桌面现状 | 类 |
 |---|---|---|---|
-| `stories`（角色传记） | 5 个页面/组件 | **正文读写 100% 走 HTTP**，无本地实现 | **C** |
+| `stories`（角色传记） | 5 个页面/组件 | **S13-1 已本地化 2026-09-26**：进 L4 契约 + SQLite schema v4 `character_stories`，`useStories` 改走 `storySaves` 分派口 | **A** |
 | `search` | OutlinerPanel、GlobalSearch | 编排台「从舞台库导入 / 搜索道具」仍 `searchApi.*`，而本地资产池早已存在 | **C** |
 | `llm` | LlmStatusBadge | 桌面每次开编辑器发一次必败 `/llm/health`，且把"没问到"渲染成"已降级" | **C→已修** |
 | `editor`（道具/场景/工程） | 19 处 | 主链路已分派；本轮修好 `ItemDetailPage`、`useProjectDirectory`、`useProjectOutliner` 三处绕开 `readItem()` 的直连 | **C→已修** |

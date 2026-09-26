@@ -200,6 +200,7 @@ import type {
   StoredAchievement,
   StoredAssetItem,
   StoredAssetScene,
+  StoredStory,
   UnlockedAchievement,
 } from "./records";
 
@@ -297,6 +298,20 @@ export interface StorageProvider {
   getScene(id: string): Promise<StorageResult<StoredAssetScene>>;
 
   deleteScene(id: string): Promise<StorageResult<void>>;
+
+  // ---------- 角色传记（创作主数据，Phase 13 S13-1） ----------
+
+  /** 按 sortOrder 升序返回该角色的全部传记；角色不存在时返回空清单而非 not_found */
+  listStories(characterId: string): Promise<StorageResult<StoredStory[]>>;
+
+  /** upsert，返回权威 id；wordCount 由实现方从 content 重算，入参值不采信 */
+  saveStory(story: StoredStory): Promise<StorageResult<{ id: string }>>;
+
+  /** 归属即隔离：跨角色拿别人的传记 id 读，按 not_found 处理，不做「知道 id 就能读」 */
+  getStory(characterId: string, id: string): Promise<StorageResult<StoredStory>>;
+
+  /** 不存在→not_found。返回值 void，不静默吞删除失败 */
+  deleteStory(characterId: string, id: string): Promise<StorageResult<void>>;
 
   // ---------- 运行时存档（per project × playerToken × slot） ----------
 

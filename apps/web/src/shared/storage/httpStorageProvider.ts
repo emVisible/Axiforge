@@ -33,10 +33,15 @@ import {
   toStoredCharacter,
   metaPatchToUpdateBody,
 } from "./httpDomains";
+import {
+  httpDeleteStory,
+  httpGetStory,
+  httpListStories,
+  httpSaveStory,
+} from "./httpStories";
 import type {
   AssetInput,
   CreateProjectInput,
-  LocalSaveSlot,
   NarrativePayload,
   ProjectBundle,
   ProjectMeta,
@@ -49,7 +54,7 @@ import type {
   StoredAssetItem,
   StoredAssetScene,
   StoredCharacter,
-  UnlockedAchievement,
+  StoredStory,
   VisibilityScope,
 } from "@axiforge/editor-core";
 import { classifyAssetRef, err, filterByVisibility, ok } from "@axiforge/editor-core";
@@ -299,98 +304,69 @@ export class HttpStorageProvider implements StorageProvider {
     }
   }
 
-  // ---------- 四个新域：实现体在 httpDomains.ts（守 G1 行数预算） ----------
+  // ---------- 各域实现体在外置模块（守 G1 行数预算）；纯转调不重复声明返回类型 ----------
 
-  listItems(scope?: VisibilityScope): Promise<StorageResult<StoredAssetItem[]>> {
+  listItems(scope?: VisibilityScope) {
     return httpListItems(scope);
   }
-
-  saveItem(item: StoredAssetItem): Promise<StorageResult<{ id: string }>> {
+  saveItem(item: StoredAssetItem) {
     return httpSaveItem(item, this.creatorId);
   }
-
-  getItem(id: string): Promise<StorageResult<StoredAssetItem>> {
+  getItem(id: string) {
     return httpGetItem(id);
   }
-
-  deleteItem(id: string): Promise<StorageResult<void>> {
+  deleteItem(id: string) {
     return httpDeleteItem(id);
   }
-
-  listScenes(scope?: VisibilityScope): Promise<StorageResult<StoredAssetScene[]>> {
+  listScenes(scope?: VisibilityScope) {
     return httpListScenes(scope);
   }
-
-  saveScene(scene: StoredAssetScene): Promise<StorageResult<{ id: string }>> {
+  saveScene(scene: StoredAssetScene) {
     return httpSaveScene(scene, this.creatorId);
   }
-
-  getScene(id: string): Promise<StorageResult<StoredAssetScene>> {
+  getScene(id: string) {
     return httpGetScene(id);
   }
-
-  deleteScene(id: string): Promise<StorageResult<void>> {
+  deleteScene(id: string) {
     return httpDeleteScene(id);
   }
-
-  listSaves(
-    projectId: string,
-    playerToken: string,
-  ): Promise<StorageResult<LocalSaveSlot[]>> {
+  listStories(characterId: string) {
+    return httpListStories(characterId);
+  }
+  saveStory(story: StoredStory) {
+    return httpSaveStory(story);
+  }
+  getStory(characterId: string, id: string) {
+    return httpGetStory(characterId, id);
+  }
+  deleteStory(characterId: string, id: string) {
+    return httpDeleteStory(characterId, id);
+  }
+  listSaves(projectId: string, playerToken: string) {
     return httpListSaves(projectId, playerToken);
   }
-
-  getSave(
-    projectId: string,
-    playerToken: string,
-    slot = 0,
-  ): Promise<StorageResult<LocalSaveSlot>> {
+  getSave(projectId: string, playerToken: string, slot = 0) {
     return httpGetSave(projectId, playerToken, slot);
   }
-
-  writeSave(
-    projectId: string,
-    playerToken: string,
-    input: SaveSlotInput,
-  ): Promise<StorageResult<LocalSaveSlot>> {
+  writeSave(projectId: string, playerToken: string, input: SaveSlotInput) {
     return httpWriteSave(projectId, playerToken, input);
   }
-
-  clearSave(
-    projectId: string,
-    playerToken: string,
-    slot = 0,
-  ): Promise<StorageResult<void>> {
+  clearSave(projectId: string, playerToken: string, slot = 0) {
     return httpClearSave(projectId, playerToken, slot);
   }
-
-  listAchievements(projectId: string): Promise<StorageResult<StoredAchievement[]>> {
+  listAchievements(projectId: string) {
     return httpListAchievements(projectId);
   }
-
-  saveAchievement(
-    projectId: string,
-    achievement: StoredAchievement,
-  ): Promise<StorageResult<StoredAchievement>> {
+  saveAchievement(projectId: string, achievement: StoredAchievement) {
     return httpSaveAchievement(projectId, achievement);
   }
-
-  deleteAchievement(projectId: string, id: string): Promise<StorageResult<void>> {
+  deleteAchievement(projectId: string, id: string) {
     return httpDeleteAchievement(projectId, id);
   }
-
-  unlockAchievement(
-    projectId: string,
-    playerToken: string,
-    key: string,
-  ): Promise<StorageResult<void>> {
+  unlockAchievement(projectId: string, playerToken: string, key: string) {
     return httpUnlockAchievement(projectId, playerToken, key);
   }
-
-  listUnlocked(
-    projectId: string,
-    playerToken: string,
-  ): Promise<StorageResult<UnlockedAchievement[]>> {
+  listUnlocked(projectId: string, playerToken: string) {
     return httpListUnlocked(projectId, playerToken);
   }
 }

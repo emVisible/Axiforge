@@ -1,4 +1,4 @@
-# Build Blueprint v1.5 | Status: confirmed → executing（M1 ✓ · M2 内核与离线通路 ✓ · M3 进行中）
+# Build Blueprint v1.6 | Status: confirmed → executing（M1 ✓ · M2 ✓ · M3 进行中，含桌面化转向的度量基线）
 
 > 日期 2026-09-25 · 分支 `desktop` · 基线 `af8ef81`（tag `desktop-v0.7` 之后）· 主题 **演绎内核：AXS 单一语法 + 创作端 AI 辅助**
 > 关联 [ADR-024](docs/ADR/024-desktop-local-first.md)、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)、[ROADMAP_FINAL.md](docs/ROADMAP_FINAL.md) M3
@@ -79,6 +79,7 @@
 - [ ] S3-T2 端点从「私有方言」转「canonical + 归因」：`/api/v1/editor/ai/prose-to-axs` 与 `prose-to-script` 的产物改为 canonical 文本，响应补 `degraded` 原因字段（端点本身**已存在且有活入口**，本项是改造不是新建） | Acceptance: 两端点契约测试更新并绿；`/health` 现有行为与 `LlmStatusBadge` 消费字段零变更；`StoryEditPage` 的「AXS 草稿」粘进 `AxsCodeEditor` 后 parse 零 diagnostic | M3
 - [ ] S3-T3 失败与缺席显式化：模型不可达 / 超时 / CORS 拒绝 → 自动落 rules，并携带 `source="rules"` 与降级原因 | Acceptance: 模拟断网与无 Ollama 两场景仍拿到合法 AXS 且原因可见；错误不被渲染成空建议 | M3
 - [ ] S3-T4 用户文档与运维口径：`OLLAMA_ORIGINS` 配置要求、失败症状、离线可得的降级形态 | Acceptance: `docs/user` 新增可复现小节；README 配置/脚本表同步；docRegistry 用例不漂移 | M3
+- [ ] S3-T5 「概览」在桌面态做到**路由本体**缺席：入口已隐藏但直达 `/studio/dashboard` 仍会挂载并请求 `/api/v1/creator/dashboard`。修法与既有缺席域一致（`deployment.ts` 判据），不是加一层 try/catch 把失败藏起来 | Acceptance: 该条目从 `desktop-http.spec.ts` 的欠账表移入零请求名单后仍全绿；反向实验证明棘轮会咬人（本次已做一次：临时把该路由塞进零请求名单 → `1 failed`、报「桌面态仍请求了：/api/v1/creator/dashboard」，还原 → `9 passed`） | M3
 - [ ] S4-T1 建议面 API：产物只进建议结构，不写 `.axs` | Acceptance: 机械断言「改→生成→不采纳→重读」后文本字节不变 | M4
 - [ ] S4-T2 采纳动作经 Transaction/Journal 落文 | Acceptance: 采纳后一次 undo 回到采纳前字节；Journal 内可见该事务；toast 只在事务 ok 时出现 | M4
 - [ ] S4-T3 三层文档记位：ADR-027 回写、宪章 Phase 记位、Blueprint 收尾 | Acceptance: 三处与本文件 checkbox 与实际代码一致，无虚假勾选、历史表未删改 | M4
@@ -90,7 +91,7 @@
 1. 桌面态（release .app，断网、无后端、无 Ollama）：选中一拍，输入一段散文 → 得到建议 → 面板显示 `source=rules` 与「离线降级」原因 → 采纳 → 文本轨出现合法 AXS → undo → 回到原文。
 2. 同机配好 Ollama 并设 `OLLAMA_ORIGINS`：同一操作 `source=ollama`；故意关掉 Ollama 后重试 → 回到 rules 且原因可见（不是空态）。
 3. 门禁：`node scripts/check-axs-draft-grammar.mjs` 与两端 runner 各自退出码为 0；塞一条旧方言行 → 红。
-4. `pnpm gates` 全绿（含新门禁）、`pnpm e2e` 13 条原样全绿、`cd backend && uv run pytest -q` 全绿。
+4. `pnpm gates` 全绿（含新门禁）、`pnpm e2e` 全绿（基线 13 条行为用例 + 桌面态 HTTP 棘轮 9 条断言 = 22）、`cd backend && uv run pytest -q` 全绿。
 
 ---
 
@@ -118,3 +119,4 @@
 - v1.4 内核入 TS（2026-09-25）：`packages/axs/src/draft.ts` 落 `proseToScriptDraft()` + `draftFromProse()`，9 条单测覆盖五类行为。**关键取舍：内核不自己拼文本**——`draftFromProse` 把 IR 交给 `printAxs` 打印，所以产物天然 canonical，而不是"再写一套发射器然后盼两边一致"（否则 M1 刚清掉的第二真相源就以另一种形式长回来了）。共享向量因此从两方升成**三方锁**：TS 内核产出的文本 == 向量 == Python 发射器产出 == `printAxs(parseAxs(向量))`。红过一次：把 TS 转场时长临时改 700，向量立刻报 `expected '# 转场\n@transition fade 700…' to be '…500…'`、退出码 1，还原后 0。
   对齐过程中撞到一个形状细节：`printAxs` 对**空音轨**会留下双空格（`("@bgm " + "" + " loop").trim()` 只 trim 首尾）。Python 侧刻意照搬而非"顺手修正"，并在代码里写明理由——形状以 `printAxs` 为准，要改得两端一起改，不是谁方便谁改。
 - v1.5 桌面离线拿到演绎辅助（2026-09-25）：`shared/api/draftDispatch.ts` 落 `draftDeps = { isLocal, remote }` + `requestDraft` / `requestAxsDraft`，两个活入口（剪辑台 AI 草稿、角色传记→AXS）都改走分派口——桌面态规则引擎在本地成文、**一个请求都不发**，浏览器态逐字不变仍走 `/editor/ai/*`。这才是「内核入 TS」的实际收益：不是纯洁性，而是离线端从此有这个功能。`applyDraft` 一并搬进同模块（怎么把草稿变成 IR 是同一个关注点），顺带让 `ScriptEditor` 只引一个模块、停在 615 行的棘轮线内。测试两支各有断言（本地支断言零远端调用与产物文本，远端支断言 snake_case 参数），本地支在 node 下真的被执行到了。过程中删掉一个我为「测试可观察性」塞进生产 API 的 `localInstructionProbe` 字段——断言返回值与远端未被调用已经足够，测试脚手架不该进契约；它残留的调用点被 `tsc -b` 抓出。**该项只完成两支**：本地模型与在线 API 仍经 Python provider，没在 TS 侧立第三支，故按未完成记，不糊成已完成。
+- v1.6 桌面化转向与 HTTP 残留棘轮（2026-09-26）：人类宣布最终形态是**只保留桌面端**。先做备份与还原手册（`docs/WEB_SUNSET_RESTORE.md`，tag `web-archive-20260926` → `777591f`；核实 `main` 无独有提交，且仓库从来没有 web 部署管线——无 Dockerfile/vercel/netlify，所以"去掉 web"是删部署目标 + 迁功能，不是下线线上服务，也不是合并两条线）。为把"还剩多少没本地化"变成可测数字，新增 E14 棘轮 `apps/web/e2e/desktop-http.spec.ts`：注入桌面探针（`isTauriEnvironment()` 的真实判据就是 `"__TAURI_INTERNALS__" in window`）让浏览器里的 app 走本地支，断言 7 个路由零 `/api/v1` 请求 + 1 个欠账路由仍在请求（**故意反向棘轮：修好即变红，红了才删条目**），并先断言标记确实生效以防假绿。测量结果：桌面态 HTTP 残留 **2 → 1**——`UserContext` 每次挂载打的 `/users/session` 收进了缺席判据，此前它的失败被 `catch { setProfile(null) }` 静默吞掉，等于每个页面首帧都在等一次注定失败的请求。棘轮红过一次：临时把欠账路由塞进零请求名单 → `1 failed` 并报出具体端点，还原 → `9 passed`。e2e 基线从 13 条行为用例增至 22 条断言。另新查出一项未登记的工作并补进清单：「概览」入口在本地态已隐藏，但**直达路由仍会挂载发请求**，属路由本体缺席没做全。

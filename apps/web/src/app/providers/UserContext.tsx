@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { userApi, type UserProfile } from "@/shared/api/user";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import { getPlayerToken } from "@/shared/lib/playerToken";
 
@@ -36,6 +37,12 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const playerToken = useMemo(() => getPlayerToken(), []);
 
   const refresh = useCallback(async () => {
+    // 桌面壳目前无法指向后端（deployment.ts 既有判据），这个请求必然失败且过去一直
+    // 被下面的 catch 静默吞掉——每个页面的首帧都在等它。本地态身份就是缺席，直接如实标注。
+    if (isLocalOnlyDeployment()) {
+      setProfile(null);
+      return;
+    }
     try {
       const p = await userApi.session({
         creator_id: getCreatorId(),

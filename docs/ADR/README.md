@@ -17,6 +17,7 @@
 | [ADR-024](./024-desktop-local-first.md) | 桌面优先战略（Tauri 壳 + Local-First） | 已采纳 |
 | [ADR-025](./025-axs-peer-dual-view.md) | AXS 与剪辑台对等双视图（修订 ADR-016） | 已采纳 |
 | [ADR-026](./026-local-assets-and-axsp-v2.md) | 素材本地化与 `.axsp` v2 容器（兑现 ADR-024 决策 3/4） | 已采纳 |
+| [ADR-027](./027-axs-single-grammar-authority.md) | AXS 语法单一权威：废除 `【】` 方言与 Python 侧第二解析器 | 已采纳 |
 
 ## 待落文档（最终建议已定于 [`../ROADMAP_FINAL.md`](../ROADMAP_FINAL.md) §7，逐个正式落 ADR）
 

@@ -1,4 +1,4 @@
-# Build Blueprint v1.0 | Status: draft（待确认后进 Forge）
+# Build Blueprint v1.1 | Status: confirmed（人类令「按计划开始执行」）→ executing v1.1
 
 > 日期 2026-09-25 · 分支 `desktop` · 基线 `af8ef81`（tag `desktop-v0.7` 之后）· 主题 **演绎内核：AXS 单一语法 + 创作端 AI 辅助**
 > 关联 [ADR-024](docs/ADR/024-desktop-local-first.md)、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)、[ROADMAP_FINAL.md](docs/ROADMAP_FINAL.md) M3
@@ -65,7 +65,7 @@
 
 ## 5. Task List
 
-- [ ] S1-T1 写「AXS 方言对照表」并立 ADR-027：逐指令列 canonical / `ai_draft` 发射 / `prompts` 教给模型的三种写法，每行指到源码行号 | Acceptance: ADR 状态「已采纳」含备选与否决理由；表内每条差异都有文件:行号可点验 | M1
+- [x] S1-T1 写「AXS 方言对照表」并立 ADR-027：逐指令列 canonical / `ai_draft` 发射 / `prompts` 教给模型的三种写法，每行指到源码行号 | Acceptance: ADR 状态「已采纳」含备选与否决理由；表内每条差异都有文件:行号可点验 | M1
 - [ ] S1-T2 把规则引擎的舞台指令输出改为 canonical 形态（`@bg` `@bgm … loop` `@transition kind ms` `@show 角色 [表情]` `@hide`），对白分隔符按 `packages/axs` 实际接受的写法统一 | Acceptance: 新增断言用**共享向量**验产物被语法层接受，不用 Python 自己那套解析自证；旧 `【】` 形态在扫描面内计数为 0 | M1
 - [ ] S1-T3 重写 `prose_to_axs_system`：只教 canonical 语法并附一段已通过 parse 的示例 | Acceptance: 提示词文本内不再出现 `【`/全角冒号示例；示例本身进 golden 用例并通过 | M1
 - [ ] S1-T4 新增门禁 `scripts/check-axs-draft-grammar.mjs`：对 AI 通路样本集断言 parse 成功率 100% 且 `parse→print→parse` 幂等 | Acceptance: 先做反向实验——塞入一行 `【音乐 x】` 必须退出码 1，还原后 0；退出码单独取 | M1
@@ -104,3 +104,4 @@
 ## 8. Change Log
 
 - v1.0 draft（2026-09-25）：人类给出「支持演绎模式」的宽指令，经两轮前沿问答锁定语义（AXS 语法层创作端 AI 辅助，非运行时即兴）、内核落点（TS 真相源 + 双端 golden）、冲突策略（只出建议、采纳才落文）、离线下限（rules 必须独立成拍）、模型接入路径（webview fetch + 文档要求 OLLAMA_ORIGINS）。取证发现本版的真正阻塞项是三套 AXS 方言并存（`parse.ts` 内 `【` 计数 0 vs `ai_draft.py:97-110` 与 `prompts.py:30` 的 `【】` 形态），以及后端 AI 能力齐备却只有 `/health` 一条路由。据此把 M1 定为方言统一而非接模型。待人类确认后转 confirmed 进 Forge。
+- v1.1 首项任务结案（2026-09-25）：对照表与 ADR-027 落盘（`docs/ADR/027-axs-single-grammar-authority.md`，已登记进 `docs/ADR/README.md`）。执行时把 §1 的判断**收紧了两处**：① 危险不是「解析失败」而是「静默降级」——canonical 的分派兜底把任何非 `@`、非 `\`、不含 ASCII 冒号的行当旁白（`parse.ts:540/553/559/568`），所以 `【背景 教堂】` 会被原样读给玩家听、全角冒号的对白会丢说话人，且**不产生任何 diagnostic**；② 规则引擎只覆盖 12 条 canonical 指令中的 5 条，`@camera`/`@show`/`@hide`/`@move` 整层不可生成——镜头语言正是「演出上限」最吃的那层，故 M1 不承诺离线也能出镜头。ADR 另立两条欠账：Python 侧 `axs_to_script()` 是第二解析器（须废除）、全角冒号应给 lint 诊断而非放宽解析（本轮不做）。发射器行号在提交前用 grep 逐个复核过（narration `:125-126`、choice `:127-130`、拍标题 `:141-153`），初稿曾按位置推算而偏一到两行。

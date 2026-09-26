@@ -25,14 +25,18 @@ const CLEAN_ROUTES = [
   "/studio/items",
   "/studio/scenes",
   "/studio/characters/mine",
+  "/studio/dashboard",
   "/profile",
   "/docs",
 ];
 
-const KNOWN_DEBT_ROUTES: Record<string, string> = {
-  "/studio/dashboard":
-    "侧栏「概览」入口在本地态已隐藏，但直达路由仍会挂载并请求 /api/v1/creator/dashboard；需要让路由本体也显式缺席",
-};
+/**
+ * 修好一项就把它从这里删掉、挪进 CLEAN_ROUTES。目前为空 = 已枚举的无 id 路由
+ * 在桌面分支下都不再打云端。
+ * 仍未覆盖的是需要 id 的路由（编辑器 /studio/projects/:id、试玩 /play/:id、角色详情），
+ * 它们在浏览器里拿不到本地 SQLite，要等壳内冒烟或可注入后端才能测——不是"已验证干净"。
+ */
+const KNOWN_DEBT_ROUTES: Record<string, string> = {};
 
 async function visitInDesktopMode(page: Page, route: string): Promise<string[]> {
   const hits: string[] = [];

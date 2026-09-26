@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
-    "check": "cargo check"
+    "check": "cargo check --quiet --manifest-path src-tauri/Cargo.toml"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

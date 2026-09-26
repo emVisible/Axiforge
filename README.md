@@ -54,6 +54,7 @@ pnpm dev
 | `pnpm typecheck` / `test:unit` / `coverage` / `lint` | 上述门禁的分项 |
 | `pnpm check:purity` | 断言 `core`/`axs`/`editor-core` 零 React/DOM/网络/平台依赖 |
 | `pnpm check:circular` | dpdm 循环依赖 = 0 |
+| `pnpm check:desktop` | Tauri 壳的 `cargo check`（Rust 侧类型与权限面）。**刻意不进 `pnpm gates`**：gates 只跑 JS，合并进去会让没有 Rust 工具链的人连门禁都跑不动；实测本地 21s（预热 target），冷缓存需拉 Tauri 依赖树 |
 | `pnpm e2e` | Playwright 行为基线（独立库 `axiforge_e2e`，自包含起服务） |
 | `pnpm test:api` | 后端集成测试 |
 | `pnpm setup` | 初始化 PostgreSQL 数据库与表 |

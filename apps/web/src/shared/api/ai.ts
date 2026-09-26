@@ -34,6 +34,15 @@ export function applyDraft(
     throw new Error(bad ? `第 ${bad.line} 行：${bad.message}` : "生成文本未解析出任何指令");
   }
 
+  // 模型不守语法时兜住最已知的那一种：AXS 的兜底会把 `【背景 …】` 当旁白静静插入，
+  // diagnostics 为空、UI 无从察觉。只拦这一种已证实的形态，不做泛化猜测。
+  const dialect = next.find(
+    (i) => i.op === "narration" && /^【(背景|音乐|旁白|转场|特效)/.test((i as { text?: string }).text ?? ""),
+  );
+  if (dialect) {
+    throw new Error("模型返回了非 AXS 的括号方言舞台指令，已拒绝写入");
+  }
+
   return mode === "replace" ? next : [...current, ...next];
 }
 

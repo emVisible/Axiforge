@@ -45,4 +45,23 @@ describe("applyDraft（AI 草稿响应 → 指令序列）", () => {
       applyDraft({ script: [], source: "rules", axs: "", needs_parse: false }, old, "replace"),
     ).toThrow(/未解析出任何指令/);
   });
+
+  it("模型不守语法、返回括号方言时拒绝写入——而不是静静插一堆当旁白的文本", () => {
+    expect(() =>
+      applyDraft(
+        { script: [], source: "ollama", axs: "# 拍\n【背景 交汇港】\n甲: 你好\n", needs_parse: true },
+        old,
+        "replace",
+      ),
+    ).toThrow(/括号方言/);
+  });
+
+  it("普通旁白里带书名号之类不误伤：只有以【+舞台关键词开头才拦", () => {
+    const next = applyDraft(
+      { script: [], source: "ollama", axs: "# 拍\n【示范】序章那天的雨很大。\n", needs_parse: true },
+      old,
+      "replace",
+    );
+    expect(next.map((i) => i.op)).toEqual(["narration"]);
+  });
 });

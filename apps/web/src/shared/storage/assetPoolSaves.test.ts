@@ -7,11 +7,15 @@ import {
   readItems,
   readScenes,
   removeItem,
+  searchImportScenes,
   updateItem,
 } from "./assetPoolSaves";
 
 const listRemote = vi.fn().mockResolvedValue([]);
 const deleteRemote = vi.fn().mockResolvedValue(undefined);
+const remoteScenes = vi.hoisted(() => vi.fn());
+
+vi.mock("@/shared/api/search", () => ({ searchApi: { scenes: remoteScenes } }));
 
 vi.mock("@/shared/api/editor", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/shared/api/editor")>();
@@ -29,8 +33,10 @@ beforeEach(() => {
   provider = new MemoryStorageProvider();
   assetPoolDeps.isLocal = () => true;
   assetPoolDeps.provider = async () => provider;
+  assetPoolDeps.author = () => OWNER;
   listRemote.mockClear();
   deleteRemote.mockClear();
+  remoteScenes.mockClear();
 });
 
 describe("道具本地支", () => {
@@ -85,6 +91,33 @@ describe("场景本地支", () => {
     expect(rows[0]?.world_setting).toBe("方舟");
     expect(rows[0]?.tags).toEqual(["密室"]);
     expect(rows[0]?.node_templates).toEqual([{ title: "暗格" }]);
+  });
+});
+
+describe("舞台库导入候选检索", () => {
+  it("桌面支在本地池里按名匹配且零请求；空白查询一律返回空", async () => {
+    await createScene({ name: "地窖" }, OWNER);
+    await createScene({ name: "天台" }, OWNER);
+    expect(await searchImportScenes("")).toEqual([]);
+    expect(await searchImportScenes("   ")).toEqual([]);
+    expect(remoteScenes).not.toHaveBeenCalled();
+
+    const hits = await searchImportScenes("地窖");
+    expect(hits.map((h) => h.name)).toEqual(["地窖"]);
+    expect(hits[0]!.id).toBeTruthy();
+    expect(remoteScenes).not.toHaveBeenCalled();
+  });
+
+  it("上限 8 条与后端口径一致——两端截断长度不该不同", async () => {
+    for (let i = 0; i < 11; i += 1) await createScene({ name: `库${String(i)}` }, OWNER);
+    const hits = await searchImportScenes("库");
+    expect(hits.length).toBe(8);
+  });
+
+  it("非桌面环境仍打 /search/scenes", async () => {
+    assetPoolDeps.isLocal = () => false;
+    await searchImportScenes("钥");
+    expect(remoteScenes).toHaveBeenCalledWith("钥");
   });
 });
 

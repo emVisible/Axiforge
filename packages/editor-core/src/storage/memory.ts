@@ -25,6 +25,7 @@ import type {
   ProjectBundle,
   ProjectMeta,
   ProjectMetaPatch,
+  ProjectSceneInput,
   SaveSlotInput,
   StorageProvider,
   StorageResult,
@@ -156,12 +157,12 @@ export class MemoryStorageProvider implements StorageProvider {
 
   async addProjectScene(
     id: string,
-    scene: { title: string },
+    scene: ProjectSceneInput,
   ): Promise<StorageResult<{ id: string }>> {
     const row = this.projects.get(id);
     if (!row) return err({ code: "not_found", entity: "project", id });
     const sceneId = this.nextId("scene");
-    row.scenes = [...row.scenes, { id: sceneId, title: scene.title }];
+    row.scenes = [...row.scenes, { ...scene, id: sceneId }];
     return ok({ id: sceneId });
   }
 

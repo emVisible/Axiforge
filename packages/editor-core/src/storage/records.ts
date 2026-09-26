@@ -7,10 +7,32 @@
  */
 
 /**
+ * 工程内的舞台（`project_scenes` 行）。
+ *
+ * 除 id/title 外的字段全部可选，是因为**远端与本地的列集合不同**：
+ * 后端还有 parent_scene_id / created_at 等，本地只补齐了导入通路要用的那几个。
+ * 可选不等于可以随手丢——读路径能给出就必须给出（见 `storage/index.ts` 的适配器），
+ * 否则「从舞台库导入」在桌面上会变成写进去读不回来的静默降级。
+ */
+export interface StoredScene {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly location?: string | null;
+  readonly atmosphere?: string | null;
+  /** 指向全局资产池 asset_scenes.id；inline 舞台为 null */
+  readonly sceneRefId?: string | null;
+  readonly source?: "inline" | "reference" | "locked";
+  readonly sortOrder?: number;
+}
+
+/** addProjectScene 的入参：id 由实现分配，故不在这里出现 */
+export type ProjectSceneInput = Omit<StoredScene, "id"> & { readonly title: string };
+
+/**
  * 全局资产池三兄弟（角色 / 道具 / 场景）的共同形状：
  * filterByVisibility 只依赖这四个字段，故一处约束而非三处复制。
  */
-
 export interface StoredAssetItem {
   readonly id: string;
   readonly name: string;

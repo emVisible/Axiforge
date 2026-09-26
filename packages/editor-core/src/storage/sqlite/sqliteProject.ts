@@ -12,9 +12,11 @@ import type {
   ProjectBundle,
   ProjectMeta,
   ProjectMetaPatch,
+  ProjectSceneInput,
   StorageResult,
   StoredEdge,
   StoredNode,
+  StoredScene,
 } from "../types";
 import { emptyProjectMetadata, err, ok } from "../types";
 import type { SqlBackend, SqlStmt } from "./backend";
@@ -171,10 +173,25 @@ export class SqliteProjectStore {
         id: e.id, source: e.source_node_id, target: e.target_node_id, label: e.label,
       }));
 
-      const sceneRows = await this.backend.select<{ id: string; title: string }>(
-        `SELECT id, title FROM project_scenes WHERE project_id = ? ORDER BY sort_order, id`,
+      const sceneRows = await this.backend.select<{
+        id: string; title: string; description: string | null; location: string | null;
+        atmosphere: string | null; scene_ref_id: string | null; source: string | null;
+        sort_order: number;
+      }>(
+        `SELECT id, title, description, location, atmosphere, scene_ref_id, source, sort_order
+         FROM project_scenes WHERE project_id = ? ORDER BY sort_order, id`,
         [id],
       );
+      const scenes = sceneRows.map((s) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description ?? "",
+        location: s.location,
+        atmosphere: s.atmosphere,
+        sceneRefId: s.scene_ref_id,
+        source: (s.source ?? "inline") as StoredScene["source"],
+        sortOrder: Number(s.sort_order) || 0,
+      }));
       const roleRows = await this.backend.select<{ id: string; character_ref_id: string }>(
         `SELECT id, character_ref_id FROM project_roles WHERE project_id = ?`,
         [id],
@@ -185,7 +202,7 @@ export class SqliteProjectStore {
         axsSource: row.axs_source,
         nodes,
         edges,
-        scenes: sceneRows,
+        scenes,
         roles: roleRows.map((r) => ({ id: r.id, characterRefId: r.character_ref_id })),
       });
     } catch (cause) {
@@ -273,7 +290,7 @@ export class SqliteProjectStore {
 
   async addProjectScene(
     id: string,
-    scene: { title: string },
+    scene: ProjectSceneInput,
   ): Promise<StorageResult<{ id: string }>> {
     try {
       const exists = await this.backend.select<{ id: string }>(
@@ -282,9 +299,15 @@ export class SqliteProjectStore {
       if (!exists.length) return err({ code: "not_found", entity: "project", id });
       const sceneId = uuid();
       await this.backend.execute(
-        `INSERT INTO project_scenes (id, project_id, title, sort_order) VALUES (?, ?, ?,
-          (SELECT COUNT(*) FROM project_scenes WHERE project_id = ?))`,
-        [sceneId, id, scene.title, id],
+        `INSERT INTO project_scenes
+         (id, project_id, title, sort_order, description, location, atmosphere, scene_ref_id, source)
+         VALUES (?, ?, ?,
+           (SELECT COUNT(*) FROM project_scenes WHERE project_id = ?), ?, ?, ?, ?, ?)`,
+        [
+          sceneId, id, scene.title, id,
+          scene.description ?? "", scene.location ?? null, scene.atmosphere ?? null,
+          scene.sceneRefId ?? null, scene.source ?? "inline",
+        ],
       );
       return ok({ id: sceneId });
     } catch (cause) {

@@ -23,7 +23,7 @@
 | 云端模块 | 消费者 | 桌面现状 | 类 |
 |---|---|---|---|
 | `stories`（角色传记） | 5 个页面/组件 | **S13-1 已本地化 2026-09-26**：进 L4 契约 + SQLite schema v4 `character_stories`，`useStories` 改走 `storySaves` 分派口 | **A** |
-| `search` | OutlinerPanel、GlobalSearch | 编排台「从舞台库导入 / 搜索道具」仍 `searchApi.*`。**不是漏接**：导入要落的 `location/atmosphere/scene_ref_id` 本地 `project_scenes` 没有列，检索先本地化会得到"搜得到、点不动"的半条腿。见宪章 S13-2b/2c | **C**（阻塞于本地表列，非分派口） |
+| `search` | OutlinerPanel、GlobalSearch | **舞台侧已本地化（S13-2b 2026-09-26）**：`searchImportScenes` 桌面走本地池、导入通路两端字段口径已对齐。道具侧仍 `searchApi.items`——阻塞在本地没有 `project_asset_refs` 表（S13-2c）。`GlobalSearch` 是云语义（搜别人的作品），按 B 处理 | **C→部分已修** |
 | `llm` | LlmStatusBadge | 桌面每次开编辑器发一次必败 `/llm/health`，且把"没问到"渲染成"已降级" | **C→已修** |
 | `editor`（道具/场景/工程） | 19 处 | 主链路已分派；本轮修好 `ItemDetailPage`、`useProjectDirectory`、`useProjectOutliner` 三处绕开 `readItem()` 的直连 | **C→已修** |
 | `creator`（创作数据面板） | 6 处 | `/studio/dashboard` 直达路由仍起查询；判据已下沉到 hook 的 `enabled` | **C→已修** |

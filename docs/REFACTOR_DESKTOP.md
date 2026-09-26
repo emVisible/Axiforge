@@ -455,7 +455,15 @@
   2. `addRole`/`removeRole` **在 L4 契约里早就有两端实现了**（SQLite 与 HTTP 各一份），缺的只是调用方没接上。所以"本地化=写新代码"这个默认预期在这一项上是错的，答案是改一处调用。
   3. 新契约 `addProjectScene`/`removeProjectScene`。删舞台的语义必须显式兑现：PG 侧靠 `stage_id ON DELETE SET NULL`（`narrative/models.py:154`），而本地 `project_nodes.stage_id` **没有 FK 约束**，所以要在删行之前自己 UPDATE——契约套件里那条"删的是舞台不是戏"的断言就是钉这一点的，且已见过它红（把 UPDATE 改成恒等自赋值，SQLite 支立刻红）。
   4. 浏览器支的一次**有意松动**：改走 provider 后 `addScene` 不再显式送 `source:"inline"`、`addRole` 不再送 `importance:0`，两者都等于 Pydantic 默认值（`schemas.py:98`、`schemas.py:188`）。语义等价，但请求体不再逐字相同——这是 web 冻结线的一处例外，记在此处而不是留给下一个人猜。
-- [ ] S13-2b 编排台「从舞台库导入」本地化：契约 `addProjectScene` 现在只带 `title`，因为本地 `project_scenes` 只有 `(id,project_id,title,sort_order)` 四列，而 `StoredScene`/`ProjectBundle.scenes` 也就是 `{id,title}`，`shared/storage/index.ts:41` 把本地行适配成 `ProjectSceneResponse` 时 `source/scene_ref_id/description` 全是硬编码。**导入要落地必须先给 project_scenes 补列并打通读路径**——`OutlinerPanel.tsx:158` 的舞台副标题与 `exportProjectMarkdown.ts:14-15` 的「地点/氛围」都读这三个字段，写进去读不回来比暂时不能导入更糟。舞台库检索（`/search/scenes`）与它同属这一刀，不要单独提前做。
+- [x] S13-2b 编排台「从舞台库导入」本地化（含舞台库检索分派）
+  —— 已交付 2026-09-26。顺序是**补列 → 通读路径 → 改写入 → 最后才换 fetcher**，反过来就得到"搜得到、点下去必败"：
+  1. `project_scenes` 经 `COLUMN_PATCHES` 补 `description/location/atmosphere/scene_ref_id/source` 五列（该机制本来就是给已发布过的老库补列用的，`pragma_table_info` 判存再 ALTER）；
+  2. `StoredScene` 随之扩字段（搬进 `records.ts`，与 v0.8 那批记录形态同处），`loadProject` 与 `HttpStorageProvider.toBundle` **两条读路径同时接通**——只补写不补读就是静默降级；
+  3. `apps/web/src/shared/storage/index.ts` 那个把本地行适配成 `ProjectSceneResponse` 的映射，原先 `source/scene_ref_id/description/location/atmosphere` 全是硬编码，现改为如实取字段。`OutlinerPanel.tsx:158` 的舞台副标题与 `exportProjectMarkdown.ts:14-15` 的「地点/氛围」因此才有数据可读；
+  4. 契约 `addProjectScene` 入参升为 `ProjectSceneInput`，浏览器支的请求体口径收在 `httpProjectScenes.ts` 里（`description ?? ""`、`source ?? "inline"` 与后端 Pydantic 默认值一致），导入通路回到与改造前逐字相同的字段集合；
+  5. 契约用例「导入带来的地点/氛围/引用 id 读得回来」见过它红：把 SQLite 写入的 `location` 改成恒 null，用例立刻失败。
+  顺带一次 G1 清偿：`contract.ts` 加用例后冲到 408 行，按 `contractPools.ts` 的既有形状拆出 `contractAuthoring.ts`（一份测试源、多实现验收），并把 `OutlinerPanel` 的棘轮从 623 收到 620 锁住。
+  **仍欠一处**：`bundleToCompilerInput` 的场景投影还是 `{id,title}`，而 `SceneRef` 已经支持 `location/atmosphere/backgroundImage`——导入舞台要影响到试玩链路，得改那一处，归入 S13-2c 一起判。
 - [ ] S13-2c 编排台道具引用本地化：本地**没有 `project_asset_refs` 表**，且 bundle 读回恒为 `asset_refs: []`（`shared/storage/index.ts:92,212`）。只补写不补读会让加进去的道具在下次刷新时凭空消失，所以建表、读路径与 `addItemRef/removeItemRef` 改线必须同批落地。道具检索（`/search/items`）同属这一刀。
 - [ ] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口

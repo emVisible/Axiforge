@@ -218,6 +218,36 @@ const COLUMN_PATCHES: readonly {
     column: "rules",
     ddl: "ALTER TABLE projects ADD COLUMN rules TEXT",
   },
+  /**
+   * project_scenes 补列（S13-2b）：「从舞台库导入」要把 location/atmosphere/scene_ref_id
+   * 一起存下来——OutlinerPanel 的舞台副标题和 Markdown 导出的「地点/氛围」都读它们。
+   * 只补写不补读会静默降级成"导入成功的空舞台"，所以读路径同批改。
+   */
+  {
+    table: "project_scenes",
+    column: "description",
+    ddl: "ALTER TABLE project_scenes ADD COLUMN description TEXT NOT NULL DEFAULT ''",
+  },
+  {
+    table: "project_scenes",
+    column: "location",
+    ddl: "ALTER TABLE project_scenes ADD COLUMN location TEXT",
+  },
+  {
+    table: "project_scenes",
+    column: "atmosphere",
+    ddl: "ALTER TABLE project_scenes ADD COLUMN atmosphere TEXT",
+  },
+  {
+    table: "project_scenes",
+    column: "scene_ref_id",
+    ddl: "ALTER TABLE project_scenes ADD COLUMN scene_ref_id TEXT",
+  },
+  {
+    table: "project_scenes",
+    column: "source",
+    ddl: "ALTER TABLE project_scenes ADD COLUMN source TEXT NOT NULL DEFAULT 'inline'",
+  },
 ];
 
 /** 依序执行迁移（幂等：IF NOT EXISTS + 缺列才 ALTER） */

@@ -4,6 +4,7 @@ import { SqlJsBackend } from "./sqljs.backend";
 import { SqliteStorageProvider } from "./sqliteProvider";
 import { runStorageContractSuite } from "../contract";
 import { runStoragePoolContractSuite } from "../contractPools";
+import { runStorageAuthoringContractSuite } from "../contractAuthoring";
 
 describe("SqliteStorageProvider 初始化", () => {
   it("迁移幂等：重复 apply 不抛错", async () => {
@@ -101,6 +102,7 @@ const makeSqlite = async () => {
 
 runStorageContractSuite("SQLite(sql.js)", makeSqlite);
 runStoragePoolContractSuite("SQLite(sql.js)", makeSqlite);
+runStorageAuthoringContractSuite("SQLite(sql.js)", makeSqlite);
 
 import type { SqlBackend } from "./backend";
 

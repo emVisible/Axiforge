@@ -39,6 +39,11 @@ import {
   httpListStories,
   httpSaveStory,
 } from "./httpStories";
+import {
+  httpAddProjectScene,
+  httpRemoveProjectScene,
+  toStoredProjectScene,
+} from "./httpProjectScenes";
 import type {
   AssetInput,
   CreateProjectInput,
@@ -46,6 +51,7 @@ import type {
   ProjectBundle,
   ProjectMeta,
   ProjectMetaPatch,
+  ProjectSceneInput,
   SaveSlotInput,
   StorageProvider,
   StorageResult,
@@ -99,7 +105,7 @@ function toBundle(p: ProjectResponse): ProjectBundle {
       target: String(e.target_node_id),
       label: e.label,
     })),
-    scenes: (p.scenes || []).map((s) => ({ id: s.id, title: s.title })),
+    scenes: (p.scenes || []).map(toStoredProjectScene),
     roles: (p.roles || []).map((r) => ({
       id: r.id,
       characterRefId: r.character_ref_id,
@@ -187,25 +193,12 @@ export class HttpStorageProvider implements StorageProvider {
     }
   }
 
-  async addProjectScene(
-    id: string,
-    scene: { title: string },
-  ): Promise<StorageResult<{ id: string }>> {
-    try {
-      const created = await projectApi.addScene(id, { title: scene.title });
-      return ok({ id: String(created.id) });
-    } catch (e) {
-      return fail(e, "project", id);
-    }
+  addProjectScene(id: string, scene: ProjectSceneInput) {
+    return httpAddProjectScene(id, scene);
   }
 
-  async removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
-    try {
-      await projectApi.deleteScene(id, sceneId);
-      return ok(undefined);
-    } catch (e) {
-      return fail(e, "scene", sceneId);
-    }
+  removeProjectScene(id: string, sceneId: string) {
+    return httpRemoveProjectScene(id, sceneId);
   }
 
   async addRole(

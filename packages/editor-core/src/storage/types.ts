@@ -74,11 +74,6 @@ export interface StoredEdge {
   readonly label: string | null;
 }
 
-export interface StoredScene {
-  readonly id: string;
-  readonly title: string;
-}
-
 export interface StoredRole {
   readonly id: string;
   readonly characterRefId: string;
@@ -196,10 +191,12 @@ export interface AssetStore {
 
 import type {
   LocalSaveSlot,
+  ProjectSceneInput,
   SaveSlotInput,
   StoredAchievement,
   StoredAssetItem,
   StoredAssetScene,
+  StoredScene,
   StoredStory,
   UnlockedAchievement,
 } from "./records";
@@ -240,13 +237,13 @@ export interface StorageProvider {
 
   /**
    * 工程内舞台的新增（剪辑台「+ 新舞台」「从舞台库导入」）。
-   * 本地舞台模型本来就只有 `{id,title}`（见 StoredScene 与 ProjectBundle.scenes），
-   * 故 HTTP 侧可带的 description/location/atmosphere 在桌面不入库——不是省了，
-   * 是本地读路径无论如何都给不出这些字段，两端形状以本地能兑现的那份为准。
+   * id 由实现分配并回传——调用方拿它去挂节点，不让客户端猜。
+   * 除 title 外的字段都为可选：本地列集合与远端一致地补齐了导入要用的那几个，
+   * 但 parent_scene_id / created_at 这类仍只在远端存在。
    */
   addProjectScene(
     id: string,
-    scene: { title: string },
+    scene: ProjectSceneInput,
   ): Promise<StorageResult<{ id: string }>>;
 
   /** 删舞台不删节点：节点只是不再归属任何舞台（对齐 PG `stage_id ON DELETE SET NULL`） */

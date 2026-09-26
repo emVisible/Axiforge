@@ -17,12 +17,9 @@ import { cn } from "@/shared/components/ui";
 import CharacterSearchSelect from "@/features/character/components/CharacterSearchSelect";
 import { EntitySearchSelect } from "@/shared/components/ui";
 import { searchApi } from "@/shared/api/search";
+import { searchImportScenes } from "@/shared/storage/assetPoolSaves";
 import { getImageUrl } from "@/shared/lib/imageUrl";
-import type {
-  ProjectResponse,
-  ProjectRoleResponse,
-  ProjectSceneResponse,
-} from "@/shared/types/project";
+import type { ProjectResponse, ProjectRoleResponse, ProjectSceneResponse } from "@/shared/types/project";
 import type { ProjectMetaPatch } from "@axiforge/editor-core";
 import type { ProjectRoleOption } from "../../flow/types";
 import { nexusApi } from "@/shared/api/nexus";
@@ -308,7 +305,7 @@ export default function OutlinerPanel({
           </div>
           <div className="mt-1.5 [&_input]:text-3xs">
             <EntitySearchSelect
-              fetcher={searchApi.scenes}
+              fetcher={searchImportScenes}
               onSelect={(item) => void onImportScene(item.id)}
               placeholder="从舞台库导入…"
             />

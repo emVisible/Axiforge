@@ -17,6 +17,9 @@ import type {
   AssetSceneUpdate,
 } from "@/shared/types/asset";
 import { itemApi, sceneAssetApi } from "@/shared/api/editor";
+import { searchApi } from "@/shared/api/search";
+import type { SelectableItem } from "@/shared/api/search";
+import { getCreatorId } from "@/shared/lib/creatorId";
 import { getStorageProvider } from "@/shared/storage";
 import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
 import { storedItemToResponse, storedSceneToResponse } from "@/shared/storage/assetRecords";
@@ -30,9 +33,17 @@ import type {
 export const assetPoolDeps: {
   isLocal: () => boolean;
   provider: () => Promise<StorageProvider>;
+  /**
+   * 检索支需要"我是谁"才能在本地池里圈出可见的那部分。
+   * 放进注入点而不是就地调 getCreatorId()：node 测试里没有 localStorage，
+   * 那个函数会退化成每次一个新的 ephemeral id，本地支的可见性筛就永远筛不出东西——
+   * 于是这条支在测试里要么假绿、要么假红，两种都比没测更糟。
+   */
+  author: () => string;
 } = {
   isLocal: isTauriEnvironment,
   provider: getStorageProvider,
+  author: getCreatorId,
 };
 
 export interface PoolFilters {
@@ -250,4 +261,23 @@ export async function removeScene(id: string): Promise<void> {
   }
   const p = await assetPoolDeps.provider();
   unwrap(await p.deleteScene(id), "场景删除");
+}
+
+// ---------- 编排台「从舞台库导入」的候选检索 ----------
+
+/**
+ * 后端口径（`platform/search_router.py:140`）：空白查询返回空、按 name 子串匹配、上限 8 条。
+ * 桌面没有"别人的公开池"，候选换成**本地池里我可见的那一份**（自有 + 已公开）；
+ * 空白与上限两条口径逐字保留——候选集不同是有意的，返回形状与截断长度不该再不同。
+ *
+ * 这一格只有在导入本身也本地化之后才成立：只把 fetcher 换掉会得到"搜得到、点下去必败"，
+ * 宪章 S13-2b 记的就是这个顺序问题。
+ */
+const IMPORT_LIMIT = 8;
+
+export async function searchImportScenes(q: string): Promise<SelectableItem[]> {
+  if (!q.trim()) return [];
+  if (!assetPoolDeps.isLocal()) return searchApi.scenes(q);
+  const rows = await readScenes({ authorId: assetPoolDeps.author(), search: q });
+  return rows.slice(0, IMPORT_LIMIT).map((r) => ({ id: r.id, name: r.name }));
 }

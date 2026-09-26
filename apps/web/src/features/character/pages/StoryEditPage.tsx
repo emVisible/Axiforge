@@ -6,7 +6,7 @@ import { ErrorDisplay, Button, BackLink, LoadingSpinner } from "@/shared/compone
 import Shell from "@/shared/components/Shell";
 import ReactMarkdown from "react-markdown";
 import { routes } from "@/shared/lib/routes";
-import { aiApi } from "@/shared/api/ai";
+import { requestAxsDraft } from "@/shared/api/draftDispatch";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import { biographyToProse } from "@/features/writer/lib/storyToAxs";
@@ -122,12 +122,12 @@ export default function StoryEditPage() {
     setAxsBusy(true);
     setAxsError(null);
     try {
-      const res = await aiApi.proseToAxs({
+      const res = await requestAxsDraft({
         prose: biographyToProse(content),
         title: title || story?.title || "未命名",
-        role_names: character?.name ? [character.name] : [],
-        default_speaker: character?.name || "旁白",
-        author_id: getCreatorId(),
+        roleNames: character?.name ? [character.name] : [],
+        defaultSpeaker: character?.name || "旁白",
+        authorId: getCreatorId(),
       });
       setAxsSource(res.source);
       setAxsDraft(res.axs);

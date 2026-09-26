@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Instruction, InstructionOp, ChoiceOption } from "@axiforge/core";
 import { Input, Select, Textarea, cn, labelSm, Button } from "@/shared/components/ui";
-import { aiApi, applyDraft } from "@/shared/api/ai";
+import { applyDraft, requestDraft } from "@/shared/api/draftDispatch";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
 import { getCreatorId } from "@/shared/lib/creatorId";
 
@@ -107,10 +107,10 @@ export default function ScriptEditor({
     setAiBusy(true);
     setAiError(null);
     try {
-      const res = await aiApi.proseToScript({
+      const res = await requestDraft({
         prose,
-        role_names: roles.map((r) => r.name),
-        author_id: getCreatorId(),
+        roleNames: roles.map((r) => r.name),
+        authorId: getCreatorId(),
       });
       setAiSource(res.source);
       onChange(applyDraft(res, script, mode));

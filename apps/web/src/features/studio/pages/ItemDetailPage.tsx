@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import Shell from "@/shared/components/Shell";
 import Toast from "@/shared/components/Toast";
 import { itemApi } from "@/shared/api/editor";
+import { readItem } from "@/shared/storage/assetPoolSaves";
 import {
   BackLink,
   Badge,
@@ -43,7 +44,7 @@ export default function ItemDetailPage() {
   } | null>(null);
 
   const fetchItem = async () => {
-    const data = await itemApi.get(id!);
+    const data = await readItem(id!);
     setItem(data);
   };
   useEffect(() => {

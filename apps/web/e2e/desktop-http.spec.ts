@@ -33,10 +33,41 @@ const CLEAN_ROUTES = [
 /**
  * 修好一项就把它从这里删掉、挪进 CLEAN_ROUTES。目前为空 = 已枚举的无 id 路由
  * 在桌面分支下都不再打云端。
- * 仍未覆盖的是需要 id 的路由（编辑器 /studio/projects/:id、试玩 /play/:id、角色详情），
- * 它们在浏览器里拿不到本地 SQLite，要等壳内冒烟或可注入后端才能测——不是"已验证干净"。
  */
 const KNOWN_DEBT_ROUTES: Record<string, string> = {};
+
+/**
+ * 需要 id 的路由：桌面分支读本地 SQLite，而浏览器里 `@tauri-apps/plugin-sql` 的
+ * `invoke` 不存在。这里刻意注入一个**必然失败**的 invoke，测的不是"页面能渲染出数据"
+ * （那是壳内冒烟的职责），而是这条硬不变量：
+ *   本地存储不可用时，桌面分支也不得回落到 HTTP。
+ * 回落一旦存在，删掉 web 之后这些页面就会从"可读的失败"变成"连不上后端的挂死"。
+ */
+const LOCAL_UNAVAILABLE_ROUTES = [
+  "/studio/projects/no-such-project",
+  "/play/no-such-project",
+  "/studio/items/no-such-item",
+  "/studio/characters/no-such-character",
+];
+
+async function visitWithLocalStoreFailing(page: Page, route: string): Promise<string[]> {
+  const hits: string[] = [];
+  page.on("request", (req) => {
+    const path = new URL(req.url()).pathname;
+    if (path.startsWith("/api/v1/")) hits.push(path);
+  });
+
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+      invoke: () => Promise.reject(new Error("本地存储在此环境不可用（e2e 注入）")),
+    };
+  });
+  await page.goto(route, { waitUntil: "load" });
+  await page.waitForTimeout(2500);
+
+  await expect(page.evaluate(() => "__TAURI_INTERNALS__" in window)).resolves.toBe(true);
+  return [...new Set(hits)].sort();
+}
 
 async function visitInDesktopMode(page: Page, route: string): Promise<string[]> {
   const hits: string[] = [];
@@ -79,4 +110,13 @@ test.describe("E14 桌面态不发云端请求", () => {
       expect(errors, `${route} 抛错：${errors.join(" | ")}`).toEqual([]);
     }
   });
+});
+
+test.describe("E15 本地存储不可用时也不回落 HTTP", () => {
+  for (const route of LOCAL_UNAVAILABLE_ROUTES) {
+    test(`${route} 在本地库必然失败的前提下仍零 /api/v1 请求`, async ({ page }) => {
+      const hits = await visitWithLocalStoreFailing(page, route);
+      expect(hits, `桌面分支回落到云端了：${hits.join(", ")}`).toEqual([]);
+    });
+  }
 });

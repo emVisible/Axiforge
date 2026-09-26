@@ -1,6 +1,6 @@
 import { characterApi } from "@/shared/api/characters";
 import type { Character } from "@/shared/types/character";
-import { itemApi } from "@/shared/api/editor";
+import { readItem } from "@/shared/storage/assetPoolSaves";
 import type { ProjectResponse } from "@/shared/types/project";
 import { getStorageProvider, storedCharacterToResponse } from "@/shared/storage";
 import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
@@ -50,7 +50,7 @@ export async function fetchProjectDirectory(p: ProjectResponse): Promise<{
   const items = await Promise.all(
     itemRefs.map(async (ref) => {
       try {
-        const item = await itemApi.get(ref.asset_id);
+        const item = await readItem(ref.asset_id);
         return { id: ref.asset_id, name: item.name };
       } catch {
         return { id: ref.asset_id, name: `道具 ${ref.asset_id.slice(0, 8)}` };

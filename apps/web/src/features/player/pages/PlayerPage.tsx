@@ -370,7 +370,7 @@ export default function PlayerPage() {
     if (!projectId) return;
     try {
       setStatus("loading");
-      projectApi.recordView(projectId, playerToken).catch(() => {});
+      if (!isTauriEnvironment()) projectApi.recordView(projectId, playerToken).catch(() => {});
       // 桌面（Tauri）：Provider 数据本地编译，断网可玩；浏览器：后端编译
       const story = isTauriEnvironment()
         ? await loadStoryOffline(projectId)

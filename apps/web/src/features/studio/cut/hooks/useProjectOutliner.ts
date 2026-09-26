@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { projectApi, sceneAssetApi, itemApi } from "@/shared/api/editor";
+import { projectApi, sceneAssetApi } from "@/shared/api/editor";
+import { readItem } from "@/shared/storage/assetPoolSaves";
 import { PROJECT_KEYS } from "@/shared/hooks/useProjects";
 
 export function useProjectOutliner(projectId: string) {
@@ -82,7 +83,7 @@ export function useProjectOutliner(projectId: string) {
 
   const resolveItemName = useCallback(async (itemId: string) => {
     try {
-      const item = await itemApi.get(itemId);
+      const item = await readItem(itemId);
       return item.name;
     } catch {
       return `道具 ${itemId.slice(0, 6)}`;

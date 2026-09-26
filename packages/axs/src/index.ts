@@ -16,3 +16,6 @@ export {
 } from "./parse";
 
 export { printAxs, printCondition } from "./print";
+
+export { proseToScriptDraft, draftFromProse } from "./draft";
+export type { DraftInput } from "./draft";

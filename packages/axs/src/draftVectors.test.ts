@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { parseAxs, printAxs } from "./index";
+import { draftFromProse, parseAxs, printAxs } from "./index";
 
 /**
  * 共享 golden 向量的 TS 侧 runner（ADR-027）。
@@ -54,6 +54,17 @@ describe("AXS 演绎向量：Python 产物必须是可解析的 canonical", () =
 
       // 固定点：canonical 发射器再印一遍必须逐字节相同，否则向量与实现会各自漂移
       expect(printAxs(doc)).toBe(v.axs);
+
+      // 三方锁：TS 内核（桌面离线用）与 Python 规则引擎（web 用）必须产同一份文本，
+      // 而这份文本就是向量本身——任何一端偏走，这里就红。
+      expect(
+        draftFromProse({
+          prose: v.prose,
+          title: v.title,
+          roleNames: v.role_names,
+          defaultSpeaker: v.default_speaker,
+        }),
+      ).toBe(v.axs);
     });
   }
 });

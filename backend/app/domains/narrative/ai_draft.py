@@ -116,10 +116,10 @@ def script_to_axs(
                 line += f" {item['transition']}"
             body.append(line)
         elif op == "bgm":
-            line = f"@bgm {item.get('track') or ''}".rstrip()
-            if item.get("loop"):
-                line = f"{line} loop".strip()
-            body.append(line)
+            # 与 printAxs 逐字节一致：它是 `("@bgm " + track + " loop").trim()`，只 trim 首尾，
+            # 所以空音轨会留下双空格。刻意照搬——形状以 printAxs 为准，不在此处顺手"修正"。
+            track = item.get("track") or ""
+            body.append(f"@bgm {track}{' loop' if item.get('loop') else ''}".strip())
         elif op == "transition":
             line = f"@transition {item.get('kind', 'fade')}"
             if item.get("ms") is not None:

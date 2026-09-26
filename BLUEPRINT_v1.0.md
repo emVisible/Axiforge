@@ -1,4 +1,4 @@
-# Build Blueprint v1.3 | Status: confirmed → executing（M1 已落地，M2 起）
+# Build Blueprint v1.4 | Status: confirmed → executing（M1 已落地 · M2 内核入 TS 已落地）
 
 > 日期 2026-09-25 · 分支 `desktop` · 基线 `af8ef81`（tag `desktop-v0.7` 之后）· 主题 **演绎内核：AXS 单一语法 + 创作端 AI 辅助**
 > 关联 [ADR-024](docs/ADR/024-desktop-local-first.md)、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)、[ROADMAP_FINAL.md](docs/ROADMAP_FINAL.md) M3
@@ -72,7 +72,7 @@
 - [x] S1-T3 重写 `prose_to_axs_system`：只教 canonical 语法并附一段已通过 parse 的示例 | Acceptance: 提示词**不再教** `【】` 与全角冒号（实测 `【` 只剩 1 行，且是我加的禁止句「禁止使用【背景】【音乐】…那不是 AXS」，不是格式示例）；canonical 语法逐条来自 `print.ts` 实际形态；`@bgm` 只吃单 token 这一限制已在向量注释里记明 | M1
 - [x] S1-T4 语法门禁（**L1 改判**：判据落在 `packages/axs/src/draftVectors.test.ts` 的 vitest runner 里，不另立 `check-axs-draft-grammar.mjs`——同一裁决写两处就是第二个真相源，且 vitest 已在 `pnpm gates` 链内） | Acceptance: 反向实验做过——把向量产物临时改回 `【背景】` 方言，断言报 `expected ['narration','narration',…] to equal ['bg','bgm','say','narration']` 且退出码 1（**diagnostics 始终为空，证明只有 op 序列才抓得住静默降级**），还原后绿；两端退出码各自单独取 | M1
 - [x] S1-T5 废除 Python 侧的模型文本回读：`prose_to_script_with_source` 不再用第二解析器把 AXS 文本读回 IR，端点返回 canonical 文本，由前端 `parseAxs` 解析（复用产品自己的解析器） | Acceptance: `axs_to_script` 在扫描面 `backend/app/**` 内零引用后已删除；`ScriptEditor` 的 AI 草稿在 rules 与模型两种 source 下都产出合法指令序列（`applyDraft` 补了 5 条单测，解析不出指令时抛错带原因而非静默插入）；`ProseToScriptResponse` 契约变更同步更新了 schema、`ai.ts` 类型与 `docs` 引用 | M1
-- [ ] S2-T1 在 `packages/axs` 实现 `draftFromProse()`（散文 → 指令序列 → canonical AXS 文本），作为规则路径唯一真相源 | Acceptance: 单测覆盖切句、说话人归属、旁白、选项、舞台指令推断五类；零网络零 DOM 依赖 | M2
+- [x] S2-T1 在 `packages/axs` 实现 `draftFromProse()`（散文 → 指令序列 → canonical AXS 文本），作为规则路径唯一真相源 | Acceptance: 单测覆盖切句、说话人归属、旁白、选项、舞台指令推断五类（`draft.test.ts` 9 条）；零网络零 DOM；**产物交回 `printAxs` 打印，内核不另立第二套发射器**；共享向量升级为三方锁（TS 内核 = Python 发射 = 向量本身 = printAxs 固定点），反向实验实测把 TS 转场时长改成 700 即报红、还原即绿、退出码单独取 | M2
 - [ ] S2-T2 建共享向量 `testdata/axs-draft/*.json` 与两端 runner（TS 进 vitest、Python 进 pytest） | Acceptance: 同一批向量名与条数在两处一致；任一端偏离即红；两端退出码各自独立可取 | M2
 - [ ] S2-T3 Python 规则路径收敛：`ai_draft.prose_to_axs` 不再持有独立切句规则，改为与向量同源的单一实现 | Acceptance: 写明扫描面（`backend/app/domains/**`）后 grep 证明第二套切句规则表已不存在；pytest 全绿 | M2
 - [ ] S3-T1 前端 provider 分派做成可注入 deps（沿用 `playerSavesDeps` 已验证形状），使 rules / 本地模型 / 在线三支在 node 测试下均可执行 | Acceptance: 三支同一测试源各有断言；不出现「桌面支只写在代码里、结构上永不被测」的形态 | M3
@@ -115,3 +115,5 @@
   棘轮两次作用：`ScriptEditor` 一度涨到 628 > 615 被拦，处置是把逻辑并出门点文件而非调高基线，最终回到 615；`OutlinerPanel` 因上轮改动变短，基线 625 → 623 已收紧锁定。
   **本刀未闭合**：`@camera`/`@show`/`@hide`/`@move`/`@se`/`@voice`/`@wait` 在规则路径依然不可产生——发射器只覆盖规则引擎实际能产出的 op，没有为假设中的未来 op 预写分支。镜头语言那层要等「内核入 TS」那一项。存量内容不依赖方言已实测（见 ADR-027 后果 3）。
   补一道运行时防线（同批提交）：提示词只能**劝**模型守语法，守不住时 `【背景 x】` 会被 AXS 兜底当旁白静静插入且 diagnostics 为空。`applyDraft` 现在只拦这一种已证实的形态（`narration` 以 `【背景|音乐|旁白|转场|特效` 开头即拒绝写入），不做泛化猜测；配套测试断言 `【示范】序章那天的雨很大。` 这类正常旁白**不被误伤**。web 侧 `applyDraft` 单测 7 条。
+- v1.4 内核入 TS（2026-09-25）：`packages/axs/src/draft.ts` 落 `proseToScriptDraft()` + `draftFromProse()`，9 条单测覆盖五类行为。**关键取舍：内核不自己拼文本**——`draftFromProse` 把 IR 交给 `printAxs` 打印，所以产物天然 canonical，而不是"再写一套发射器然后盼两边一致"（否则 M1 刚清掉的第二真相源就以另一种形式长回来了）。共享向量因此从两方升成**三方锁**：TS 内核产出的文本 == 向量 == Python 发射器产出 == `printAxs(parseAxs(向量))`。红过一次：把 TS 转场时长临时改 700，向量立刻报 `expected '# 转场\n@transition fade 700…' to be '…500…'`、退出码 1，还原后 0。
+  对齐过程中撞到一个形状细节：`printAxs` 对**空音轨**会留下双空格（`("@bgm " + "" + " loop").trim()` 只 trim 首尾）。Python 侧刻意照搬而非"顺手修正"，并在代码里写明理由——形状以 `printAxs` 为准，要改得两端一起改，不是谁方便谁改。

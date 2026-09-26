@@ -463,7 +463,9 @@
   4. 契约 `addProjectScene` 入参升为 `ProjectSceneInput`，浏览器支的请求体口径收在 `httpProjectScenes.ts` 里（`description ?? ""`、`source ?? "inline"` 与后端 Pydantic 默认值一致），导入通路回到与改造前逐字相同的字段集合；
   5. 契约用例「导入带来的地点/氛围/引用 id 读得回来」见过它红：把 SQLite 写入的 `location` 改成恒 null，用例立刻失败。
   顺带一次 G1 清偿：`contract.ts` 加用例后冲到 408 行，按 `contractPools.ts` 的既有形状拆出 `contractAuthoring.ts`（一份测试源、多实现验收），并把 `OutlinerPanel` 的棘轮从 623 收到 620 锁住。
-  **仍欠一处**：`bundleToCompilerInput` 的场景投影还是 `{id,title}`，而 `SceneRef` 已经支持 `location/atmosphere/backgroundImage`——导入舞台要影响到试玩链路，得改那一处，归入 S13-2c 一起判。
+  **补记（同日）——那处「仍欠」查出来不是一个遗漏，而是一条真实的两端分叉**：`packages/core/src/compiler.ts` 的场景解析把 `sceneRef` 的兜底整段丢了（写成 `s.location ?? null`），而后端 `narrative/compiler.py:333-345` 是 `location = location or asset.location`。后果：**从舞台库导入的舞台在网页试玩有背景、在桌面试玩是空白**——同一份数据、两个编译器、两种结果。金样本抓不到它，因为三个样本工程的场景都不带 `scene_ref_id`，那条分支从未被任何 fixture 走过。
+  已改：TS 侧按 Python 的 `or` 语义用 `||`（空串也算没值，本地库里"没填"恰恰常是空串），`bundleToCompilerInput` 补上 `location/atmosphere/sceneRef` 投影并由 `loadStoryOffline` 预取资产池（复刻后端的一次查表，不是新抽象）；新增三条专项单测覆盖此前无覆盖的优先级，见过它红（把 `||` 换回 `??`，「空串算没值」立刻报 `expected '' to be '方舟·地下'`）。
+  教训写在这里而不只写在测试注释里：**金样本证明"当前两边一致"，证明不了"每条分支两边都走"**；分支要有专门用例，否则 fixture 没覆盖 = 行为没实现。
 - [ ] S13-2c 编排台道具引用本地化：本地**没有 `project_asset_refs` 表**，且 bundle 读回恒为 `asset_refs: []`（`shared/storage/index.ts:92,212`）。只补写不补读会让加进去的道具在下次刷新时凭空消失，所以建表、读路径与 `addItemRef/removeItemRef` 改线必须同批落地。道具检索（`/search/items`）同属这一刀。
 - [ ] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口

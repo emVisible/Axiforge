@@ -5,7 +5,7 @@
  * - 浏览器：HTTP（既有 FastAPI 后端）
  * 云同步/协作服务后期以装饰器形态叠加，不改变本工厂签名。
  */
-import { compileStory, type CompilerProjectInput, type StoryPackage } from "@axiforge/core";
+import { compileStory, type StoryPackage } from "@axiforge/core";
 import { collectAssetRefs, packAxsp, remapCharacterIds, unpackAxsp } from "@axiforge/editor-core";
 import type { ProjectBundle, StoredCharacter } from "@axiforge/editor-core";
 import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
@@ -25,6 +25,7 @@ import type {
 } from "@/shared/types/project";
 
 const NOW = () => new Date().toISOString();
+import { bundleToCompilerInput } from "./compilerInput";
 
 /** 存储态工程束 → 传输态 ProjectResponse（编辑器消费形态，字段对齐后端响应） */
 export function bundleToResponse(b: ProjectBundle): ProjectResponse {
@@ -98,44 +99,6 @@ export function bundleToResponse(b: ProjectBundle): ProjectResponse {
   };
 }
 
-/** 存储态工程束 + 角色库 → 编译器输入（桌面断网试玩链路） */
-export function bundleToCompilerInput(
-  b: ProjectBundle,
-  characters: {
-    id: string;
-    name: string;
-    characterData: Record<string, unknown>;
-    imagePath?: string | null;
-  }[],
-): CompilerProjectInput {
-  return {
-    id: b.meta.id,
-    title: b.meta.title,
-    worldSetting: b.meta.worldSetting,
-    playMeta: {},
-    nodes: b.nodes.map((n) => ({
-      id: n.id,
-      stageId: n.stageId,
-      editorData: n.editorData,
-      narrativeData: n.narrativeData,
-      sortOrder: n.sortOrder,
-    })),
-    edges: b.edges.map((e) => ({
-      sourceNodeId: e.source,
-      targetNodeId: e.target,
-      label: e.label,
-    })),
-    scenes: b.scenes.map((s) => ({ id: s.id, title: s.title })),
-    roles: b.roles.map((r) => ({ characterRefId: r.characterRefId })),
-    characters: characters.map((c) => ({
-      id: c.id,
-      name: c.name,
-      characterData: c.characterData,
-      imagePath: c.imagePath ?? null,
-    })),
-    items: [],
-  };
-}
 
 /** 离线编译：Provider 数据 → 本地 StoryPackage（不触网） */
 export async function loadStoryOffline(projectId: string): Promise<StoryPackage> {
@@ -145,8 +108,13 @@ export async function loadStoryOffline(projectId: string): Promise<StoryPackage>
     throw new Error(bundle.error.code === "not_found" ? "404" : bundle.error.detail);
   }
   const chars = await p.listCharacters();
+  const scenes = await p.listScenes();
   return compileStory(
-    bundleToCompilerInput(bundle.data, chars.ok ? chars.data : []),
+    bundleToCompilerInput(
+      bundle.data,
+      chars.ok ? chars.data : [],
+      scenes.ok ? scenes.data : [],
+    ),
   );
 }
 

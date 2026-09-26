@@ -3,7 +3,8 @@
  * 验证链路：plugin-sql → TauriSqlBackend → SqliteStorageProvider → 契约关键语义。
  * 输出可 grep 标记：AXIFORGE-DESKTOP-STORAGE: PASS / FAIL <步骤>
  */
-import { bundleToCompilerInput, createStorageProvider, exportProjectAsAxsp, getSeedOutcome } from "./index";
+import { createStorageProvider, exportProjectAsAxsp, getSeedOutcome } from "./index";
+import { bundleToCompilerInput } from "./compilerInput";
 import { assetDisplayUrl, getLocalAssetRoot } from "./assetContext";
 import { localAssetPath, unpackAxsp, type StorageProvider } from "@axiforge/editor-core";
 import { compileStory } from "@axiforge/core";

@@ -295,12 +295,12 @@ export function compileStory(input: CompilerProjectInput): StoryPackage {
     if (c.name) nameToId.set(c.name, c.id);
   }
 
-  // --- 场景引用（资产已预解析） ---
+  // --- 场景引用：舞台自身值优先、资产池兜底；用 `||` 而非 `??`，因为 Python 的 `or` 把空串也当没值。
   const scenes: SceneRef[] = input.scenes.map((s) => ({
     id: s.id,
     title: s.title,
-    location: s.location ?? null,
-    atmosphere: s.atmosphere ?? null,
+    location: s.location || s.sceneRef?.location || null,
+    atmosphere: s.atmosphere || s.sceneRef?.atmosphere || null,
     backgroundImage: s.sceneRef?.imagePath ?? null,
   }));
 

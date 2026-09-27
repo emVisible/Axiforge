@@ -2,7 +2,28 @@
 
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import List, Optional
+
+# 散文→AXS 的提示词不在这里手写：它的内容就是 AXS 语法本身，
+# 而语法的真相源是 packages/axs（ADR-027）。TS 与 Python 读同一份 JSON，
+# 否则改了语法忘了改提示词，模型会开始静默吐上一代方言——
+# AXS 对认不出的行的兜底是"当旁白"，diagnostics 为空，看不出已经漂了。
+_AXS_PROMPT_FILE = (
+    Path(__file__).resolve().parents[4] / "packages" / "axs" / "prompts" / "prose-to-axs.json"
+)
+
+
+@lru_cache(maxsize=1)
+def _axs_prompt() -> dict:
+    try:
+        return json.loads(_AXS_PROMPT_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:  # 宁可启动即报错，也不要静默换成空提示词
+        raise RuntimeError(
+            f"缺少 AXS 提示词文件 {_AXS_PROMPT_FILE}；它随仓库分发，不在这里手写副本"
+        ) from exc
 
 
 def suggest_character_system() -> str:
@@ -24,19 +45,7 @@ def suggest_character_user(name: str, essence: str, tags: Optional[List[str]]) -
 
 
 def prose_to_axs_system() -> str:
-    return (
-        "你是 AXS 叙事脚本助手。把散文转为 canonical AXS 源文本，逐行书写，语法只有这些：\n"
-        "# 标题\n"
-        "角色名: 台词            （半角冒号；要带表情就写 角色名(微笑): 台词）\n"
-        "纯文本行即旁白\n"
-        "@bg 背景图    @bgm 音轨 loop    @se 音效    @voice 语音    @wait 1200\n"
-        "@transition fade 500    @fx flash 600    @camera zoom 1.2\n"
-        "@show 角色 微笑 左      @hide 角色       @move 角色 右\n"
-        "> 选项文字              > 选项文字 -> 目标标题\n"
-        "旁白若以 @ > # 或反斜杠开头，行首要加一个反斜杠转义。\n"
-        "禁止使用【背景】【音乐】一类中文括号标记舞台指令：那不是 AXS，会被静默读成旁白。"
-        "只输出 AXS 正文，不要解释。"
-    )
+    return _axs_prompt()["system"]
 
 
 def prose_to_axs_user(
@@ -47,4 +56,9 @@ def prose_to_axs_user(
     default_speaker: str,
 ) -> str:
     roles = "、".join(role_names or []) or default_speaker
-    return f"标题：{title}\n可用角色：{roles}\n\n散文：\n{prose}"
+    return (
+        _axs_prompt()["user_template"]
+        .replace("{title}", title)
+        .replace("{roles}", roles)
+        .replace("{prose}", prose)
+    )

@@ -470,6 +470,16 @@
 - [ ] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
+  - **S13-4a 已交付 2026-09-27**（提示词单一真相源 + 桌面本机模型通路 + 配置 UI）：
+    1. 提示词从 `backend/llm/prompts.py` 迁到 `packages/axs/prompts/prose-to-axs.json`，两端读同一份。迁移是机械 dump 而非手抄——手抄会错在看不见的地方（末两句原本紧接、没有换行）。两端各锁一个 sha256 摘要，把"只输出"改成"请只输出"两侧同时红，见过它红。
+    2. `shared/api/localLlm.ts`：webview 自己的 fetch 打 `/api/generate` 或 `/chat/completions`，不引 tauri-plugin-http（已锁定决策）。**只产文本**，回 IR 一律本端 `parseAxs`——不在这里再造第二个解析器。
+    3. 分派口三段：配了端点→模型；没配→规则引擎；配了但调不通→退回规则**且把原因随结果交出去**（`degradedFrom`），徽标显示「AI · 规则引擎（模型不可用）」。静默降级会让人以为配置没生效，比报错更难查。
+    4. 配置 UI 挂在 `LlmStatusBadge`（桌面态可点）→ `LlmEndpointDialog`。存 localStorage 而非 L4 契约：它是"这台机器的环境"，不属于任何作品，**绝不能被打进 `.axsp`**。
+    5. E16 四条：徽标可点、填→存→**刷新→重读**、清除回到规则、全程零 `/api/v1`。「测试一次」故意做成真生成——轻量探活要么端点不统一、要么另开一条通路，都会造成"测试通过但草稿失败"的自相矛盾判据。
+  - **仍欠**：`/editor/ai/suggest-character`（AI 建档建议）在桌面仍是 HTTP；Python provider 链要等 S13-6 一起退场。
+- [x] 附带修掉：道具/场景**资产详情页**绕过分派口（S13-2 期间漏的半条腿）
+  —— 已交付 2026-09-27。`SceneAssetDetailPage` 的 get/update/delete 与 `ItemDetailPage` 的 update/delete 仍直连 `sceneAssetApi`/`itemApi`，而**清单页早已本地化**——于是桌面能看见、能点开、改完点保存却写进一个够不到的后端。两处顺带修掉同一个假「已保存」：`setItem({ ...item, ...form })` 是乐观合并，界面立刻显示新值而写入根本没成，现改为采用回读的那一份。判据补进 E15（`/studio/scenes/no-such-scene`）。
+  教训：**本地化是按"读路径"完成的，不是按"页面"完成的**——一个页面里 get/list/create/update/delete 五支各自选路，只改读的那支就等于把半条腿焊进了主干。
 - [ ] S13-5 验收基线搬家：把 13 条 e2e 覆盖的行为在「注入内存本地库」或壳内冒烟下重建，CI 改为以桌面构建为主目标；这一步做完才允许浏览器 run mode 降级为纯测试宿主
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"

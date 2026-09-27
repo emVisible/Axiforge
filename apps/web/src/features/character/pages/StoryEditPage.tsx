@@ -46,7 +46,7 @@ export default function StoryEditPage() {
   const [axsOpen, setAxsOpen] = useState(false);
   const [axsDraft, setAxsDraft] = useState("");
   const [axsBusy, setAxsBusy] = useState(false);
-  const [axsSource, setAxsSource] = useState<string | undefined>();
+  const [axsRun, setAxsRun] = useState<{ source?: string; degradedFrom?: string }>({});
   const [axsError, setAxsError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -129,7 +129,7 @@ export default function StoryEditPage() {
         defaultSpeaker: character?.name || "旁白",
         authorId: getCreatorId(),
       });
-      setAxsSource(res.source);
+      setAxsRun({ source: res.source, degradedFrom: res.degradedFrom });
       setAxsDraft(res.axs);
       setAxsOpen(true);
     } catch {
@@ -182,7 +182,7 @@ export default function StoryEditPage() {
             {saved && (
               <span className="text-xs text-emerald-500">✓ 已保存</span>
             )}
-            <LlmStatusBadge lastSource={axsSource} />
+            <LlmStatusBadge lastSource={axsRun.source} degradedFrom={axsRun.degradedFrom} />
             <Button
               size="sm"
               variant="secondary"

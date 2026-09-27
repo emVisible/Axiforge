@@ -94,7 +94,7 @@ export default function ScriptEditor({
   const [prose, setProse] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [aiSource, setAiSource] = useState<string | undefined>();
+  const [aiRun, setAiRun] = useState<{ source?: string; degradedFrom?: string }>({});
   const highlightRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function ScriptEditor({
         roleNames: roles.map((r) => r.name),
         authorId: getCreatorId(),
       });
-      setAiSource(res.source);
+      setAiRun({ source: res.source, degradedFrom: res.degradedFrom });
       onChange(applyDraft(res, script, mode));
       setAiOpen(false);
       setProse("");
@@ -163,7 +163,7 @@ export default function ScriptEditor({
           演出脚本按顺序播放。填写后将取代下方「内容」的单句对话（ADR-009）。
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          <LlmStatusBadge lastSource={aiSource} />
+          <LlmStatusBadge lastSource={aiRun.source} degradedFrom={aiRun.degradedFrom} />
           <button
             type="button"
             onClick={() => setAiOpen(true)}

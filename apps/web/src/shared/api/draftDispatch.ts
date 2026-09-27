@@ -1,10 +1,25 @@
-import { draftFromProse, parseAxs, proseToScriptDraft } from "@axiforge/axs";
+import { draftFromProse, parseAxs, proseToAxsSystem, proseToAxsUser, proseToScriptDraft } from "@axiforge/axs";
 import type { Instruction } from "@axiforge/core";
 import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
+import { loadLlmSettings } from "@/shared/lib/llmSettings";
+import { generateAxsText, LlmError } from "./localLlm";
 import { aiApi, type ProseToScriptResult } from "./ai";
 
 export type { ProseToScriptResult };
 export type DraftMode = "replace" | "append";
+
+/** 分派口自己的返回：比传输态多一个"配了模型但退回规则"的可见标记 */
+export interface DraftResult extends ProseToScriptResult {
+  /** 非空 = 本次没能用上配置的模型，原因在此。UI 必须显示它，否则降级就成了撒谎 */
+  degradedFrom?: string;
+}
+
+/** 只要文本的消费方的返回（`requestAxsDraft`）：没有 IR，也就没有 needs_parse */
+export interface AxsDraftResult {
+  axs: string;
+  source: string;
+  degradedFrom?: string;
+}
 
 export interface DraftRequest {
   prose: string;
@@ -16,30 +31,70 @@ export interface DraftRequest {
 
 export const draftDeps: {
   isLocal: () => boolean;
+  settings: () => ReturnType<typeof loadLlmSettings>;
+  model: (system: string, user: string) => Promise<string>;
   remote: (body: { prose: string; role_names?: string[]; author_id?: string }) => Promise<ProseToScriptResult>;
 } = {
   isLocal: isTauriEnvironment,
+  settings: loadLlmSettings,
+  model: (system, user) => {
+    const s = draftDeps.settings();
+    if (!s) return Promise.reject(new LlmError("llm_unavailable", "未配置端点"));
+    return generateAxsText(s, system, user);
+  },
   remote: (body) => aiApi.proseToScript(body),
 };
+
+/** 桌面离线的保底通路：规则引擎自己成拍，不依赖任何服务（已锁定决策） */
+function rulesDraft(req: DraftRequest): DraftResult {
+  return {
+    script: proseToScriptDraft(req.prose, req.roleNames),
+    source: "rules",
+    axs: draftFromProse({
+      prose: req.prose,
+      title: req.title,
+      roleNames: req.roleNames,
+      defaultSpeaker: req.defaultSpeaker,
+    }),
+    needs_parse: false,
+  };
+}
+
+function promptOf(req: DraftRequest): string {
+  return proseToAxsUser({
+    prose: req.prose,
+    title: req.title,
+    roleNames: req.roleNames,
+    defaultSpeaker: req.defaultSpeaker,
+  });
+}
 
 /**
  * AI 演绎草稿的分派口（沿用 `playerSavesDeps` 那套已验证形状）。
  *
- * 桌面态规则引擎在**本地**跑：壳目前没有任何指向后端的方式（`deployment.ts` 的既有判据），
- * 走 HTTP 只会得到一条网络错误，等于桌面离线没有演绎辅助。
+ * 桌面态三段：配了端点就交给自己机器上的模型（只拿文本，回 IR 由本端 parseAxs 做）；
+ * 没配或调不通就退回规则引擎——**退回是必须发生的，不是错误**，因为桌面离线要能独立成拍。
+ * 但退回的痕迹（degradedFrom）随结果一起出去：静默降级会被用户当成"模型在干活"，
+ * 那是比失败更糟的状态。
  * 浏览器态逐字不变，仍走 `/editor/ai/prose-to-script`。
  *
  * 注入点存在的技术理由：`isTauriEnvironment()` 在 Playwright/node 下恒为 false，
  * 本地支若不可注入就**结构上永不被执行**——上一版已经为此付过一笔判据不可达的债。
  */
-export async function requestDraft(req: DraftRequest): Promise<ProseToScriptResult> {
+export async function requestDraft(req: DraftRequest): Promise<DraftResult> {
   if (draftDeps.isLocal()) {
-    return {
-      script: proseToScriptDraft(req.prose, req.roleNames),
-      source: "rules",
-      axs: draftFromProse({ prose: req.prose, title: req.title, roleNames: req.roleNames, defaultSpeaker: req.defaultSpeaker }),
-      needs_parse: false,
-    };
+    const settings = draftDeps.settings();
+    if (!settings) return rulesDraft(req);
+    try {
+      return {
+        script: [],
+        axs: await draftDeps.model(proseToAxsSystem(), promptOf(req)),
+        source: settings.kind,
+        needs_parse: true,
+      };
+    } catch (e) {
+      return { ...rulesDraft(req), degradedFrom: e instanceof Error ? e.message : String(e) };
+    }
   }
 
   return draftDeps.remote({
@@ -51,21 +106,26 @@ export async function requestDraft(req: DraftRequest): Promise<ProseToScriptResu
 
 /**
  * 只要文本的消费方（角色传记 → AXS 草稿）走这一支。
- * 桌面态本地成文，浏览器态仍走 `/editor/ai/prose-to-axs`——同一个规则引擎，不另写第二套。
+ * 桌面态与 `requestDraft` 同一套三段（模型 → 退回规则），提示词也同一份；
+ * 浏览器态仍走 `/editor/ai/prose-to-axs`——不另写第二套规则引擎，也不另写第二份提示词。
  */
-export async function requestAxsDraft(
-  req: DraftRequest,
-): Promise<{ axs: string; source: string }> {
+export async function requestAxsDraft(req: DraftRequest): Promise<AxsDraftResult> {
   if (draftDeps.isLocal()) {
-    return {
-      axs: draftFromProse({
-        prose: req.prose,
-        title: req.title,
-        roleNames: req.roleNames,
-        defaultSpeaker: req.defaultSpeaker,
-      }),
-      source: "rules",
-    };
+    const settings = draftDeps.settings();
+    if (!settings) {
+      const draft = rulesDraft(req);
+      return { axs: draft.axs, source: draft.source };
+    }
+    try {
+      return { axs: await draftDeps.model(proseToAxsSystem(), promptOf(req)), source: settings.kind };
+    } catch (e) {
+      const draft = rulesDraft(req);
+      return {
+        axs: draft.axs,
+        source: draft.source,
+        degradedFrom: e instanceof Error ? e.message : String(e),
+      };
+    }
   }
 
   return aiApi.proseToAxs({

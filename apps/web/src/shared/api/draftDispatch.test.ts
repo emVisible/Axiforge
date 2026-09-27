@@ -5,16 +5,25 @@ import { applyDraft, draftDeps, requestAxsDraft, requestDraft, type ProseToScrip
 const old: Instruction[] = [{ op: "narration", text: "旧内容" } as Instruction];
 
 const empty: ProseToScriptResult = { script: [], source: "rules", axs: "", needs_parse: false };
-const originals = { isLocal: draftDeps.isLocal, remote: draftDeps.remote };
+const originals = {
+  isLocal: draftDeps.isLocal,
+  remote: draftDeps.remote,
+  settings: draftDeps.settings,
+  model: draftDeps.model,
+};
 
 beforeEach(() => {
   draftDeps.isLocal = originals.isLocal;
   draftDeps.remote = originals.remote;
+  draftDeps.settings = originals.settings;
+  draftDeps.model = originals.model;
 });
 
 afterEach(() => {
   draftDeps.isLocal = originals.isLocal;
   draftDeps.remote = originals.remote;
+  draftDeps.settings = originals.settings;
+  draftDeps.model = originals.model;
 });
 
 describe("applyDraft（草稿结果 → 指令序列）", () => {
@@ -120,5 +129,78 @@ describe("requestDraft（桌面本地支 / 浏览器远端支）", () => {
     });
     expect(res.source).toBe("rules");
     expect(res.axs).toBe("# 序章\n@bg 交汇港\n雨夜。\n");
+  });
+});
+
+describe("桌面态本机模型（S13-4：配置了就用，用不了就退回规则且留下痕迹）", () => {
+  const SETTINGS = { kind: "ollama" as const, baseUrl: "http://localhost:11434", model: "qwen2.5" };
+
+  it("配了端点：文本交给模型、由本端解析，source 是模型名而非 rules", async () => {
+    const seen: { system?: string; user?: string } = {};
+    draftDeps.isLocal = () => true;
+    draftDeps.settings = () => SETTINGS;
+    draftDeps.model = async (system, user) => {
+      seen.system = system;
+      seen.user = user;
+      return "# 序章\n@bg 交汇港\n堰纱: 你来了。\n";
+    };
+
+    const res = await requestDraft({ prose: "雨夜，她来了。", title: "序章", roleNames: ["堰纱"] });
+
+    expect(res.source).toBe("ollama");
+    expect(res.needs_parse).toBe(true);
+    expect(res.script).toEqual([]);
+    expect(res.axs).toBe("# 序章\n@bg 交汇港\n堰纱: 你来了。\n");
+    expect(res.degradedFrom).toBeUndefined();
+    // 提示词是两端共用的那一份，不是这里另拼的
+    expect(seen.system).toContain("@bg ");
+    expect(seen.system).toContain("禁止使用【背景】");
+    expect(seen.user).toContain("可用角色：堰纱");
+  });
+
+  it("模型调不通：退回规则引擎让草稿仍然可用，但降级原因随结果出去", async () => {
+    draftDeps.isLocal = () => true;
+    draftDeps.settings = () => SETTINGS;
+    draftDeps.model = async () => {
+      throw new Error("llm_unavailable: Failed to fetch");
+    };
+
+    const res = await requestDraft({ prose: "堰纱: 你来了。", roleNames: ["堰纱"] });
+
+    expect(res.source).toBe("rules");
+    expect(res.needs_parse).toBe(false);
+    expect(res.script.map((i) => i.op)).toEqual(["say"]);
+    expect(res.degradedFrom).toContain("llm_unavailable");
+  });
+
+  it("没配端点：根本不碰模型通路（离线的默认必须是无感的）", async () => {
+    let modelCalls = 0;
+    draftDeps.isLocal = () => true;
+    draftDeps.settings = () => null;
+    draftDeps.model = async () => {
+      modelCalls += 1;
+      return "";
+    };
+
+    const res = await requestDraft({ prose: "雨。" });
+    expect(modelCalls).toBe(0);
+    expect(res.source).toBe("rules");
+    expect(res.degradedFrom).toBeUndefined();
+  });
+
+  it("传记路径同样三段：模型成功时不降级、失败时带着原因退回", async () => {
+    draftDeps.isLocal = () => true;
+    draftDeps.settings = () => SETTINGS;
+    draftDeps.model = async () => "# 传记\n她没见过海。\n";
+    const ok = await requestAxsDraft({ prose: "她没见过海。", title: "传记" });
+    expect(ok).toEqual({ axs: "# 传记\n她没见过海。\n", source: "ollama" });
+
+    draftDeps.model = async () => {
+      throw new Error("boom");
+    };
+    const degraded = await requestAxsDraft({ prose: "她没见过海。", title: "传记" });
+    expect(degraded.source).toBe("rules");
+    expect(degraded.degradedFrom).toBe("boom");
+    expect(degraded.axs).toBe("# 传记\n她没见过海。\n");
   });
 });

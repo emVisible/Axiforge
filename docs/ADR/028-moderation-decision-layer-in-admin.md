@@ -111,3 +111,23 @@ ADR-018:32 要求「全部单体内轻量实现，不引外部服务」。Cleara
 "auto_err 必须 stay 0" 变成会红的断言。变异验证过——把词表改成 `authoritative=True`，
 2 条立刻失败。
 - Clearance 目录本身不动、不纳入版本管理（它含 `.env` 与独立 `.git`）；本 ADR 只吸收设计，不搬运代码
+
+
+## 让「自动判断」真的自动：剩余步骤与它们的性质
+
+代码侧已经通了，剩下的三步**都不是代码**，按顺序：
+
+1. **装 Laya**：`cd Clearance/vendor/laya_sidecar && uv sync`（torch 系约 2GB，需联网）。
+   我没有擅自装——这是给开发机加一个 2GB 依赖，属于要人点头的事。
+2. **起 sidecar 并打开开关**：`SIDECAR_PORT=8685 uv run --no-sync python server.py`，
+   后端设 `MODERATION_ENABLED=true`、`LAYA_SIDECAR_URL`。此时 `stats` 的 engines 会多出
+   一个 `authoritative: true` 的引擎，`--sweep` 也不再拒绝出表。
+3. **拟合温度表**：`eval/export_labels.py` 导出「带类型化答案 + 已人工结案」的案件 →
+   拟合每题温度 → 写到 sidecar 的 `CALIBRATION_FILE`。
+   第 3 步有**先有鸡还是先有蛋**的性质：没有标注就拟合不出表，没有表就一律转人工，
+   转人工才产生标注。所以真实路径是"先跑一段纯建议模式攒标注"，
+   而不是装完 Laya 就能全自动。这一点在承诺自动化率之前必须说清。
+
+在这三步完成之前，系统的实际行为是：**给建议、留证据、不自己动手**。
+这是 §4 五道检查刻意造成的，不是待修的 bug——参照实现在同样条件下会凭约十个关键词
+自动驳回内容，那才是要修的东西。

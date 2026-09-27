@@ -231,6 +231,40 @@ function qs(params: Record<string, string | number | undefined>): string {
   return `?${search.toString()}`;
 }
 
+
+export interface ModerationCase {
+  id: string;
+  subject_type: string;
+  subject_id: string;
+  author_id: string;
+  state: string;
+  suggested_action: string;
+  final_action: string;
+  via: string;
+  confidence: number | null;
+  engine: string;
+  authoritative: boolean;
+  calibrated: boolean;
+  clause_ids: string[];
+  answers: Record<string, { type: string; value: unknown; confidence: number }>;
+  reasons: string[];
+  policy_version: string;
+  questions_version: string;
+  lexicon_version: string;
+  latency_ms: number;
+  created_at: string;
+  decided_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+}
+
+export interface ModerationStats {
+  by_state: Record<string, number>;
+  by_engine: Record<string, number>;
+  engines: { name: string; healthy: boolean; authoritative: boolean }[];
+}
+
 export const adminApi = {
   stats: () => request<DashboardStats>("/dashboard/stats"),
   reports: (status = "pending") =>
@@ -287,4 +321,14 @@ export const adminApi = {
     ),
   auditLogs: ({ limit = 50, offset = 0, action }: PageParams & { action?: string } = {}) =>
     request<PaginatedResponse<AuditLog>>(`/audit-logs${qs({ limit, offset, action })}`),
+  moderationQueue: (state?: string, limit = 50) =>
+    request<ModerationCase[]>(`/moderation/queue${qs({ state, limit })}`),
+  moderationStats: () => request<ModerationStats>("/moderation/stats"),
+  moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
+    request<ModerationCase>(`/moderation/cases/${id}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ outcome, note }),
+    }),
+  moderationReopen: (id: string, note = "") =>
+    request<ModerationCase>(`/moderation/cases/${id}/reopen${qs({ note })}`, { method: "POST" }),
 };

@@ -116,6 +116,9 @@ export interface AutoJudgement {
   authoritative: boolean;
   calibrated: boolean;
   clause_ids: string[];
+  /** 单选题给出的"最主要一条"，仅建议：空串表示这次没有给（如词表结论）。 */
+  primary_suggestion: string;
+  primary_confidence: number | null;
   reasons: string[];
   policy_version: string;
   questions_version: string;

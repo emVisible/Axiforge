@@ -66,6 +66,10 @@ class AutoJudgement(BaseModel):
     authoritative: bool = False
     calibrated: bool = False
     clause_ids: List[str] = Field(default_factory=list)
+    #: 单选题给出的"最主要的一条"（questions-3）。它**只是建议**：
+    #: 实测它在干净散文上会给出自信的错误条款，所以不参与门控，也不写进 violations。
+    primary_suggestion: str = ""
+    primary_confidence: Optional[float] = None
     reasons: List[str] = Field(default_factory=list)
     policy_version: str = ""
     questions_version: str = ""

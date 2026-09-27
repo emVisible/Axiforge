@@ -149,6 +149,9 @@ def main() -> int:
     for name, label_of in (
         ("age_rating", lambda r: r.get("rating")),
         ("severity", lambda r: {"approve": 0, "reject": 2}.get(r["expected"])),
+        # 单选条款的真值 = 该行"最主要的那一条"，约定取 clauses 的第一条
+        # （与 eval/choice_probe.py 同一约定，两处必须一致，否则拟合与评测量的不是同一件事）。
+        ("primary_clause", lambda r: (r.get("clauses") or ["none"])[0]),
     ):
         rows = categorical_rows(samples, name, label_of)
         if len(rows) < MIN_ROWS:

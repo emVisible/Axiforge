@@ -20,11 +20,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app.domains.moderation.contracts import Answer, clamp01
 
-QUESTIONS_VERSION = "questions-2"
+#: questions-3 新增 `primary_clause`（单选条款）。换题集必须 bump 这一版：
+#: 它进幂等键，不 bump 的话旧结论会以新题集的名义继续被复用。
+QUESTIONS_VERSION = "questions-3"
 
 # (name, type, instructions, criteria, clause_id)
 # noul 型只需 instructions；score 型 criteria 是有序刻度；choice 型 criteria 是取值→释义。
-_QUESTION_SPECS: Tuple[Tuple[str, str, str, Any, str], ...] = (
+_AXIS_SPECS: Tuple[Tuple[str, str, str, Any, str], ...] = (
     (
         "age_rating",
         "choice",
@@ -90,6 +92,25 @@ _QUESTION_SPECS: Tuple[Tuple[str, str, str, Any, str], ...] = (
         "score",
         "若该内容被公开，对读者与平台的危害量级？",
         ["无危害", "需标注或限龄", "必须下架"],
+        None,
+    ),
+)
+
+#: 单选条款的候选。**从上面各轴的题面派生，不另写一份措辞**——
+#: 两处各写一遍，早晚会长成两个含义，而"哪个才是这条内容最主要的问题"
+#: 必须与"这条轴存不存在"用同一套定义。
+_PRIMARY_OPTIONS: Dict[str, str] = {
+    clause: instructions for name, qtype, instructions, _, clause in _AXIS_SPECS
+    if qtype == "noul" and clause
+}
+_PRIMARY_OPTIONS["none"] = "没有上述任何问题：正常创作内容或正常交流"
+
+_QUESTION_SPECS: Tuple[Tuple[str, str, str, Any, str], ...] = _AXIS_SPECS + (
+    (
+        "primary_clause",
+        "choice",
+        "这篇内容最主要的一个问题属于哪一类？只选一个。",
+        _PRIMARY_OPTIONS,
         None,
     ),
 )

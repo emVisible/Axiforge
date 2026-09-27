@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from typing import Optional
 
 import pytest
@@ -195,6 +196,35 @@ async def test_queue_default_order_puts_suspicious_first(db_session):
     finally:
         for sid in ids:
             await _purge(db_session, sid)
+
+
+@pytest.mark.asyncio
+async def test_primary_clause_suggestion_reaches_the_admin_contract(db_session):
+    """单选建议要从模型答案 → 落库快照 → 中台契约一路可见（跨层不能只通一半）。
+
+    它同时是一条边界断言：这条建议**不进** clause_ids，因此不参与门控。
+    """
+    from app.domains.moderation.contracts import Answer
+    from app.domains.platform.admin_service import _auto_judgement
+
+    prim = Answer("primary_clause", "choice", "self_harm_unsafe", 0.73,
+                  {"self_harm_unsafe": 0.73, "none": 0.2})
+    switch = Switchable(replace(
+        _verdict(ACTION_HUMAN, confidence=0.4, calibrated=False),
+        answers={"primary_clause": prim}))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="雨落下来")
+        await db_session.commit()
+        assert case is not None
+        judgement = _auto_judgement(case)
+        assert judgement.primary_suggestion == "self_harm_unsafe"
+        assert judgement.primary_confidence == pytest.approx(0.73)
+        assert "self_harm_unsafe" not in judgement.clause_ids
+    finally:
+        await _purge(db_session, subject_id)
 
 
 @pytest.mark.asyncio

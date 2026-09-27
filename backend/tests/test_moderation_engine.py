@@ -48,6 +48,13 @@ def clean_answers(**over):
         "spam_promotion": {"noul": 0.02},
         "severity": {"score": 0.0, "confidence": 1.0,
                      "probabilities": {"0": 1.0, "1": 0.0, "2": 0.0}},
+        "primary_clause": {"choice": "none", "confidence": 0.4644,
+                           "probabilities": {"none": 0.72, "sexual_explicit": 0.06,
+                                             "gratuitous_violence": 0.05,
+                                             "self_harm_unsafe": 0.04,
+                                             "hate_incitement": 0.04,
+                                             "illegal_instruction": 0.05,
+                                             "doxxing": 0.03, "spam_promotion": 0.01}},
     }
     base.update(over)
     return base
@@ -277,36 +284,60 @@ def test_refitting_the_temperature_table_invalidates_the_key():
 
 # ---------- 置信度量纲（真机 Laya 接通后测出的缺陷） ----------
 
-#: sidecar 实测原文（多语 checkpoint，一段干净的中文散文）。
-#: 保留原样的 probabilities 与自报 confidence，改一个数字这条测试就失去意义。
+#: sidecar 实测原文（多语 checkpoint，一段干净的中文散文，state 用生产同款
+#: title/body 形状——用 `text` 键会让答案变成 self_harm 0.89，那是我的调用错了，
+#: 不是模型的行为）。保留原样的 probabilities 与自报 confidence，
+#: 改一个数字这条测试就失去意义。
 MEASURED_CLEAN_PROSE = {
-    "age_rating": {"choice": "all", "confidence": 0.1076,
-                   "probabilities": {"all": 0.5474, "teen": 0.2963, "adult": 0.1563}},
-    "sexual_content": {"noul": 0.001},
-    "violence_gore": {"noul": 0.0013},
-    "self_harm": {"noul": 0.0016},
-    "hate_targeted": {"noul": 0.0006},
-    "illegal_act_instruction": {"noul": 0.0},
-    "pii_real_person": {"noul": 0.0414},
-    "spam_promotion": {"noul": 0.0015},
-    "severity": {"score": 0.7081, "confidence": 0.3655,
-                 "probabilities": {"0": 0.3087, "1": 0.6745, "2": 0.0168}},
+    "age_rating": {"type": "choice", "confidence": 0.0655,
+                   "probabilities": {"all": 0.4965, "teen": 0.3139, "adult": 0.1897},
+                   "choice": "all"},
+    "sexual_content": {"type": "noul", "noul": 0.0013, "confidence": 0.9987},
+    "violence_gore": {"type": "noul", "noul": 0.0025, "confidence": 0.9975},
+    "self_harm": {"type": "noul", "noul": 0.0039, "confidence": 0.9961},
+    "hate_targeted": {"type": "noul", "noul": 0.0011, "confidence": 0.9989},
+    "illegal_act_instruction": {"type": "noul", "noul": 0.0, "confidence": 1.0},
+    "pii_real_person": {"type": "noul", "noul": 0.0505, "confidence": 0.9495},
+    "spam_promotion": {"type": "noul", "noul": 0.0007, "confidence": 0.9993},
+    "severity": {"type": "score", "confidence": 0.2103, "score": 0.7838,
+                 "probabilities": {"0": 0.3001, "1": 0.616, "2": 0.0839}},
+    # 单选在这段干净稿子上给出 self_harm_unsafe 0.73：**错而自信**。
+    # 这就是它只能当归因建议、不能进规则表或门控的实测理由（七条轴一致报低才是对的）。
+    "primary_clause": {"type": "choice", "confidence": 0.6177, "choice": "self_harm_unsafe",
+                       "probabilities": {"sexual_explicit": 0.04, "gratuitous_violence": 0.0101,
+                                         "self_harm_unsafe": 0.7298, "hate_incitement": 0.0028,
+                                         "illegal_instruction": 0.0013, "doxxing": 0.0047,
+                                         "spam_promotion": 0.0021, "none": 0.2094}},
 }
 
 
 def test_choice_confidence_is_not_used_as_a_probability():
-    """Laya 对 choice 自报的 0.1076 是 1−归一化熵，不是"这次判对的概率"。
+    """Laya 对 choice 自报的 0.0655 是 1−归一化熵，不是"这次判对的概率"。
 
     旧的 approve 置信度直接取它，于是自动通过线（0.90）在数学上永远够不到——
-    链里有权威引擎也一样 auto_rate=0。正确做法是从向量算 P(不是成人)=1−0.1563=0.8437。
+    链里有权威引擎也一样 auto_rate=0。正确做法是从向量算 P(不是成人)=1−0.1897=0.8103。
     """
     answers, problems = normalize_answers(MEASURED_CLEAN_PROSE)
     assert problems == []
     v = decide_from_answers(answers, engine="laya:test", calibrated=True)
     assert v.action == ACTION_APPROVE
-    assert v.confidence == pytest.approx(1.0 - 0.1563, abs=1e-4)
-    assert gate(v, Policy(), authoritative=True)[0] == ACTION_HUMAN  # 0.84 < 0.90
+    assert v.confidence == pytest.approx(1.0 - 0.1897, abs=1e-4)
+    assert gate(v, Policy(), authoritative=True)[0] == ACTION_HUMAN  # 0.81 < 0.90
     assert gate(v, Policy(0.80, 0.95), authoritative=True)[0] == ACTION_APPROVE
+
+
+def test_primary_clause_is_advisory_and_never_reaches_the_gate():
+    """单选条款在这里判成 self_harm_unsafe 0.73，但它不许影响动作或条款。
+
+    这条断言是 D3 的边界：单选题整体归因更准（52.9% vs 41.2%），
+    可它在干净稿子上会给出自信的错误条款——一旦进规则表，
+    它比"七条轴一致报低"更容易误伤。
+    """
+    answers, _ = normalize_answers(MEASURED_CLEAN_PROSE)
+    v = decide_from_answers(answers, engine="laya:test", calibrated=True)
+    assert "self_harm_unsafe" not in v.clause_ids
+    assert v.rule == "no_risk"
+    assert v.action == ACTION_APPROVE
 
 
 def test_severity_is_never_a_content_clause():

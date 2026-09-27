@@ -43,6 +43,8 @@ from app.domains.platform.models import AuditLog, ContentReport, PlatformEvent, 
 
 def _auto_judgement(case: ModerationCase) -> AutoJudgement:
     """ORM 字段叫 id，契约里叫 case_id（上下文里已经有 target_id，不叫 id 免得歧义）。"""
+    prim = (case.answers or {}).get("primary_clause") or {}
+    pconf = prim.get("confidence")
     return AutoJudgement(
         case_id=case.id,
         state=case.state,
@@ -54,6 +56,9 @@ def _auto_judgement(case: ModerationCase) -> AutoJudgement:
         authoritative=case.authoritative,
         calibrated=case.calibrated,
         clause_ids=list(case.clause_ids or []),
+        # 单选建议：值在 normalize 阶段已过白名单，这里只做形状防御，不再夹一次。
+        primary_suggestion=str(prim.get("value") or ""),
+        primary_confidence=float(pconf) if isinstance(pconf, (int, float)) else None,
         reasons=list(case.reasons or []),
         policy_version=case.policy_version,
         questions_version=case.questions_version,

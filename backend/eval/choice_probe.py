@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("TESTING", "1")
 
 from app.domains.moderation.questions import (  # noqa: E402
-    BOOL_QUESTIONS, clause_for,
+    BOOL_QUESTIONS, build_questions, clause_for,
 )
 from eval.moderation_eval import load_samples  # noqa: E402
 
@@ -40,26 +40,15 @@ _NONE = "none"
 
 
 def probe_questions() -> Dict[str, dict]:
-    criteria = {clause_for(n): q for n, q in
-                ((n, _instruction(n)) for n in BOOL_QUESTIONS)}
-    criteria[_NONE] = "没有上述任何问题：正常创作内容或正常交流"
-    return {
-        "primary_clause": {"type": "choice",
-                           "instructions": "这篇内容最主要的一个问题属于哪一类？只选一个。",
-                           "criteria": criteria},
-        **{n: {"type": "noul", "instructions": _instruction(n)} for n in BOOL_QUESTIONS},
-    }
+    """直接用生产题集，不再自己拼一份。
 
-
-_INST_CACHE: Dict[str, str] = {}
-
-
-def _instruction(name: str) -> str:
-    if not _INST_CACHE:
-        from app.domains.moderation.questions import build_questions
-        for k, v in build_questions().items():
-            _INST_CACHE[k] = v["instructions"]
-    return _INST_CACHE[name]
+    第一版在这里自己构造"7 条 noul + 1 道单选"（8 题），而生产是 10 题——
+    同一句文本在两种题集下给出的单选答案并不一致（干净散文在生产题集下被判
+    `self_harm_unsafe` 0.89）。也就是说"一次调用里问了哪些题"会影响答案，
+    那么离线拼题集测出来的命中率就不能外推到生产。要么用生产题集测，
+    要么这张表就没有读数资格。
+    """
+    return build_questions()
 
 
 def ask(title: str, body: str, kind: str) -> dict:

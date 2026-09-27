@@ -231,6 +231,19 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
           ))}
         </div>
       )}
+      {judgement.primary_suggestion && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-2xs text-ink-faint">模型认为最主要</span>
+          <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-2xs text-ink-muted">
+            {judgement.primary_suggestion === "none"
+              ? "无问题"
+              : clauseLabel(judgement.primary_suggestion)}
+            {judgement.primary_confidence !== null &&
+              ` · ${Math.round(judgement.primary_confidence * 100)}%`}
+          </span>
+          <span className="text-2xs text-ink-faint">仅供参考，不参与执行</span>
+        </div>
+      )}
       {judgement.reasons.length > 0 && (
         <ul className="mt-1.5 space-y-0.5 text-2xs text-ink-muted">
           {judgement.reasons.slice(0, 4).map((r, i) => (

@@ -130,7 +130,11 @@ report_router = APIRouter(prefix="/api/v1/report", tags=["report"])
 
 @report_router.post("/", response_model=ReportResponse, status_code=201)
 async def create_report(data: ReportCreate, db: AsyncSession = Depends(get_db)):
-    """公开内容举报占位（ADR-003）：记录入库，暂无审核流程。"""
+    """公开内容举报（ADR-003）：记录入库，并立刻跑一遍自动判断留痕（ADR-028）。
+
+    机器结论不改变举报本身的状态（仍由人工 resolve/dismiss），
+    但运营打开这条举报的上下文时已经能看到引擎给了什么、依据是什么。
+    """
     return await ReportService(db).create(data)
 
 routers = [user_router, identity_router, report_router]

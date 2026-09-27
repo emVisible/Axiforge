@@ -75,7 +75,12 @@ ADR-018:32 要求「全部单体内轻量实现，不引外部服务」。Cleara
 
 - 新增 `backend/app/domains/moderation/`：`contracts / questions / policy / engine / registry / providers{lexicon,laya_sidecar}`，17 条测试，全部对着上表写（其中多条在 Clearance 原逻辑下会失败）
 - 中台此前"有处置无判断"的缺口闭合；`content_validate` 的占位词表有了正式替代物
-- **尚欠（按依赖顺序，不可颠倒）**：① ~~决策落 Postgres~~ 已完成（`moderation_cases` / `moderation_decision_logs` + 幂等迁移，迁移在真库跑过，`conf=9.0` 被 CHECK 约束以 IntegrityError 拒收）；② ~~接进发布/评论路径~~ 已完成（角色公开两处 + 评论创建，走 `advisory_review`：SAVEPOINT 包裹、任何异常不外抛）；③ ~~中台一屏~~ 已完成（`/moderation` 自动判断队列，含引擎资格、条款、置信、via 的运营语言、判断依据展开、处置与回退）；④ 校准温度表——**没有它，按 §4 系统只会转人工，这是刻意的保守**，见下方实测；⑤ 词表外置为可热更配置；⑥ 标注集从"我按条款口径撰写"升级为多人一致度量的金集。
+- **尚欠（按依赖顺序，不可颠倒）**：① ~~决策落 Postgres~~ 已完成（`moderation_cases` / `moderation_decision_logs` + 幂等迁移，迁移在真库跑过，`conf=9.0` 被 CHECK 约束以 IntegrityError 拒收）；② ~~接进发布/评论/举报路径~~ 已完成：角色公开两处 + 评论创建 + **举报创建**。
+   举报这一处是融合价值最高的：机器结论挂在 `moderation/context` 的 `auto_judgement` 字段上，
+   运营打开一条举报时看到的是"引擎判了什么 + 命中条款 + via 理由 + 举报原由"，而不是从空白开始判。
+   三者都走 `advisory_review`（SAVEPOINT 包裹、任何异常不外抛）。
+   一条被测试逼出来的顺序教训：举报路径原本在 `commit()` **之后**才跑审核，
+   于是举报成功、案件却留在未提交的事务里被回滚——判断"接进去了"和"判断真的落库了"是两件事。；③ ~~中台一屏~~ 已完成（`/moderation` 自动判断队列，含引擎资格、条款、置信、via 的运营语言、判断依据展开、处置与回退）；④ 校准温度表——**没有它，按 §4 系统只会转人工，这是刻意的保守**，见下方实测；⑤ 词表外置为可热更配置；⑥ 标注集从"我按条款口径撰写"升级为多人一致度量的金集。
 - **`/editor/ai/*` 与发布路径的关系**：审核不参与发布判定（ADR-018:23 继续成立），所以 `moderation_enabled=False` 时发布行为与改造前完全一致。
 
 ## 实测基线（参照实现没有的部分，因此这是净增）

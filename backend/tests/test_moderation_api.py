@@ -144,3 +144,46 @@ async def test_publishing_with_moderation_off_still_succeeds(client: AsyncClient
     )
     assert created.status_code in (200, 201), created.text
     assert created.json()["is_public"] is True
+
+
+@pytest.mark.asyncio
+async def test_report_arrives_with_the_machine_finding_attached(client: AsyncClient):
+    """举报的价值不在于排队，而在于运营点开时已经有一版判断。
+
+    这条测的是整条融合链：建一个描述含导流话术的作品 → 举报它 →
+    中台的 moderation context 里就该带着机器结论与命中条款。
+    """
+    created = await client.post(
+        "/api/v1/editor/projects/",
+        json={
+            "title": "被举报的作品",
+            "description": "加微信领 全新体验，点击链接注册送 888",
+            "author_id": "creator-mod-02",
+        },
+    )
+    assert created.status_code in (200, 201), created.text
+    project_id = created.json()["id"]
+
+    reported = await client.post(
+        "/api/v1/report/",
+        json={
+            "target_type": "project",
+            "target_id": project_id,
+            "reason": "疑似导流",
+            "reporter_token": "reporter-1",
+        },
+    )
+    assert reported.status_code in (200, 201), reported.text
+
+    ctx = await client.get(
+        "/api/v1/admin/moderation/context",
+        params={"target_type": "project", "target_id": project_id},
+        headers=ADMIN,
+    )
+    assert ctx.status_code == 200, ctx.text
+    judgement = ctx.json()["auto_judgement"]
+    assert judgement is not None, "举报之后 context 里必须带着机器结论"
+    assert "spam_promotion" in judgement["clause_ids"]
+    assert judgement["final_action"] == "human_review"
+    # 词表不权威：它可以把东西递到人面前，但不能自己把作品判死
+    assert judgement["authoritative"] is False

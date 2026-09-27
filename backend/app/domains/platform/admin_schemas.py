@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Generic, List, Literal, Optional, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 ItemT = TypeVar("ItemT")
 
@@ -51,10 +51,32 @@ class AuthorModerationProfile(BaseModel):
     violation_count: int = 0
 
 
+class AutoJudgement(BaseModel):
+    """这个对象最近一次机器裁决。人工点进举报时应该先看到它，而不是从空白开始判。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    case_id: UUID
+    state: str
+    engine: str
+    suggested_action: str
+    final_action: str
+    via: str
+    confidence: Optional[float] = None
+    authoritative: bool = False
+    calibrated: bool = False
+    clause_ids: List[str] = Field(default_factory=list)
+    reasons: List[str] = Field(default_factory=list)
+    policy_version: str = ""
+    questions_version: str = ""
+    decided_at: Optional[datetime] = None
+
+
 class ModerationContextResponse(BaseModel):
     target_preview: ModerationTargetPreview
     related_comments: List[AdminCommentSnippet] = Field(default_factory=list)
     author_profile: Optional[AuthorModerationProfile] = None
+    auto_judgement: Optional[AutoJudgement] = None
 
 
 class AdminReportResponse(BaseModel):

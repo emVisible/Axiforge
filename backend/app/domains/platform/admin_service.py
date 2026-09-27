@@ -16,6 +16,7 @@ from app.core.audit import write_audit_log
 from app.core.strike_policy import STRIKE_PUBLISH_BLOCK
 from app.domains.character.models import Character
 from app.domains.narrative.models import Project
+from app.domains.moderation.models import ModerationCase
 from app.domains.platform.admin_moderation import (
     build_moderation_preview,
     resolve_moderation_context,
@@ -28,6 +29,7 @@ from app.domains.platform.admin_schemas import (
     AdminUserResponse,
     AdminViolationResponse,
     AuditLogResponse,
+    AutoJudgement,
     AuthorModerationProfile,
     DashboardStatsResponse,
     DashboardTopProject,
@@ -37,6 +39,26 @@ from app.domains.platform.admin_schemas import (
     ReportResolveRequest,
 )
 from app.domains.platform.models import AuditLog, ContentReport, PlatformEvent, UserAccount, Violation
+
+
+def _auto_judgement(case: ModerationCase) -> AutoJudgement:
+    """ORM 字段叫 id，契约里叫 case_id（上下文里已经有 target_id，不叫 id 免得歧义）。"""
+    return AutoJudgement(
+        case_id=case.id,
+        state=case.state,
+        engine=case.engine,
+        suggested_action=case.suggested_action,
+        final_action=case.final_action,
+        via=case.via,
+        confidence=case.confidence,
+        authoritative=case.authoritative,
+        calibrated=case.calibrated,
+        clause_ids=list(case.clause_ids or []),
+        reasons=list(case.reasons or []),
+        policy_version=case.policy_version,
+        questions_version=case.questions_version,
+        decided_at=case.decided_at,
+    )
 
 
 class AdminService:
@@ -225,6 +247,18 @@ class AdminService:
             self.db, target_type=target_type, target_id=target_id
         )
         profile = raw.get("author_profile")
+        # 人工打开举报上下文时先看到机器结论，而不是从空白开始判
+        judgement = (
+            await self.db.execute(
+                select(ModerationCase)
+                .where(
+                    ModerationCase.subject_type == target_type,
+                    ModerationCase.subject_id == target_id,
+                )
+                .order_by(ModerationCase.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
         return ModerationContextResponse(
             target_preview=ModerationTargetPreview.model_validate(preview),
             related_comments=[
@@ -233,6 +267,7 @@ class AdminService:
             author_profile=(
                 AuthorModerationProfile.model_validate(profile) if profile else None
             ),
+            auto_judgement=(_auto_judgement(judgement) if judgement else None),
         )
 
     async def hide_comment(self, comment_id: UUID, *, note: Optional[str] = None) -> bool:

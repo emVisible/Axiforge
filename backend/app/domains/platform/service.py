@@ -353,6 +353,24 @@ class ReportService:
             reporter_token=data.reporter_token,
         )
         self.db.add(row)
+        # 举报进来就先判一遍：运营打开这条举报时看到的是"机器结论 + 依据 + 举报理由"，
+        # 而不是从空白开始。审核失败不影响举报本身（advisory_review 内部吞异常）。
+        # 顺序要紧：判断必须发生在 commit 之前，否则案件留在未提交的事务里，
+        # 举报成功了但结论从来没落库——这条是测试逼出来的。
+        from app.domains.moderation.service import advisory_review
+        from app.domains.platform.admin_moderation import build_moderation_preview
+
+        preview = await build_moderation_preview(
+            self.db, target_type=data.target_type, target_id=data.target_id
+        )
+        await advisory_review(
+            self.db,
+            subject_type=data.target_type,
+            subject_id=data.target_id,
+            title=preview.get("title") or "",
+            body=preview.get("excerpt") or "",
+            author_id=str(preview.get("author_id") or ""),
+        )
         await self.db.commit()
         await self.db.refresh(row)
         return ReportResponse.model_validate(row)

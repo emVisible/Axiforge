@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.character.models import Character
 from app.domains.narrative.models import Project, ProjectNode
-from app.domains.narrative.service import project_subject_text
+from app.domains.narrative.text import project_subject_text
 from app.domains.platform.models import Comment
 
 

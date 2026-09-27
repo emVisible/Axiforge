@@ -18,6 +18,20 @@ async def prepare_database():
     await init_db()
 
 
+@pytest.fixture(autouse=True)
+async def settle_moderation_tasks():
+    """判断层现在是后台派发的。用例结束前把它派出去的活儿等完。
+
+    不等会发生的事：上一条用例的判定在下一条用例跑到一半时落库——
+    表现为偶发的"案件数不对"，以及整轮套件突然多等几十秒（连接池被两条
+    会话抢）。这不是测试取巧：`drain_pending` 就是这条链对外承诺的收敛点。
+    """
+    from app.domains.moderation.background import drain_pending
+
+    yield
+    await drain_pending()
+
+
 @pytest.fixture
 async def client():
     transport = ASGITransport(app=app)

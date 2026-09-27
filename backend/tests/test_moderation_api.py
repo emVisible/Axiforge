@@ -30,7 +30,14 @@ async def post_comment(client: AsyncClient, body: str) -> str:
 
 
 async def queue_for(client: AsyncClient, subject_id: str) -> list:
-    """翻完整个队列再筛——只看第一页会把"看不见"误报成"没建案"。"""
+    """翻完整个队列再筛——只看第一页会把"看不见"误报成"没建案"。
+
+    先 `drain_pending()`：保存路径的判定现在是后台派发的，请求返回时案件**允许还没落地**。
+    这不是测试的取巧，异步化之后"最终会有"就是这条链对外的一致性级别。
+    """
+    from app.domains.moderation.background import drain_pending
+
+    await drain_pending()
     out = []
     offset = 0
     while True:

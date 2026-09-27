@@ -13,7 +13,7 @@ from app.core.content_validate import validate_publish_text
 from app.core.pagination import Page
 from app.core.strike_policy import publish_block_reasons
 from app.core.story_cache import story_cache
-from app.domains.moderation.service import advisory_review
+from app.domains.moderation.background import schedule_review
 
 from app.domains.narrative.models import (
     Project,
@@ -42,45 +42,6 @@ from app.domains.narrative.schemas import (
     ProjectAssetRefCreate,
     ProjectAssetRefResponse,
 )
-
-
-def narrative_prose_text(nodes) -> str:
-    """送审正文 = 读者会看到的文字（旁白 + 台词），按运行时顺序拼接。
-
-    库里**两种形状并存**（实测 400 个节点：扁平 `narration`/`dialogue` 占 309/382，
-    新编辑器写的 `script: [{op, text}]` 占 21 且会越来越多），只认一种就等于
-    对另一半内容永远拿到空正文——而空正文不会报错，只会让审核"看起来很干净"。
-
-    不用 `axs_source`：那是带 `【背景 …】` 之类指令的真相源，把标记喂给内容模型
-    只会让它去判断排版指令，而不是判断这篇稿子本身。
-    """
-    parts: List[str] = []
-    for n in sorted(nodes, key=lambda x: (x.sort_order or 0)):
-        nd = n.narrative_data or {}
-        for key in ("narration", "dialogue"):
-            val = nd.get(key)
-            if isinstance(val, str) and val.strip():
-                parts.append(val.strip())
-        script = nd.get("script")
-        if isinstance(script, list):
-            for item in script:
-                if (isinstance(item, dict) and item.get("op") in ("narration", "say")
-                        and isinstance(item.get("text"), str)):
-                    parts.append(item["text"].strip())
-    return "\n".join(p for p in parts if p)
-
-
-def project_subject_text(*, title: str, description: str, nodes) -> Tuple[str, str]:
-    """作品作为审核主体的口径：标题单独给，正文 = 简介 + 读者会看到的文字。
-
-    这里必须是**唯一一处**定义，保存路径和 `moderation.content` 都调它。
-    在此之前保存路径只判正文、举报路径只判简介（面板那份摘录），
-    同一部作品于是留下两份内容指纹、挂着两个案件，而两边看起来都"判过了"。
-    简介是发现页上读者真正看到的文案，漏掉它等于给导流话术留了一条公开面。
-    """
-    prose = narrative_prose_text(nodes)
-    body = "\n\n".join(p for p in ((description or "").strip(), prose) if p)
-    return (title or ""), body
 
 
 class ProjectService:
@@ -777,24 +738,11 @@ class ProjectService:
         proj = await self.db.get(Project, project_id)
         if proj:
             proj.axs_source = data.axs_source
-        # 审核旁路留痕（ADR-028）：作品是平台的核心对象，判断层不接到这里就只是
-        # "审评论和角色"。必须在 commit 之前调用——放在 commit 之后，审核行会随
-        # 调用方事务一起被丢掉（举报路径踩过一次）。失败不影响保存本身。
-        # 文本口径走 moderation 域那一份唯一定义，不在这里重新拼一遍。
-        title, body = project_subject_text(
-            title=project.title or "",
-            description=proj.description if proj else "",
-            nodes=data.nodes,
-        )
-        await advisory_review(
-            self.db,
-            subject_type="project",
-            subject_id=project_id,
-            title=title,
-            body=body,
-            author_id=project.author_id or "",
-        )
         await self.db.commit()
+        # 作品是平台的核心对象，判断层不接到这里就只是"审评论和角色"（ADR-028）。
+        # 派到后台，且派发点在 commit **之后**：后台用的是另一个 session，
+        # 看不见未提交的内容；早一步就会去判一篇还不存在的稿子。
+        schedule_review("project", project_id)
         story_cache.invalidate(str(project_id))
         loaded = await self._load_project(project_id)
         return await self._to_response(loaded) if loaded else None

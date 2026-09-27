@@ -113,7 +113,7 @@ def test_narrative_prose_text_covers_both_stored_shapes():
     """
     from types import SimpleNamespace
 
-    from app.domains.narrative.service import narrative_prose_text
+    from app.domains.narrative.text import narrative_prose_text
 
     nodes = [
         SimpleNamespace(sort_order=1, narrative_data={
@@ -155,6 +155,9 @@ async def test_saving_a_project_narrative_reaches_the_review_queue(client: Async
     )
     assert synced.status_code == 200
 
+    from app.domains.moderation.background import drain_pending
+
+    await drain_pending()  # 判定在后台：保存返回 ≠ 案件已落地
     queue = await client.get("/api/v1/admin/moderation/queue",
                              params={"limit": 200}, headers=admin)
     assert queue.status_code == 200

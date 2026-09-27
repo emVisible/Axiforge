@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Optional
 
 import pytest
@@ -187,9 +188,9 @@ async def test_queue_default_order_puts_suspicious_first(db_session):
                          title="零置信但有明确条款", body="她就是住 XX 路 12 号楼")
         await db_session.commit()
 
-        all_rows = await svc.queue(limit=5000, order="risk")
+        all_rows = (await svc.queue(limit=5000, order="risk"))["items"]
         by_risk = [c.subject_id for c in all_rows if c.subject_id in ids]
-        by_new = [c.subject_id for c in await svc.queue(limit=5000, order="new")
+        by_new = [c.subject_id for c in (await svc.queue(limit=5000, order="new"))["items"]
                   if c.subject_id in ids]
         assert by_risk == [ids[2], ids[0], ids[1]], "条款 > 置信度 > 时间"
         assert by_new == [ids[2], ids[1], ids[0]], "按时间则后落库的在前"
@@ -253,6 +254,45 @@ async def test_machine_reopinion_does_not_override_a_human_resolution(db_session
         assert logs[-1].action == ACTION_APPROVE, "新意见要留痕，只是不落执行"
     finally:
         await _purge(db_session, subject_id)
+
+
+async def test_queue_order_is_total_even_when_created_at_ties(db_session):
+    """同一事务插入的案件 `created_at` 完全相同（PG 的 now() 取事务开始时间）。
+
+    这时"按最新排"退化成数据库爱给什么给什么，翻页就会重复或漏项——而分页测试
+    本身抓不到它：两条同形状的查询可能恰好返回同样的任意顺序。所以这里把
+    **插入顺序**与 **id 降序**故意做成不一样（id 由本测试指定），
+    这样"末级键写没写"必须能被断出来。
+    """
+    from uuid import UUID
+
+    from app.domains.moderation.models import ModerationCase
+
+    ids = [UUID("00000000-0000-0000-0000-%012d" % i) for i in (1, 2, 3)]
+    now = datetime.now(timezone.utc)
+    try:
+        for n, cid in enumerate(ids):   # 插入顺序 = id 升序
+            db_session.add(ModerationCase(
+                id=cid, subject_type="comment", subject_id=f"tie-{n}-{uuid.uuid4().hex[:6]}",
+                author_id="a", fingerprint=f"fp-tie-{n}", state="pending",
+                engine="lexicon", answers={}, reasons=[], clause_ids=[],
+                created_at=now, policy_version="policy-1", questions_version="questions-3",
+            ))
+        await db_session.commit()
+
+        svc = ModerationService(db_session)  # queue() 不碰引擎，不用装配链
+        got = [c.id for c in (await svc.queue(order="new", limit=50))["items"] if c.id in ids]
+        assert got == list(reversed(ids)), (
+            f"平局时末级键必须是 id 降序：期望 {list(reversed(ids))}，实得 {got}")
+
+        first = [c.id for c in (await svc.queue(order="new", limit=2, offset=0))["items"]
+                 if c.id in ids]
+        second = [c.id for c in (await svc.queue(order="new", limit=2, offset=2))["items"]
+                  if c.id in ids]
+        assert first + second == got, "翻页拼起来必须等于按序读全量"
+    finally:
+        await db_session.execute(delete(ModerationCase).where(ModerationCase.id.in_(ids)))
+        await db_session.commit()
 
 
 class Reporting(Switchable):

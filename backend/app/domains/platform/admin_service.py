@@ -228,19 +228,30 @@ class AdminService:
         )
 
     async def list_reports(
-        self, *, status: str = "pending", limit: int = 50
-    ) -> List[AdminReportResponse]:
+        self, *, status: str = "pending", limit: int = 50, offset: int = 0
+    ) -> dict:
+        """举报队列分页。`total` 是**这个状态下的全量**，不是本页条数——
+        没有它，运营看到"50 条"就不知道后面还有没有，而 50 正是过去的硬上限。
+
+        排序末级必须带 `id`：同一事务里插入的多行 `created_at` 完全相同
+        （PG 的 now() 取事务开始时间），只排到时间会在翻页时重复或漏项。
+        """
+        base = select(ContentReport).where(ContentReport.status == status)
+        total = (
+            await self.db.execute(
+                select(func.count()).select_from(base.subquery())
+            )
+        ).scalar_one()
         result = await self.db.execute(
-            select(ContentReport)
-            .where(ContentReport.status == status)
-            .order_by(ContentReport.created_at.desc())
+            base.order_by(ContentReport.created_at.desc(), ContentReport.id.desc())
+            .offset(offset)
             .limit(limit)
         )
         rows = list(result.scalars().all())
         out: List[AdminReportResponse] = []
         for r in rows:
             out.append(await self._report_response(r))
-        return out
+        return {"items": out, "total": int(total)}
 
     async def get_moderation_context(
         self, *, target_type: str, target_id: str

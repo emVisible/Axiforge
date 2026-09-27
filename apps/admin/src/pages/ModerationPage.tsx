@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   Badge,
@@ -6,9 +6,10 @@ import {
   DataTable,
   ErrorDisplay,
   PageHeader,
+  Pagination,
   type DataTableColumn,
 } from "@axiforge/ui";
-import { adminApi, type ModerationCase } from "@/api/adminClient";
+import { adminApi, type ModerationCase, type PaginatedResponse } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
@@ -25,6 +26,8 @@ const SORT_OPTIONS: { key: "risk" | "new"; label: string }[] = [
   { key: "risk", label: "先看可疑" },
   { key: "new", label: "最新" },
 ];
+
+const PAGE_SIZE = 50;
 
 function fmt(v: number | null): string {
   return v === null ? "—" : `${(v * 100).toFixed(0)}%`;
@@ -46,11 +49,18 @@ export default function ModerationPage() {
   const [order, setOrder] = useState<"risk" | "new">("risk");
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [page, setPage] = useState(0);
   const vocab = useModerationVocabulary();
 
-  const list = useAdminList<ModerationCase[]>({
-    queryKey: adminQueryKeys.moderationQueue(state, order),
-    fetcher: () => adminApi.moderationQueue(state || undefined, 100, order),
+  // 换筛选条件或换排序都必须回到第一页，否则会停在一个不属于当前结果集的偏移上
+  useEffect(() => {
+    setPage(0);
+  }, [state, order]);
+
+  const list = useAdminList<PaginatedResponse<ModerationCase>>({
+    queryKey: adminQueryKeys.moderationQueue(state, order, page),
+    fetcher: () =>
+      adminApi.moderationQueue(state || undefined, PAGE_SIZE, order, page * PAGE_SIZE),
   });
   const stats = useAdminList({
     queryKey: adminQueryKeys.moderationStats(),
@@ -269,15 +279,24 @@ export default function ModerationPage() {
       {list.error && <ErrorDisplay message={list.error} onRetry={list.reload} />}
       <DataTable
         columns={columns}
-        rows={list.data ?? []}
+        rows={list.data?.items ?? []}
         rowKey={(r) => r.id}
         loading={list.loading}
         emptyTitle="队列为空"
         emptyDescription="没有内容被自动放行或被自动否决——这两件事都只会在权威引擎过线后发生"
       />
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={list.data?.total ?? 0}
+        onPageChange={setPage}
+      />
 
       {openId && (
-        <EvidencePanel row={(list.data ?? []).find((r) => r.id === openId)} onClose={() => setOpenId(null)} />
+        <EvidencePanel
+          row={(list.data?.items ?? []).find((r) => r.id === openId)}
+          onClose={() => setOpenId(null)}
+        />
       )}
 
       <p className="mt-4 text-2xs text-ink-faint">

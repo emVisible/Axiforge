@@ -15,6 +15,7 @@ from app.domains.moderation.questions import QUESTIONS_VERSION
 from app.domains.moderation.registry import build_policy
 from app.domains.moderation.schemas import (
     CaseResponse,
+    QueuePage,
     ResolveRequest,
     StatsResponse,
     VocabularyResponse,
@@ -38,14 +39,15 @@ def _svc(db: AsyncSession) -> ModerationService:
     return ModerationService(db)
 
 
-@moderation_router.get("/queue", response_model=List[CaseResponse])
+@moderation_router.get("/queue", response_model=QueuePage)
 async def moderation_queue(
     state: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     order: str = Query(default="risk", pattern="^(risk|new)$"),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _svc(db).queue(state=state, limit=limit, order=order)
+    return await _svc(db).queue(state=state, limit=limit, order=order, offset=offset)
 
 
 @moderation_router.get("/stats", response_model=StatsResponse)

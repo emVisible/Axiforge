@@ -45,6 +45,19 @@ class CaseResponse(BaseModel):
     resolution_note: Optional[str] = None
 
 
+class QueuePage(BaseModel):
+    """队列分页。`total` 是该状态下的全量条数，不是本页条数。
+
+    没有它，运营看到"100 条"时不知道后面还有没有——而这里曾经连翻页都做不到，
+    上限就是硬上限（举报列表更糟：默认 50 条，第 51 条起永久看不见）。
+    """
+
+    items: List[CaseResponse]
+    total: int
+    offset: int = 0
+    limit: int = 50
+
+
 class ResolveRequest(BaseModel):
     outcome: str = Field(pattern="^(resolved|dismissed)$")
     note: str = ""

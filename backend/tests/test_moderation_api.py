@@ -30,9 +30,19 @@ async def post_comment(client: AsyncClient, body: str) -> str:
 
 
 async def queue_for(client: AsyncClient, subject_id: str) -> list:
-    res = await client.get("/api/v1/admin/moderation/queue", params={"limit": 200}, headers=ADMIN)
-    assert res.status_code == 200, res.text
-    return [c for c in res.json() if c["subject_id"] == subject_id]
+    """翻完整个队列再筛——只看第一页会把"看不见"误报成"没建案"。"""
+    out = []
+    offset = 0
+    while True:
+        res = await client.get(
+            "/api/v1/admin/moderation/queue",
+            params={"limit": 200, "offset": offset}, headers=ADMIN)
+        assert res.status_code == 200, res.text
+        page = res.json()
+        out += [c for c in page["items"] if c["subject_id"] == subject_id]
+        offset += 200
+        if offset >= page["total"]:
+            return out
 
 
 @pytest.mark.asyncio
@@ -280,6 +290,36 @@ async def test_rejudge_rereads_the_full_content_not_the_panel_excerpt(client: As
         db_session, subject_type="comment", subject_id=comment_id)
     assert loaded == body, "重判取的是全文，不是摘录"
     assert author == "creator-mod-01"
+
+
+@pytest.mark.asyncio
+async def test_queue_pages_are_disjoint_and_cover_the_whole_state(client: AsyncClient):
+    """队列必须能翻完。此前 `limit` 就是硬上限：第 200 条以后的案件在界面上不存在。
+
+    断言写成一页页读到的序列**等于**一次读全量切出来的前缀，而不是"看起来有 total"：
+    末级排序键不稳时（同一事务插入的多行 `created_at` 相同）翻页会重复或漏项，
+    而那只有把两页拼起来跟全量对一遍才照得出来。
+    """
+    ids = [await post_comment(client, f"加微信领 全新体验 {i}") for i in range(6)]
+
+    async def page(offset: int, limit: int = 3) -> dict:
+        res = await client.get(
+            "/api/v1/admin/moderation/queue",
+            params={"limit": limit, "offset": offset, "state": "pending"}, headers=ADMIN)
+        assert res.status_code == 200, res.text
+        return res.json()
+
+    first, second = await page(0), await page(3)
+    whole = await page(0, limit=200)
+
+    assert first["total"] == second["total"] == whole["total"], "同一状态下 total 不该随页变化"
+    assert whole["total"] >= 6, f"前提：队列里至少 6 条（实测 {whole['total']}）"
+    p1 = [c["id"] for c in first["items"]]
+    p2 = [c["id"] for c in second["items"]]
+    assert len(p1) == 3 and len(p2) == 3
+    assert not set(p1) & set(p2), "两页不许重复同一案件"
+    assert p1 + p2 == [c["id"] for c in whole["items"]][:6], "翻页拼起来必须等于按序读全量"
+    assert all(c["state"] == "pending" for c in first["items"])
 
 
 @pytest.mark.asyncio

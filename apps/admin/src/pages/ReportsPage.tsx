@@ -6,12 +6,14 @@ import {
   ErrorDisplay,
   LoadingSpinner,
   PageHeader,
+  Pagination,
   SegmentedControl,
   useToast,
 } from "@axiforge/ui";
 import {
   adminApi,
   type AdminCommentSnippet,
+  type PaginatedResponse,
   type AdminReport,
   type AuthorModerationProfile,
   type AutoJudgement,
@@ -27,6 +29,8 @@ import {
   targetTypeLabel,
 } from "@/lib/moderation";
 
+const PAGE_SIZE = 25;
+
 type ReportTab = "pending" | "resolved" | "dismissed";
 
 interface PendingAction {
@@ -37,10 +41,13 @@ interface PendingAction {
 export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data: items, loading, error, setError, reload } = useAdminList<AdminReport[]>({
-    queryKey: adminQueryKeys.reports(tab),
-    fetcher: () => adminApi.reports(tab),
-  });
+  const [page, setPage] = useState(0);
+  const { data, loading, error, setError, reload } =
+    useAdminList<PaginatedResponse<AdminReport>>({
+      queryKey: adminQueryKeys.reports(tab, page),
+      fetcher: () => adminApi.reports({ status: tab, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+    });
+  const items = data?.items ?? null;
   const { invalidateStats } = useAdminInvalidation();
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
@@ -69,6 +76,11 @@ export default function ReportsPage() {
     const key = reportTargetKey(selected);
     return items.filter((r) => reportTargetKey(r) === key);
   }, [items, selected]);
+
+  // 换 Tab 必须回第一页：偏移量属于上一个筛选条件，留着会停在一个空窗口上
+  useEffect(() => {
+    setPage(0);
+  }, [tab]);
 
   useEffect(() => {
     if (items?.length && !items.some((r) => r.id === selectedId)) {
@@ -271,6 +283,14 @@ export default function ReportsPage() {
                 );
               })}
             </ul>
+            <div className="border-t border-border px-1">
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={data?.total ?? 0}
+                onPageChange={setPage}
+              />
+            </div>
           </div>
 
           <ModerationPreviewPanel

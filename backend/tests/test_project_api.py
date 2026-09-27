@@ -158,7 +158,7 @@ async def test_saving_a_project_narrative_reaches_the_review_queue(client: Async
     queue = await client.get("/api/v1/admin/moderation/queue",
                              params={"limit": 200}, headers=admin)
     assert queue.status_code == 200
-    cases = [c for c in queue.json() if c["subject_id"] == project_id]
+    cases = [c for c in queue.json()["items"] if c["subject_id"] == project_id]
     assert len(cases) == 1, "一次保存该留一条案件（ADR-028 的旁路留痕）"
     assert cases[0]["subject_type"] == "project"
     assert "spam_promotion" in cases[0]["clause_ids"]

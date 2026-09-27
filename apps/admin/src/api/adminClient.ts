@@ -231,6 +231,13 @@ export interface AdminViolation {
   created_at: string;
 }
 
+/** 举报队列的分页入参。`offset` 没有它就只能看见前 50 条。 */
+export interface ReportPageParams {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface PageParams {
   limit?: number;
   offset?: number;
@@ -324,8 +331,8 @@ export interface EngineCalibration {
 
 export const adminApi = {
   stats: () => request<DashboardStats>("/dashboard/stats"),
-  reports: (status = "pending") =>
-    request<AdminReport[]>(`/reports?status=${encodeURIComponent(status)}`),
+  reports: ({ status = "pending", limit = 50, offset = 0 }: ReportPageParams = {}) =>
+    request<PaginatedResponse<AdminReport>>(`/reports${qs({ status, limit, offset })}`),
   resolveReport: (
     id: string,
     action: "dismiss" | "take_down",
@@ -378,8 +385,12 @@ export const adminApi = {
     ),
   auditLogs: ({ limit = 50, offset = 0, action }: PageParams & { action?: string } = {}) =>
     request<PaginatedResponse<AuditLog>>(`/audit-logs${qs({ limit, offset, action })}`),
-  moderationQueue: (state?: string, limit = 50, order: "risk" | "new" = "risk") =>
-    request<ModerationCase[]>(`/moderation/queue${qs({ state, limit, order })}`),
+  moderationQueue: (
+    state?: string,
+    limit = 50,
+    order: "risk" | "new" = "risk",
+    offset = 0,
+  ) => request<PaginatedResponse<ModerationCase>>(`/moderation/queue${qs({ state, limit, order, offset })}`),
   moderationStats: () => request<ModerationStats>("/moderation/stats"),
   moderationVocabulary: () => request<ModerationVocabulary>("/moderation/vocabulary"),
   moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>

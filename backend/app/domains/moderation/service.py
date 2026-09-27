@@ -252,8 +252,8 @@ class ModerationService:
         return case
 
     async def queue(self, state: Optional[str] = None, limit: int = 50,
-                    order: str = "risk") -> List[ModerationCase]:
-        """人工队列。默认按"最该先看"排，不是按最新排。
+                    order: str = "risk", offset: int = 0) -> dict:
+        """人工队列（分页）。默认按"最该先看"排，不是按最新排。
 
         第一级排序键是**有没有明确条款**——这是一个事实（某条规则确实指认了内容），
         不是自报数。必须用它，因为实测词表案件的 `confidence` 全是 0.0：
@@ -266,20 +266,25 @@ class ModerationService:
         所以这是**排序**，不是**结论**——界面必须把这句话显示出来。
         """
         clause_weight = func.coalesce(func.jsonb_array_length(ModerationCase.clause_ids), 0)
-        q = select(ModerationCase)
-        # 末级键必须是确定性的：同一事务里插入的多行 `created_at` 完全相同
-        # （PG 的 now() 取事务开始时间），只排到时间会在分页时重复或漏项。
-        if order == "new":
-            q = q.order_by(ModerationCase.created_at.desc(), ModerationCase.id.desc())
-        else:
-            q = q.order_by(clause_weight.desc(),
-                           ModerationCase.confidence.desc().nulls_last(),
-                           ModerationCase.created_at.desc(),
-                           ModerationCase.id.desc())
-        q = q.limit(limit)
+        base = select(ModerationCase)
+        count_q = select(func.count()).select_from(ModerationCase)
         if state:
-            q = q.where(ModerationCase.state == state)
-        return list((await self.db.execute(q)).scalars().all())
+            base = base.where(ModerationCase.state == state)
+            count_q = count_q.where(ModerationCase.state == state)
+        # 末级键必须是确定性的：同一事务里插入的多行 `created_at` 完全相同
+        # （PG 的 now() 取事务开始时间），只排到时间会在翻页时重复或漏项。
+        if order == "new":
+            base = base.order_by(ModerationCase.created_at.desc(), ModerationCase.id.desc())
+        else:
+            base = base.order_by(clause_weight.desc(),
+                                 ModerationCase.confidence.desc().nulls_last(),
+                                 ModerationCase.created_at.desc(),
+                                 ModerationCase.id.desc())
+        total = (await self.db.execute(count_q)).scalar_one()
+        rows = (
+            await self.db.execute(base.offset(offset).limit(limit))
+        ).scalars().all()
+        return {"items": list(rows), "total": int(total)}
 
     async def get(self, case_id: UUID) -> Optional[ModerationCase]:
         return await self.db.get(ModerationCase, case_id)

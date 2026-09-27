@@ -11,13 +11,18 @@ import {
 import { adminApi, type ModerationCase } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
-import { clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
+import { actionLabel, clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
 
 const STATE_TABS: { key: string; label: string }[] = [
   { key: "pending", label: "待人工" },
   { key: "auto_closed", label: "已自动结案" },
   { key: "dismissed", label: "判为误报" },
   { key: "", label: "全部" },
+];
+
+const SORT_OPTIONS: { key: "risk" | "new"; label: string }[] = [
+  { key: "risk", label: "先看可疑" },
+  { key: "new", label: "最新" },
 ];
 
 function fmt(v: number | null): string {
@@ -30,19 +35,20 @@ function EngineBadge({ row }: { row: ModerationCase }) {
     <div className="flex flex-wrap items-center gap-1">
       <Badge variant={row.authoritative ? "default" : "amber"}>{row.engine || "—"}</Badge>
       {!row.calibrated && <Badge variant="amber">未校准</Badge>}
-      {row.authoritative && <Badge variant="default">可执行</Badge>}
+      {row.authoritative && <Badge variant="default">有执行资格</Badge>}
     </div>
   );
 }
 
 export default function ModerationPage() {
   const [state, setState] = useState("pending");
+  const [order, setOrder] = useState<"risk" | "new">("risk");
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
 
   const list = useAdminList<ModerationCase[]>({
-    queryKey: adminQueryKeys.moderationQueue(state),
-    fetcher: () => adminApi.moderationQueue(state || undefined, 100),
+    queryKey: adminQueryKeys.moderationQueue(state, order),
+    fetcher: () => adminApi.moderationQueue(state || undefined, 100, order),
   });
   const stats = useAdminList({
     queryKey: adminQueryKeys.moderationStats(),
@@ -99,7 +105,7 @@ export default function ModerationPage() {
       header: "结论 / 置信",
       render: (r) => (
         <div>
-          <span className="text-xs">{r.final_action || "—"}</span>
+          <span className="text-xs">{actionLabel(r.final_action)}</span>
           <span className="ml-2 font-mono text-xs text-ink-muted">{fmt(r.confidence)}</span>
           <div className="text-2xs text-ink-faint">{viaLabel(r.via)}</div>
         </div>
@@ -194,7 +200,31 @@ export default function ModerationPage() {
               : ""}
           </button>
         ))}
+        <span className="ml-auto flex items-center gap-1 text-2xs text-ink-faint">
+          排序
+          {SORT_OPTIONS.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => setOrder(o.key)}
+              className={`rounded-full px-2.5 py-0.5 ${
+                order === o.key
+                  ? "bg-brand-muted text-brand"
+                  : "border border-border text-ink-muted hover:text-ink"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </span>
       </div>
+
+      {order === "risk" && (
+        <p className="mb-3 text-2xs text-ink-faint">
+          先看可疑 = 有明确条款的优先，其次按支撑该结论的最弱证据排序，最后按时间。
+          它只决定先看哪条，不是风险度量也不是结论：词表与模型的置信度量纲不同，跨引擎不可比。
+        </p>
+      )}
 
       <div className="mb-3">
         <input

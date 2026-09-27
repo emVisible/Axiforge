@@ -33,9 +33,10 @@ def _svc(db: AsyncSession) -> ModerationService:
 async def moderation_queue(
     state: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
+    order: str = Query(default="risk", pattern="^(risk|new)$"),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _svc(db).queue(state=state, limit=limit)
+    return await _svc(db).queue(state=state, limit=limit, order=order)
 
 
 @moderation_router.get("/stats", response_model=StatsResponse)

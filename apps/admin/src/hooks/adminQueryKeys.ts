@@ -9,7 +9,8 @@ export const adminQueryKeys = {
     ["admin", "projects", page, q ?? "", status ?? ""] as const,
   characters: (page: number, q?: string, status?: string) =>
     ["admin", "characters", page, q ?? "", status ?? ""] as const,
-  moderationQueue: (state: string) => ["admin", "moderation-queue", state] as const,
+  moderationQueue: (state: string, order: string) =>
+    ["admin", "moderation-queue", state, order] as const,
   moderationStats: () => ["admin", "moderation-stats"] as const,
   violations: (page: number, creatorId?: string) =>
     ["admin", "violations", page, creatorId ?? ""] as const,

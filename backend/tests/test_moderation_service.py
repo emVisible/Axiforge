@@ -156,6 +156,48 @@ async def test_engine_refusal_does_not_open_a_queue_case(db_session):
 
 
 @pytest.mark.asyncio
+async def test_queue_default_order_puts_suspicious_first(db_session):
+    """队列默认"先看可疑"：三级排序键都要各就各位（现阶段唯一安全的自动化）。
+
+    第一级必须是"有没有明确条款"而不是置信度——实测词表案件的 confidence 全是 0.0，
+    只按置信度排的话，在默认（未开模型）配置下这个控件等同于按时间排。
+    这里 limit 取大于全表行数：无条款的行本来就会被挤到分页之外，
+    那正是新排序的行为，测试不能假装看不见，所以把它显式包含进来再断言相对顺序。
+    """
+    switch = Switchable(Verdict(action=ACTION_HUMAN, confidence=0.85, engine="fake:model",
+                                calibrated=True, rule="manual_test"))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    ids = [f"life-{uuid.uuid4().hex[:8]}" for _ in range(3)]
+    try:
+        await svc.review(subject_type="project", subject_id=ids[0],
+                         title="高置信无条款", body="雨落下来")
+        # 三次独立的保存 = 三个独立事务：PG 的 now() 取事务开始时间，
+        # 同一个事务里插入的行 created_at 完全相同，"按时间"在批内没有定义。
+        await db_session.commit()
+        switch.verdict = Verdict(action=ACTION_HUMAN, confidence=0.30, engine="fake:model",
+                                 calibrated=True, rule="manual_test")
+        await svc.review(subject_type="project", subject_id=ids[1],
+                         title="低置信无条款", body="风也停了")
+        await db_session.commit()
+        switch.verdict = Verdict(action=ACTION_HUMAN, confidence=0.0, engine="fake:model",
+                                 calibrated=True, clause_ids=["doxxing"],
+                                 rule="hate_or_doxx_or_instruction")
+        await svc.review(subject_type="project", subject_id=ids[2],
+                         title="零置信但有明确条款", body="她就是住 XX 路 12 号楼")
+        await db_session.commit()
+
+        all_rows = await svc.queue(limit=5000, order="risk")
+        by_risk = [c.subject_id for c in all_rows if c.subject_id in ids]
+        by_new = [c.subject_id for c in await svc.queue(limit=5000, order="new")
+                  if c.subject_id in ids]
+        assert by_risk == [ids[2], ids[0], ids[1]], "条款 > 置信度 > 时间"
+        assert by_new == [ids[2], ids[1], ids[0]], "按时间则后落库的在前"
+    finally:
+        for sid in ids:
+            await _purge(db_session, sid)
+
+
+@pytest.mark.asyncio
 async def test_machine_reopinion_does_not_override_a_human_resolution(db_session):
     """人结过案的，机器的新意见只记日志，不改案件状态。"""
     switch = Switchable(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))

@@ -245,8 +245,32 @@ class ModerationService:
             await self.db.flush()
         return case
 
-    async def queue(self, state: Optional[str] = None, limit: int = 50) -> List[ModerationCase]:
-        q = select(ModerationCase).order_by(ModerationCase.created_at.desc()).limit(limit)
+    async def queue(self, state: Optional[str] = None, limit: int = 50,
+                    order: str = "risk") -> List[ModerationCase]:
+        """人工队列。默认按"最该先看"排，不是按最新排。
+
+        第一级排序键是**有没有明确条款**——这是一个事实（某条规则确实指认了内容），
+        不是自报数。必须用它，因为实测词表案件的 `confidence` 全是 0.0：
+        只按 confidence 排，在默认（未开模型）配置下会退化成"按时间"，
+        于是交付一个不起作用的控件。第二级才是 confidence（支撑结论的最弱证据概率），
+        第三级是时间。
+
+        两条诚实的前提：① 词表与模型的置信度不同量纲，跨引擎比较只配当"先看哪条"的提示，
+        不配当风险度量；② 模型条款归属在高置信档仍会错（ADR-028 实测 57% / 18%），
+        所以这是**排序**，不是**结论**——界面必须把这句话显示出来。
+        """
+        clause_weight = func.coalesce(func.jsonb_array_length(ModerationCase.clause_ids), 0)
+        q = select(ModerationCase)
+        # 末级键必须是确定性的：同一事务里插入的多行 `created_at` 完全相同
+        # （PG 的 now() 取事务开始时间），只排到时间会在分页时重复或漏项。
+        if order == "new":
+            q = q.order_by(ModerationCase.created_at.desc(), ModerationCase.id.desc())
+        else:
+            q = q.order_by(clause_weight.desc(),
+                           ModerationCase.confidence.desc().nulls_last(),
+                           ModerationCase.created_at.desc(),
+                           ModerationCase.id.desc())
+        q = q.limit(limit)
         if state:
             q = q.where(ModerationCase.state == state)
         return list((await self.db.execute(q)).scalars().all())

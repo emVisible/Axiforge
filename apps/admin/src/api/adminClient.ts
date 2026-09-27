@@ -339,8 +339,8 @@ export const adminApi = {
     ),
   auditLogs: ({ limit = 50, offset = 0, action }: PageParams & { action?: string } = {}) =>
     request<PaginatedResponse<AuditLog>>(`/audit-logs${qs({ limit, offset, action })}`),
-  moderationQueue: (state?: string, limit = 50) =>
-    request<ModerationCase[]>(`/moderation/queue${qs({ state, limit })}`),
+  moderationQueue: (state?: string, limit = 50, order: "risk" | "new" = "risk") =>
+    request<ModerationCase[]>(`/moderation/queue${qs({ state, limit, order })}`),
   moderationStats: () => request<ModerationStats>("/moderation/stats"),
   moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
     request<ModerationCase>(`/moderation/cases/${id}/resolve`, {

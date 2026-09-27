@@ -118,3 +118,14 @@ export function viaLabel(via: string): string {
 export function clauseLabel(clause: string): string {
   return CLAUSE_LABELS[clause] || clause;
 }
+
+/** 动作的稳定中文（队列的"结论"列与预览面板共用，不能一处中文一处英文）。 */
+const ACTION_LABELS: Record<string, string> = {
+  approve: "自动通过",
+  reject: "自动驳回",
+  human_review: "转人工",
+};
+
+export function actionLabel(action: string): string {
+  return ACTION_LABELS[action] || action || "—";
+}

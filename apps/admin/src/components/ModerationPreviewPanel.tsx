@@ -12,6 +12,7 @@ import type {
 } from "@/api/adminClient";
 import ModerationContextSections from "@/components/ModerationContextSections";
 import {
+  actionLabel,
   clauseLabel,
   formatReportTime,
   maskToken,
@@ -200,7 +201,7 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
     <section className="rounded-xl border border-border bg-surface-raised px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-2xs uppercase tracking-wide text-ink-faint">自动判断</span>
-        <span className="text-xs font-medium">{judgement.final_action || "—"}</span>
+        <span className="text-xs font-medium">{actionLabel(judgement.final_action)}</span>
         <span className="text-2xs text-ink-muted">{viaLabel(judgement.via)}</span>
         <span className="ml-auto flex items-center gap-1">
           <span className="rounded-full border border-border px-1.5 py-0.5 text-2xs">

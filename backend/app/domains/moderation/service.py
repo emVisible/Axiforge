@@ -148,7 +148,13 @@ class ModerationService:
         # 全链没说话（既没命中条款也没给出结论）时**不开案件**。
         # 默认配置下链里只有词表，若"无信号"也建案，人工队列会被干净内容灌满，
         # 而队列的价值恰恰是"这里需要人看一眼"。引擎整体故障仍会建案（outcome is None）。
-        if outcome is not None and outcome.verdict.engine == "chain":
+        #
+        # 引擎**主动拒绝**（正文超窗等）同样不开案件：那条内容的真实状态是
+        # "机器根本没看"，它既不需要人处置，也不该占一个人工名额——
+        # 尤其在这条链已经接到作品保存路径上之后，长稿是常态而非例外。
+        if outcome is not None and (
+            outcome.verdict.engine == "chain" or outcome.verdict.refusal
+        ):
             return None
 
         existing = (

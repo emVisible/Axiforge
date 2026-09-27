@@ -133,6 +133,29 @@ async def test_changed_conclusion_updates_the_case_instead_of_being_dropped(db_s
 
 
 @pytest.mark.asyncio
+async def test_engine_refusal_does_not_open_a_queue_case(db_session):
+    """引擎主动拒绝（正文超窗）不该变成一条人工案件。
+
+    作品正文动辄上万字，若每条拒绝都占一个队列名额，接上保存路径的那一刻
+    就是把队列灌满的那一刻——而那些行的真实状态是"机器没看"，人无从处置。
+    """
+    switch = Switchable(Verdict(action=ACTION_HUMAN, confidence=0.0, engine="fake:model",
+                                refusal="over_length:7003>6000"))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id, title="长稿", body="雨" * 7000)
+        await db_session.commit()
+        assert case is None
+        rows = await db_session.execute(
+            select(ModerationCase).where(ModerationCase.subject_id == subject_id))
+        assert rows.scalars().all() == []
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
 async def test_machine_reopinion_does_not_override_a_human_resolution(db_session):
     """人结过案的，机器的新意见只记日志，不改案件状态。"""
     switch = Switchable(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))

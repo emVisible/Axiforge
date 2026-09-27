@@ -11,7 +11,7 @@ import {
 import { adminApi, type ModerationCase } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
-import { clauseLabel, viaLabel } from "@/lib/moderation";
+import { clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
 
 const STATE_TABS: { key: string; label: string }[] = [
   { key: "pending", label: "待人工" },
@@ -68,7 +68,9 @@ export default function ModerationPage() {
       header: "对象",
       render: (r) => (
         <div className="min-w-0">
-          <span className="text-xs text-ink-muted">{r.subject_type}</span>{" "}
+          <span className="text-xs text-ink-muted">
+            {targetTypeLabel[r.subject_type] || r.subject_type}
+          </span>{" "}
           <span className="font-mono text-xs">{r.subject_id.slice(0, 8)}</span>
           <div className="text-2xs text-ink-faint">
             作者 <span className="font-mono">{r.author_id || "—"}</span>

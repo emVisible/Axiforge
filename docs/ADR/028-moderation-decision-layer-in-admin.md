@@ -642,6 +642,71 @@ Metal 断言（`_status < MTLCommandBufferStatusCommitted`）上，进程消失�
 在该测试开头加 `drain_pending()` 后 3 轮全绿。
 
 
+### D14/D15 落地：引擎没答话要看得见，且降级判定不许覆盖权威结论（2026-09-27 第三轮）
+
+起因是一次真机崩溃（MPS 断言 `MTLCommandBufferStatusCommitted`，sidecar 进程直接没了）。
+当时链按设计降级了：不抛给调用方、不自动执行、词表案件照建。但事后看队列，
+**中台看不出"刚才有一台引擎死了"**——D14 就是这条。查下去发现它是三处，且第二处更严重：
+
+1. **沉默被丢了**（`engine.py` 的 `if verdict.abstained: continue`）。
+   sidecar 客户端把 `URLError` 翻成 `Verdict.abstain(name, "sidecar 不可达：URLError")`，
+   这句话在链里被 `continue` 扔掉，落库的案件依据只剩词表自己那几行。
+   真机实录（修前，同一条案件点「让模型重判」）：
+   `engine: lexicon | via: non_authoritative_engine | reasons: ["lexicon 命中 导流垃圾", …]`
+   ——与"引擎活着时词表自己判的"逐字无法区分。
+2. **降级判定会覆盖掉上一次的权威结论**（这条是修第 1 条时才发现的，记为 D15）。
+   上面那次重判不止丢了原因，还把案件上的 `answers` / `confidence` / `clause_ids`
+   换成词表的空值。修前实测：某案件 `conf 0.9844 / clauses [hate_incitement, doxxing,
+   illegal_instruction]` → 点一次重判（sidecar 死着）→ `engine lexicon / conf 0.0 / clauses []`。
+   后果不是"少了一行说明"：**那条内容真正的风险信号从案件上消失**，
+   队列的风险排序（条款 > 置信度）还把它挪到后面，运营从此看不见它。
+3. 顺带照出两处同源问题：`model_version()` 把"探测失败"按 30s TTL 缓存（sidecar 活过来之后
+   最长半分钟内的真实结论仍标着 `laya:unreachable`），以及决策日志的 `engines_tried` 列
+   在建案分支存引擎名、在去重分支存 reasons——同一列两种含义，复盘时分不清问了几台引擎。
+
+改法（都很小，但每条钉死一个断言）：
+
+| 位置 | 改动 |
+| --- | --- |
+| `engine.decide` | 权威引擎弃权时把原因收进 `silent`，拼到最终结论的 `reasons` 后面；同时 `logger.warning`——全链沉默时不建案件，日志是那条判定唯一的痕迹 |
+| `engine.decide` | 只收权威引擎的沉默。词表在干净稿子上沉默是设计，写进去等于每条自动通过的案件都挂一行噪音，真那条被淹掉 |
+| `Outcome.engine_silence` | 结构化带上"这次被问到但没答话"的清单，给服务层判"这次不如上次有资格"用 |
+| `service.review` | 已有案件是权威结论、这次是降级判定时：**不动结论字段**，只在依据追加一行未答话（按内容去重，不累加） |
+| `laya_sidecar` | 失败探测的 TTL 独立成 2s，成功仍 30s |
+| `service.review` | 去重分支的 `engines_tried` 改回引擎名 |
+
+修后真机同一条案件（sidecar 死着点重判）：
+
+```
+BEFORE 154973d5  engine laya:sidecar conf 0.9844 clauses [hate_incitement, doxxing, illegal_instruction] auth True
+AFTER  (dead)    engine laya:sidecar conf 0.9844 clauses 同上 auth True  via human_only_clause:hate_incitement
+                 依据末行「laya:sidecar 未答话：sidecar 不可达：URLError」
+AFTER  (复活)    engine laya:sidecar conf 0.7871 model_state=laya:multilingual+Tddecfd30，未答话那行自动消失
+```
+
+顺带测到一条对自动化很关键的事实：**同一 payload 连打两次 `/decide`，答案逐比特相同**
+（`age_rating` / `severity` / `hate_targeted` / `primary_clause` 的浮点全精度一致）。
+所以"复活后置信度从 0.9844 变 0.7871"不是模型判不稳，而是 `model_state` 摘要本身变了
+（`Te38e1c5c` → `Tddecfd30`，即 §12 那条标定版次失效键在起作用）。
+一个诚实的缺口：`calibration.json` 不入库，我无法核对 `Te38e1c5c` 具体是哪一版表。
+
+核验：`pytest` 134 passed（新增 6 条：引擎留痕 ×2、不污染干净稿 ×1、日志 ×1、降级不覆盖 ×1、
+失败探测重试 ×1，另把原先只断言 `action` 的 sidecar-down 测试补成断依据），exit 0；
+`pnpm gates` exit 0。四次变异各见过一次红，且红的是不同的测试：
+去掉 `silent.append` → 3 条红；把权威筛子改成"所有弃权都记" → 干净稿那条红；
+失败 TTL 也用成功 TTL → 重试那条红；`downgrade` 恒 False → 覆盖保护那条红。
+
+仍未解（都不是代码缺口，需要口径）：
+- **sidecar 自动重启**：现在死了就一路降级到人工，直到有人手工拉起。要不要给中台加"引擎进程自愈"，
+  以及它算谁的职责，是产品决定。
+- **MPS 崩溃根因**：`_status < MTLCommandBufferStatusCommitted` 是 torch/Metal 侧的断言，
+  单实例复现一次，没有稳定触发条件。
+- **判定引擎的 Python 环境寄存在未纳入版本管理的参照物里**：进程实态是
+  `Clearance/vendor/laya_sidecar/.venv/bin/python backend/sidecar/server.py`。
+  sidecar 代码在本仓库，但跑它的解释器和依赖树在参照物目录里——那个目录删掉，
+  中台的模型判断层就起不来。该不该把它搬到 `backend/sidecar/.venv`（要重装 torch），
+  也需要口径。
+
 
 ### 现在到"真的自动"之间还差什么
 

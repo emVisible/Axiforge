@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
@@ -31,6 +32,8 @@ from app.domains.moderation.questions import QUESTIONS_VERSION
 
 _CACHE_MAX = 512
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class Outcome:
@@ -43,6 +46,9 @@ class Outcome:
     questions_version: str
     engines_tried: Tuple[str, ...] = ()
     prior_reasons: Tuple[str, ...] = ()
+    #: 这次**被问到但没答话**的权威引擎（含原因）。空元组 = 权威引擎都答了。
+    #: 服务层靠它判断"这次的结论不如上次有资格"，见 `service.review`。
+    engine_silence: Tuple[str, ...] = ()
     #: 执行这条结论的引擎有没有不可逆动作的资格（gate 用它，落库也要留痕）
     authoritative: bool = False
     calibrated: bool = False
@@ -122,6 +128,9 @@ class ModerationEngine:
 
         tried: List[str] = []
         prior: List[Verdict] = []
+        #: 权威引擎这次**没能**说话，连同它为什么没说。词表沉默是设计（干净稿子
+        #: 本就没有命中），权威引擎沉默是事故——两者不能混成一个"链没结论"。
+        silent: List[str] = []
         chosen: Optional[Verdict] = None
 
         for provider in self.providers:
@@ -133,6 +142,12 @@ class ModerationEngine:
             except Exception as exc:  # 单个引擎故障不影响链
                 verdict = Verdict.abstain(provider.name, f"引擎异常：{type(exc).__name__}")
             if verdict.abstained:
+                if provider.authoritative:
+                    why = "；".join(verdict.reasons) or "引擎未说明原因"
+                    silent.append(f"{provider.name} 未答话：{why}")
+                    # 全链沉默时不建案件（见 service.review），这一次判定在队列里
+                    # 根本不会出现——日志是唯一还留得住这条事实的地方。
+                    logger.warning("权威审核引擎未答话：%s｜%s", provider.name, why)
                 continue
             if provider.authoritative:
                 chosen = verdict
@@ -150,20 +165,24 @@ class ModerationEngine:
         else:
             authoritative = True
 
+        # 依据里要留下"这次有几台引擎没答话"。真机测过的缺陷：sidecar 崩溃时
+        # 案件照样建出来（词表命中），但依据只有词表自己的那几行，
+        # 中台读到的是"判过了，结论是转人工"，而不是一台模型刚刚死了。
+        extra = list(silent)
         if prior and chosen not in prior:
-            reasons = list(chosen.reasons) + [
+            extra += [
                 f"前面的引擎 {p.engine} 说「{ACTION_LABELS.get(p.action, p.action)}」："
                 + "；".join(p.reasons[:2])
                 for p in prior
             ]
-            from dataclasses import replace as _replace
-
-            chosen = _replace(chosen, reasons=reasons)
+        if extra:
+            chosen = replace(chosen, reasons=list(chosen.reasons) + extra)
 
         action, via = gate(chosen, policy, authoritative=authoritative)
         outcome = Outcome(
             action=action, via=via, verdict=chosen, policy_version=policy.version,
             questions_version=QUESTIONS_VERSION, engines_tried=tuple(tried),
+            engine_silence=tuple(silent),
             prior_reasons=tuple(f"{p.engine}:{p.action}" for p in prior),
             authoritative=authoritative, calibrated=chosen.calibrated,
         )

@@ -100,6 +100,9 @@ async def test_repeated_review_of_unchanged_conclusion_stays_one_case(db_session
         assert second.id == first.id, "同一内容同一结论不该再开一条案件"
         logs = await _logs(db_session, first.id)
         assert [bool(x.dedupe_hit) for x in logs] == [False, True]
+        # 这一列在建案与去重两个分支里必须是同一种东西：引擎名。
+        # 去重分支从前存的是 reasons，同一列两种含义 = 复盘时分不清问了几台引擎。
+        assert [x.engines_tried for x in logs] == [["fake:model"], ["fake:model"]]
     finally:
         await _purge(db_session, subject_id)
 
@@ -153,6 +156,96 @@ async def test_engine_refusal_does_not_open_a_queue_case(db_session):
         rows = await db_session.execute(
             select(ModerationCase).where(ModerationCase.subject_id == subject_id))
         assert rows.scalars().all() == []
+    finally:
+        await _purge(db_session, subject_id)
+
+
+class Dead:
+    """权威引擎没答话时的真实形状：sidecar 客户端把 URLError 翻成 abstain，不外抛。"""
+
+    name = "laya:sidecar"
+    authoritative = True
+
+    def model_version(self) -> str:
+        return "laya:unreachable"
+
+    def health_check(self) -> bool:
+        return False
+
+    def moderate(self, subject: ModerationSubject) -> Verdict:  # noqa: ARG002
+        return Verdict.abstain(self.name, "sidecar 不可达：URLError")
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_rejudge_keeps_the_model_verdict_it_cannot_match(db_session):
+    """真机测出来的覆盖事故：sidecar 崩着的时候点一次「让模型重判」，
+    案件上的 answers / confidence / clause_ids 被换成词表的空值——那条内容真正的
+    风险信号从案件上消失，队列的风险排序还把它挪到了后面。
+
+    降级判定从此只留一条备注，不动结论。
+    """
+    from app.domains.moderation.providers.lexicon import LexiconEngine
+
+    class Maybe:
+        name = "fake:model"
+        authoritative = True
+        dead = False
+
+        def model_version(self) -> str:
+            return f"fake:alive:{int(self.dead)}"
+
+        def health_check(self) -> bool:
+            return not self.dead
+
+        def moderate(self, subject: ModerationSubject) -> Verdict:  # noqa: ARG002
+            if self.dead:
+                return Verdict.abstain(self.name, "sidecar 不可达：URLError")
+            return Verdict(action=ACTION_HUMAN, confidence=0.98, engine=self.name,
+                           calibrated=True, clause_ids=["hate_incitement"],
+                           rule="hate_or_doxx_or_instruction",
+                           reasons=["规则「仇恨 / 隐私 / 违法教程」→ 自动驳回 置信 0.98"])
+
+    eng = Maybe()
+    svc = ModerationService(db_session, ModerationEngine([LexiconEngine(), eng], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(subject_type="project", subject_id=subject_id,
+                                title="夜航", body="加微信领 返利群")
+        await db_session.commit()
+        assert case is not None and case.authoritative is True
+        assert case.clause_ids == ["hate_incitement"]
+
+        eng.dead = True
+        again = await svc.review(subject_type="project", subject_id=subject_id,
+                                 title="夜航", body="加微信领 返利群")
+        await db_session.commit()
+        assert again is not None and again.id == case.id
+        assert again.authoritative is True, "没答话的引擎不许把自己的资格写进案件"
+        assert again.engine == "fake:model" and again.clause_ids == ["hate_incitement"]
+        assert any("未答话" in r for r in again.reasons), again.reasons
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
+async def test_a_dead_model_is_visible_on_the_saved_case(db_session):
+    """依据那一栏要能回答"这台模型当时在不在"。
+
+    引擎层的留痕如果进不到落库的 reasons，运营在队列里看到的还是
+    "词表判了转人工"，而真相是"只有词表判了"——两者的人工工作量完全不同。
+    """
+    from app.domains.moderation.providers.lexicon import LexiconEngine
+
+    svc = ModerationService(db_session, ModerationEngine([LexiconEngine(), Dead()], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id,
+            title="夜航", body="加微信领 返利群")
+        await db_session.commit()
+        assert case is not None
+        assert any("laya:sidecar 未答话" in r for r in case.reasons), case.reasons
+        assert case.engine == "lexicon" and case.authoritative is False
     finally:
         await _purge(db_session, subject_id)
 

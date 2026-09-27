@@ -181,3 +181,13 @@ export function whatIfVerdict(
   }
   return { tone: "ok", text: `会自动执行 ${auto} 条，与人工结论全部一致` };
 }
+
+/** 引擎没答话那行依据的标记。后端只有一处生成点（`moderation/engine.py` 的 `未答话`），
+ * 这里复用它：界面上"这台模型刚才死了"必须一眼看得见，而不是只躺在依据里。 */
+export const ENGINE_SILENCE_MARK = "未答话";
+
+/** 依据里最后一条"某台权威引擎没答话"；没有则空串。 */
+export function engineSilenceNote(reasons: string[] | null | undefined): string {
+  const hits = (reasons ?? []).filter((r) => r.includes(ENGINE_SILENCE_MARK));
+  return hits.length > 0 ? hits[hits.length - 1] : "";
+}

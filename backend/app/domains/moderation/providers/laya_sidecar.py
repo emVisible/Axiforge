@@ -44,12 +44,17 @@ class LayaSidecarEngine:
     #: /health 的模型状态里包含温度表内容，重拟之后结论必须变，所以要参与幂等键。
     #: 但每次判定都打一次 /health 是浪费——按 TTL 缓存。
     _HEALTH_TTL_S = 30.0
+    #: 探测**失败**时缓存要短得多。失败值不只是"暂时不知道"，它会写进幂等键和
+    #: 依据里的 `model_state`：sidecar 活过来之后，最长 30 秒内的真实判定仍会
+    #: 被标成 `laya:unreachable`，一条好端端的结论以"引擎没答话"的名义落库。
+    _HEALTH_FAIL_TTL_S = 2.0
 
     def __init__(self, base_url: str = "http://127.0.0.1:8685", timeout_s: float = 8.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_s = timeout_s
         self._mv = ""
         self._mv_at = 0.0
+        self._mv_ok = True
 
     def _health(self) -> Optional[dict]:
         try:
@@ -74,9 +79,11 @@ class LayaSidecarEngine:
 
     def model_version(self) -> str:
         now = time.monotonic()
-        if not self._mv or now - self._mv_at > self._HEALTH_TTL_S:
+        ttl = self._HEALTH_TTL_S if self._mv_ok else self._HEALTH_FAIL_TTL_S
+        if not self._mv or now - self._mv_at > ttl:
             self._mv_at = now
             self._mv = self._probe_version()
+            self._mv_ok = self._mv != "laya:unreachable"
         return self._mv
 
     def health_check(self) -> bool:

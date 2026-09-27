@@ -182,7 +182,20 @@ class ModerationService:
         if existing is not None:
             snap = _outcome_snapshot(outcome)
             stale = _conclusion_diff(existing, outcome)
-            if stale and existing.state in (STATE_PENDING, STATE_AUTO_CLOSED):
+            # 降级判定不许覆盖权威结论。真机测过：sidecar 崩着的时候点一次
+            # 「让模型重判」，案件上的 answers / confidence / clause_ids 会被
+            # 换成词表的空值——那条内容真正的风险信号就此从案件上消失，
+            # 队列的风险排序也把它挪到后面。这一次尝试只留一条备注。
+            downgrade = bool(stale) and bool(existing.authoritative) and (
+                outcome is not None and not outcome.authoritative
+                and bool(outcome.engine_silence)
+            )
+            if downgrade:
+                notes = [line for line in outcome.engine_silence
+                         if line not in (existing.reasons or [])]
+                if notes:
+                    existing.reasons = list(existing.reasons or []) + notes
+            elif stale and existing.state in (STATE_PENDING, STATE_AUTO_CLOSED):
                 # 命中同一内容指纹不等于"结论相同"：策略版、题集版、温度表都可能已经变了。
                 # 旧代码在这里原样返回旧案件，这一次模型调用被整个丢掉，
                 # 于是队列里那条内容永远挂着旧裁决。人已结案的（resolved/dismissed）
@@ -208,7 +221,10 @@ class ModerationService:
                     case_id=existing.id, dedupe_hit=not stale,
                     action=src["final_action"], via=src["via"],
                     confidence=src["confidence"], engine=src["engine"],
-                    engines_tried=list(src["reasons"]),
+                    # 这一列存的是"问了哪几台引擎"，建案分支存的也是它。
+                    # 从前这里塞的是 reasons——同一个列两种含义，
+                    # 于是决策日志在复盘时分不清"哪几台被调用"和"为什么这么判"。
+                    engines_tried=list(outcome.engines_tried) if outcome else [],
                     policy_version=src["policy_version"],
                     questions_version=src["questions_version"],
                 )

@@ -220,6 +220,86 @@ def test_sidecar_down_degrades_to_human_without_raising():
     eng = ModerationEngine([FakeSidecar({}, error=urllib.error.URLError("refused"))])
     out = decide(eng, subject())
     assert out.action == ACTION_HUMAN
+    # 降级可以，静默不行：没答话这个事实必须跟着结论走
+    assert "laya:sidecar 未答话" in " ".join(out.verdict.reasons)
+
+
+def test_a_dead_authoritative_engine_leaves_its_reason_on_the_case():
+    """真机测过的缺口：sidecar 崩了，案件照样建（词表命中），依据里却只有词表自己那几行。
+
+    链在 `continue` 时把弃权原因丢了，于是中台读到的是"判过了，结论是转人工"，
+    而不是一台权威模型刚刚没答话。锁住的是"沉默也要留痕"。
+    """
+    import urllib.error
+
+    eng = ModerationEngine([LexiconEngine(),
+                            FakeSidecar({}, error=urllib.error.URLError("refused"))])
+    out = decide(eng, subject("加微信领 返利群"))
+    joined = " ".join(out.verdict.reasons)
+    assert "laya:sidecar 未答话" in joined and "URLError" in joined
+    assert out.authoritative is False and out.action == ACTION_HUMAN
+
+
+def test_a_clean_run_does_not_record_the_lexicons_silence():
+    """词表在干净稿子上沉默是设计（它本来就只对命中发声），不能变成依据里的噪音。
+
+    只筛权威引擎这条规则如果写成"所有弃权都记"，每条自动通过的案件都会挂一行
+    "lexicon 未答话"，真正那条"模型没答话"就被淹掉了。
+    """
+    eng = ModerationEngine([LexiconEngine(), FakeSidecar(clean_answers())])
+    out = decide(eng, subject("一个关于雨夜港口的故事。"))
+    assert out.action == ACTION_APPROVE
+    assert not any("未答话" in r for r in out.verdict.reasons)
+
+
+def test_a_dead_engine_with_no_fallback_reaches_the_log(caplog):
+    """全链沉默时不建案件（设计如此），日志是唯一还留得住这条事实的地方。
+
+    少了它，sidecar 崩掉的后果只是"自动执行率掉回 0、队列变短"——
+    一个没有任何一行写着"因为引擎死了"的可观测性缺口。
+    """
+    import logging
+    import urllib.error
+
+    eng = ModerationEngine([FakeSidecar({}, error=urllib.error.URLError("refused"))])
+    with caplog.at_level(logging.WARNING):
+        out = decide(eng, subject())
+    assert out.verdict.engine == "chain"
+    text = " ".join(f"{r.getMessage()}" for r in caplog.records)
+    assert "权威审核引擎未答话" in text and "laya:sidecar" in text
+
+
+def test_a_failed_version_probe_is_retried_soon(monkeypatch):
+    """探测失败的缓存必须比成功短：失败值会进幂等键，也会写进依据里的 model_state。
+
+    按 30 秒 TTL 缓存"unreachable"时，sidecar 活过来之后的真实结论会连着
+    半分钟被标成"这台引擎没答话"——一条好端端的自动通过挂着假的技术背景。
+    """
+    from app.domains.moderation.providers import laya_sidecar as ls
+
+    eng = ls.LayaSidecarEngine(base_url="http://127.0.0.1:1")
+    calls = {"n": 0}
+
+    def health():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return None
+        return {"ok": True, "default": "multilingual", "calibration": {"T": {}, "b": {}}}
+
+    eng._health = health  # type: ignore[method-assign]
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(ls.time, "monotonic", lambda: clock["t"])
+
+    assert eng.model_version() == "laya:unreachable"
+    clock["t"] += ls.LayaSidecarEngine._HEALTH_FAIL_TTL_S + 1
+    reachable = eng.model_version()
+    assert reachable.startswith("laya:multilingual+T"), reachable
+    assert calls["n"] == 2
+
+    # 成功值仍然按 30 秒缓存——否则每条判定都要多打一次 /health
+    clock["t"] += 10
+    assert eng.model_version() == reachable
+    assert calls["n"] == 2
 
 
 def test_overlong_content_is_not_truncated_then_auto_decided():

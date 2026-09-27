@@ -6,6 +6,7 @@ import {
   actionLabel,
   calibrationSummary,
   clauseLabel,
+  engineSilenceNote,
   maskToken,
   questionLabel,
   suggestionLabel,
@@ -162,5 +163,23 @@ describe("举报人凭据的显示", () => {
     expect(maskToken("abcdefghij")).toBe("…cdefghij");
     expect(maskToken("short")).toBe("short");
     expect(maskToken(null)).toBe("匿名");
+  });
+});
+
+describe("引擎没答话的那行依据", () => {
+  // 2026-09-27 真机 sidecar 崩溃时落库的原文（案件 154973d5 的依据末行）
+  const reasons = [
+    "model=multilingual",
+    "规则「仇恨 / 隐私 / 违法教程」→ 自动驳回 置信 0.98",
+    "laya:sidecar 未答话：sidecar 不可达：URLError",
+  ];
+
+  it("能把权威引擎没答话读出来，并带上它为什么没说", () => {
+    expect(engineSilenceNote(reasons)).toBe("laya:sidecar 未答话：sidecar 不可达：URLError");
+  });
+
+  it("健康案件的依据里读不出东西来——不许把正常结论误报成引擎死了", () => {
+    expect(engineSilenceNote(["model=multilingual", "temperature fitted"])).toBe("");
+    expect(engineSilenceNote(undefined)).toBe("");
   });
 });

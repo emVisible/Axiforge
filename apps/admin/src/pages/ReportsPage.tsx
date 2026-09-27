@@ -23,6 +23,7 @@ import { useAdminInvalidation, useAdminList } from "@/hooks/useAdminList";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import {
   countSiblingReports,
+  engineSilenceNote,
   formatReportTime,
   reportSummaryLine,
   reportTargetKey,
@@ -187,8 +188,9 @@ export default function ReportsPage() {
    * 手动让模型用**全文**重判一次。路由返回的是判定结果而非面板那份契约，
    * 所以结束后必须重新读 context——不能把内存里的旧结论就地改写。
    *
-   * 提示语区分两种真实结果：内容与策略都没变时引擎走指纹缓存，案件结论不动、
-   * 只多一行判断记录（`decided_at` 不变）；只有结论变了才会刷新案件。
+   * 提示语区分三种真实结果：模型没答话（后端保留上次结论，只加一行依据）、
+   * 内容与策略都没变（命中指纹缓存，结论不动只多一行判断记录）、结论真的变了。
+   * 第一种最容易被当成第二种：两者 `decided_at` 都不动，但含义完全不同。
    */
   const rejudge = async () => {
     if (!selected || !autoJudgement) return;
@@ -197,11 +199,14 @@ export default function ReportsPage() {
     try {
       await adminApi.moderationRejudge(autoJudgement.case_id);
       const after = await loadContext(selected);
+      const silence = engineSilenceNote(after?.reasons);
       showToast(
-        after?.decided_at === before
-          ? "已按全文送判：结论未变，判断记录加了一行"
-          : "模型结论已更新",
-        "success",
+        silence
+          ? `这台模型没答话，已保留上次结论：${silence}`
+          : after?.decided_at === before
+            ? "已按全文送判：结论未变，判断记录加了一行"
+            : "模型结论已更新",
+        silence ? "error" : "success",
       );
     } catch (e) {
       showToast(e instanceof Error ? e.message : "重判失败", "error");

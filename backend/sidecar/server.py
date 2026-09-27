@@ -100,7 +100,9 @@ def decide_once(state, questions: dict, lang_guess=None, *, calibrate: bool = Tr
     global _loaded
     _loaded = list(router.loaded)
     raw = res.get("answers", {})
-    answers, done = rescale_answers(raw, calibration_table())
+    # calibrate=False 是给拟合脚本用的：在已经缩放过的分布上再拟一次温度，
+    # 得到的是两次缩放的复合，看着"更准"但不可复现，而且每次重拟都会再缩一次。
+    answers, done = rescale_answers(raw, calibration_table() if calibrate else {})
     return {"ok": True, "answers": answers,
             "routing": res.get("routing", routed),
             "calibrated_questions": sorted(done),

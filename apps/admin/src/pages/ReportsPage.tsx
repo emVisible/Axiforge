@@ -14,6 +14,7 @@ import {
   type AdminCommentSnippet,
   type AdminReport,
   type AuthorModerationProfile,
+  type AutoJudgement,
 } from "@/api/adminClient";
 import ModerationPreviewPanel from "@/components/ModerationPreviewPanel";
 import { useAdminInvalidation, useAdminList } from "@/hooks/useAdminList";
@@ -45,6 +46,7 @@ export default function ReportsPage() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [contextComments, setContextComments] = useState<AdminCommentSnippet[]>([]);
   const [authorProfile, setAuthorProfile] = useState<AuthorModerationProfile | null>(null);
+  const [autoJudgement, setAutoJudgement] = useState<AutoJudgement | null>(null);
   const [hidingCommentId, setHidingCommentId] = useState<string | null>(null);
   const { showToast } = useToast();
 
@@ -78,12 +80,14 @@ export default function ReportsPage() {
     if (!report) {
       setContextComments([]);
       setAuthorProfile(null);
+      setAutoJudgement(null);
       return;
     }
     try {
       const ctx = await adminApi.moderationContext(report.target_type, report.target_id);
       setContextComments(ctx.related_comments);
       setAuthorProfile(ctx.author_profile);
+      setAutoJudgement(ctx.auto_judgement);
     } catch {
       setContextComments([]);
       setAuthorProfile(null);
@@ -243,6 +247,7 @@ export default function ReportsPage() {
             siblingReports={siblingReports}
             relatedComments={contextComments}
             authorProfile={authorProfile}
+            autoJudgement={autoJudgement}
             busy={busy}
             hidingCommentId={hidingCommentId}
             onHideComment={tab === "pending" ? hideComment : undefined}

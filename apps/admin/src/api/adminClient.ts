@@ -105,10 +105,28 @@ export interface ModerationTargetPreview {
   violation_count: number;
 }
 
+export interface AutoJudgement {
+  case_id: string;
+  state: string;
+  engine: string;
+  suggested_action: string;
+  final_action: string;
+  via: string;
+  confidence: number | null;
+  authoritative: boolean;
+  calibrated: boolean;
+  clause_ids: string[];
+  reasons: string[];
+  policy_version: string;
+  questions_version: string;
+  decided_at: string | null;
+}
+
 export interface ModerationContext {
   target_preview: ModerationTargetPreview;
   related_comments: AdminCommentSnippet[];
   author_profile: AuthorModerationProfile | null;
+  auto_judgement: AutoJudgement | null;
 }
 
 export interface AdminCommentSnippet {

@@ -4,7 +4,12 @@ import {
   Card,
 } from "@axiforge/ui";
 import { ExternalLink, User } from "lucide-react";
-import type { AdminReport, AuthorModerationProfile, AdminCommentSnippet } from "@/api/adminClient";
+import type {
+  AdminReport,
+  AuthorModerationProfile,
+  AdminCommentSnippet,
+  AutoJudgement,
+} from "@/api/adminClient";
 import ModerationContextSections from "@/components/ModerationContextSections";
 import {
   formatReportTime,
@@ -19,6 +24,7 @@ interface ModerationPreviewPanelProps {
   siblingReports?: AdminReport[];
   relatedComments?: AdminCommentSnippet[];
   authorProfile?: AuthorModerationProfile | null;
+  autoJudgement?: AutoJudgement | null;
   onDismiss: () => void;
   onTakeDown: () => void;
   onHideComment?: (commentId: string) => void;
@@ -32,6 +38,7 @@ export default function ModerationPreviewPanel({
   siblingReports = [],
   relatedComments = [],
   authorProfile,
+  autoJudgement,
   onDismiss,
   onTakeDown,
   onHideComment,
@@ -143,6 +150,8 @@ export default function ModerationPreviewPanel({
           <div className="font-mono text-[10px]">ID {report.target_id}</div>
         </section>
 
+        {autoJudgement && <AutoJudgementStrip judgement={autoJudgement} />}
+
         <ModerationContextSections
           comments={relatedComments}
           author={authorProfile}
@@ -174,5 +183,92 @@ export default function ModerationPreviewPanel({
         </div>
       </div>
     </Card>
+  );
+}
+
+
+const CLAUSE_LABELS: Record<string, string> = {
+  sexual_explicit: "露骨性内容",
+  gratuitous_violence: "血腥暴力",
+  self_harm_unsafe: "自伤未安全处理",
+  hate_incitement: "煽动仇恨",
+  illegal_instruction: "违法教程",
+  doxxing: "真人隐私",
+  spam_promotion: "导流垃圾",
+  rating_mismatch: "分级不符",
+};
+
+const VIA_LABELS: Record<string, string> = {
+  non_authoritative_engine: "引擎不权威，转人工",
+  human_only_clause: "命中需人工判断的条款",
+  uncalibrated: "置信度未校准，不自动执行",
+  engine_abstained: "所有引擎弃权",
+  engine_unavailable: "审核引擎不可用",
+  policy_default: "策略默认转人工",
+};
+
+function viaLabel(via: string): string {
+  if (!via) return "—";
+  if (via.startsWith("auto@")) return `自动执行（线 ${via.slice(5)}）`;
+  if (via.startsWith("below_approve_line")) return "低于通过线，转人工";
+  if (via.startsWith("below_reject_line")) return "低于驳回线，转人工";
+  if (via.startsWith("engine_error")) return "引擎异常，转人工";
+  return VIA_LABELS[via] ?? via;
+}
+
+/**
+ * 机器结论条。放在举报元信息之下、评论区之上——它是运营读这条举报时的第一屏信息。
+ *
+ * 明确标出"有没有执行资格"与"是否校准"：只有两者都成立，系统才会自己动手；
+ * 否则它只是把一个建议递到人面前。运营需要知道自己在替谁做最后那一步。
+ */
+function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
+  return (
+    <section className="rounded-xl border border-border bg-surface-raised px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide text-ink-faint">自动判断</span>
+        <span className="text-xs font-medium">{judgement.final_action || "—"}</span>
+        <span className="text-[10px] text-ink-muted">{viaLabel(judgement.via)}</span>
+        <span className="ml-auto flex items-center gap-1">
+          <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px]">
+            {judgement.engine}
+          </span>
+          {!judgement.calibrated && (
+            <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] text-amber-600">
+              未校准
+            </span>
+          )}
+          {judgement.authoritative && (
+            <span className="rounded-full border border-emerald-500/40 px-1.5 py-0.5 text-[10px] text-emerald-600">
+              可执行
+            </span>
+          )}
+        </span>
+      </div>
+      {judgement.clause_ids.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {judgement.clause_ids.map((c) => (
+            <span
+              key={c}
+              className="rounded-full bg-brand-muted px-2 py-0.5 text-[10px] text-brand"
+            >
+              {CLAUSE_LABELS[c] || c}
+            </span>
+          ))}
+        </div>
+      )}
+      {judgement.reasons.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-[10px] text-ink-muted">
+          {judgement.reasons.slice(0, 4).map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1 text-[10px] text-ink-faint">
+        置信 {judgement.confidence === null ? "—" : `${(judgement.confidence * 100).toFixed(0)}%`}
+        <span className="mx-1">·</span>
+        {judgement.policy_version} / {judgement.questions_version}
+      </div>
+    </section>
   );
 }

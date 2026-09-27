@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from app.domains.moderation.contracts import (
     ACTION_HUMAN,
+    ACTION_LABELS,
     ModerationProvider,
     ModerationSubject,
     Policy,
@@ -151,7 +152,9 @@ class ModerationEngine:
 
         if prior and chosen not in prior:
             reasons = list(chosen.reasons) + [
-                f"prior[{p.engine}]={p.action}:{';'.join(p.reasons[:2])}" for p in prior
+                f"前面的引擎 {p.engine} 说「{ACTION_LABELS.get(p.action, p.action)}」："
+                + "；".join(p.reasons[:2])
+                for p in prior
             ]
             from dataclasses import replace as _replace
 

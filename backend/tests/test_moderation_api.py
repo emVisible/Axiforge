@@ -54,6 +54,11 @@ async def test_lexicon_hit_on_comment_becomes_a_pending_case(client: AsyncClient
     assert "spam_promotion" in case["clause_ids"]
     # 判断依据外露：运营在一屏里要能回答"为什么这条进来了"
     assert case["reasons"]
+    # 依据文本本身也得是可读的——把 `spam_promotion` 直接拼进理由，
+    # 就等于让后端在最该说人话的地方继续说内部 id。
+    joined = " ".join(case["reasons"])
+    assert "导流垃圾" in joined
+    assert "spam_promotion" not in joined
     assert case["questions_version"].startswith("questions-")
     assert case["policy_version"].startswith("policy-")
     # 词表不权威 → 它不可能把内容自动放走或自动驳回
@@ -275,6 +280,34 @@ async def test_rejudge_rereads_the_full_content_not_the_panel_excerpt(client: As
         db_session, subject_type="comment", subject_id=comment_id)
     assert loaded == body, "重判取的是全文，不是摘录"
     assert author == "creator-mod-01"
+
+
+@pytest.mark.asyncio
+async def test_vocabulary_covers_every_clause_and_rule_it_ships(client: AsyncClient):
+    """中台读的那份词汇表必须与后端定义**逐项相等**。
+
+    漂移的形态是静默的：加一条轴、忘了发短名，界面就打印 `spam_promotion` 这种
+    内部 id，而没有任何一端会报错。这条测试就是那"另一端"。
+    """
+    from app.domains.moderation.policy import RULES
+    from app.domains.moderation.questions import REGISTERED_CLAUSES
+
+    assert (await client.get("/api/v1/admin/moderation/vocabulary")).status_code == 401
+
+    res = await client.get("/api/v1/admin/moderation/vocabulary", headers=ADMIN)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert set(body["clauses"]) == set(REGISTERED_CLAUSES), "条款短名与条款注册表漂移"
+    assert all(body["clauses"].values())
+    assert set(body["rules"]) == {r.key for r in RULES}, "规则表与短名表漂移"
+    assert all(body["rules"].values())
+    assert set(body["actions"]) == {"approve", "reject", "human_review"}
+    assert set(body["human_only_clauses"]) <= set(REGISTERED_CLAUSES), \
+        "策略引用了一个没定义过的条款"
+    # `none` 是单选题的一档，不是条款：它只能出现在建议表里
+    assert body["suggestions"]["none"] == "无问题"
+    assert "none" not in body["clauses"]
+    assert body["questions_version"].startswith("questions-")
 
 
 @pytest.mark.asyncio

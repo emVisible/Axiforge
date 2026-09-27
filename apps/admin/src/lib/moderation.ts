@@ -1,4 +1,4 @@
-import type { AdminReport } from "@/api/adminClient";
+import type { AdminReport, ModerationVocabulary } from "@/api/adminClient";
 
 const WEB_ORIGIN =
   import.meta.env.VITE_WEB_ORIGIN?.replace(/\/$/, "") || "http://localhost:5174";
@@ -49,34 +49,35 @@ export function countSiblingReports(items: AdminReport[], selected: AdminReport)
   ).length;
 }
 
-/** 内容条款 → 中文。队列行与预览面板必须同一份措辞：
- *  两处各写一份，早晚会有一处改了另一处没改，同一个条款在两个界面长两个名字。
- *  真正的注册表在后端 `questions.REGISTERED_CLAUSES`，这里与它的漂移是一个已知待办。 */
-export const CLAUSE_LABELS: Record<string, string> = {
-  sexual_explicit: "露骨性内容",
-  gratuitous_violence: "血腥暴力",
-  self_harm_unsafe: "自伤未安全处理",
-  hate_incitement: "煽动仇恨",
-  illegal_instruction: "违法教程",
-  doxxing: "真人隐私",
-  spam_promotion: "导流垃圾",
-  rating_mismatch: "分级不符",
+/** 词汇表未到位时的空表。标签函数会落回内部 id——那是可见的缺口，不是兜底文案。 */
+export const EMPTY_VOCABULARY: ModerationVocabulary = {
+  clauses: {},
+  suggestions: {},
+  rules: {},
+  actions: {},
+  human_only_clauses: [],
+  policy_version: "",
+  questions_version: "",
 };
+
+export function clauseLabel(v: ModerationVocabulary, clause: string): string {
+  return v.clauses[clause] || clause;
+}
+
+/** 单选题「最主要一条」的读法。它和条款不是一个取值域：多一个 `none`。 */
+export function suggestionLabel(v: ModerationVocabulary, suggestion: string): string {
+  return v.suggestions[suggestion] || suggestion;
+}
 
 /** 命中即建议人工的规则 → 中文（`via=suggested_human:<rule>` 的后半段）。 */
-const RULE_LABELS: Record<string, string> = {
-  high_severity: "危害量级偏高",
-  adult_or_violence_needs_label: "含成人/血腥内容，需人工定级",
-  hate_or_doxx_or_instruction: "仇恨/隐私/违法教程",
-  spam_only: "导流垃圾",
-};
+export function ruleLabel(v: ModerationVocabulary, rule: string): string {
+  return v.rules[rule] || rule;
+}
 
-const VIA_LABELS: Record<string, string> = {
-  non_authoritative_engine: "引擎不权威，转人工",
-  uncalibrated: "置信度未校准，不自动执行",
-  engine_abstained: "所有引擎弃权",
-  engine_unavailable: "审核引擎不可用",
-};
+/** 动作的稳定中文（队列的"结论"列与预览面板共用，不能一处中文一处英文）。 */
+export function actionLabel(v: ModerationVocabulary, action: string): string {
+  return v.actions[action] || action || "—";
+}
 
 /** 带后缀的 via 全部走这里剥前缀：手写 `slice(19)` 是一个没人能一眼验住的数字。 */
 function tail(via: string, prefix: string): string {
@@ -85,12 +86,13 @@ function tail(via: string, prefix: string): string {
 
 /**
  * `via` 是"这条结论为什么是这个动作"的机器标签，直接摊给运营看等于让人读源码。
- * 后端保持稳定前缀、前端负责措辞：改文案不动契约。
+ * 后端保持稳定前缀、前端负责把前缀排成一句人话；**句子里的条款名与规则名来自词汇表**，
+ * 不在这里另抄一份。
  *
  * 带后缀的 via（`human_only_clause:doxxing`、`below_approve_line 0.77<0.90`）
  * 保留数字与条款名：一队列里全是"转人工"时，运营就无法回答"这条跟那条有什么不同"。
  */
-export function viaLabel(via: string): string {
+export function viaLabel(v: ModerationVocabulary, via: string): string {
   if (!via) return "—";
   if (via.startsWith("auto@")) return `自动执行（线 ${tail(via, "auto@")}）`;
   if (via.startsWith("below_approve_line")) return `低于通过线（${tail(via, "below_approve_line ")}）`;
@@ -105,27 +107,18 @@ export function viaLabel(via: string): string {
       : `引擎拒绝自动执行：${detail}`;
   }
   if (via.startsWith("human_only_clause:")) {
-    const clause = tail(via, "human_only_clause:");
-    return `命中需人工判断的条款：${clauseLabel(clause)}`;
+    return `命中需人工判断的条款：${clauseLabel(v, tail(via, "human_only_clause:"))}`;
   }
   if (via.startsWith("suggested_human:")) {
-    const rule = tail(via, "suggested_human:");
-    return `规则建议人工：${RULE_LABELS[rule] || rule}`;
+    return `规则建议人工：${ruleLabel(v, tail(via, "suggested_human:"))}`;
   }
-  return VIA_LABELS[via] ?? via;
+  return VIA_SUFFIX_FREE[via] ?? via;
 }
 
-export function clauseLabel(clause: string): string {
-  return CLAUSE_LABELS[clause] || clause;
-}
-
-/** 动作的稳定中文（队列的"结论"列与预览面板共用，不能一处中文一处英文）。 */
-const ACTION_LABELS: Record<string, string> = {
-  approve: "自动通过",
-  reject: "自动驳回",
-  human_review: "转人工",
+/** 不带后缀的 via 就是几个固定状态，措辞属于展示层，留在前端。 */
+const VIA_SUFFIX_FREE: Record<string, string> = {
+  non_authoritative_engine: "引擎不权威，转人工",
+  uncalibrated: "置信度未校准，不自动执行",
+  engine_abstained: "所有引擎弃权",
+  engine_unavailable: "审核引擎不可用",
 };
-
-export function actionLabel(action: string): string {
-  return ACTION_LABELS[action] || action || "—";
-}

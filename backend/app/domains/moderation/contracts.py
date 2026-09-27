@@ -32,6 +32,14 @@ ACTION_REJECT = "reject"
 ACTION_HUMAN = "human_review"
 ACTIONS = (ACTION_APPROVE, ACTION_REJECT, ACTION_HUMAN)
 
+#: 三种结论的运营侧短名。放在取值域旁边而不是中台前端：
+#: 两份表漂移时两端都不会报错，最坏情况是把 `human_review` 印给运营。
+ACTION_LABELS: Dict[str, str] = {
+    ACTION_APPROVE: "自动通过",
+    ACTION_REJECT: "自动驳回",
+    ACTION_HUMAN: "转人工",
+}
+
 
 @dataclass(frozen=True)
 class ModerationSubject:

@@ -167,6 +167,29 @@ REGISTERED_CLAUSES: frozenset = frozenset(
     c for _, _, _, _, c in _QUESTION_SPECS if c
 )
 
+#: 条款给运营看的短名。放在这里而不是中台前端：条款的**定义**与它的**读法**
+#: 分在两处维护时，加一条轴只会让 UI 直接打印 `spam_promotion` 这种内部 id，
+#: 而且没有任何东西会报警——漂移是静默的。下面那道断言让它在导入时就炸。
+CLAUSE_LABELS: Dict[str, str] = {
+    "sexual_explicit": "露骨性内容",
+    "gratuitous_violence": "血腥暴力",
+    "self_harm_unsafe": "自伤未安全处理",
+    "hate_incitement": "煽动仇恨",
+    "illegal_instruction": "违法教程",
+    "doxxing": "真人隐私",
+    "spam_promotion": "导流垃圾",
+    "rating_mismatch": "分级不符",
+}
+
+#: 单选题「最主要一条」的取值读法：条款短名 + `none` 那一档（它不是条款）。
+SUGGESTION_LABELS: Dict[str, str] = {**CLAUSE_LABELS, "none": "无问题"}
+
+assert set(CLAUSE_LABELS) == set(REGISTERED_CLAUSES), (
+    "条款短名与条款注册表漂移了：缺 "
+    f"{sorted(set(REGISTERED_CLAUSES) - set(CLAUSE_LABELS))}，"
+    f"多 {sorted(set(CLAUSE_LABELS) - set(REGISTERED_CLAUSES))}"
+)
+
 
 def question_types() -> Dict[str, str]:
     return {name: qtype for name, qtype, *_ in _QUESTION_SPECS}

@@ -17,6 +17,7 @@ import re
 from typing import Dict, List
 
 from app.domains.moderation.contracts import ACTION_HUMAN, ModerationSubject, Verdict
+from app.domains.moderation.questions import CLAUSE_LABELS
 
 # 每条：条款 → 词/模式。生产上应外置成可热更的配置（参照实现也是这么列在 roadmap 里的）。
 _PATTERNS: Dict[str, List[str]] = {
@@ -85,6 +86,9 @@ class LexiconEngine:
             action=ACTION_HUMAN,
             confidence=0.0,
             engine=self.name,
-            reasons=[f"lexicon 命中 {','.join(sorted(hits))}", f"lexicon_version={LEXICON_VERSION}"],
+            reasons=[
+                "lexicon 命中 " + "、".join(CLAUSE_LABELS.get(h, h) for h in sorted(hits)),
+                f"lexicon_version={LEXICON_VERSION}",
+            ],
             clause_ids=sorted(hits),
         )

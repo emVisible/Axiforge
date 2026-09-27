@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,3 +60,19 @@ class StatsResponse(BaseModel):
     by_state: dict
     by_engine: dict
     engines: List[EngineHealth]
+
+
+class VocabularyResponse(BaseModel):
+    """判断层词汇表（条款/规则/结论的运营侧短名）+ 版本键。
+
+    版本键让前端可以"这套词已经过期了"为理由重取：换了题集或策略后
+    条款集本身会变，用一份缓存到死的词表去渲染新条款，就又回到抄两份的老路。
+    """
+
+    clauses: Dict[str, str]
+    suggestions: Dict[str, str]
+    rules: Dict[str, str]
+    actions: Dict[str, str]
+    human_only_clauses: List[str]
+    policy_version: str
+    questions_version: str

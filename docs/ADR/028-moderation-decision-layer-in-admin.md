@@ -375,6 +375,47 @@ DB 侧断言案件数 1、`fingerprint == content_sha("", 全文)` 且 `!= conte
 
 
 
+### D5 落地：词汇表进 API，前端不再抄第二份
+
+中台此前在自己代码里抄了三张表：8 条条款短名、4 条规则短名、3 条结论短名（共 15 条），
+外加后端理由文本里直接拼的内部 id。这不是"重复几行字"的问题：**两份词汇表漂移时两端都不报错**，
+最坏情况是运营在队列里读到 `spam_promotion`，最好的情况是同一条款在两个界面长两个名字。
+而条款集是会长的（每加一条轴都要进题集、进规则、进中台），抄一份的代价随规模涨。
+
+20. **词汇表的唯一权威在后端定义它的那三个模块旁边，不在 UI 层。**
+    `questions.CLAUSE_LABELS` 紧挨 `_AXIS_SPECS`、`Rule.label` 是规则对象的一个字段、
+    `contracts.ACTION_LABELS` 紧挨 `ACTIONS`；`moderation/vocabulary.py` 只做投影，
+    并在**导入期**断言三者与取值域逐项相等——漂移不再是运行时才发现的事。
+    `GET /api/v1/admin/moderation/vocabulary` 把这份投影发出去（同样受 `require_admin` 保护），
+    带 `policy_version` / `questions_version` 两个版本键，前端因此可以说"这套词过期了"。
+21. **前端的 `viaLabel` 保留解析、交出词汇。** 剥前缀、把数字排进一句人话是展示逻辑；
+    条款名、规则名、结论名从 API 来。词表未到位时标签落回**内部 id**，
+    这是有意的：接口挂了要看得见，不该用一句兜底文案盖住。
+22. **理由文本也说人话**（同一处权威的第二批受益者）：
+
+| 位置 | 之前 | 现在（真机同一条评论） |
+|---|---|---|
+| 词表命中 | `lexicon 命中 spam_promotion` | `lexicon 命中 导流垃圾` |
+| 规则结论 | `rule=hate_or_doxx_or_instruction → reject conf=0.62` | `规则「仇恨 / 隐私 / 违法教程」→ 自动驳回 置信 0.98` |
+| 前置引擎 | `prior[lexicon]=human_review:…` | `前面的引擎 lexicon 说「转人工」：lexicon 命中 导流垃圾；…` |
+
+**仍在的泄漏，明确记下不假装做完**：sidecar 的模型自述（`model=multilingual`、
+`routing: non-Latin script…`）是引擎诊断不是词汇；`未标定轴：age_rating、severity` 里的
+**问题名**还没有短名表（问题层与条款层是两个取值域，加它得先想清楚问题要不要对运营露出）；
+`lexicon_version=` / `questions_version=` 保持原样。
+
+顺带第二次撞到阻断 B：真机一条纯导流评论上 Laya 给 `hate=1.00 pii=0.98 instruction=0.98`、
+置信 0.98，被 `human_only_clause` 一票否决转人工。这与 D3 那条"单选只当建议"是同一件事的两面：
+模型在广告文本上把三条重罪轴一起打满，所以既不能让它自动驳回，也不能把它的 argmax 当条款写库。
+
+核验：`pytest` 104 passed（含 `test_vocabulary_covers_every_clause_and_rule_it_ships` 逐项相等）；
+两处变异都见过红——删掉 `doxxing` 的短名 → 导入期 `AssertionError: 条款短名与条款注册表漂移了：缺 ['doxxing']`，
+把理由文本退回 id 拼接 → `assert '导流垃圾' in 'lexicon 命中 spam_promotion …'`；
+浏览器两个页面各扫 13 个内部 id，命中 **0 处**，两屏标签全部来自 API；
+一次页面加载只发 **1 次** `/vocabulary`（React Query 同 key 合并）；`pnpm gates` exit 0。
+
+
+
 ### 现在到"真的自动"之间还差什么
 
 按顺序，且第 2 步之前不要谈自动化率：

@@ -11,6 +11,7 @@ import {
 import { adminApi, type ModerationCase } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
+import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
 import { actionLabel, clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
 
 const STATE_TABS: { key: string; label: string }[] = [
@@ -45,6 +46,7 @@ export default function ModerationPage() {
   const [order, setOrder] = useState<"risk" | "new">("risk");
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const vocab = useModerationVocabulary();
 
   const list = useAdminList<ModerationCase[]>({
     queryKey: adminQueryKeys.moderationQueue(state, order),
@@ -92,7 +94,7 @@ export default function ModerationPage() {
           <div className="flex flex-wrap gap-1">
             {r.clause_ids.map((c) => (
               <Badge key={c} variant="amber">
-                {clauseLabel(c)}
+                {clauseLabel(vocab, c)}
               </Badge>
             ))}
           </div>
@@ -105,9 +107,9 @@ export default function ModerationPage() {
       header: "结论 / 置信",
       render: (r) => (
         <div>
-          <span className="text-xs">{actionLabel(r.final_action)}</span>
+          <span className="text-xs">{actionLabel(vocab, r.final_action)}</span>
           <span className="ml-2 font-mono text-xs text-ink-muted">{fmt(r.confidence)}</span>
-          <div className="text-2xs text-ink-faint">{viaLabel(r.via)}</div>
+          <div className="text-2xs text-ink-faint">{viaLabel(vocab, r.via)}</div>
         </div>
       ),
     },

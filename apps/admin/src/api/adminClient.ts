@@ -125,6 +125,18 @@ export interface AutoJudgement {
   decided_at: string | null;
 }
 
+/** 判断层词汇表：条款/规则/结论的中文短名由后端那一处定义投影出来。
+ *  前端不再自己抄一份——两份表漂移时两端都不报错，最坏情况是把内部 id 印给运营。 */
+export interface ModerationVocabulary {
+  clauses: Record<string, string>;
+  suggestions: Record<string, string>;
+  rules: Record<string, string>;
+  actions: Record<string, string>;
+  human_only_clauses: string[];
+  policy_version: string;
+  questions_version: string;
+}
+
 export interface ModerationContext {
   target_preview: ModerationTargetPreview;
   related_comments: AdminCommentSnippet[];
@@ -345,6 +357,7 @@ export const adminApi = {
   moderationQueue: (state?: string, limit = 50, order: "risk" | "new" = "risk") =>
     request<ModerationCase[]>(`/moderation/queue${qs({ state, limit, order })}`),
   moderationStats: () => request<ModerationStats>("/moderation/stats"),
+  moderationVocabulary: () => request<ModerationVocabulary>("/moderation/vocabulary"),
   moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
     request<ModerationCase>(`/moderation/cases/${id}/resolve`, {
       method: "POST",

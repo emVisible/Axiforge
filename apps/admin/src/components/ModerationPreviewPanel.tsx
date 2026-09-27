@@ -11,11 +11,13 @@ import type {
   AutoJudgement,
 } from "@/api/adminClient";
 import ModerationContextSections from "@/components/ModerationContextSections";
+import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
 import {
   actionLabel,
   clauseLabel,
   formatReportTime,
   maskToken,
+  suggestionLabel,
   targetTypeLabel,
   viaLabel,
   webDiscoverUrl,
@@ -215,12 +217,13 @@ function AutoJudgementStrip({
   onRejudge?: () => void;
   rejudging?: boolean;
 }) {
+  const vocab = useModerationVocabulary();
   return (
     <section className="rounded-xl border border-border bg-surface-raised px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-2xs uppercase tracking-wide text-ink-faint">自动判断</span>
-        <span className="text-xs font-medium">{actionLabel(judgement.final_action)}</span>
-        <span className="text-2xs text-ink-muted">{viaLabel(judgement.via)}</span>
+        <span className="text-xs font-medium">{actionLabel(vocab, judgement.final_action)}</span>
+        <span className="text-2xs text-ink-muted">{viaLabel(vocab, judgement.via)}</span>
         <span className="ml-auto flex items-center gap-1">
           <span className="rounded-full border border-border px-1.5 py-0.5 text-2xs">
             {judgement.engine}
@@ -244,7 +247,7 @@ function AutoJudgementStrip({
               key={c}
               className="rounded-full bg-brand-muted px-2 py-0.5 text-2xs text-brand"
             >
-              {clauseLabel(c)}
+              {clauseLabel(vocab, c)}
             </span>
           ))}
         </div>
@@ -253,9 +256,7 @@ function AutoJudgementStrip({
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span className="text-2xs text-ink-faint">模型认为最主要</span>
           <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-2xs text-ink-muted">
-            {judgement.primary_suggestion === "none"
-              ? "无问题"
-              : clauseLabel(judgement.primary_suggestion)}
+            {suggestionLabel(vocab, judgement.primary_suggestion)}
             {judgement.primary_confidence !== null &&
               ` · ${Math.round(judgement.primary_confidence * 100)}%`}
           </span>

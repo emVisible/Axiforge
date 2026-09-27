@@ -18,6 +18,7 @@ from typing import Callable, Dict, List, Sequence, Tuple
 from app.domains.moderation.contracts import (
     ACTION_APPROVE,
     ACTION_HUMAN,
+    ACTION_LABELS,
     ACTION_REJECT,
     Answer,
     Policy,
@@ -41,6 +42,9 @@ class Rule:
     when: Callable[[Dict[str, Answer]], bool]
     clauses: Callable[[Dict[str, Answer]], List[str]]
     evidence: Callable[[Dict[str, Answer]], str]
+    #: 运营侧短名。`via=suggested_human:<key>` 会把这个 key 发到中台，
+    #: 没有它就只能在前端另抄一份规则表——两份表漂移时没有任何一端会报错。
+    label: str = ""
 
 
 def _p(answers: Dict[str, Answer], name: str) -> float:
@@ -110,6 +114,7 @@ def _no_risk_confidence(answers: Dict[str, Answer]) -> float:
 RULES: Sequence[Rule] = (
     Rule(
         key="hate_or_doxx_or_instruction",
+        label="仇恨 / 隐私 / 违法教程",
         action=ACTION_REJECT,
         when=lambda a: max(_p(a, "hate_targeted"), _p(a, "pii_real_person"),
                            _p(a, "illegal_act_instruction")) >= RISK_PRESENT,
@@ -123,6 +128,7 @@ RULES: Sequence[Rule] = (
     ),
     Rule(
         key="adult_or_violence_needs_label",
+        label="含成人或血腥内容，需人工定级",
         action=ACTION_HUMAN,
         when=lambda a: (a.get("age_rating") and a["age_rating"].value == "adult")
         or max(_p(a, "sexual_content"), _p(a, "violence_gore"), _p(a, "self_harm")) >= RISK_PRESENT,
@@ -138,6 +144,7 @@ RULES: Sequence[Rule] = (
     ),
     Rule(
         key="spam_only",
+        label="导流垃圾",
         action=ACTION_REJECT,
         when=lambda a: _p(a, "spam_promotion") >= RISK_PRESENT,
         clauses=lambda a: ["spam_promotion"],
@@ -145,6 +152,7 @@ RULES: Sequence[Rule] = (
     ),
     Rule(
         key="high_severity",
+        label="危害量级偏高",
         action=ACTION_HUMAN,
         when=lambda a: float(getattr(a.get("severity"), "value", 0) or 0) >= 1.0,
         # severity 是量级轴，不是内容条款：它没有 clause_id，历史上这里写成
@@ -179,7 +187,10 @@ def decide_from_answers(
         if not hit:
             continue
         conf = _rule_confidence(answers, rule.key)
-        reasons.append(f"rule={rule.key} → {rule.action} conf={conf:.2f}")
+        reasons.append(
+            f"规则「{rule.label or rule.key}」→ {ACTION_LABELS.get(rule.action, rule.action)}"
+            f" 置信 {conf:.2f}"
+        )
         reasons.append(rule.evidence(answers))
         return Verdict(
             action=rule.action, confidence=conf, engine=engine, reasons=reasons,
@@ -191,7 +202,9 @@ def decide_from_answers(
     # 负面证据里最弱的一条，而不是参照实现那个 max(cat_conf, 0.5) 的人造地板
     # （0.5 会让低证据也够到门边），也不再单独依赖 age_rating 那条不同量纲的自报值。
     conf = _no_risk_confidence(answers)
-    reasons.append(f"rule=no_risk → {ACTION_APPROVE} conf={conf:.2f}")
+    reasons.append(
+        f"规则「没有任何一条轴报警」→ {ACTION_LABELS[ACTION_APPROVE]} 置信 {conf:.2f}"
+    )
     return Verdict(
         action=ACTION_APPROVE, confidence=conf, engine=engine, reasons=reasons,
         rule="no_risk", answers=answers, calibrated=calibrated,

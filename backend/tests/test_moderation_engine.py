@@ -176,6 +176,12 @@ def test_lexicon_hit_does_not_mask_the_model():
     assert out.verdict.engine == "laya:sidecar"
     assert out.action == ACTION_APPROVE
     assert any(p.startswith("lexicon") for p in out.prior_reasons)
+    # 理由文本是给运营读的，不是给 grep 读的：规则名与动作都要落成人话。
+    # 结构化的机读值另有去处（`via`、`rule`、`final_action` 字段），不靠这里承载。
+    joined = " ".join(out.verdict.reasons)
+    assert "rule=" not in joined and ACTION_APPROVE not in joined
+    assert "自动通过" in joined
+    assert "前面的引擎 lexicon" in joined
 
 
 def test_human_only_clause_vetoes_auto_action_even_at_high_confidence():

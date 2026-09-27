@@ -11,8 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.admin_auth import require_admin
 from app.database import get_db
 from app.domains.moderation.content import load_subject_content
-from app.domains.moderation.schemas import CaseResponse, ResolveRequest, StatsResponse
+from app.domains.moderation.questions import QUESTIONS_VERSION
+from app.domains.moderation.registry import build_policy
+from app.domains.moderation.schemas import (
+    CaseResponse,
+    ResolveRequest,
+    StatsResponse,
+    VocabularyResponse,
+)
 from app.domains.moderation.service import ModerationService
+from app.domains.moderation.vocabulary import vocabulary
 
 moderation_router = APIRouter(
     prefix="/api/v1/admin/moderation",
@@ -43,6 +51,20 @@ async def moderation_queue(
 @moderation_router.get("/stats", response_model=StatsResponse)
 async def moderation_stats(db: AsyncSession = Depends(get_db)):
     return await _svc(db).stats()
+
+
+@moderation_router.get("/vocabulary", response_model=VocabularyResponse)
+async def moderation_vocabulary():
+    """判断层词汇表：条款/规则/结论的中文短名，由定义它们的那三个模块投影出来。
+
+    不带版本键的话前端只能"启动时取一次"，而条款集是会长的——
+    新加一条轴时，缓存到死的词表会把内部 id 直接印到运营眼前。
+    """
+    return VocabularyResponse(
+        **vocabulary(),
+        policy_version=build_policy().version,
+        questions_version=QUESTIONS_VERSION,
+    )
 
 
 @moderation_router.get("/cases/{case_id}", response_model=CaseResponse)

@@ -125,7 +125,7 @@ export default function LlmEndpointDialog({ open, onClose, onSaved }: LlmEndpoin
           )}
         </div>
         {feedback && (
-          <p className="rounded-lg bg-surface-raised px-3 py-2 text-2xs leading-relaxed text-ink-muted">
+          <p className="whitespace-pre-wrap rounded-lg bg-surface-raised px-3 py-2 text-2xs leading-relaxed text-ink-muted">
             {feedback}
           </p>
         )}

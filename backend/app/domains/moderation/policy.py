@@ -57,7 +57,10 @@ _RISK_AXES: Tuple[str, ...] = BOOL_QUESTIONS
 
 #: 每道非二元题"什么算命中风险"——从概率向量里取哪些档的概率。
 #: choice 取该档；score 取"量级不低于第 1 档（需标注或限龄）"。
-_EVENT_LABEL: Dict[str, object] = {"age_rating": "adult", "severity": 1}
+#: 每条非 noul 题"风险事件"指的是哪个取值（score 是"≥ 这个刻度锚点"）。
+#: severity 的锚点必须是**顶档 2（必须下架）**，不是中点 1。实测原因见 high_severity：
+#: 标定压平后 P(≥1) 对 31/33 条都 ≥0.3，用它当否决线等于把这条轴变成噪声闸门。
+_EVENT_LABEL: Dict[str, object] = {"age_rating": "adult", "severity": 2}
 
 
 def _event_p(answers: Dict[str, Answer], name: str) -> float:
@@ -154,11 +157,17 @@ RULES: Sequence[Rule] = (
         key="high_severity",
         label="危害量级偏高",
         action=ACTION_HUMAN,
-        when=lambda a: float(getattr(a.get("severity"), "value", 0) or 0) >= 1.0,
-        # severity 是量级轴，不是内容条款：它没有 clause_id，历史上这里写成
-        # `clause_for("severity") or "severity"`，于是把问题名当条款发到了中台。
+        # 判据是"模型认为必须下架的概率过半"，不是量级期望值 ≥1.0。
+        # 换掉的两件事：(1) 期望把刻度间距当语义，而 0/1/2 不是等距语义，分布一被标定压平
+        # 期望就落到刻度中点 1.0 附近，否决线变成掷硬币；(2) 触发用的量与置信度用的量
+        # 原本是两个（期望 vs `_event_p`），现在同一个量，界面报出的数字就是扣扳机的那个。
+        # 实测：34 行标注里这条规则原本触发 4 次，其中 3 次打在期望标签为 approve 的干净内容上；
+        # 顶档概率全部 <0.5（最高的是 clean-01 的 0.364，比最差的 reject-03 还高），
+        # 所以这条轴目前不否决任何东西——**保留规则而不是删掉它**，是为了模型真的
+        # 把"必须下架"推到 0.5 以上时这条路还活着。
+        when=lambda a: _event_p(a, "severity") >= RISK_PRESENT,
         clauses=lambda a: [],
-        evidence=lambda a: f"severity={float(getattr(a.get('severity'), 'value', 0) or 0):.1f}",
+        evidence=lambda a: f"P(必须下架)={_event_p(a, 'severity'):.2f}",
     ),
 )
 

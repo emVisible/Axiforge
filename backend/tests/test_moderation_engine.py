@@ -364,6 +364,40 @@ def test_severity_is_never_a_content_clause():
     assert "hate_incitement" in v.clause_ids
 
 
+def test_high_severity_is_not_a_coin_flip_on_the_scale_midpoint():
+    """量级期望 ≥1.0 不是"危害偏高"，是"分布被压平后落在刻度中点"。
+
+    下面这份向量的期望是 1.06（旧判据会转人工），但模型认为"必须下架"的概率只有 0.36。
+    2026-09-27 在 34 行标注上量的：旧判据触发 4 次，其中 3 次打在期望标签为 approve
+    的干净内容上；顶档概率最高的一条恰恰是 clean-01（0.364），比 reject-03 还高。
+    """
+    answers, _ = normalize_answers(clean_answers(
+        severity={"score": 1.06, "confidence": 0.21,
+                  "probabilities": {"0": 0.30, "1": 0.34, "2": 0.36}},
+    ))
+    assert float(answers["severity"].value) >= 1.0, "前提：旧判据会在这里扣扳机"
+    v = decide_from_answers(answers, engine="laya:test", calibrated=True)
+    assert v.rule != "high_severity", "顶档概率过半之前不许否决其余七条具体轴"
+    assert v.action == ACTION_APPROVE
+
+
+def test_high_severity_fires_on_top_anchor_mass_and_reports_that_same_number():
+    """触发用的量必须就是置信度报出的量。
+
+    原先不是：`when` 看期望、`_rule_confidence` 看 `_event_p`，
+    于是界面可以显示"P=0.05 却因这条规则转人工"。
+    """
+    answers, _ = normalize_answers(clean_answers(
+        severity={"score": 1.6, "confidence": 0.7,
+                  "probabilities": {"0": 0.1, "1": 0.2, "2": 0.7}},
+    ))
+    v = decide_from_answers(answers, engine="laya:test", calibrated=True)
+    assert v.rule == "high_severity"
+    assert v.action == ACTION_HUMAN
+    assert v.confidence == pytest.approx(0.7, abs=0.01)
+    assert v.clause_ids == [], "量级轴不是内容条款"
+
+
 def test_score_answer_without_self_reported_confidence_is_rejected():
     """缺置信度不是"小问题"：温度拟合要的就是每条答案的自报值，缺了就无法标定。"""
     payload = clean_answers()

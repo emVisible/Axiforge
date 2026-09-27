@@ -187,3 +187,57 @@ async def test_report_arrives_with_the_machine_finding_attached(client: AsyncCli
     assert judgement["final_action"] == "human_review"
     # 词表不权威：它可以把东西递到人面前，但不能自己把作品判死
     assert judgement["authoritative"] is False
+
+
+@pytest.mark.asyncio
+async def test_label_export_only_emits_rows_that_can_be_fitted(db_session):
+    """校准需要标注，标注来自处置过的**带答案**案件。
+
+    空导出会一路绿灯地骗过所有人：脚本跑通了、0 条也打印得出来。
+    所以这里直接造一条有类型化答案的已结案案件，证明映射真的发生。
+    用完即删——测试库不自动回滚，留着下次撞唯一约束。
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import delete
+
+    from app.domains.moderation.models import ModerationCase
+    from eval.export_labels import collect
+
+    sid_fitted = f"c-label-{uuid.uuid4().hex[:8]}"
+    sid_empty = f"c-label-{uuid.uuid4().hex[:8]}"
+    now = datetime.now(timezone.utc)
+    try:
+        db_session.add_all(
+            [
+                ModerationCase(
+                    subject_type="comment", subject_id=sid_fitted, author_id="a1",
+                    fingerprint=f"fp-{uuid.uuid4().hex[:8]}", state="resolved",
+                    engine="laya:sidecar",
+                    answers={"spam_promotion": {"type": "noul", "value": 0.91, "confidence": 0.91}},
+                    calibrated=False, decided_at=now, resolved_at=now, resolved_by="admin-role",
+                    policy_version="policy-1", questions_version="questions-2",
+                ),
+                # 词表案件没有答案：它进不了拟合，必须被过滤掉而不是产出一行垃圾标签
+                ModerationCase(
+                    subject_type="comment", subject_id=sid_empty, author_id="a1",
+                    fingerprint=f"fp-{uuid.uuid4().hex[:8]}", state="dismissed",
+                    engine="lexicon", answers={}, resolved_at=now,
+                ),
+            ]
+        )
+        await db_session.commit()
+
+        rows = await collect()
+        mine = [r for r in rows if r["subject_id"] == sid_fitted]
+        assert len(mine) == 1
+        assert mine[0]["expected"] == "reject", "人工确认处置应对应期望动作 reject"
+        assert mine[0]["answers"]["spam_promotion"]["value"] == 0.91
+        assert not any(r["subject_id"] == sid_empty for r in rows), "无答案的行不得进入拟合"
+    finally:
+        await db_session.execute(
+            delete(ModerationCase).where(
+                ModerationCase.subject_id.in_([sid_fitted, sid_empty])
+            )
+        )
+        await db_session.commit()

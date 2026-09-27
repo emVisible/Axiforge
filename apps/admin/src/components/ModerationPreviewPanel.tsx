@@ -226,20 +226,20 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
   return (
     <section className="rounded-xl border border-border bg-surface-raised px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wide text-ink-faint">自动判断</span>
+        <span className="text-2xs uppercase tracking-wide text-ink-faint">自动判断</span>
         <span className="text-xs font-medium">{judgement.final_action || "—"}</span>
-        <span className="text-[10px] text-ink-muted">{viaLabel(judgement.via)}</span>
+        <span className="text-2xs text-ink-muted">{viaLabel(judgement.via)}</span>
         <span className="ml-auto flex items-center gap-1">
-          <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px]">
+          <span className="rounded-full border border-border px-1.5 py-0.5 text-2xs">
             {judgement.engine}
           </span>
           {!judgement.calibrated && (
-            <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] text-amber-600">
+            <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-2xs text-amber-600">
               未校准
             </span>
           )}
           {judgement.authoritative && (
-            <span className="rounded-full border border-emerald-500/40 px-1.5 py-0.5 text-[10px] text-emerald-600">
+            <span className="rounded-full border border-emerald-500/40 px-1.5 py-0.5 text-2xs text-emerald-600">
               可执行
             </span>
           )}
@@ -250,7 +250,7 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
           {judgement.clause_ids.map((c) => (
             <span
               key={c}
-              className="rounded-full bg-brand-muted px-2 py-0.5 text-[10px] text-brand"
+              className="rounded-full bg-brand-muted px-2 py-0.5 text-2xs text-brand"
             >
               {CLAUSE_LABELS[c] || c}
             </span>
@@ -258,13 +258,13 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
         </div>
       )}
       {judgement.reasons.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5 text-[10px] text-ink-muted">
+        <ul className="mt-1.5 space-y-0.5 text-2xs text-ink-muted">
           {judgement.reasons.slice(0, 4).map((r, i) => (
             <li key={i}>{r}</li>
           ))}
         </ul>
       )}
-      <div className="mt-1 text-[10px] text-ink-faint">
+      <div className="mt-1 text-2xs text-ink-faint">
         置信 {judgement.confidence === null ? "—" : `${(judgement.confidence * 100).toFixed(0)}%`}
         <span className="mx-1">·</span>
         {judgement.policy_version} / {judgement.questions_version}

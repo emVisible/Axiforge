@@ -21,6 +21,7 @@ import asyncio
 import json
 import os
 import sys
+from dataclasses import replace
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, List
@@ -138,8 +139,31 @@ async def collect(rows: List[dict]) -> List[dict]:
     return snaps, engine
 
 
+def keep_argmax_clause(answers, clauses):
+    """D3 的**测量用**对照（已证伪，留在这里防止有人再试一次）：
+    一条内容只保留概率最高的那条风险轴。
+
+    实测（真机 Laya + 9/9 标定，34 条）：clause_precision 0.11→0.13、
+    clause_recall 0.16→0.11、**auto_rate 一点没动**。原因是这些轴不是"多个候选里
+    有一个对"，而是**一起饱和**——纯广告文本上 spam=1.00 / illegal=0.98 / pii=0.98，
+    argmax 只是在噪声里挑一个。独立 noul 探针之间不竞争，所以要修的不是取值规则，
+    而是"让各条款互斥地竞争同一个概率额度"（见 D3 的单选题设计）。
+
+    另外这不只是精度问题：argmax 会让"既是导流又是真人隐私"的内容只报 spam_promotion，
+    从而绕开 `HUMAN_ONLY_CLAUSES` 的一票否决，把"该给人看"变成"机器直接驳回"。
+    """
+    from app.domains.moderation.questions import clause_for
+
+    axis = {clause_for(n): n for n in answers if clause_for(n)}
+    ranked = [c for c in clauses if c in axis]
+    if len(ranked) < 2:
+        return clauses
+    top = max(ranked, key=lambda c: float(answers[axis[c]].value or 0.0))
+    return [c for c in clauses if c not in axis or c == top]
+
+
 def variant_results(snaps: List[dict], *, rules=None, assume_calibrated: bool,
-                    policy: Optional[Policy] = None) -> List[dict]:
+                    policy: Optional[Policy] = None, clause_filter=None) -> List[dict]:
     """用同一批模型答案，换一个策略层求值一遍。`rules=None` 表示用生产规则表。"""
     from app.domains.moderation import policy as policy_mod
 
@@ -156,6 +180,8 @@ def variant_results(snaps: List[dict], *, rules=None, assume_calibrated: bool,
                 v.answers, engine=v.engine, calibrated=assume_calibrated,
                 extra_reasons=list(v.reasons),
             )
+            if clause_filter is not None:
+                new_v = replace(new_v, clause_ids=clause_filter(v.answers, new_v.clause_ids))
             action, via = policy_mod.gate(
                 new_v, pol.resolved(row["kind"]), authoritative=s["outcome"].authoritative)
             out.append({
@@ -272,6 +298,8 @@ async def main() -> int:
                                             assume_calibrated=True)),
                 ("high_severity 需与风险轴同时命中",
                  dict(rules=severity_as_amplifier(RULES), assume_calibrated=True)),
+                ("仅留 argmax 条款（D3 对照）",
+                 dict(rules=None, assume_calibrated=True, clause_filter=keep_argmax_clause)),
                 ("生产规则表 + 不校准（= 线上现状）",
                  dict(rules=None, assume_calibrated=False)),
             ]

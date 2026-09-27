@@ -4,7 +4,8 @@ import { Trash2 } from "lucide-react";
 
 import Shell from "@/shared/components/Shell";
 import Toast from "@/shared/components/Toast";
-import { sceneAssetApi } from "@/shared/api/editor";
+import { readScene, removeScene, updateScene } from "@/shared/storage/assetPoolSaves";
+import { getCreatorId } from "@/shared/lib/creatorId";
 import {
   BackLink,
   Badge,
@@ -32,7 +33,7 @@ export default function SceneAssetDetailPage() {
   } | null>(null);
 
   const fetchScene = async () => {
-    const data = await sceneAssetApi.get(id!);
+    const data = await readScene(id!);
     setScene(data);
   };
 
@@ -71,7 +72,9 @@ export default function SceneAssetDetailPage() {
   };
 
   const save = async () => {
-    await sceneAssetApi.update(id!, {
+    await updateScene(
+      id!,
+      {
       name: form.name,
       description: form.description,
       location: form.location || null,
@@ -80,8 +83,10 @@ export default function SceneAssetDetailPage() {
       world_setting: form.world_setting || null,
       rules: form.rules || null,
       image_path: form.image_path || null,
-      is_public: form.is_public || null,
-    });
+        is_public: form.is_public || null,
+      },
+      getCreatorId(),
+    );
     await fetchScene();
     setEditing(false);
     showToast("已保存");
@@ -89,7 +94,7 @@ export default function SceneAssetDetailPage() {
 
   const handleDelete = async () => {
     if (!confirm("删除？")) return;
-    await sceneAssetApi.delete(id!);
+    await removeScene(id!);
     navigate("/studio/scenes");
   };
 

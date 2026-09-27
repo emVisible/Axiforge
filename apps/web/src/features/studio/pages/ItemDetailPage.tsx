@@ -4,8 +4,8 @@ import { Trash2 } from "lucide-react";
 
 import Shell from "@/shared/components/Shell";
 import Toast from "@/shared/components/Toast";
-import { itemApi } from "@/shared/api/editor";
-import { readItem } from "@/shared/storage/assetPoolSaves";
+import { readItem, removeItem, updateItem } from "@/shared/storage/assetPoolSaves";
+import { getCreatorId } from "@/shared/lib/creatorId";
 import {
   BackLink,
   Badge,
@@ -91,15 +91,17 @@ export default function ItemDetailPage() {
   };
 
   const save = async () => {
-    await itemApi.update(id!, form);
-    setItem({ ...item, ...form });
+    // 用服务端/本地库回读的那一份，不拿表单去乐观合并：
+    // 之前 setItem({...item, ...form}) 让界面立刻显示新值，而写入其实可能根本没成——「已保存」是假的
+    const fresh = await updateItem(id!, form, getCreatorId());
+    setItem(fresh);
     setEditing(false);
     showToast("已保存");
   };
 
   const handleDelete = async () => {
     if (!confirm("删除？")) return;
-    await itemApi.delete(id!);
+    await removeItem(id!);
     navigate("/studio/items");
   };
 

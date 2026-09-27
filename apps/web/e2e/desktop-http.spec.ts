@@ -47,6 +47,7 @@ const LOCAL_UNAVAILABLE_ROUTES = [
   "/studio/projects/no-such-project",
   "/play/no-such-project",
   "/studio/items/no-such-item",
+  "/studio/scenes/no-such-scene",
   "/studio/characters/no-such-character",
   // S13-1 传记本地化后新增：页面在本地库必然失败时也不许回去打 storyApi
   "/studio/characters/no-such-character/stories/no-such-story",

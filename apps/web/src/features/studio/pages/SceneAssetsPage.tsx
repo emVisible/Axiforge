@@ -25,6 +25,7 @@ import {
 } from "@/shared/components/ui";
 import type { AssetSceneResponse } from "@/shared/types/asset";
 import { getCreatorId } from "@/shared/lib/creatorId";
+import { removeScene } from "@/shared/storage/assetPoolSaves";
 import { SCENE_WORKFLOW } from "@/shared/lib/workflowSteps";
 import { resolveQueryState } from "@/shared/lib/queryState";
 
@@ -120,8 +121,9 @@ export default function SceneAssetsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const { sceneAssetApi } = await import("@/shared/api/editor");
-    await sceneAssetApi.delete(id);
+    // 走分派口而不是 sceneAssetApi：桌面态这样删是"提示成功、下次打开还在"，
+    // 比报个网络错误更难发现。清单已经是本地读的，删除必须同一条路。
+    await removeScene(id);
     qc.invalidateQueries({ queryKey: SCENE_ASSET_KEYS.all });
   };
 

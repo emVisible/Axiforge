@@ -154,6 +154,32 @@ def build_questions() -> Dict[str, Dict[str, Any]]:
     return out
 
 
+#: 类型化问题的运营侧短名。理由文本里会出现"未标定轴：…"、界面要列温度表覆盖面，
+#: 那些地方露 `pii_real_person` 等于让运营去猜内部字段名。
+QUESTION_LABELS: Dict[str, str] = {
+    "age_rating": "年龄分级",
+    "sexual_content": "性内容",
+    "violence_gore": "血腥暴力",
+    "self_harm": "自伤处理",
+    "hate_targeted": "煽动仇恨",
+    "illegal_act_instruction": "违法教程",
+    "pii_real_person": "真人隐私",
+    "spam_promotion": "导流垃圾",
+    "severity": "危害量级",
+    "primary_clause": "最主要一条",
+}
+
+assert set(QUESTION_LABELS) == set(build_questions()), (
+    "问题短名与题集漂移：缺 "
+    f"{sorted(set(build_questions()) - set(QUESTION_LABELS))}，"
+    f"多 {sorted(set(QUESTION_LABELS) - set(build_questions()))}"
+)
+
+
+def question_label(name: str) -> str:
+    return QUESTION_LABELS.get(name, name)
+
+
 def clause_for(question: str) -> Optional[str]:
     for name, _, _, _, clause in _QUESTION_SPECS:
         if name == question:

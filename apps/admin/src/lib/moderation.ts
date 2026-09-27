@@ -1,4 +1,4 @@
-import type { AdminReport, ModerationVocabulary } from "@/api/adminClient";
+import type { AdminReport, EngineCalibration, ModerationVocabulary } from "@/api/adminClient";
 
 const WEB_ORIGIN =
   import.meta.env.VITE_WEB_ORIGIN?.replace(/\/$/, "") || "http://localhost:5174";
@@ -55,10 +55,40 @@ export const EMPTY_VOCABULARY: ModerationVocabulary = {
   suggestions: {},
   rules: {},
   actions: {},
+  questions: {},
   human_only_clauses: [],
   policy_version: "",
   questions_version: "",
 };
+
+export function questionLabel(v: ModerationVocabulary, name: string): string {
+  return v.questions[name] || name;
+}
+
+/** 温度表覆盖面的一行话。tone 是状态不是布尔：
+ *  "没标定"与"标定被网格截断"是两个不同的下一步（前者要补标注，后者要放宽搜索网格）。 */
+export function calibrationSummary(
+  v: ModerationVocabulary,
+  c: EngineCalibration,
+): { text: string; tone: "ok" | "warn" | "error" } {
+  if (!c.reachable) {
+    return { text: `${c.engine} 标定状态取不到${c.error ? `（${c.error}）` : ""}`, tone: "error" };
+  }
+  const names = (list: string[], cap = 3) =>
+    list.slice(0, cap).map((n) => questionLabel(v, n)).join("、") +
+    (list.length > cap ? `…共 ${list.length} 题` : "");
+  const covered = `${c.covered.length}/${c.declared.length} 题`;
+  if (c.missing.length) {
+    return { text: `标定 ${covered}，缺 ${names(c.missing)}`, tone: "warn" };
+  }
+  if (c.censored.length) {
+    return {
+      text: `标定 ${covered}，其中 ${names(c.censored)} 的拟合触到网格上限（置信仍偏高）`,
+      tone: "warn",
+    };
+  }
+  return { text: `标定 ${covered}`, tone: "ok" };
+}
 
 export function clauseLabel(v: ModerationVocabulary, clause: string): string {
   return v.clauses[clause] || clause;

@@ -11,6 +11,7 @@ ADR-018:23 说发布只跑规则校验、不做前置人工审核，所以本模
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 from datetime import datetime, timezone
@@ -20,7 +21,12 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domains.moderation.contracts import ACTION_HUMAN, ModerationSubject, Verdict
+from app.domains.moderation.contracts import (
+    ACTION_HUMAN,
+    CalibrationReporter,
+    ModerationSubject,
+    Verdict,
+)
 from app.domains.moderation.engine import ModerationEngine, Outcome
 from app.domains.moderation.models import (
     ModerationCase,
@@ -331,7 +337,32 @@ class ModerationService:
                 {"name": n, "healthy": h, "authoritative": a}
                 for n, h, a in self.engine.availability()
             ],
+            "policy": {
+                "version": self.engine.policy.version,
+                "auto_approve": self.engine.policy.auto_approve_threshold,
+                "auto_reject": self.engine.policy.auto_reject_threshold,
+                "human_band": self.engine.policy.human_band,
+            },
+            "calibration": await self._calibration_reports(),
         }
+
+    async def _calibration_reports(self) -> List[dict]:
+        """能报标定覆盖面的引擎各报一条。词表没有温度表，所以它不在列表里——
+        这是"能力缺席"而不是"覆盖为 0"，两者混起来会让界面显示一个假的红色缺口。
+
+        客户端是阻塞的 urllib，与 `moderate` 同样丢给 `to_thread`；
+        报不出来时留一条带错误名的记录，而不是整个 stats 失败或悄悄跳过。
+        """
+        reports: List[dict] = []
+        for provider in self.engine.providers:
+            if not isinstance(provider, CalibrationReporter):
+                continue
+            try:
+                data = await asyncio.to_thread(provider.calibration)
+            except Exception as exc:  # 覆盖面探测失败不该让中台打不开
+                data = {"reachable": False, "error": type(exc).__name__}
+            reports.append({"engine": provider.name, **data})
+        return reports
 
 
 async def advisory_review(

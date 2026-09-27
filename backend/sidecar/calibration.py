@@ -20,6 +20,11 @@ import math
 _EPS = 1e-9
 _GRID = [round(0.1 + 0.05 * i, 2) for i in range(99)]  # 0.10..5.00
 
+#: 搜索网格上限。`/health` 会把它一起上报：拟合结果等于这个值的题**不是"标定好了"，
+#: 而是"想更正但网格不允许"**——上报时把这类题单独列出来，否则 10/10 覆盖是个假绿灯。
+GRID_MAX = _GRID[-1]
+GRID_MIN = _GRID[0]
+
 
 def _clip(p: float) -> float:
     return min(1.0 - _EPS, max(_EPS, p))

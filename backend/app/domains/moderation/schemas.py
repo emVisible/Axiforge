@@ -56,10 +56,37 @@ class EngineHealth(BaseModel):
     authoritative: bool
 
 
+class EngineCalibration(BaseModel):
+    """一个引擎的标定覆盖面。`missing` 才是运营要看的那一栏：
+    任一题未覆盖，整条链就不会自动执行。"""
+
+    engine: str
+    reachable: bool = True
+    declared: List[str] = []
+    covered: List[str] = []
+    missing: List[str] = []
+    temperatures: Dict[str, float] = {}
+    #: 温度搜索网格上限；0 表示引擎没上报（旧 sidecar）
+    grid_max: float = 0.0
+    #: 拟合值坐在上限上的题：不是"标定好了"，是"想更正但网格不允许"，置信度仍虚高
+    censored: List[str] = []
+    path: str = ""
+    error: str = ""
+
+
+class PolicyThresholds(BaseModel):
+    version: str
+    auto_approve: float
+    auto_reject: float
+    human_band: float
+
+
 class StatsResponse(BaseModel):
     by_state: dict
     by_engine: dict
     engines: List[EngineHealth]
+    policy: PolicyThresholds
+    calibration: List[EngineCalibration] = []
 
 
 class VocabularyResponse(BaseModel):
@@ -72,6 +99,8 @@ class VocabularyResponse(BaseModel):
     clauses: Dict[str, str]
     suggestions: Dict[str, str]
     rules: Dict[str, str]
+    #: 类型化问题的短名（"未标定轴"、温度表覆盖面这些位置要用）
+    questions: Dict[str, str]
     actions: Dict[str, str]
     human_only_clauses: List[str]
     policy_version: str

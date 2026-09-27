@@ -132,6 +132,8 @@ export interface ModerationVocabulary {
   suggestions: Record<string, string>;
   rules: Record<string, string>;
   actions: Record<string, string>;
+  /** 类型化问题的短名：温度表覆盖面、"未标定轴"这些位置要用。 */
+  questions: Record<string, string>;
   human_only_clauses: string[];
   policy_version: string;
   questions_version: string;
@@ -296,6 +298,28 @@ export interface ModerationStats {
   by_state: Record<string, number>;
   by_engine: Record<string, number>;
   engines: { name: string; healthy: boolean; authoritative: boolean }[];
+  policy: {
+    version: string;
+    auto_approve: number;
+    auto_reject: number;
+    human_band: number;
+  };
+  /** 能报标定面的引擎各一条（词表没有温度表，所以不在这里）。 */
+  calibration: EngineCalibration[];
+}
+
+/** 温度表覆盖面。`missing` 与 `censored` 是两件事：前者没标定，后者标定被网格截断。 */
+export interface EngineCalibration {
+  engine: string;
+  reachable: boolean;
+  declared: string[];
+  covered: string[];
+  missing: string[];
+  temperatures: Record<string, number>;
+  grid_max: number;
+  censored: string[];
+  path: string;
+  error: string;
 }
 
 export const adminApi = {

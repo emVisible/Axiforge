@@ -253,3 +253,53 @@ async def test_machine_reopinion_does_not_override_a_human_resolution(db_session
         assert logs[-1].action == ACTION_APPROVE, "新意见要留痕，只是不落执行"
     finally:
         await _purge(db_session, subject_id)
+
+
+class Reporting(Switchable):
+    """带标定覆盖面可上报的假引擎（实现 `calibration()`，即 CalibrationReporter）。"""
+
+    def __init__(self, verdict: Verdict, report: dict) -> None:
+        super().__init__(verdict)
+        self._report = report
+
+    def calibration(self) -> dict:
+        return self._report
+
+
+class Broken(Switchable):
+    def calibration(self) -> dict:
+        raise RuntimeError("sidecar 没起来")
+
+
+async def test_stats_names_the_questions_missing_from_the_temperature_table(db_session):
+    """「为什么一条都不会自动执行」要在界面上有答案，而答案不是布尔，是缺哪几题。"""
+    from app.domains.moderation.contracts import CalibrationReporter
+    from app.domains.moderation.providers.lexicon import LexiconEngine
+
+    provider = Reporting(
+        _verdict(ACTION_HUMAN, confidence=0.4, calibrated=False),
+        {"reachable": True, "declared": ["age_rating", "severity", "spam_promotion"],
+         "covered": ["age_rating", "spam_promotion"], "missing": ["severity"],
+         "temperatures": {"age_rating": 1.4}, "path": "/tmp/calibration.json"},
+    )
+    stats = await ModerationService(db_session, ModerationEngine([provider], Policy())).stats()
+    rep = next(r for r in stats["calibration"] if r["engine"] == "fake:model")
+    assert rep["missing"] == ["severity"]
+    assert rep["covered"] == ["age_rating", "spam_promotion"]
+    assert stats["policy"]["auto_approve"] == Policy().auto_approve_threshold
+
+    # 词表没有温度表：它是"没有这个能力"，不是"覆盖 0 题"。
+    # 混起来会让界面显示一个假的红色缺口，而真实的缺口被稀释。
+    assert not isinstance(LexiconEngine(), CalibrationReporter)
+    lex = await ModerationService(
+        db_session, ModerationEngine([LexiconEngine()], Policy())).stats()
+    assert lex["calibration"] == []
+
+
+async def test_a_failing_calibration_probe_degrades_to_one_error_row(db_session):
+    """探测失败要留一行带错误名的记录：整个 stats 不该因此 500，也不该静默跳过。"""
+    broken = Broken(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))
+    stats = await ModerationService(db_session, ModerationEngine([broken], Policy())).stats()
+    assert len(stats["calibration"]) == 1, "静默跳过会让人以为这台引擎不需要标定"
+    assert stats["calibration"][0]["reachable"] is False
+    assert stats["calibration"][0]["error"] == "RuntimeError"

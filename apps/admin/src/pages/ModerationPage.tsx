@@ -12,7 +12,7 @@ import { adminApi, type ModerationCase } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
-import { actionLabel, clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
+import { actionLabel, calibrationSummary, clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
 
 const STATE_TABS: { key: string; label: string }[] = [
   { key: "pending", label: "待人工" },
@@ -179,6 +179,35 @@ export default function ModerationPage() {
                   {e.authoritative ? " · 权威" : ""}
                 </span>
               ))}
+              {stats.data.calibration.map((c) => {
+                const sum = calibrationSummary(vocab, c);
+                return (
+                  <span
+                    key={c.engine}
+                    className={`rounded-full border px-2 py-0.5 ${
+                      sum.tone === "ok"
+                        ? "border-emerald-500/40 text-emerald-600"
+                        : sum.tone === "warn"
+                          ? "border-amber-500/40 text-amber-600"
+                          : "border-rose-500/40 text-rose-600"
+                    }`}
+                    title={
+                      c.path
+                        ? `温度表：${c.path}`
+                        : "取不到温度表覆盖面，此时整链一律转人工"
+                    }
+                  >
+                    {c.engine} · {sum.text}
+                  </span>
+                );
+              })}
+              <span
+                className="rounded-full border border-border px-2 py-0.5 text-ink-muted"
+                title="低于通过线/高于驳回线都不自动执行；未标定的题只要有一题没覆盖，整链转人工"
+              >
+                {stats.data.policy.version} · 通过线 {stats.data.policy.auto_approve.toFixed(2)}
+                <span className="mx-1">/</span>驳回线 {stats.data.policy.auto_reject.toFixed(2)}
+              </span>
             </div>
           )
         }

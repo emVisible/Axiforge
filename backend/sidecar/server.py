@@ -35,7 +35,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from calibration import load_table, rescale_answers
+from calibration import GRID_MAX, load_table, rescale_answers
 
 _router = None
 _device = "unknown"
@@ -141,6 +141,7 @@ class Handler(BaseHTTPRequestHandler):
                 "path": CALIBRATION_FILE,
                 "questions": sorted(table),
                 "T": {k: (v or {}).get("T") for k, v in table.items()},
+                "grid_max": GRID_MAX,
             },
         })
 

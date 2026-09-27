@@ -302,6 +302,9 @@ async def test_vocabulary_covers_every_clause_and_rule_it_ships(client: AsyncCli
     assert set(body["rules"]) == {r.key for r in RULES}, "规则表与短名表漂移"
     assert all(body["rules"].values())
     assert set(body["actions"]) == {"approve", "reject", "human_review"}
+    from app.domains.moderation.questions import build_questions
+
+    assert set(body["questions"]) == set(build_questions()), "问题短名与题集漂移"
     assert set(body["human_only_clauses"]) <= set(REGISTERED_CLAUSES), \
         "策略引用了一个没定义过的条款"
     # `none` 是单选题的一档，不是条款：它只能出现在建议表里

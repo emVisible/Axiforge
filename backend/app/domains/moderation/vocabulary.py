@@ -19,6 +19,7 @@ from app.domains.moderation.policy import RULES
 from app.domains.moderation.questions import (
     CLAUSE_LABELS,
     HUMAN_ONLY_CLAUSES,
+    QUESTION_LABELS,
     SUGGESTION_LABELS,
 )
 
@@ -37,6 +38,7 @@ def vocabulary() -> Dict[str, object]:
         "clauses": clauses,
         "suggestions": dict(SUGGESTION_LABELS),
         "rules": rules,
+        "questions": dict(QUESTION_LABELS),
         "actions": dict(ACTION_LABELS),
         # 命中即不允许自动通过。前端要把它标成"必须人工"，但不能自己决定哪些条款算——
         # 那是策略，不是展示。

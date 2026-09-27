@@ -399,3 +399,42 @@ def test_sidecar_without_coverage_field_is_treated_as_uncalibrated():
     out = decide(ModerationEngine([Legacy(clean_answers())]), subject())
     assert out.action == ACTION_HUMAN
     assert out.calibrated is False
+
+
+def test_calibration_reports_flag_questions_stuck_at_the_grid_ceiling():
+    """T 坐在搜索上限上不是"标定完成"，是"想更正但网格不允许"。
+
+    这一条决定了 10/10 覆盖是不是真绿灯：实测当前温度表里有题就是顶格的，
+    而顶格那几题的置信度仍然虚高——界面必须把它和"缺题"分开说。
+    """
+    from app.domains.moderation.providers.laya_sidecar import LayaSidecarEngine
+    from app.domains.moderation.questions import build_questions
+
+    def engine_with(cal):
+        e = LayaSidecarEngine(base_url="http://127.0.0.1:1")
+        e._health = lambda: {"ok": True, "calibration": cal}  # type: ignore[method-assign]
+        return e
+
+    rep = engine_with({
+        "questions": ["spam_promotion", "severity", "age_rating"],
+        "T": {"spam_promotion": 2.35, "severity": 5.0, "age_rating": 1.4},
+        "grid_max": 5.0,
+        "path": "/tmp/calibration.json",
+    }).calibration()
+    assert rep["censored"] == ["severity"]
+    assert len(rep["missing"]) == len(build_questions()) - 3
+
+    # 旧 sidecar 不报 grid_max：不猜哪些被截断，宁可显示"未上报"
+    legacy = engine_with({"questions": ["severity"], "T": {"severity": 5.0}}).calibration()
+    assert legacy["censored"] == [] and legacy["grid_max"] == 0.0
+
+
+def test_unreachable_sidecar_reports_every_declared_question_missing():
+    from app.domains.moderation.providers.laya_sidecar import LayaSidecarEngine
+    from app.domains.moderation.questions import build_questions
+
+    e = LayaSidecarEngine(base_url="http://127.0.0.1:1")
+    e._health = lambda: None  # type: ignore[method-assign]
+    rep = e.calibration()
+    assert rep["reachable"] is False
+    assert rep["missing"] == rep["declared"] == sorted(build_questions())

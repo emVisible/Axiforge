@@ -26,7 +26,12 @@ from typing import Optional
 
 from app.domains.moderation.contracts import ACTION_HUMAN, ModerationSubject, Verdict
 from app.domains.moderation.policy import decide_from_answers
-from app.domains.moderation.questions import QUESTIONS_VERSION, build_questions, normalize_answers
+from app.domains.moderation.questions import (
+    QUESTIONS_VERSION,
+    build_questions,
+    normalize_answers,
+    question_label,
+)
 
 #: 送进模型的最大字符数。超过它宁可多一次人工，也不拿半篇内容做全自动裁决。
 MAX_MODEL_CHARS = 6000
@@ -46,11 +51,17 @@ class LayaSidecarEngine:
         self._mv = ""
         self._mv_at = 0.0
 
-    def _probe_version(self) -> str:
+    def _health(self) -> Optional[dict]:
         try:
             with urllib.request.urlopen(f"{self.base_url}/health", timeout=1.5) as r:
-                h = json.loads(r.read().decode())
+                data = json.loads(r.read().decode())
         except (urllib.error.URLError, OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _probe_version(self) -> str:
+        h = self._health()
+        if h is None:
             return "laya:unreachable"
         cal = h.get("calibration") or {}
         digest = hashlib.sha1(
@@ -66,11 +77,38 @@ class LayaSidecarEngine:
         return self._mv
 
     def health_check(self) -> bool:
-        try:
-            with urllib.request.urlopen(f"{self.base_url}/health", timeout=1.5) as r:
-                return json.loads(r.read().decode()).get("ok") is True
-        except (urllib.error.URLError, OSError, ValueError):
-            return False
+        h = self._health()
+        return bool(h and h.get("ok") is True)
+
+    def calibration(self) -> dict:
+        """温度表覆盖面：题集声明了哪些轴、温度表实际覆盖了哪些、缺哪些。
+
+        这是"为什么一条都不会自动执行"的唯一诚实答案。判定链在任一题未覆盖时
+        整体转人工（见 `moderate` 里的 `declared <= done`），所以"缺哪几题"
+        比"校准过了"更有用——后者是个会骗人的布尔。
+        """
+        h = self._health()
+        declared = sorted(build_questions())
+        if h is None:
+            return {"reachable": False, "declared": declared, "covered": [],
+                    "missing": declared, "temperatures": {}, "path": ""}
+        cal = h.get("calibration") or {}
+        covered = sorted(str(q) for q in (cal.get("questions") or []))
+        temps = {str(k): float(v) for k, v in (cal.get("T") or {}).items()}
+        grid_max = float(cal.get("grid_max") or 0.0)
+        # 拟合值坐在网格上限上 = 还想更正但网格不允许，这类题的置信度仍是虚高的。
+        # 不知道网格上限（旧 sidecar）时不猜：报空列表，界面上显示"未上报"。
+        censored = sorted(q for q, t in temps.items() if grid_max and t >= grid_max)
+        return {
+            "reachable": True,
+            "declared": declared,
+            "covered": covered,
+            "missing": [q for q in declared if q not in set(covered)],
+            "temperatures": temps,
+            "grid_max": grid_max,
+            "censored": censored,
+            "path": str(cal.get("path") or ""),
+        }
 
     def _decide(self, state: dict) -> dict:
         payload = json.dumps(
@@ -124,7 +162,9 @@ class LayaSidecarEngine:
         done = {str(q) for q in (data.get("calibrated_questions") or [])}
         calibrated = bool(declared) and declared <= done
         if not calibrated and done:
-            reasons.append("未标定轴：" + "、".join(sorted(declared - done)[:6]))
+            reasons.append(
+                "未标定轴：" + "、".join(question_label(q) for q in sorted(declared - done)[:6])
+            )
 
         if problems:
             # 答案不可信 = 这个引擎这次没有发言权。参照实现在这里会兜底成 "other" 然后自动通过。

@@ -131,6 +131,19 @@ class ModerationProvider(Protocol):
         ...
 
 
+@runtime_checkable
+class CalibrationReporter(Protocol):
+    """可选能力：能报告自己标定覆盖面的引擎。
+
+    单独一个协议而不是塞进 `ModerationProvider`：标定是模型引擎才有的性质，
+    词表没有温度表，硬要求它实现一个方法只会产出 `return None` 的噪音。
+    中台要靠它回答"为什么一条都不会自动执行"——答案不是布尔，是缺哪几题。
+    """
+
+    def calibration(self) -> Dict[str, object]:
+        ...
+
+
 @dataclass(frozen=True)
 class Policy:
     """调用期解析的门控参数（不在 import 期冻结）。"""

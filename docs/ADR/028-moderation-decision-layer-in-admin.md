@@ -323,6 +323,11 @@ ADR-018:32 要求「全部单体内轻量实现，不引外部服务」。Cleara
 其余各轴的温度与门控结果**与 questions-2 完全一致**（`auto_err=0`、转人工原因分布逐字相同），
 所以这次题集升级对执行面是中性的——正如设计所要求。
 
+核验方式（逐层，不是只看单测）：真机评论 → `engine=laya:sidecar` → `answers` 落库含
+`primary_clause` → `/admin/moderation/context` 返回 `primary_suggestion=sexual_explicit`
+`primary_confidence=0.4897`（与规则发出的 `rating_mismatch` 并列可见）→
+浏览器里审核工作台右侧渲染出「模型认为最主要 | 露骨性内容 · 49% | 仅供参考，不参与执行」。
+
 ### 现在到"真的自动"之间还差什么
 
 按顺序，且第 2 步之前不要谈自动化率：

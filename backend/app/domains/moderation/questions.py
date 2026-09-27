@@ -140,6 +140,13 @@ def clause_for(question: str) -> Optional[str]:
     return None
 
 
+#: 内容条款的唯一合法取值。策略规则、violations.clause、中台标签只能引用这里的值——
+#: 把问题名（如 severity）当条款写出去，中台就会显示一个谁也没定义过的标签。
+REGISTERED_CLAUSES: frozenset = frozenset(
+    c for _, _, _, _, c in _QUESTION_SPECS if c
+)
+
+
 def question_types() -> Dict[str, str]:
     return {name: qtype for name, qtype, *_ in _QUESTION_SPECS}
 
@@ -178,7 +185,8 @@ def normalize_answers(raw: Dict[str, Any]) -> Tuple[Dict[str, Answer], List[str]
             if conf is None:
                 problems.append(f"{name} 置信度缺失或越界")
                 continue
-            answers[name] = Answer(name, qtype, value, conf, payload.get("choice"))
+            answers[name] = Answer(name, qtype, value, conf,
+                                   payload.get("probabilities") or value)
         elif qtype == "score":
             lo, hi = SCORE_RANGE[name]
             try:
@@ -189,7 +197,14 @@ def normalize_answers(raw: Dict[str, Any]) -> Tuple[Dict[str, Answer], List[str]
             if not (lo <= v <= hi):
                 problems.append(f"{name} 分数 {v} 超出 [{lo},{hi}]")
                 continue
-            answers[name] = Answer(name, qtype, v, 1.0, payload.get("score"))
+            # 分数不是置信度：Laya 对 score 型同样自报 confidence（实测 0.37），
+            # 补成 1.0 等于把"引擎自己都不确定的量级"冒充成满格证据喂给门控。
+            conf = clamp01(payload.get("confidence"))
+            if conf is None:
+                problems.append(f"{name} 置信度缺失或越界")
+                continue
+            answers[name] = Answer(name, qtype, v, conf,
+                                   payload.get("probabilities") or v)
         else:  # noul：二元概率
             p = clamp01(payload.get("noul"))
             if p is None:

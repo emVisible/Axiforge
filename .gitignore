@@ -65,6 +65,13 @@ yarn-error.log*
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+# --- Laya sidecar（torch 重依赖隔离在这里，见 backend/sidecar/server.py）---
+backend/sidecar/.venv/
+# 温度表是**产物**，真相源是导出的人工处置标注（eval/export_labels.py → eval/calibrate.py）。
+# 提交它会造成第二个真相源，而且等于把"执行资格"发给一份 34 行自标注集上的拟合结果。
+backend/eval/calibration.json
+backend/eval/moderation_labels.jsonl
+
 # --- IDE & editors ---
 .idea/
 .vscode/*

@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.moderation.contracts import ACTION_HUMAN, ModerationSubject, Verdict
-from app.domains.moderation.engine import ModerationEngine
+from app.domains.moderation.engine import ModerationEngine, Outcome
 from app.domains.moderation.models import (
     ModerationCase,
     ModerationDecisionLog,
@@ -53,10 +53,54 @@ def _conf(v: object) -> Optional[float]:
 
 
 def _answer_snapshot(verdict: Verdict) -> dict:
+    """落库的答案快照。
+
+    必须带 `probabilities`：温度拟合要的就是原始分布，而 `export_labels.py` 是从
+    这张表里取标注的。只存标量值的话，choice/score 两类轴在生产上永远无法重拟——
+    那正是现在最需要的东西（人工每处置一次，本该给温度表添一格真实证据）。
+    """
+    out = {}
+    for name, a in verdict.answers.items():
+        row = {"type": a.qtype, "value": a.value, "confidence": round(a.confidence, 4)}
+        if isinstance(a.raw, dict):
+            row["probabilities"] = {str(k): round(float(v), 6) for k, v in a.raw.items()}
+        out[name] = row
+    return out
+
+
+def _outcome_snapshot(outcome: Optional[Outcome]) -> dict:
+    """这一次调用**实际得出**的结论，映射到案件上的字段名。
+
+    单独一个函数是因为两处都要用、且必须同源：幂等判断比较的是它，
+    写决策日志记的也是它；分成两份字面量就会有一天只改一份。
+    """
+    if outcome is None:
+        return {}
+    v = outcome.verdict
     return {
-        name: {"type": a.qtype, "value": a.value, "confidence": round(a.confidence, 4)}
-        for name, a in verdict.answers.items()
+        "suggested_action": v.action,
+        "final_action": outcome.action,
+        "via": outcome.via,
+        # 与列的精度对齐，否则浮点尾差会被读成"结论变了"
+        "confidence": _conf(v.confidence),
+        "engine": v.engine,
+        "authoritative": bool(outcome.authoritative),
+        "calibrated": bool(v.calibrated),
+        "clause_ids": list(v.clause_ids),
+        "answers": _answer_snapshot(v),
+        "reasons": list(v.reasons),
+        "policy_version": outcome.policy_version,
+        "questions_version": outcome.questions_version,
+        "lexicon_version": LEXICON_VERSION,
     }
+
+
+def _conclusion_diff(existing: ModerationCase, outcome: Optional[Outcome]) -> dict:
+    """新结论相对案件上旧结论的变化字段；空 = 真的幂等命中。"""
+    fresh = _outcome_snapshot(outcome)
+    if not fresh:
+        return {}
+    return {k: val for k, val in fresh.items() if getattr(existing, k) != val}
 
 
 class ModerationService:
@@ -118,14 +162,37 @@ class ModerationService:
         ).scalar_one_or_none()
 
         if existing is not None:
+            snap = _outcome_snapshot(outcome)
+            stale = _conclusion_diff(existing, outcome)
+            if stale and existing.state in (STATE_PENDING, STATE_AUTO_CLOSED):
+                # 命中同一内容指纹不等于"结论相同"：策略版、题集版、温度表都可能已经变了。
+                # 旧代码在这里原样返回旧案件，这一次模型调用被整个丢掉，
+                # 于是队列里那条内容永远挂着旧裁决。人已结案的（resolved/dismissed）
+                # 不覆盖——机器的新意见不该重开人的决定。
+                for field, value in stale.items():
+                    setattr(existing, field, value)
+                existing.decided_at = datetime.now(timezone.utc)
+                existing.state = (
+                    STATE_AUTO_CLOSED if snap["final_action"] != ACTION_HUMAN
+                    else STATE_PENDING
+                )
+            # 这一次调用得出了什么就记什么；引擎异常（snap 为空）时记案件现状，
+            # 因为这一次确实没有产生新结论。
+            src = snap or {
+                "final_action": existing.final_action, "via": existing.via,
+                "confidence": existing.confidence, "engine": existing.engine,
+                "reasons": existing.reasons,
+                "policy_version": existing.policy_version,
+                "questions_version": existing.questions_version,
+            }
             self.db.add(
                 ModerationDecisionLog(
-                    case_id=existing.id, dedupe_hit=True,
-                    action=existing.final_action, via=existing.via,
-                    confidence=existing.confidence, engine=existing.engine,
-                    engines_tried=list(existing.reasons),
-                    policy_version=existing.policy_version,
-                    questions_version=existing.questions_version,
+                    case_id=existing.id, dedupe_hit=not stale,
+                    action=src["final_action"], via=src["via"],
+                    confidence=src["confidence"], engine=src["engine"],
+                    engines_tried=list(src["reasons"]),
+                    policy_version=src["policy_version"],
+                    questions_version=src["questions_version"],
                 )
             )
             await self.db.flush()

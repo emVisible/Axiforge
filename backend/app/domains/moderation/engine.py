@@ -57,15 +57,35 @@ class Outcome:
         return self.verdict.engine
 
 
-def content_fingerprint(subject: ModerationSubject, policy: Policy) -> str:
-    """幂等键：同一内容 + 同一版策略与题集 = 同一个结论。
+def content_fingerprint(subject: ModerationSubject, policy: Policy,
+                        model_versions: Tuple[str, ...]) -> str:
+    """幂等键：同一内容 + 同一版策略与题集 + 同一版模型状态 = 同一个结论。
 
     参照实现在 REGISTRY 里给每个动作写了 `"idempotency": "required"`，
     但 `submit` 每次都发新 UUID，重复提交被静默重判。
+
+    `model_versions` 是这条键里后补的一半：换了 checkpoint 或重拟了温度表之后，
+    同一篇稿子的旧结论必须失效重判。少了它，"温度表改了"在缓存与幂等键上
+    都是不可见的——旧结论会以新模型的名义继续被复用。
+    它做成必填参数是有意为之：给一个默认空元组就等于允许"忘了传"，
+    而忘了传的时候所有内容的键会退化到同一套旧语义上，且不会有任何报错。
     """
     sha = subject.content_sha256 or hashlib.sha256(subject.text.encode("utf-8")).hexdigest()
-    raw = f"{subject.kind}|{sha}|{policy.version}|{QUESTIONS_VERSION}"
+    raw = (f"{subject.kind}|{sha}|{policy.version}|{QUESTIONS_VERSION}"
+           f"|{'>'.join(sorted(model_versions))}")
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _model_versions(providers: Sequence[ModerationProvider]) -> Tuple[str, ...]:
+    """探测各引擎的模型状态指纹。探测失败不能让整个判定崩掉，也不能静默变成空串
+    （那会让所有结论共享同一个键）——所以按引擎名标 unknown。"""
+    out = []
+    for p in providers:
+        try:
+            out.append(f"{p.name}={p.model_version()}")
+        except Exception:
+            out.append(f"{p.name}=unknown")
+    return tuple(out)
 
 
 class ModerationEngine:
@@ -90,7 +110,7 @@ class ModerationEngine:
 
     async def decide(self, subject: ModerationSubject) -> Outcome:
         policy = self.policy.resolved(subject.kind)
-        key = content_fingerprint(subject, policy)
+        key = content_fingerprint(subject, policy, _model_versions(self.providers))
         cached = self._cache.get(key)
         if cached is not None:
             self._cache.move_to_end(key)

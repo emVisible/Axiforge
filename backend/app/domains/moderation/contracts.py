@@ -77,11 +77,18 @@ class Verdict:
     engine: str = ""
     reasons: List[str] = field(default_factory=list)
     clause_ids: List[str] = field(default_factory=list)
+    #: 命中了哪条规则（`RULES[].key` 或 `no_risk`）。参照实现的 if 梯让人无法回答
+    #: "是什么让它驳回的"，这里把答案留在结论里而不是留在代码顺序里。
+    rule: str = ""
     answers: Dict[str, Answer] = field(default_factory=dict)
     latency_ms: int = -1
     calibrated: bool = False
     abstained: bool = False
     error: str = ""
+    #: 引擎**主动拒绝**自动执行的原因（如正文超窗、语种不支持）。
+    #: 它与 abstained 不同：不是"我没什么可说"，而是"我有话但不能由我执行"；
+    #: 也不该复用 calibrated=False 去表达——那会把"看不全"报成"没标定"。
+    refusal: str = ""
 
     @staticmethod
     def abstain(engine: str, reason: str) -> "Verdict":
@@ -103,6 +110,11 @@ class ModerationProvider(Protocol):
 
     name: str
     authoritative: bool
+
+    def model_version(self) -> str:
+        """决定结论的模型状态指纹（checkpoint + 温度表）。换 checkpoint 或重拟温度表
+        之后，同一篇稿子的旧结论必须失效重判——所以它要进幂等键。"""
+        ...
 
     def health_check(self) -> bool:
         ...

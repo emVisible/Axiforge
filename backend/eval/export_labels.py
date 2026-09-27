@@ -81,6 +81,17 @@ def main() -> int:
     if not rows:
         print("提示：还没有「带类型化答案且已人工结案」的案件。"
               "需要先起 laya sidecar 跑出一批判断，再由运营处置，才有可拟合的样本。")
+        return 0
+    # 温度拟合按题型要的东西不同：noul 只要标量，choice/score 要整条分布。
+    # 只报"有多少条标注"会让人以为可以重拟全部 9 题，其实可能一条轴都拟不动。
+    with_probs = sum(
+        1 for r in rows
+        if any(isinstance(a, dict) and isinstance(a.get("probabilities"), dict)
+               for a in (r["answers"] or {}).values())
+    )
+    print(f"其中带概率向量的 {with_probs} 条——age_rating / severity 只能从这些里重拟。")
+    if with_probs == 0:
+        print("这批导出全部来自「快照未存向量」的旧案件，二元轴之外拟不出任何东西。")
     return 0
 
 

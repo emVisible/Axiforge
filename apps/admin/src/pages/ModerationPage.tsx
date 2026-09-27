@@ -11,6 +11,7 @@ import {
 import { adminApi, type ModerationCase } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
+import { clauseLabel, viaLabel } from "@/lib/moderation";
 
 const STATE_TABS: { key: string; label: string }[] = [
   { key: "pending", label: "待人工" },
@@ -18,39 +19,6 @@ const STATE_TABS: { key: string; label: string }[] = [
   { key: "dismissed", label: "判为误报" },
   { key: "", label: "全部" },
 ];
-
-const CLAUSE_LABELS: Record<string, string> = {
-  sexual_explicit: "露骨性内容",
-  gratuitous_violence: "血腥暴力",
-  self_harm_unsafe: "自伤未安全处理",
-  hate_incitement: "煽动仇恨",
-  illegal_instruction: "违法教程",
-  doxxing: "真人隐私",
-  spam_promotion: "导流垃圾",
-  rating_mismatch: "分级不符",
-};
-
-/**
- * `via` 是"这条结论为什么是这个动作"的机器标签，直接摊给运营看等于让人读源码。
- * 后端保持稳定枚举、前端负责措辞：改文案不动契约。
- */
-const VIA_LABELS: Record<string, string> = {
-  non_authoritative_engine: "引擎不权威，转人工",
-  human_only_clause: "命中需人工判断的条款",
-  uncalibrated: "置信度未校准，不自动执行",
-  engine_abstained: "所有引擎弃权",
-  engine_unavailable: "审核引擎不可用",
-  policy_default: "策略默认转人工",
-};
-
-function viaLabel(via: string): string {
-  if (!via) return "—";
-  if (via.startsWith("auto@")) return `自动执行（线 ${via.slice(5)}）`;
-  if (via.startsWith("below_approve_line")) return "低于通过线，转人工";
-  if (via.startsWith("below_reject_line")) return "低于驳回线，转人工";
-  if (via.startsWith("engine_error")) return "引擎异常，转人工";
-  return VIA_LABELS[via] ?? via;
-}
 
 function fmt(v: number | null): string {
   return v === null ? "—" : `${(v * 100).toFixed(0)}%`;
@@ -116,7 +84,7 @@ export default function ModerationPage() {
           <div className="flex flex-wrap gap-1">
             {r.clause_ids.map((c) => (
               <Badge key={c} variant="amber">
-                {CLAUSE_LABELS[c] || c}
+                {clauseLabel(c)}
               </Badge>
             ))}
           </div>

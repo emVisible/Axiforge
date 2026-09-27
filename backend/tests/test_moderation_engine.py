@@ -22,7 +22,7 @@ from app.domains.moderation.engine import ModerationEngine, content_fingerprint
 from app.domains.moderation.policy import decide_from_answers, gate
 from app.domains.moderation.providers.laya_sidecar import LayaSidecarEngine
 from app.domains.moderation.providers.lexicon import LexiconEngine
-from app.domains.moderation.questions import normalize_answers
+from app.domains.moderation.questions import build_questions, normalize_answers
 
 
 def subject(body: str = "一个关于雨夜港口的故事。", kind: str = "project") -> ModerationSubject:
@@ -30,8 +30,15 @@ def subject(body: str = "一个关于雨夜港口的故事。", kind: str = "pro
 
 
 def clean_answers(**over):
+    """按 sidecar 实测的**真实载荷形状**造假答案，不是按我们希望它长什么样。
+
+    choice / score 都带 `probabilities`，且 `confidence` 是 Laya 实际的算法
+    （1−归一化熵）算出来的自洽值：策略层读的是向量而不是这个自报值，
+    fixture 若不给向量，测到的就只是降级分支。
+    """
     base = {
-        "age_rating": {"choice": "all", "confidence": 0.97},
+        "age_rating": {"choice": "all", "confidence": 0.97,
+                       "probabilities": {"all": 0.96, "teen": 0.02, "adult": 0.02}},
         "sexual_content": {"noul": 0.02},
         "violence_gore": {"noul": 0.03},
         "self_harm": {"noul": 0.01},
@@ -39,7 +46,8 @@ def clean_answers(**over):
         "illegal_act_instruction": {"noul": 0.01},
         "pii_real_person": {"noul": 0.01},
         "spam_promotion": {"noul": 0.02},
-        "severity": {"score": 0.0},
+        "severity": {"score": 0.0, "confidence": 1.0,
+                     "probabilities": {"0": 1.0, "1": 0.0, "2": 0.0}},
     }
     base.update(over)
     return base
@@ -48,15 +56,34 @@ def clean_answers(**over):
 class FakeSidecar(LayaSidecarEngine):
     """只替换传输，保留真实的 normalize + policy 路径（否则测的是假东西）。"""
 
-    def __init__(self, answers, *, calibrated=True, error=None):
+    def __init__(self, answers, *, calibrated=True, error=None,
+                 calibrated_questions=None, model_version="laya:test+T0000", healthy=True):
         super().__init__(base_url="http://sidecar.invalid")
         self._answers, self._calibrated, self._error = answers, calibrated, error
+        self._questions = calibrated_questions
+        self._healthy = healthy
+        # 真实实现会去 GET /health 探温度表；单元测试里那是一次无谓的网络往返，
+        # 而且它现在参与幂等键，所以必须可控（下面那条测试要翻它）。
+        self._mv = model_version
+
+    def model_version(self) -> str:
+        return self._mv
+
+    def health_check(self) -> bool:
+        # 假引擎不碰网络：继承来的实现会去 GET sidecar.invalid/health，
+        # 解析失败在部分机器上不是"立刻返回 False"而是等满 1.5s 超时——
+        # 实测同一套测试在 1.5s 与 51s 之间跳过一次，就是这个不确定性。
+        return self._healthy
 
     def _decide(self, state):  # noqa: ARG002
         if self._error:
             raise self._error
-        return {"ok": True, "answers": self._answers, "routing": {"model": "multilingual"},
-                "calibrated": self._calibrated}
+        res = {"ok": True, "answers": self._answers, "routing": {"model": "multilingual"}}
+        if self._questions is not None:
+            res["calibrated_questions"] = list(self._questions)
+        elif self._calibrated:
+            res["calibrated_questions"] = sorted(build_questions())
+        return res
 
 
 def decide(engine, s):
@@ -145,13 +172,19 @@ def test_lexicon_hit_does_not_mask_the_model():
 
 
 def test_human_only_clause_vetoes_auto_action_even_at_high_confidence():
-    """仇恨/隐私/违法教程需要的是判断与上下文，不是自动下架。"""
+    """仇恨/隐私/违法教程需要的是判断与上下文，不是自动下架。
+
+    via 必须点出是哪条条款：一队列里全是 "human_only_clause" 时，
+    运营无法区分"这条是隐私"和"那条是违法教程"，而处置口径本来就不一样。
+    """
     answers, problems = normalize_answers(clean_answers(hate_targeted={"noul": 0.99}))
     assert problems == []
     v = decide_from_answers(answers, engine="laya:sidecar", calibrated=True)
+    assert v.confidence >= Policy().auto_reject_threshold, "前提：不否决的话它会自动驳回"
+    assert v.rule == "hate_or_doxx_or_instruction"
     action, via = gate(v, Policy(), authoritative=True)
     assert action == ACTION_HUMAN
-    assert via == "human_only_clause"
+    assert via == "human_only_clause:hate_incitement"
 
 
 def test_all_engines_silent_means_human_never_approve():
@@ -181,6 +214,9 @@ def test_overlong_content_is_not_truncated_then_auto_decided():
     out = decide(eng, subject("雨" * 7000))
     assert out.action == ACTION_HUMAN
     assert "窗口" in " ".join(out.verdict.reasons)
+    # via 是队列上唯一可见的理由字段。只断言 action 的话，这条会被显示成
+    # "置信度未校准"——运营会去重拟温度表，而真正要做的是把长文分段。
+    assert out.via.startswith("refusal:over_length:")
 
 
 # ---------- 可复现与幂等 ----------
@@ -194,6 +230,20 @@ def test_same_content_and_policy_is_decided_once():
     assert second.via == first.via
 
 
+def test_refitting_the_table_redecides_through_the_cache():
+    """上面那条测试的另一半：温度表换了，同一篇稿子必须重新判，不能再命中缓存。
+
+    只测 `content_fingerprint` 是测不到的——真正的风险在调用点忘了传 model_versions。
+    """
+    provider = FakeSidecar(clean_answers())
+    eng = ModerationEngine([provider])
+    s = subject("同一篇稿子")
+    decide(eng, s)
+    assert decide(eng, s).dedupe_hit is True
+    provider._mv = "laya:test+T9999"  # 模拟重拟温度表
+    assert decide(eng, s).dedupe_hit is False
+
+
 def test_outcome_carries_versions_for_reproduction():
     out = decide(ModerationEngine([FakeSidecar(clean_answers())]), subject())
     assert out.questions_version.startswith("questions-")
@@ -203,6 +253,108 @@ def test_outcome_carries_versions_for_reproduction():
 
 def test_fingerprint_includes_policy_and_question_versions():
     s = subject("abc")
-    a = content_fingerprint(s, Policy(version="policy-1"))
-    b = content_fingerprint(s, Policy(version="policy-2"))
+    a = content_fingerprint(s, Policy(version="policy-1"), ("lexicon=v1",))
+    b = content_fingerprint(s, Policy(version="policy-2"), ("lexicon=v1",))
     assert a != b
+
+
+def test_refitting_the_temperature_table_invalidates_the_key():
+    """重拟温度表 = 置信度换了标尺 = 旧结论不能再以新模型的名义复用。
+
+    这条键如果只含 policy 与题集版本，那么"改了 calibration.json"在幂等键上
+    完全不可见：同一篇稿子会永久命中旧裁决，而队列显示的却是新配置。
+    """
+    s = subject("同一篇稿子")
+    p = Policy()
+    before = content_fingerprint(s, p, ("laya:sidecar=multilingual+Taaaa",))
+    after = content_fingerprint(s, p, ("laya:sidecar=multilingual+Tbbbb",))
+    assert before != after
+
+
+# ---------- 置信度量纲（真机 Laya 接通后测出的缺陷） ----------
+
+#: sidecar 实测原文（多语 checkpoint，一段干净的中文散文）。
+#: 保留原样的 probabilities 与自报 confidence，改一个数字这条测试就失去意义。
+MEASURED_CLEAN_PROSE = {
+    "age_rating": {"choice": "all", "confidence": 0.1076,
+                   "probabilities": {"all": 0.5474, "teen": 0.2963, "adult": 0.1563}},
+    "sexual_content": {"noul": 0.001},
+    "violence_gore": {"noul": 0.0013},
+    "self_harm": {"noul": 0.0016},
+    "hate_targeted": {"noul": 0.0006},
+    "illegal_act_instruction": {"noul": 0.0},
+    "pii_real_person": {"noul": 0.0414},
+    "spam_promotion": {"noul": 0.0015},
+    "severity": {"score": 0.7081, "confidence": 0.3655,
+                 "probabilities": {"0": 0.3087, "1": 0.6745, "2": 0.0168}},
+}
+
+
+def test_choice_confidence_is_not_used_as_a_probability():
+    """Laya 对 choice 自报的 0.1076 是 1−归一化熵，不是"这次判对的概率"。
+
+    旧的 approve 置信度直接取它，于是自动通过线（0.90）在数学上永远够不到——
+    链里有权威引擎也一样 auto_rate=0。正确做法是从向量算 P(不是成人)=1−0.1563=0.8437。
+    """
+    answers, problems = normalize_answers(MEASURED_CLEAN_PROSE)
+    assert problems == []
+    v = decide_from_answers(answers, engine="laya:test", calibrated=True)
+    assert v.action == ACTION_APPROVE
+    assert v.confidence == pytest.approx(1.0 - 0.1563, abs=1e-4)
+    assert gate(v, Policy(), authoritative=True)[0] == ACTION_HUMAN  # 0.84 < 0.90
+    assert gate(v, Policy(0.80, 0.95), authoritative=True)[0] == ACTION_APPROVE
+
+
+def test_severity_is_never_a_content_clause():
+    """severity 是量级轴（clause_id=None）。历史上规则表把它的问题名当条款发出去了。"""
+    from app.domains.moderation.policy import RULES
+    from app.domains.moderation.questions import REGISTERED_CLAUSES
+
+    answers, _ = normalize_answers(clean_answers(
+        severity={"score": 2.0, "confidence": 0.9,
+                  "probabilities": {"0": 0.0, "1": 0.05, "2": 0.95}},
+        hate_targeted={"noul": 0.97},
+    ))
+    for rule in RULES:
+        emitted = rule.clauses(answers)
+        assert set(emitted) <= REGISTERED_CLAUSES, f"{rule.key} 发出了未注册条款 {emitted}"
+    v = decide_from_answers(answers, engine="laya:test")
+    assert "severity" not in v.clause_ids
+    assert "hate_incitement" in v.clause_ids
+
+
+def test_score_answer_without_self_reported_confidence_is_rejected():
+    """缺置信度不是"小问题"：温度拟合要的就是每条答案的自报值，缺了就无法标定。"""
+    payload = clean_answers()
+    payload["severity"] = {"score": 1.4}
+    _, problems = normalize_answers(payload)
+    assert any("severity" in p for p in problems)
+
+
+def test_partially_calibrated_chain_cannot_execute():
+    """标定是逐题的：3/9 条轴有温度表时整条链仍然只能转人工。
+
+    参照实现回一个链级 bool（"有任一 T≠1 生效"），这种部分标定会被报成"已标定"，
+    于是没标定的那六条轴的置信度被当成可比较的量拿去执行不可逆动作。
+    """
+    partial = ["age_rating", "severity", "spam_promotion"]
+    eng = ModerationEngine([FakeSidecar(clean_answers(), calibrated_questions=partial)])
+    out = decide(eng, subject())
+    assert out.action == ACTION_HUMAN
+    assert out.calibrated is False
+    assert any(r.startswith("未标定轴：") for r in out.verdict.reasons)
+
+
+def test_sidecar_without_coverage_field_is_treated_as_uncalibrated():
+    """旧 sidecar 不报覆盖列表时按未标定处理，不给"没上报=已标定"留空子。"""
+
+    class Legacy(FakeSidecar):
+        def _decide(self, state):  # noqa: ARG002
+            res = super()._decide(state)
+            res.pop("calibrated_questions")
+            res["calibrated"] = True  # 参照实现那个不可信的链级 bool
+            return res
+
+    out = decide(ModerationEngine([Legacy(clean_answers())]), subject())
+    assert out.action == ACTION_HUMAN
+    assert out.calibrated is False

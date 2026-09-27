@@ -12,12 +12,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Dict, List
 
 from app.domains.moderation.contracts import ACTION_HUMAN, ModerationSubject, Verdict
-
-LEXICON_VERSION = "lexicon-1"
 
 # 每条：条款 → 词/模式。生产上应外置成可热更的配置（参照实现也是这么列在 roadmap 里的）。
 _PATTERNS: Dict[str, List[str]] = {
@@ -52,6 +51,12 @@ _COMPILED = {
     for clause, pats in _PATTERNS.items()
 }
 
+#: 词表版本从内容算，不手写。手写的版本号是一个"要有人记得改"的承诺，
+#: 而加一个词之后忘记 bump，旧结论就会以新代码的名义继续被幂等复用。
+LEXICON_VERSION = "lexicon-" + hashlib.sha1(
+    "|".join(f"{c}={';'.join(pats)}" for c, pats in sorted(_PATTERNS.items())).encode("utf-8")
+).hexdigest()[:8]
+
 
 class LexiconEngine:
     """命中即转人工；不命中也不构成"通过"的证据，因此恒弃权。"""
@@ -61,6 +66,9 @@ class LexiconEngine:
 
     def health_check(self) -> bool:
         return True
+
+    def model_version(self) -> str:
+        return LEXICON_VERSION
 
     def moderate(self, subject: ModerationSubject) -> Verdict:
         text = subject.text.lower()

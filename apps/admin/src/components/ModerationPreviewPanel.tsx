@@ -12,9 +12,11 @@ import type {
 } from "@/api/adminClient";
 import ModerationContextSections from "@/components/ModerationContextSections";
 import {
+  clauseLabel,
   formatReportTime,
   maskToken,
   targetTypeLabel,
+  viaLabel,
   webDiscoverUrl,
 } from "@/lib/moderation";
 
@@ -187,35 +189,6 @@ export default function ModerationPreviewPanel({
 }
 
 
-const CLAUSE_LABELS: Record<string, string> = {
-  sexual_explicit: "露骨性内容",
-  gratuitous_violence: "血腥暴力",
-  self_harm_unsafe: "自伤未安全处理",
-  hate_incitement: "煽动仇恨",
-  illegal_instruction: "违法教程",
-  doxxing: "真人隐私",
-  spam_promotion: "导流垃圾",
-  rating_mismatch: "分级不符",
-};
-
-const VIA_LABELS: Record<string, string> = {
-  non_authoritative_engine: "引擎不权威，转人工",
-  human_only_clause: "命中需人工判断的条款",
-  uncalibrated: "置信度未校准，不自动执行",
-  engine_abstained: "所有引擎弃权",
-  engine_unavailable: "审核引擎不可用",
-  policy_default: "策略默认转人工",
-};
-
-function viaLabel(via: string): string {
-  if (!via) return "—";
-  if (via.startsWith("auto@")) return `自动执行（线 ${via.slice(5)}）`;
-  if (via.startsWith("below_approve_line")) return "低于通过线，转人工";
-  if (via.startsWith("below_reject_line")) return "低于驳回线，转人工";
-  if (via.startsWith("engine_error")) return "引擎异常，转人工";
-  return VIA_LABELS[via] ?? via;
-}
-
 /**
  * 机器结论条。放在举报元信息之下、评论区之上——它是运营读这条举报时的第一屏信息。
  *
@@ -240,7 +213,7 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
           )}
           {judgement.authoritative && (
             <span className="rounded-full border border-emerald-500/40 px-1.5 py-0.5 text-2xs text-emerald-600">
-              可执行
+              有执行资格
             </span>
           )}
         </span>
@@ -252,7 +225,7 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
               key={c}
               className="rounded-full bg-brand-muted px-2 py-0.5 text-2xs text-brand"
             >
-              {CLAUSE_LABELS[c] || c}
+              {clauseLabel(c)}
             </span>
           ))}
         </div>

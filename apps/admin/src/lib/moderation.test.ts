@@ -10,6 +10,7 @@ import {
   questionLabel,
   suggestionLabel,
   viaLabel,
+  whatIfVerdict,
 } from "@/lib/moderation";
 
 /** 后端 `/admin/moderation/vocabulary` 那份投影的测试替身（取值域一致，措辞同源）。 */
@@ -125,6 +126,33 @@ describe("温度表覆盖面的三态", () => {
     expect(many.text).toContain("共 9 题");
     expect(many.text).toContain("q1、q2、q3");
     expect(many.text).not.toContain("q9");
+  });
+});
+
+describe("阈值假设的读数", () => {
+  const base = { conflicts: 0, auto_approve: 0, auto_reject: 0, undecided: 0 };
+
+  it("有误放就是 danger，且报出条数", () => {
+    const v = whatIfVerdict({ ...base, auto_approve: 3, conflicts: 1 });
+    expect(v.tone).toBe("danger");
+    expect(v.text).toContain("1 条");
+  });
+
+  it("没有一条会被执行时读作 ok，而不是留一片空白", () => {
+    expect(whatIfVerdict(base).tone).toBe("ok");
+    expect(whatIfVerdict(base).text).toContain("没有案件会被自动执行");
+  });
+
+  it("会自动执行但缺人工对照时是 warn，不是 ok", () => {
+    // 压成布尔就会有人去下调阈值而不是去攒处置——这两件事的下一步完全相反。
+    const v = whatIfVerdict({ ...base, auto_approve: 2, undecided: 5 });
+    expect(v.tone).toBe("warn");
+    expect(v.text).toContain("2 条");
+    expect(v.text).toContain("5 条还没有人工结论");
+  });
+
+  it("会自动执行且与人工全部一致才是 ok", () => {
+    expect(whatIfVerdict({ ...base, auto_reject: 2 }).tone).toBe("ok");
   });
 });
 

@@ -17,6 +17,8 @@ from app.domains.moderation.schemas import (
     CaseResponse,
     QueuePage,
     ResolveRequest,
+    WhatIfResponse,
+    WhatIfRowResponse,
     StatsResponse,
     VocabularyResponse,
 )
@@ -66,6 +68,24 @@ async def moderation_vocabulary():
         **vocabulary(),
         policy_version=build_policy().version,
         questions_version=QUESTIONS_VERSION,
+    )
+
+
+@moderation_router.get("/what-if", response_model=WhatIfResponse)
+async def moderation_what_if(
+    approve: float = Query(default=0.75, ge=0.0, le=1.0),
+    reject: float = Query(default=0.95, ge=0.0, le=1.0),
+    scan: int = Query(default=500, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+):
+    """**只读**的阈值假设：这条线画到这里，已处置过的案件里有几条会被机器自动执行、
+    其中几条与当时的人工结论相反（`conflicts`）。不改策略、不写库、不给任何引擎新资格。
+    """
+    report = await _svc(db).whatif(approve=approve, reject=reject, scan=scan)
+    return WhatIfResponse(
+        **{k: v for k, v in report.__dict__.items() if k != "rows"},
+        scanned=report.evaluated + sum(report.skipped.values()),
+        rows=[WhatIfRowResponse(**r.__dict__) for r in report.rows],
     )
 
 

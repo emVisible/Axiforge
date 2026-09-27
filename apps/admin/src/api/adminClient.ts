@@ -139,6 +139,36 @@ export interface ModerationVocabulary {
   questions_version: string;
 }
 
+export interface WhatIfRow {
+  case_id: string;
+  subject_type: string;
+  subject_id: string;
+  state: string;
+  actual_action: string;
+  hypothetical_action: string;
+  via: string;
+  confidence: number;
+  human_outcome: string;
+  agreement: "agree" | "conflict" | "undecided";
+  /** 这一行真实生效的线：评论与素材被按类型收紧过，填 0.75 不等于对评论按 0.75 判。 */
+  effective_approve: number;
+  effective_reject: number;
+}
+
+export interface WhatIfReport {
+  approve_line: number;
+  reject_line: number;
+  evaluated: number;
+  scanned: number;
+  skipped: Record<string, number>;
+  auto_approve: number;
+  auto_reject: number;
+  agrees: number;
+  conflicts: number;
+  undecided: number;
+  rows: WhatIfRow[];
+}
+
 export interface ModerationContext {
   target_preview: ModerationTargetPreview;
   related_comments: AdminCommentSnippet[];
@@ -393,6 +423,9 @@ export const adminApi = {
   ) => request<PaginatedResponse<ModerationCase>>(`/moderation/queue${qs({ state, limit, order, offset })}`),
   moderationStats: () => request<ModerationStats>("/moderation/stats"),
   moderationVocabulary: () => request<ModerationVocabulary>("/moderation/vocabulary"),
+  /** 只读的阈值假设：拿已落库的答案重放，不改策略、不写库。 */
+  moderationWhatIf: (approve: number, reject: number, scan = 500) =>
+    request<WhatIfReport>(`/moderation/what-if${qs({ approve, reject, scan })}`),
   moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
     request<ModerationCase>(`/moderation/cases/${id}/resolve`, {
       method: "POST",

@@ -58,6 +58,37 @@ class QueuePage(BaseModel):
     limit: int = 50
 
 
+class WhatIfRowResponse(BaseModel):
+    case_id: str
+    subject_type: str
+    subject_id: str
+    state: str
+    actual_action: str
+    hypothetical_action: str
+    via: str
+    confidence: float
+    human_outcome: str
+    agreement: str
+    effective_approve: float
+    effective_reject: float
+
+
+class WhatIfResponse(BaseModel):
+    """假定阈值下的重放结果。`conflicts` 是要盯的那个数：机器会动、人当时动了相反的方向。"""
+
+    approve_line: float
+    reject_line: float
+    evaluated: int
+    scanned: int
+    skipped: Dict[str, int]
+    auto_approve: int
+    auto_reject: int
+    agrees: int
+    conflicts: int
+    undecided: int
+    rows: List[WhatIfRowResponse]
+
+
 class ResolveRequest(BaseModel):
     outcome: str = Field(pattern="^(resolved|dismissed)$")
     note: str = ""

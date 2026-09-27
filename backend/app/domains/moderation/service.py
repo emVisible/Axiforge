@@ -41,6 +41,9 @@ from app.domains.moderation.registry import get_engine
 
 logger = logging.getLogger(__name__)
 
+#: 三种题型各自把标量值放在哪个键下——与 sidecar 的返回形状同源。
+_VALUE_KEY = {"noul": "noul", "score": "score", "choice": "choice"}
+
 
 def content_sha(title: str, body: str) -> str:
     return hashlib.sha256(f"{title or ''}\n{body or ''}".encode("utf-8")).hexdigest()
@@ -67,7 +70,10 @@ def _answer_snapshot(verdict: Verdict) -> dict:
     """
     out = {}
     for name, a in verdict.answers.items():
-        row = {"type": a.qtype, "value": a.value, "confidence": round(a.confidence, 4)}
+        # 键名用引擎自己的那一套（`noul`/`score`/`choice`），不另造一个 `value` 镜像：
+        # 这份快照不是给人看的摘要，是给 `normalize_answers` 读回来的。两边形状一致
+        # 才能拿已落库的答案重放策略（阈值假设计算、改判据后的复算都靠它）。
+        row = {"type": a.qtype, _VALUE_KEY[a.qtype]: a.value, "confidence": round(a.confidence, 4)}
         if isinstance(a.raw, dict):
             row["probabilities"] = {str(k): round(float(v), 6) for k, v in a.raw.items()}
         out[name] = row
@@ -350,6 +356,20 @@ class ModerationService:
             },
             "calibration": await self._calibration_reports(),
         }
+
+    async def whatif(self, *, approve: float, reject: float, scan: int = 500) -> dict:
+        """阈值假设：读最近 ``scan`` 条案件，在它们**已落库的答案**上重放假定的线。"""
+        from app.domains.moderation.whatif import evaluate
+
+        rows = (
+            await self.db.execute(
+                select(ModerationCase)
+                .order_by(ModerationCase.decided_at.desc().nulls_last(),
+                          ModerationCase.id.desc())
+                .limit(scan)
+            )
+        ).scalars().all()
+        return evaluate(list(rows), approve=approve, reject=reject)
 
     async def _calibration_reports(self) -> List[dict]:
         """能报标定覆盖面的引擎各报一条。词表没有温度表，所以它不在列表里——

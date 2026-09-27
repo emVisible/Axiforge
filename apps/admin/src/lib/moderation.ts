@@ -1,4 +1,9 @@
-import type { AdminReport, EngineCalibration, ModerationVocabulary } from "@/api/adminClient";
+import type {
+  AdminReport,
+  EngineCalibration,
+  ModerationVocabulary,
+  WhatIfReport,
+} from "@/api/adminClient";
 
 const WEB_ORIGIN =
   import.meta.env.VITE_WEB_ORIGIN?.replace(/\/$/, "") || "http://localhost:5174";
@@ -152,3 +157,27 @@ const VIA_SUFFIX_FREE: Record<string, string> = {
   engine_abstained: "所有引擎弃权",
   engine_unavailable: "审核引擎不可用",
 };
+
+/**
+ * 阈值假设的一行读数。status 而不是布尔：
+ * "有人判过且机器与之相反"(conflict) 与 "根本没人判过"(undecided) 是两种完全不同的下一步，
+ * 前者是风险、后者是缺标注——压成一个 boolean 就会有人去下调阈值而不是去攒处置。
+ */
+export function whatIfVerdict(
+  report: Pick<WhatIfReport, "conflicts" | "auto_approve" | "auto_reject" | "undecided">,
+): { tone: "ok" | "warn" | "danger"; text: string } {
+  const auto = report.auto_approve + report.auto_reject;
+  if (report.conflicts > 0) {
+    return { tone: "danger", text: `这条线会误放/误伤 ${report.conflicts} 条已处置过的案件` };
+  }
+  if (auto === 0) {
+    return { tone: "ok", text: "这条线下没有案件会被自动执行" };
+  }
+  if (report.undecided > 0) {
+    return {
+      tone: "warn",
+      text: `会自动执行 ${auto} 条，其中 ${report.undecided} 条还没有人工结论可对`,
+    };
+  }
+  return { tone: "ok", text: `会自动执行 ${auto} 条，与人工结论全部一致` };
+}

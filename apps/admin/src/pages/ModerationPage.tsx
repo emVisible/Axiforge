@@ -10,6 +10,7 @@ import {
   type DataTableColumn,
 } from "@axiforge/ui";
 import { adminApi, type ModerationCase, type PaginatedResponse } from "@/api/adminClient";
+import ModerationWhatIfPanel from "@/components/ModerationWhatIfPanel";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
@@ -291,6 +292,16 @@ export default function ModerationPage() {
         total={list.data?.total ?? 0}
         onPageChange={setPage}
       />
+
+      {stats.data && (
+        <ModerationWhatIfPanel
+          current={{
+            auto_approve: stats.data.policy.auto_approve,
+            auto_reject: stats.data.policy.auto_reject,
+            version: stats.data.policy.version,
+          }}
+        />
+      )}
 
       {openId && (
         <EvidencePanel

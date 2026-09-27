@@ -57,7 +57,7 @@ def _auto_judgement(case: ModerationCase) -> AutoJudgement:
         calibrated=case.calibrated,
         clause_ids=list(case.clause_ids or []),
         # 单选建议：值在 normalize 阶段已过白名单，这里只做形状防御，不再夹一次。
-        primary_suggestion=str(prim.get("value") or ""),
+        primary_suggestion=str(prim.get("choice") or ""),
         primary_confidence=float(pconf) if isinstance(pconf, (int, float)) else None,
         reasons=list(case.reasons or []),
         policy_version=case.policy_version,

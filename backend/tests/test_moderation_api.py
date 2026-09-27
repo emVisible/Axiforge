@@ -307,7 +307,13 @@ async def test_queue_pages_are_disjoint_and_cover_the_whole_state(client: AsyncC
     末级排序键不稳时（同一事务插入的多行 `created_at` 相同）翻页会重复或漏项，
     而那只有把两页拼起来跟全量对一遍才照得出来。
     """
+    from app.domains.moderation.background import drain_pending
+
     ids = [await post_comment(client, f"加微信领 全新体验 {i}") for i in range(6)]
+
+    # 先等后台判定结束再开始读。三次读中间若插进一条新案件，`total` 会漂，
+    # 于是"两页拼接=全量前缀"这条断言测的就不是排序而是时序了。
+    await drain_pending()
 
     async def page(offset: int, limit: int = 3) -> dict:
         res = await client.get(
@@ -327,6 +333,67 @@ async def test_queue_pages_are_disjoint_and_cover_the_whole_state(client: AsyncC
     assert not set(p1) & set(p2), "两页不许重复同一案件"
     assert p1 + p2 == [c["id"] for c in whole["items"]][:6], "翻页拼起来必须等于按序读全量"
     assert all(c["state"] == "pending" for c in first["items"])
+
+
+@pytest.mark.asyncio
+async def test_what_if_endpoint_reads_stored_answers_without_changing_anything(
+    client: AsyncClient, db_session
+):
+    """阈值假设端点：读已落库的答案重放，**不写任何一行**。
+
+    顺带钉住 D13 那个真正的修复——快照的键名与 `normalize_answers` 读的要一致。
+    之前写成 `value`，于是库里 0/10 题能回放，这条链上任何"用已有答案重算"
+    的功能都会静默得到一张空表（表现是"什么都没被自动执行"，而不是报错）。
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy import delete, func, select
+
+    from app.domains.moderation.models import ModerationCase
+    from app.domains.moderation.questions import QUESTIONS_VERSION
+    from tests.test_moderation_whatif import CLEAN
+
+    sid = f"whatif-{uuid.uuid4().hex[:8]}"
+    row = ModerationCase(
+        subject_type="project", subject_id=sid, author_id="creator-whatif",
+        fingerprint=f"fp-{uuid.uuid4().hex[:16]}", state="resolved",
+        final_action="human_review", engine="laya:sidecar", calibrated=True,
+        authoritative=True, answers=dict(CLEAN), clause_ids=[], reasons=[],
+        policy_version="policy-1", questions_version=QUESTIONS_VERSION,
+        decided_at=datetime.now(timezone.utc),
+    )
+    try:
+        db_session.add(row)
+        await db_session.commit()
+
+        assert (await client.get("/api/v1/admin/moderation/what-if")).status_code == 401
+        res = await client.get(
+            "/api/v1/admin/moderation/what-if",
+            params={"approve": 0.75, "reject": 0.95}, headers=ADMIN)
+        assert res.status_code == 200, res.text
+        body = res.json()
+        mine = [r for r in body["rows"] if r["subject_id"] == sid]
+        assert len(mine) == 1, "作品侧 0.84 的证据应当过 0.75 这条假定线"
+        assert mine[0]["hypothetical_action"] == "approve"
+        assert mine[0]["human_outcome"] == "resolved"
+        assert mine[0]["agreement"] == "conflict", "人要下架、机器要放行 = 误放"
+        assert mine[0]["effective_approve"] == 0.75
+        assert body["conflicts"] >= 1
+
+        after = (
+            await db_session.execute(
+                select(func.count()).select_from(ModerationCase).where(
+                    ModerationCase.subject_id == sid))
+        ).scalar_one()
+        assert after == 1, "what-if 是只读的：不许新建案件，也不许改掉人工处置"
+        reread = (
+            await db_session.execute(
+                select(ModerationCase).where(ModerationCase.subject_id == sid))
+        ).scalar_one()
+        assert reread.final_action == "human_review"
+    finally:
+        await db_session.execute(delete(ModerationCase).where(ModerationCase.subject_id == sid))
+        await db_session.commit()
 
 
 @pytest.mark.asyncio

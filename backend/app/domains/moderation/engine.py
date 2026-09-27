@@ -15,7 +15,7 @@ import asyncio
 import hashlib
 import time
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from app.domains.moderation.contracts import (
@@ -114,14 +114,10 @@ class ModerationEngine:
         cached = self._cache.get(key)
         if cached is not None:
             self._cache.move_to_end(key)
-            return Outcome(
-                action=cached.action, via=cached.via, verdict=cached.verdict,
-                policy_version=cached.policy_version,
-                questions_version=cached.questions_version,
-                engines_tried=cached.engines_tried,
-                prior_reasons=cached.prior_reasons, dedupe_hit=True,
-                created_at=cached.created_at,
-            )
+            # 用 replace 而不是逐字段重建：逐字段写漏一个就静默变回默认值。
+            # 这里原来漏了 authoritative 与 calibrated，于是"重复审同一篇"会被
+            # 服务层读成"结论变了"（资格从 True 掉到 False），去重统计全错。
+            return replace(cached, dedupe_hit=True)
 
         tried: List[str] = []
         prior: List[Verdict] = []

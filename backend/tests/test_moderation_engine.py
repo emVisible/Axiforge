@@ -228,6 +228,10 @@ def test_same_content_and_policy_is_decided_once():
     assert first.dedupe_hit is False
     assert second.dedupe_hit is True
     assert second.via == first.via
+    # 缓存命中是"重建一个 Outcome"，逐字段写就会漏——曾经漏掉这两个，
+    # 于是服务层把"重复审同一篇"读成"结论变了"（资格从 True 掉到 False）。
+    assert (second.authoritative, second.calibrated) == (first.authoritative, first.calibrated)
+    assert second.authoritative is True and second.calibrated is True
 
 
 def test_refitting_the_table_redecides_through_the_cache():

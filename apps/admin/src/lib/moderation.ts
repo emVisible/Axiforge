@@ -78,6 +78,11 @@ const VIA_LABELS: Record<string, string> = {
   engine_unavailable: "审核引擎不可用",
 };
 
+/** 带后缀的 via 全部走这里剥前缀：手写 `slice(19)` 是一个没人能一眼验住的数字。 */
+function tail(via: string, prefix: string): string {
+  return via.startsWith(prefix) ? via.slice(prefix.length) : via;
+}
+
 /**
  * `via` 是"这条结论为什么是这个动作"的机器标签，直接摊给运营看等于让人读源码。
  * 后端保持稳定前缀、前端负责措辞：改文案不动契约。
@@ -87,24 +92,24 @@ const VIA_LABELS: Record<string, string> = {
  */
 export function viaLabel(via: string): string {
   if (!via) return "—";
-  if (via.startsWith("auto@")) return `自动执行（线 ${via.slice(5)}）`;
-  if (via.startsWith("below_approve_line")) return `低于通过线（${via.slice(19)}）`;
-  if (via.startsWith("below_reject_line")) return `低于驳回线（${via.slice(18)}）`;
+  if (via.startsWith("auto@")) return `自动执行（线 ${tail(via, "auto@")}）`;
+  if (via.startsWith("below_approve_line")) return `低于通过线（${tail(via, "below_approve_line ")}）`;
+  if (via.startsWith("below_reject_line")) return `低于驳回线（${tail(via, "below_reject_line ")}）`;
   if (via.startsWith("engine_error")) return "引擎异常，转人工";
   if (via.startsWith("refusal:")) {
     // 引擎"有话但不能执行"与"没标定"是两件事：混起来会让人去重拟温度表，
     // 而真正要做的可能是把长文分段。
-    const detail = via.slice("refusal:".length);
+    const detail = tail(via, "refusal:");
     return detail.startsWith("over_length:")
-      ? `正文超出模型窗口（${detail.slice(12)}），不做截断后自动裁决`
+      ? `正文超出模型窗口（${tail(detail, "over_length:")}），不做截断后自动裁决`
       : `引擎拒绝自动执行：${detail}`;
   }
   if (via.startsWith("human_only_clause:")) {
-    const clause = via.slice("human_only_clause:".length);
-    return `命中需人工判断的条款：${CLAUSE_LABELS[clause] || clause}`;
+    const clause = tail(via, "human_only_clause:");
+    return `命中需人工判断的条款：${clauseLabel(clause)}`;
   }
   if (via.startsWith("suggested_human:")) {
-    const rule = via.slice("suggested_human:".length);
+    const rule = tail(via, "suggested_human:");
     return `规则建议人工：${RULE_LABELS[rule] || rule}`;
   }
   return VIA_LABELS[via] ?? via;

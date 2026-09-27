@@ -142,6 +142,17 @@ ADR-018:32 要求「全部单体内轻量实现，不引外部服务」。Cleara
    现在 severity 不发条款，`questions.REGISTERED_CLAUSES` 成为唯一注册表，
    并有测试断言"任何规则能发出的条款都必须已注册"。
 
+### 给案件生命周期补测试时，又照出两处（这两处不是模型给的，是测试给的）
+
+4. **缓存命中会丢字段。** `engine.decide` 的缓存快路径是"逐字段重建一个 Outcome"，
+   漏掉了 `authoritative` 与 `calibrated` ——它们静默掉回默认 False。
+   后果不在那次判定（动作已经算完了），而在**下一次**：服务层把"资格从 True 变 False"
+   读成"结论变了"，于是每次重复审同一篇都会写案件、去重统计永远是"没命中"。
+   改成 `dataclasses.replace(cached, dedupe_hit=True)`：会漏字段的写法本身就是错的形态。
+5. **判定历史不能按 `id` 排序。** `moderation_decision_logs.id` 是 uuid4，
+   按它 `ORDER BY` 等于随机——我自己新写的测试先在这里给出过一次"顺序完全颠倒"的假信号。
+   表上建的索引是 `(case_id, created_at)`，读历史也必须按 `created_at`。
+
 ### 阈值不是保守，是扫出来的
 
 `--sweep` 现在把通过线一路探到会出错为止（同一批模型答案，只换策略层）：

@@ -12,6 +12,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.content_validate import validate_comment_body
+from app.domains.moderation.service import advisory_review
 from app.domains.narrative.models import Project
 from app.domains.platform.comment_schemas import (
     CommentCreate,
@@ -173,6 +174,17 @@ class CommentService:
             ).scalar_one_or_none()
             if root and root.id != parent.id:
                 root.reply_count = (root.reply_count or 0) + 1
+
+        # 评论是公开面里量最大的一类，审核在这里留痕；
+        # 引擎或写库失败都不会让一条评论发不出去（advisory_review 内部吞异常 + SAVEPOINT）
+        await advisory_review(
+            self.db,
+            subject_type="comment",
+            subject_id=row.id,
+            title="",
+            body=row.body,
+            author_id=row.author_id or "",
+        )
 
         await self.db.commit()
         await self.db.refresh(row)

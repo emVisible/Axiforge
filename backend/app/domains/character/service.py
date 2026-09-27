@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.content_validate import validate_publish_text
+from app.domains.moderation.service import advisory_review
 from app.core.strike_policy import publish_block_reasons
 from app.domains.character.models import Character
 from app.domains.character.models import Tag
@@ -184,6 +185,15 @@ class CharacterService:
                 if errors:
                     raise ValueError("; ".join(errors))
             character.is_public = update.is_public
+            # 审核旁路留痕：不阻塞发布，也不参与这里的放行判定（ADR-018:23）
+            await advisory_review(
+                self.db,
+                subject_type="character",
+                subject_id=character.id,
+                title=character.name,
+                body=summary,
+                author_id=character.author_id or "",
+            )
 
         if update.image_path is not None:
             character.image_path = update.image_path
@@ -342,6 +352,15 @@ class CharacterService:
                 if errors:
                     raise ValueError("; ".join(errors))
             character.is_public = update.is_public
+            # 审核旁路留痕：不阻塞发布，也不参与这里的放行判定（ADR-018:23）
+            await advisory_review(
+                self.db,
+                subject_type="character",
+                subject_id=character.id,
+                title=character.name,
+                body=summary,
+                author_id=character.author_id or "",
+            )
 
         await self.db.commit()
         await self.db.refresh(character, ["tags"])

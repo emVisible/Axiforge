@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import time
 from collections import OrderedDict
@@ -41,6 +42,9 @@ class Outcome:
     questions_version: str
     engines_tried: Tuple[str, ...] = ()
     prior_reasons: Tuple[str, ...] = ()
+    #: 执行这条结论的引擎有没有不可逆动作的资格（gate 用它，落库也要留痕）
+    authoritative: bool = False
+    calibrated: bool = False
     dedupe_hit: bool = False
     created_at: float = field(default_factory=time.time)
 
@@ -106,7 +110,9 @@ class ModerationEngine:
         for provider in self.providers:
             tried.append(provider.name)
             try:
-                verdict = provider.moderate(subject)
+                # sidecar 客户端是阻塞 urllib，放线程里跑，别让它卡事件循环。
+                # 这里是唯一该做这件事的位置：只有链知道哪个引擎会阻塞。
+                verdict = await asyncio.to_thread(provider.moderate, subject)
             except Exception as exc:  # 单个引擎故障不影响链
                 verdict = Verdict.abstain(provider.name, f"引擎异常：{type(exc).__name__}")
             if verdict.abstained:
@@ -140,6 +146,7 @@ class ModerationEngine:
             action=action, via=via, verdict=chosen, policy_version=policy.version,
             questions_version=QUESTIONS_VERSION, engines_tried=tuple(tried),
             prior_reasons=tuple(f"{p.engine}:{p.action}" for p in prior),
+            authoritative=authoritative, calibrated=chosen.calibrated,
         )
         self._cache[key] = outcome
         if len(self._cache) > _CACHE_MAX:

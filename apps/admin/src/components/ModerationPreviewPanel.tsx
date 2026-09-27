@@ -3,7 +3,7 @@ import {
   Button,
   Card,
 } from "@axiforge/ui";
-import { ExternalLink, User } from "lucide-react";
+import { ExternalLink, RefreshCw, User } from "lucide-react";
 import type {
   AdminReport,
   AuthorModerationProfile,
@@ -30,6 +30,8 @@ interface ModerationPreviewPanelProps {
   autoJudgement?: AutoJudgement | null;
   onDismiss: () => void;
   onTakeDown: () => void;
+  onRejudge?: () => void;
+  rejudging?: boolean;
   onHideComment?: (commentId: string) => void;
   hidingCommentId?: string | null;
   busy?: boolean;
@@ -44,6 +46,8 @@ export default function ModerationPreviewPanel({
   autoJudgement,
   onDismiss,
   onTakeDown,
+  onRejudge,
+  rejudging = false,
   onHideComment,
   hidingCommentId,
   busy,
@@ -153,7 +157,13 @@ export default function ModerationPreviewPanel({
           <div className="font-mono text-[10px]">ID {report.target_id}</div>
         </section>
 
-        {autoJudgement && <AutoJudgementStrip judgement={autoJudgement} />}
+        {autoJudgement && (
+          <AutoJudgementStrip
+            judgement={autoJudgement}
+            onRejudge={onRejudge}
+            rejudging={rejudging}
+          />
+        )}
 
         <ModerationContextSections
           comments={relatedComments}
@@ -196,7 +206,15 @@ export default function ModerationPreviewPanel({
  * 明确标出"有没有执行资格"与"是否校准"：只有两者都成立，系统才会自己动手；
  * 否则它只是把一个建议递到人面前。运营需要知道自己在替谁做最后那一步。
  */
-function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
+function AutoJudgementStrip({
+  judgement,
+  onRejudge,
+  rejudging = false,
+}: {
+  judgement: AutoJudgement;
+  onRejudge?: () => void;
+  rejudging?: boolean;
+}) {
   return (
     <section className="rounded-xl border border-border bg-surface-raised px-3 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
@@ -251,10 +269,24 @@ function AutoJudgementStrip({ judgement }: { judgement: AutoJudgement }) {
           ))}
         </ul>
       )}
-      <div className="mt-1 text-2xs text-ink-faint">
-        置信 {judgement.confidence === null ? "—" : `${(judgement.confidence * 100).toFixed(0)}%`}
-        <span className="mx-1">·</span>
-        {judgement.policy_version} / {judgement.questions_version}
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="text-2xs text-ink-faint">
+          置信 {judgement.confidence === null ? "—" : `${(judgement.confidence * 100).toFixed(0)}%`}
+          <span className="mx-1">·</span>
+          {judgement.policy_version} / {judgement.questions_version}
+        </span>
+        {onRejudge && (
+          <Button
+            className="ml-auto"
+            size="sm"
+            variant="ghost"
+            disabled={rejudging}
+            onClick={onRejudge}
+          >
+            <RefreshCw className={rejudging ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
+            {rejudging ? "判定中" : "让模型重判"}
+          </Button>
+        )}
       </div>
     </section>
   );

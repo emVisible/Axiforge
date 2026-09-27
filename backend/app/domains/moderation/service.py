@@ -295,7 +295,10 @@ class ModerationService:
         case.resolved_at = datetime.now(timezone.utc)
         case.resolved_by = actor
         case.resolution_note = note or None
-        await self.db.flush()
+        # 顶层用例自己提交：`get_db` 只 close 不 commit，只 flush 的话
+        # 会话结束就回滚——运营点了"确认处置"看到 200，库里其实还是 pending。
+        # 中台其它写路径（admin_service 的六个动作）都是这个约定，这里曾是唯一的例外。
+        await self.db.commit()
         return case
 
     async def reopen(self, case_id: UUID, *, actor: str, note: str = "") -> Optional[ModerationCase]:
@@ -307,7 +310,7 @@ class ModerationService:
         case.resolved_at = None
         case.resolved_by = actor
         case.resolution_note = note or None
-        await self.db.flush()
+        await self.db.commit()   # 同 resolve：不提交的话回退也只活在内存里
         return case
 
     async def stats(self) -> dict:

@@ -82,6 +82,13 @@ async def test_resolve_then_reopen_roundtrip(client: AsyncClient):
     # 处置人来自鉴权层，不接受请求体自报；也不能是 token 原文
     assert dismissed.json()["resolved_by"] == "admin-role"
     assert "dev-admin" not in dismissed.text
+    # 必须**另起一次请求**再读：响应体来自同一会话里的 ORM 对象，
+    # 服务层只 flush 不 commit 时它照样显示 dismissed，而库里根本没写进去。
+    # （这里曾经真漏过一次提交，只有跨请求重读能抓到。）
+    reread = await client.get(f"/api/v1/admin/moderation/cases/{case['id']}", headers=ADMIN)
+    assert reread.status_code == 200
+    assert reread.json()["state"] == "dismissed", "处置没落库=运营白点一次，温度表也永远攒不到标注"
+    assert reread.json()["resolved_by"] == "admin-role"
 
     reopened = await client.post(
         f"/api/v1/admin/moderation/cases/{case['id']}/reopen",
@@ -241,3 +248,82 @@ async def test_label_export_only_emits_rows_that_can_be_fitted(db_session):
             )
         )
         await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_rejudge_rereads_the_full_content_not_the_panel_excerpt(client: AsyncClient,
+                                                                     db_session):
+    """「现在重判一次」要拿全文，且这条动作真的落库。
+
+    审阅面板那份是 280 字摘录；若重判复用它，长内容会被"看起来判过了"地截断判定。
+    这里用一段 400 字的正文，断言取回的 body 没有被截。
+    """
+    from app.domains.moderation.content import load_subject_content
+
+    body = "加微信领 全新体验，返利群拉你。" + ("这段废话用来把正文撑长。" * 20)
+    comment_id = await post_comment(client, body)
+    cases = await queue_for(client, comment_id)
+    assert len(cases) == 1
+
+    again = await client.post(
+        f"/api/v1/admin/moderation/cases/{cases[0]['id']}/rejudge", headers=ADMIN)
+    assert again.status_code == 200, again.text
+    assert again.json()["state"] == "pending"
+    assert "spam_promotion" in again.json()["clause_ids"]
+
+    title, loaded, author = await load_subject_content(
+        db_session, subject_type="comment", subject_id=comment_id)
+    assert loaded == body, "重判取的是全文，不是摘录"
+    assert author == "creator-mod-01"
+
+
+@pytest.mark.asyncio
+async def test_rejudge_unknown_case_is_404(client: AsyncClient):
+    res = await client.post(
+        "/api/v1/admin/moderation/cases/00000000-0000-0000-0000-000000000000/rejudge",
+        headers=ADMIN)
+    assert res.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_report_and_rejudge_judge_the_same_text_as_the_save_path(client: AsyncClient,
+                                                                       db_session):
+    """保存、举报、重判三个入口必须判同一份文本。
+
+    评论正文允许 4000 字，举报入口从前取的是面板那份 500 字摘录，而案件身份是
+    内容指纹——摘录和全文两个指纹，于是同一条评论挂着两个案件，每份结论看起来
+    都"判过了"。这里用一个必然超过摘录长度的正文，走完整圈后断言只剩一个案件，
+    且它的指纹就是全文的指纹。
+    """
+    from sqlalchemy import select
+
+    from app.domains.moderation.models import ModerationCase
+    from app.domains.moderation.service import content_sha
+
+    body = "加微信领 全新体验，返利群拉你。" + ("这段废话用来把正文撑长。" * 60)
+    assert len(body) > 500
+    comment_id = await post_comment(client, body)
+
+    reported = await client.post(
+        "/api/v1/report/",
+        json={
+            "target_type": "comment",
+            "target_id": comment_id,
+            "reason": "疑似导流",
+            "reporter_token": "reporter-1",
+        },
+    )
+    assert reported.status_code in (200, 201), reported.text
+    cases = await queue_for(client, comment_id)
+    assert len(cases) == 1, "举报没有按摘录另开一个案件"
+
+    again = await client.post(
+        f"/api/v1/admin/moderation/cases/{cases[0]['id']}/rejudge", headers=ADMIN)
+    assert again.status_code == 200, again.text
+
+    rows = (
+        await db_session.execute(
+            select(ModerationCase).where(ModerationCase.subject_id == comment_id))
+    ).scalars().all()
+    assert len(rows) == 1, f"三个入口判的应是同一份文本，实际 {len(rows)} 个案件"
+    assert rows[0].fingerprint == content_sha("", body)

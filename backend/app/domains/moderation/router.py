@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_auth import require_admin
 from app.database import get_db
+from app.domains.moderation.content import load_subject_content
 from app.domains.moderation.schemas import CaseResponse, ResolveRequest, StatsResponse
 from app.domains.moderation.service import ModerationService
 
@@ -72,6 +73,36 @@ async def moderation_resolve(
     if not case:
         raise HTTPException(404, "案件不存在")
     return case
+
+
+@moderation_router.post("/cases/{case_id}/rejudge", response_model=CaseResponse)
+async def moderation_rejudge(case_id: UUID, db: AsyncSession = Depends(get_db)):
+    """让模型**现在**重判一次——"通过 Laya 进行自动判断"的手动入口。
+
+    为什么需要它：判断只发生在内容保存的那一刻，那么重拟温度表、改词表、
+    换题集之后，队列里的旧结论没有任何一条路能变成新结论——除非作者重新存一次稿。
+    §12 把模型状态放进了幂等键，但没人触发它就没人重算。
+
+    取的是**全文**而不是审阅面板那份 280 字摘录：看不全就自动裁决，
+    是 `MAX_MODEL_CHARS` 明令禁止的事，不能因为换了入口就变成允许的。
+    """
+    svc = _svc(db)
+    case = await svc.get(case_id)
+    if not case:
+        raise HTTPException(404, "案件不存在")
+    content = await load_subject_content(
+        db, subject_type=case.subject_type, subject_id=case.subject_id)
+    if content is None:
+        raise HTTPException(410, "原内容已删除，或这类主体暂不支持重判")
+    title, body, author_id = content
+    again = await svc.review(
+        subject_type=case.subject_type, subject_id=case.subject_id,
+        title=title, body=body, author_id=author_id)
+    if again is None:
+        raise HTTPException(409, "这条链现在给不出可落库的结论（引擎不可用、全部弃权，"
+                                 "或正文超出模型窗口）")
+    await db.commit()
+    return again
 
 
 @moderation_router.post("/cases/{case_id}/reopen", response_model=CaseResponse)

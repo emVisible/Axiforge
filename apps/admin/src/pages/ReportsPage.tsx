@@ -48,6 +48,7 @@ export default function ReportsPage() {
   const [authorProfile, setAuthorProfile] = useState<AuthorModerationProfile | null>(null);
   const [autoJudgement, setAutoJudgement] = useState<AutoJudgement | null>(null);
   const [hidingCommentId, setHidingCommentId] = useState<string | null>(null);
+  const [rejudging, setRejudging] = useState(false);
   const { showToast } = useToast();
 
   const selected = items?.find((r) => r.id === selectedId) ?? items?.[0] ?? null;
@@ -76,21 +77,23 @@ export default function ReportsPage() {
     if (!items?.length) setSelectedId(null);
   }, [items, selectedId]);
 
-  const loadContext = useCallback(async (report: AdminReport | null) => {
+  const loadContext = useCallback(async (report: AdminReport | null): Promise<AutoJudgement | null> => {
     if (!report) {
       setContextComments([]);
       setAuthorProfile(null);
       setAutoJudgement(null);
-      return;
+      return null;
     }
     try {
       const ctx = await adminApi.moderationContext(report.target_type, report.target_id);
       setContextComments(ctx.related_comments);
       setAuthorProfile(ctx.author_profile);
       setAutoJudgement(ctx.auto_judgement);
+      return ctx.auto_judgement;
     } catch {
       setContextComments([]);
       setAuthorProfile(null);
+      return null;
     }
   }, []);
 
@@ -110,7 +113,9 @@ export default function ReportsPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (pending || busy) return;
+      // 重判在途时禁止切换条目：两个 loadContext 并发时后写的那份会盖掉前一份，
+      // 面板就会把上一个条目的机器结论显示在当前条目上。
+      if (pending || busy || rejudging) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
@@ -130,7 +135,7 @@ export default function ReportsPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pending, busy, selectByOffset, selected, tab]);
+  }, [pending, busy, rejudging, selectByOffset, selected, tab]);
 
   const resolve = async (note?: string) => {
     if (!pending) return;
@@ -163,6 +168,33 @@ export default function ReportsPage() {
       setError(e instanceof Error ? e.message : "下架评论失败");
     } finally {
       setHidingCommentId(null);
+    }
+  };
+
+  /**
+   * 手动让模型用**全文**重判一次。路由返回的是判定结果而非面板那份契约，
+   * 所以结束后必须重新读 context——不能把内存里的旧结论就地改写。
+   *
+   * 提示语区分两种真实结果：内容与策略都没变时引擎走指纹缓存，案件结论不动、
+   * 只多一行判断记录（`decided_at` 不变）；只有结论变了才会刷新案件。
+   */
+  const rejudge = async () => {
+    if (!selected || !autoJudgement) return;
+    const before = autoJudgement.decided_at;
+    setRejudging(true);
+    try {
+      await adminApi.moderationRejudge(autoJudgement.case_id);
+      const after = await loadContext(selected);
+      showToast(
+        after?.decided_at === before
+          ? "已按全文送判：结论未变，判断记录加了一行"
+          : "模型结论已更新",
+        "success",
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "重判失败", "error");
+    } finally {
+      setRejudging(false);
     }
   };
 
@@ -253,6 +285,8 @@ export default function ReportsPage() {
             onHideComment={tab === "pending" ? hideComment : undefined}
             onDismiss={() => selected && setPending({ report: selected, action: "dismiss" })}
             onTakeDown={() => selected && setPending({ report: selected, action: "take_down" })}
+            onRejudge={autoJudgement ? rejudge : undefined}
+            rejudging={rejudging}
           />
         </div>
       )}

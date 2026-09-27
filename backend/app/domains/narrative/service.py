@@ -2,7 +2,7 @@
 
 import copy
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import uuid
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,6 +68,19 @@ def narrative_prose_text(nodes) -> str:
                         and isinstance(item.get("text"), str)):
                     parts.append(item["text"].strip())
     return "\n".join(p for p in parts if p)
+
+
+def project_subject_text(*, title: str, description: str, nodes) -> Tuple[str, str]:
+    """作品作为审核主体的口径：标题单独给，正文 = 简介 + 读者会看到的文字。
+
+    这里必须是**唯一一处**定义，保存路径和 `moderation.content` 都调它。
+    在此之前保存路径只判正文、举报路径只判简介（面板那份摘录），
+    同一部作品于是留下两份内容指纹、挂着两个案件，而两边看起来都"判过了"。
+    简介是发现页上读者真正看到的文案，漏掉它等于给导流话术留了一条公开面。
+    """
+    prose = narrative_prose_text(nodes)
+    body = "\n\n".join(p for p in ((description or "").strip(), prose) if p)
+    return (title or ""), body
 
 
 class ProjectService:
@@ -767,12 +780,18 @@ class ProjectService:
         # 审核旁路留痕（ADR-028）：作品是平台的核心对象，判断层不接到这里就只是
         # "审评论和角色"。必须在 commit 之前调用——放在 commit 之后，审核行会随
         # 调用方事务一起被丢掉（举报路径踩过一次）。失败不影响保存本身。
+        # 文本口径走 moderation 域那一份唯一定义，不在这里重新拼一遍。
+        title, body = project_subject_text(
+            title=project.title or "",
+            description=proj.description if proj else "",
+            nodes=data.nodes,
+        )
         await advisory_review(
             self.db,
             subject_type="project",
             subject_id=project_id,
-            title=project.title or "",
-            body=narrative_prose_text(data.nodes),
+            title=title,
+            body=body,
             author_id=project.author_id or "",
         )
         await self.db.commit()

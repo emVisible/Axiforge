@@ -357,20 +357,29 @@ class ReportService:
         # 而不是从空白开始。审核失败不影响举报本身（advisory_review 内部吞异常）。
         # 顺序要紧：判断必须发生在 commit 之前，否则案件留在未提交的事务里，
         # 举报成功了但结论从来没落库——这条是测试逼出来的。
+        #
+        # 送判取的是**全文**而不是审阅面板那份摘录：面板给作品的是 `description`、
+        # 给长评论的是 500 字截断，用它判定等于让模型评一份目录页；
+        # 更糟的是保存路径已经在判全文，两份文本两个指纹，同一部作品会长期挂着两个案件。
+        from app.domains.moderation.content import load_subject_content
         from app.domains.moderation.service import advisory_review
-        from app.domains.platform.admin_moderation import build_moderation_preview
 
-        preview = await build_moderation_preview(
-            self.db, target_type=data.target_type, target_id=data.target_id
+        content = await load_subject_content(
+            self.db, subject_type=data.target_type, subject_id=data.target_id
         )
-        await advisory_review(
-            self.db,
-            subject_type=data.target_type,
-            subject_id=data.target_id,
-            title=preview.get("title") or "",
-            body=preview.get("excerpt") or "",
-            author_id=str(preview.get("author_id") or ""),
-        )
+        # 取不到全文 = 内容已删除或这类主体不在判断层覆盖范围内。
+        # 此时不建案件：旧做法是拿"（内容不存在或已删除）"这句占位去判定，
+        # 结论必然干净，于是队列里多出一条"机器看过说没问题"的假留痕。
+        if content is not None:
+            title, body, author_id = content
+            await advisory_review(
+                self.db,
+                subject_type=data.target_type,
+                subject_id=data.target_id,
+                title=title,
+                body=body,
+                author_id=author_id,
+            )
         await self.db.commit()
         await self.db.refresh(row)
         return ReportResponse.model_validate(row)

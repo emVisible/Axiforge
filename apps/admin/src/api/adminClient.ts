@@ -350,6 +350,9 @@ export const adminApi = {
       method: "POST",
       body: JSON.stringify({ outcome, note }),
     }),
+  /** 让模型现在重判一次（读全文，不是面板那份摘录）。 */
+  moderationRejudge: (id: string) =>
+    request<ModerationCase>(`/moderation/cases/${id}/rejudge`, { method: "POST" }),
   moderationReopen: (id: string, note = "") =>
     request<ModerationCase>(`/moderation/cases/${id}/reopen${qs({ note })}`, { method: "POST" }),
 };

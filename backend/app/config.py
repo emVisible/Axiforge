@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     deepseek_model: str = "deepseek-chat"
     llm_daily_limit_per_creator: int = 30
+    # 内容审核判断层（ADR-028，落地 ADR-018:24 预留的 ModerationProvider）
+    # 默认关闭：ADR-018 写的是"LLM 审核留接口，默认关闭"，发布路径不受影响。
+    moderation_enabled: bool = False
+    laya_sidecar_url: str = "http://127.0.0.1:8685"
+    moderation_auto_approve_threshold: float = 0.90
+    moderation_auto_reject_threshold: float = 0.95
+    moderation_human_band: float = 0.70
+    # 改阈值/改词表时递增它：版本号随每条决策落库，否则旧决策无法复现当时的判线。
+    moderation_policy_revision: str = "1"
 
     class Config:
         env_file = ".env"

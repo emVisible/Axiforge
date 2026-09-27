@@ -141,6 +141,7 @@ class Handler(BaseHTTPRequestHandler):
                 "path": CALIBRATION_FILE,
                 "questions": sorted(table),
                 "T": {k: (v or {}).get("T") for k, v in table.items()},
+                "b": {k: (v or {}).get("b", 0.0) for k, v in table.items()},
                 "grid_max": GRID_MAX,
             },
         })

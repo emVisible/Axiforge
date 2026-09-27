@@ -64,8 +64,11 @@ class LayaSidecarEngine:
         if h is None:
             return "laya:unreachable"
         cal = h.get("calibration") or {}
+        # 指纹要覆盖**全部**自由参数：只带 T 的话，一次"只改偏置"的重拟不会让
+        # 旧结论失效，同一篇稿子会以过期标定的名义继续被复用。
         digest = hashlib.sha1(
-            json.dumps(cal.get("T") or {}, sort_keys=True).encode("utf-8")
+            json.dumps({"T": cal.get("T") or {}, "b": cal.get("b") or {}},
+                       sort_keys=True).encode("utf-8")
         ).hexdigest()[:8]
         return f"laya:{h.get('default', '?')}+T{digest}"
 

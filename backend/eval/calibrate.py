@@ -33,6 +33,7 @@ os.environ.setdefault("TESTING", "1")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "sidecar"))
 from calibration import (  # noqa: E402
+    fit_affine_binary,
     fit_temperature_binary,
     fit_temperature_categorical,
     nll_binary,
@@ -126,6 +127,15 @@ def loo_binary(pairs: List[Tuple[float, int]]) -> Tuple[float, float]:
     return total / len(pairs), sum(Ts) / len(Ts)
 
 
+def loo_affine(pairs: list) -> float:
+    """留一持出 NLL（仿射版）。IRLS 够快，才做得起重拟 n 次。"""
+    total = 0.0
+    for i, pair in enumerate(pairs):
+        T, b, _, _ = fit_affine_binary(pairs[:i] + pairs[i + 1:])
+        total += nll_binary([pair], T, b)
+    return total / len(pairs)
+
+
 def main() -> int:
     questions = build_questions()
     samples = collect(questions)
@@ -138,13 +148,25 @@ def main() -> int:
         if len(pairs) < MIN_ROWS or pos == 0 or pos == len(pairs):
             print(f"  {name:<24} 跳过（n={len(pairs)} 正={pos}）——不写进表，门控据此保持不可执行")
             continue
-        T, before, after = fit_temperature_binary(pairs)
-        loo, _ = loo_binary(pairs)
-        table[name] = {"T": T, "n": len(pairs), "pos": pos,
-                       "nll_in_before": round(before, 4), "nll_in_after": round(after, 4),
-                       "nll_loo": round(loo, 4)}
-        print(f"  {name:<24} T={T:<5} n={len(pairs):<3} 正={pos:<3} "
-              f"in {before:.3f}→{after:.3f}  持出 {loo:.3f}")
+        # 纯温度 vs 仿射（带偏置）由**持出** NLL 决定，不由样本内决定：
+        # 多一个自由度的方法在 34 行上必然把 in-sample 压得更低，那正是过拟合的样子。
+        tT, before, after = fit_temperature_binary(pairs)
+        loo_t, _ = loo_binary(pairs)
+        aT, ab, _, _ = fit_affine_binary(pairs)
+        loo_a = loo_affine(pairs)
+        use_affine = loo_a < loo_t - 1e-4
+        T, b = (aT, ab) if use_affine else (tT, 0.0)
+        loo = loo_a if use_affine else loo_t
+        table[name] = {"T": T, "b": b, "method": "affine" if use_affine else "temperature",
+                       "n": len(pairs), "pos": pos,
+                       "nll_in_before": round(before, 4),
+                       "nll_in_after": round(after, 4),
+                       "nll_loo": round(loo, 4),
+                       "nll_loo_temperature": round(loo_t, 4),
+                       "nll_loo_affine": round(loo_a, 4)}
+        print(f"  {name:<24} {('仿射' if use_affine else '温度'):<4} T={T:<6} b={b:<6} "
+              f"n={len(pairs):<3} 正={pos:<3} in {before:.3f}→{after:.3f}  "
+              f"持出 温度 {loo_t:.3f} / 仿射 {loo_a:.3f}")
 
     for name, label_of in (
         ("age_rating", lambda r: r.get("rating")),

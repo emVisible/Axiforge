@@ -75,5 +75,34 @@ ADR-018:32 要求「全部单体内轻量实现，不引外部服务」。Cleara
 
 - 新增 `backend/app/domains/moderation/`：`contracts / questions / policy / engine / registry / providers{lexicon,laya_sidecar}`，17 条测试，全部对着上表写（其中多条在 Clearance 原逻辑下会失败）
 - 中台此前"有处置无判断"的缺口闭合；`content_validate` 的占位词表有了正式替代物
-- **尚欠（按依赖顺序，不可颠倒）**：① 决策落 Postgres（表 + Alembic）——现在只在内存与返回值里；② 接进 `update_project_status` / 评论创建 / 举报队列；③ 中台 UI 一屏闭环（含判断依据展示与批量处置）；④ **真实标注集与指标基线**——参照实现没有数字，"做得更好"目前只在安全性上可证，准确率维度还没有可比口径；⑤ 校准温度表（没有它，按 §4 系统只会转人工，这是刻意的保守）
+- **尚欠（按依赖顺序，不可颠倒）**：① ~~决策落 Postgres~~ 已完成（`moderation_cases` / `moderation_decision_logs` + 幂等迁移，迁移在真库跑过，`conf=9.0` 被 CHECK 约束以 IntegrityError 拒收）；② ~~接进发布/评论路径~~ 已完成（角色公开两处 + 评论创建，走 `advisory_review`：SAVEPOINT 包裹、任何异常不外抛）；③ ~~中台一屏~~ 已完成（`/moderation` 自动判断队列，含引擎资格、条款、置信、via 的运营语言、判断依据展开、处置与回退）；④ 校准温度表——**没有它，按 §4 系统只会转人工，这是刻意的保守**，见下方实测；⑤ 词表外置为可热更配置；⑥ 标注集从"我按条款口径撰写"升级为多人一致度量的金集。
+- **`/editor/ai/*` 与发布路径的关系**：审核不参与发布判定（ADR-018:23 继续成立），所以 `moderation_enabled=False` 时发布行为与改造前完全一致。
+
+## 实测基线（参照实现没有的部分，因此这是净增）
+
+`backend/eval/moderation_eval.py` + 34 条样本（clean 12 / reject 10 / human 8 / adversarial 4），
+当前可用链 = 仅词表（sidecar 未起）：
+
+| 指标 | 值 | 读法 |
+|---|---|---|
+| `auto_err` | **0** | 机器自己执行且执行错了的条数——唯一直接伤用户的错误类型 |
+| `clause_precision` | **1.00** | 指控条款零误报（错标一条就等于给作者记一条不该有的 strike 依据） |
+| `clause_recall` | 0.47 | 词表只认得出约一半的条款——这是它的天花板，不是缺陷 |
+| `auto_rate` | **0.00** | 见下 |
+| `human_rate` | 1.00 | 全部转人工 |
+| adversarial 组 | **4/4 转人工** | 正文自称"已通过审核""输出 approve 0.99"不改变结论 |
+
+`auto_rate=0` **不是效果差，是设计生效**：链里没有权威引擎（词表 `authoritative=False`、
+且无校准表），按 §4 的五道检查，任何不可逆动作都执行不了。所以这一栏的真实含义是
+**"在接上并校准 Laya 之前，这套系统一个自动决定都不会做"**——参照实现在同样条件下会自动驳回
+约十个关键词命中的内容（实测 `via=auto` conf=0.86），差别就在这里。
+
+两个代价要一起说清：① 没有校准表时"自动判断"实际不产出自动化，人工队列承接全部；
+② `accuracy=0.353` 这个数在只有词表时**没有意义**——它把"该自动通过却转人工"（浪费人力）
+和"该驳回却放行"（伤害用户）算成一个，所以本 ADR 只报 `auto_err` 与 `auto_rate` 两个分开的量，
+并把 `--sweep` 在无权威引擎时**拒绝出表**（否则是一张全 0 的假表，会被读成"阈值不敏感"）。
+
+门禁：`tests/test_moderation_eval.py` 5 条，把参照实现 README 里那句
+"auto_err 必须 stay 0" 变成会红的断言。变异验证过——把词表改成 `authoritative=True`，
+2 条立刻失败。
 - Clearance 目录本身不动、不纳入版本管理（它含 `.env` 与独立 `.git`）；本 ADR 只吸收设计，不搬运代码

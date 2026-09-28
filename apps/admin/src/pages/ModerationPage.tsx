@@ -11,6 +11,7 @@ import {
 } from "@axiforge/ui";
 import { adminApi, type ModerationCase, type PaginatedResponse } from "@/api/adminClient";
 import ModerationWhatIfPanel from "@/components/ModerationWhatIfPanel";
+import ModerationRequeuePanel from "@/components/ModerationRequeuePanel";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
@@ -325,6 +326,13 @@ export default function ModerationPage() {
           }}
         />
       )}
+
+      <ModerationRequeuePanel
+        onFinished={() => {
+          list.invalidate();
+          stats.invalidate();
+        }}
+      />
 
       {openId && (
         <EvidencePanel

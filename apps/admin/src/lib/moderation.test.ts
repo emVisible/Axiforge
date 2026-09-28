@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { EngineCalibration, ModerationVocabulary } from "@/api/adminClient";
+import type { EngineCalibration, ModerationVocabulary, RequeueStatus } from "@/api/adminClient";
 import {
   EMPTY_VOCABULARY,
   actionLabel,
@@ -9,6 +9,7 @@ import {
   engineSilenceNote,
   maskToken,
   questionLabel,
+  requeueSummary,
   stalenessSummary,
   suggestionLabel,
   viaLabel,
@@ -191,7 +192,35 @@ describe("举报人凭据的显示", () => {
   });
 });
 
-describe("引擎没答话的那行依据", () => {  // 2026-09-27 真机 sidecar 崩溃时落库的原文（案件 154973d5 的依据末行）
+describe("批量重判的读数", () => {
+  const base: RequeueStatus = {
+    running: false, queued: 150, judged: 1, lexicon_only: 147, would_close: 0,
+    no_content: 2, no_case: 0, failed: 0, cancelled: false,
+  };
+
+  it("跑完了但绝大多数只有词表说话，不许报绿——那次就是 147/150 被算成判完", () => {
+    const s = requeueSummary(base);
+    expect(s.tone).toBe("warn");
+    expect(s.text).toContain("模型答了 1 条");
+    expect(s.text).toContain("147 条只有词表说话");
+  });
+
+  it("模型真答了话才是绿的 ok，且过门的要说明还没结案", () => {
+    const s = requeueSummary({ ...base, judged: 140, lexicon_only: 0, would_close: 3 });
+    expect(s.tone).toBe("ok");
+    expect(s.text).toContain("3 条已过门（未结案，等人确认）");
+  });
+
+  it("一条都没答话时不是 ok；失败则直接是 danger", () => {
+    expect(requeueSummary({ ...base, judged: 0, lexicon_only: 150 }).tone).toBe("warn");
+    expect(requeueSummary({ ...base, judged: 0, lexicon_only: 0, failed: 9 }).tone).toBe("danger");
+    expect(requeueSummary({ ...base, running: true }).tone).toBe("running");
+    expect(requeueSummary({ ...base, queued: 0 }).text).toBe("还没跑过批量重判");
+  });
+});
+
+describe("引擎没答话的那行依据", () => {
+  // 2026-09-27 真机 sidecar 崩溃时落库的原文（案件 154973d5 的依据末行）
   const reasons = [
     "model=multilingual",
     "规则「仇恨 / 隐私 / 违法教程」→ 自动驳回 置信 0.98",

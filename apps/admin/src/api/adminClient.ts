@@ -346,6 +346,20 @@ export interface QueueStaleness {
   without_authoritative_verdict: number;
 }
 
+/** 批量重判的进度。计数是互斥单值：`judged` 只代表"权威引擎答了话"，
+ *  只有词表说话的那些落在 `lexicon_only`——把它们混进 judged 会报出假的成功。 */
+export interface RequeueStatus {
+  running: boolean;
+  queued: number;
+  judged: number;
+  lexicon_only: number;
+  would_close: number;
+  no_content: number;
+  no_case: number;
+  failed: number;
+  cancelled: boolean;
+}
+
 export interface ModerationStats {
   by_state: Record<string, number>;
   by_engine: Record<string, number>;
@@ -444,6 +458,15 @@ export const adminApi = {
    *  这里再写一份 500 就是第二个真相源，两边改一忘一时读到的窗会静默不同。 */
   moderationWhatIf: (approve: number, reject: number, scan?: number) =>
     request<WhatIfReport>(`/moderation/what-if${qs({ approve, reject, scan })}`),
+  /** 启动批量重判。默认 `allow_close=false`：只刷新结论，不把这些条从人工队列里移走。 */
+  moderationRequeue: (body: { scope: string; limit: number; allow_close?: boolean }) =>
+    request<RequeueStatus>("/moderation/requeue", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  moderationRequeueStatus: () => request<RequeueStatus>("/moderation/requeue"),
+  moderationRequeueCancel: () =>
+    request<RequeueStatus>("/moderation/requeue/cancel", { method: "POST" }),
   moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
     request<ModerationCase>(`/moderation/cases/${id}/resolve`, {
       method: "POST",

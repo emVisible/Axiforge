@@ -881,6 +881,37 @@ failed assertion `A command encoder is already encoding to this command buffer'
 要拿到能支撑"挪线"的证据，只有两条路——真实多样的内容进来，或者人开始对现有 32 篇做处置。
 另外该给 `/what-if` 补一个 `distinct_contents` 读数，让"292 条可回放"这种话不再被单独说出口。
 
+### D22 落地：批量重判接到队列页，运营自己就能跑（2026-09-28 第七轮）
+
+`ModerationRequeuePanel`：范围（模型没答过的 / 版本已推进的 / 全部待处置）+ 条数 +
+「允许批量结案」勾选 + 1.2s 一跳的进度徽章。两条不可让的设计写进组件 docstring：
+① **默认不结案**（勾选框的文案说的是后果，不是"允许自动通过"这种含糊话）；
+② **`lexicon_only` 单独一格且它一出现就不是绿的** —— 这条正是 D14 那个教训的界面化：
+第一次上线时计数器把 147/150 报成"判完"，而库里模型证据只多了 1 条。
+
+浏览器里把两条读数都走过（不是只看代码）：
+
+| 情形 | 徽章 |
+| --- | --- |
+| 模型活着，跑 8 条 | 绿 `模型答了 5 条 · 3 条原内容已不在` |
+| 杀掉 sidecar 再跑 6 条 | 琥珀 `模型答了 0 条 · 3 条只有词表说话 · 3 条原内容已不在` |
+
+**接界面时才暴露的一个缺陷（已修，值得记下来）**：进度最初挂在
+`useQuery({ refetchInterval: q => q.state.data?.running ? 1000 : false })` 上，
+而"要不要继续轮询"由**当前这份数据**决定 —— 只要最后一次快照是 `running:true`，
+就再也没有人去取终态。实测面板一直停在「重判中 0/200」而服务端早已 `running:false`，
+连带 `onFinished` 不触发、队列与统计都不刷新。改成组件自己管的 interval
+（跑着才轮询，取到 `running:false` 那一次才停并回调），另外挂载时先读一次，
+这样上一轮的读数（以及"在另一个标签页启动的批量"）不至于看不见。
+
+`requeueSummary()` 放在 `lib/moderation.ts` 并有 3 条断言，包括那个不能骗人的形状：
+`judged=1 / lexicon_only=147` 必须是 warn 而不是 ok。徽章颜色这次是真的有颜色——
+它同时是 #46（`@source` 缺失导致 `bg-emerald-50` 在中台产物里没有规则）的回归验证。
+
+核验：`pytest` 149 passed、admin `vitest` 25 passed、`pnpm gates` exit 0；
+`distinct` 一处修正：`/requeue` 与真实规模（200 条）跑完 `judged=197 / lexicon_only=0 /
+no_content=3 / failed=0`，sidecar 在锁串行化之后活过了整轮。
+
 ### 现在到"真的自动"之间还差什么
 
 按顺序，且第 2 步之前不要谈自动化率：

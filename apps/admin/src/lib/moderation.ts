@@ -3,6 +3,7 @@ import type {
   EngineCalibration,
   ModerationVocabulary,
   QueueStaleness,
+  RequeueStatus,
   WhatIfReport,
 } from "@/api/adminClient";
 
@@ -158,6 +159,31 @@ const VIA_SUFFIX_FREE: Record<string, string> = {
   engine_abstained: "所有引擎弃权",
   engine_unavailable: "审核引擎不可用",
 };
+
+/**
+ * 批量重判的读数。这里的原则与 D14 同一条：**"跑完了"不等于"模型看过了"**。
+ * 第一次上线时计数器把 147 条只到词表的也算成判完，而库里只多了 1 条模型证据——
+ * 所以 `lexicon_only` 必须单独说出来，且它一出现就是黄/红而不是绿。
+ */
+export function requeueSummary(s: RequeueStatus): {
+  tone: "idle" | "running" | "ok" | "warn" | "danger";
+  text: string;
+} {
+  if (s.running) {
+    const done = s.judged + s.lexicon_only + s.would_close + s.no_content + s.no_case + s.failed;
+    return { tone: "running", text: `重判中 ${done}/${s.queued}` };
+  }
+  if (s.queued === 0) return { tone: "idle", text: "还没跑过批量重判" };
+  const parts: string[] = [`模型答了 ${s.judged} 条`];
+  if (s.would_close > 0) parts.push(`${s.would_close} 条已过门（未结案，等人确认）`);
+  if (s.lexicon_only > 0) parts.push(`${s.lexicon_only} 条只有词表说话`);
+  if (s.no_content > 0) parts.push(`${s.no_content} 条原内容已不在`);
+  if (s.failed > 0) parts.push(`${s.failed} 条失败`);
+  if (s.cancelled) parts.push("已取消");
+  const tone: "ok" | "warn" | "danger" =
+    s.failed > 0 ? "danger" : s.judged === 0 || s.lexicon_only > 0 || s.cancelled ? "warn" : "ok";
+  return { tone, text: parts.join(" · ") };
+}
 
 /**
  * 队列结论的版本新鲜度读数。存在的理由：判定只在内容被保存那一刻发生，

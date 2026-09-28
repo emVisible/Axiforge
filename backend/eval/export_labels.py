@@ -34,6 +34,37 @@ from app.domains.moderation.models import ModerationCase  # noqa: E402
 OUTCOME_TO_EXPECTED = {"resolved": "reject", "dismissed": "approve"}
 
 
+def case_payload(r: ModerationCase) -> dict:
+    """一条导出行。**键名必须与 `eval/moderation_samples.jsonl` 一致**——
+    拟合与评测读的是同一套键（`clauses` / `answers` / `expected`），
+    这里少一个键，`calibrate.py` 不会报错而是**整行跳过**：
+    它明写"没有条款标注的行不能凭空当成七条轴都不存在"。
+    以前这份导出就从来没发过 `clauses`，于是"攒够标注 → 重拟"这条路
+    真要跑起来会得到一份 0 样本的温度表。
+
+    `clauses` 的语义是"人背书过的条款集合"，不是"机器报过的条款"：
+    - `resolved`（确认处置）→ 机器当时标的条款被人认了 → 原样带出；
+    - `dismissed`（判为误报）→ 那些条款被人否了 → 空集，于是这七条轴各记一个 0，
+      这正是过报应当付出的代价。
+    一个必须说清的偏差：这样得到的正样本永远只覆盖"机器自己想到的那些轴"，
+    人没有逐轴打勾的入口，所以它**低估假阳性**、拟出来的温度偏乐观。
+    要把这个偏差拿掉得给处置面板加逐轴勾选（ADR-028 §"还差什么"第 3 步的金集版本）。
+    """
+    return {
+        "case_id": str(r.id),
+        "subject_type": r.subject_type,
+        "subject_id": r.subject_id,
+        "engine": r.engine,
+        "answers": r.answers,
+        "clauses": list(r.clause_ids) if r.state == "resolved" else [],
+        "expected": OUTCOME_TO_EXPECTED.get(r.state, "human_review"),
+        "human_state": r.state,
+        "policy_version": r.policy_version,
+        "questions_version": r.questions_version,
+        "calibrated_at_decide": r.calibrated,
+    }
+
+
 async def collect() -> list[dict]:
     """导出 (类型化答案, 人工标签) 对，供温度拟合。"""
     async with async_session() as db:
@@ -51,20 +82,7 @@ async def collect() -> list[dict]:
         if not r.answers:
             # 词表结论没有答案；把"没有答案"的行喂进拟合会拟合出一个毫无意义的 T
             continue
-        out.append(
-            {
-                "case_id": str(r.id),
-                "subject_type": r.subject_type,
-                "subject_id": r.subject_id,
-                "engine": r.engine,
-                "answers": r.answers,
-                "expected": OUTCOME_TO_EXPECTED.get(r.state, "human_review"),
-                "human_state": r.state,
-                "policy_version": r.policy_version,
-                "questions_version": r.questions_version,
-                "calibrated_at_decide": r.calibrated,
-            }
-        )
+        out.append(case_payload(r))
     return out
 
 

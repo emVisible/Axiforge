@@ -125,6 +125,12 @@ class EngineCalibration(BaseModel):
     grid_max: float = 0.0
     #: 拟合值坐在上限上的题：不是"标定好了"，是"想更正但网格不允许"，置信度仍虚高
     censored: List[str] = []
+    #: 持出 NLL 打不过常数预测器的题：这个数在当前标注量下**不携带信息**，
+    #: 而 approve 的置信度是各轴取 min，所以它正在按 min 否决整条自动通道（ADR-028 D25）。
+    flattened: List[str] = []
+    #: 这张温度表有没有上报判断力字段。旧表没这个键时是 false——
+    #: "没数据"与"有数据且是负的"必须在界面上长得不一样。
+    flattening_reported: bool = False
     path: str = ""
     error: str = ""
 

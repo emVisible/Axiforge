@@ -109,6 +109,11 @@ class LayaSidecarEngine:
         # 拟合值坐在网格上限上 = 还想更正但网格不允许，这类题的置信度仍是虚高的。
         # 不知道网格上限（旧 sidecar）时不猜：报空列表，界面上显示"未上报"。
         censored = sorted(q for q, t in temps.items() if grid_max and t >= grid_max)
+        # `informative=false` 的轴：持出 NLL 打不过"只看标签频率、不看模型"的常数预测器。
+        # 它不是"标得差一点"，是**这个数在当前标注量下不携带信息**——而 approve 的置信度
+        # 是各轴取 min，一条没有判断力的轴就有权否决整条自动通道，这正是现在发生的事。
+        inf = cal.get("informative") or {}
+        flattened = sorted(str(q) for q, v in inf.items() if v is False)
         return {
             "reachable": True,
             "declared": declared,
@@ -117,6 +122,9 @@ class LayaSidecarEngine:
             "temperatures": temps,
             "grid_max": grid_max,
             "censored": censored,
+            "flattened": flattened,
+            # 区分"这张表没这个字段"（旧表，None）与"报了、全是 true"（新表，没问题）。
+            "flattening_reported": any(v is not None for v in inf.values()),
             "path": str(cal.get("path") or ""),
         }
 

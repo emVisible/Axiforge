@@ -90,11 +90,28 @@ export function calibrationSummary(
   if (c.missing.length) {
     return { text: `标定 ${covered}，缺 ${names(c.missing)}`, tone: "warn" };
   }
+  const flat = c.flattened ?? [];
+  if (flat.length) {
+    // 「标定 10/10 题」在这里是一句会骗人的话：题数齐了，但其中这几题的缩放后概率
+    // 打不过"完全不看模型"的常数预测器——它们不携带信息，却在 approve 的取 min 里
+    // 否决整条自动通道。这一枚必须说"没有判断力"，不能说"标定完成"。
+    // 顶格（censored）是另一件下一步（放宽网格），两类都命中时两条都要说，别只报前面那个。
+    const censoredNote = c.censored.length ? `·另有 ${c.censored.length} 题触到网格上限` : "";
+    return {
+      text: `标定 ${covered}，其中 ${names(flat)} 打不过常数预测器（不携带信息，却按 min 压住自动通道）${censoredNote}`,
+      tone: "warn",
+    };
+  }
   if (c.censored.length) {
     return {
       text: `标定 ${covered}，其中 ${names(c.censored)} 的拟合触到网格上限（置信仍偏高）`,
       tone: "warn",
     };
+  }
+  if (c.flattening_reported !== true) {
+    // 旧温度表没上报判断力。这里给 warn 不是"有问题"，是"这一维看不见"——
+    // 把它显示成 ok 会让人以为 10/10 且题题有信息。
+    return { text: `标定 ${covered}（这张表没上报判断力，无法判断有无空转轴）`, tone: "warn" };
   }
   return { text: `标定 ${covered}`, tone: "ok" };
 }

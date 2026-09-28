@@ -43,6 +43,8 @@ const calib = (over: Partial<EngineCalibration>): EngineCalibration => ({
   temperatures: {},
   grid_max: 20,
   censored: [],
+  flattened: [],
+  flattening_reported: true,
   path: "",
   error: "",
   ...over,
@@ -95,7 +97,7 @@ describe("via 的中文展开", () => {
   });
 });
 
-describe("温度表覆盖面的三态", () => {
+describe("温度表覆盖面的几种读法", () => {
   it("全绿只在既覆盖满又没有顶格时出现", () => {
     expect(calibrationSummary(VOCAB, calib({}))).toEqual({
       text: "标定 3/3 题",
@@ -115,6 +117,31 @@ describe("温度表覆盖面的三态", () => {
     expect(censored.tone).toBe("warn");
     expect(censored.text).toContain("拟合触到网格上限");
     expect(censored.text).toContain("危害量级");
+  });
+
+  it("题数齐但其中有轴打不过常数预测器——不许显示成标定完成", () => {
+    // D25 实测：34 行标注下 8/10 题没有判断力，而覆盖面仍是 10/10。
+    // approve 的置信度是各轴取 min，所以这些轴正在否决自动通道。
+    const flat = calibrationSummary(
+      VOCAB,
+      calib({ flattened: ["pii_real_person", "severity"], censored: ["pii_real_person"] }),
+    );
+    expect(flat.tone).toBe("warn");
+    expect(flat.text).toContain("打不过常数预测器");
+    expect(flat.text).toContain("真人隐私、危害量级");
+    expect(flat.text).toContain("3/3 题");
+    // 两类缺口各自的下一步不同（补标注 vs 放宽网格），命中两个时不许只说一个
+    expect(flat.text).toContain("另有 1 题触到网格上限");
+  });
+
+  it("旧温度表没上报判断力时也不是绿灯：看不见 ≠ 没问题", () => {
+    const old = calibrationSummary(VOCAB, calib({ flattening_reported: false }));
+    expect(old.tone).toBe("warn");
+    expect(old.text).toContain("没上报判断力");
+    const missingKey = calibrationSummary(VOCAB, {
+      ...calib({}), flattening_reported: undefined,
+    });
+    expect(missingKey.tone).toBe("warn");
   });
 
   it("取不到覆盖面是 error：此时整链不可执行，不能显示成没问题", () => {

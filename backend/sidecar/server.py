@@ -162,6 +162,11 @@ class Handler(BaseHTTPRequestHandler):
                 "T": {k: (v or {}).get("T") for k, v in table.items()},
                 "b": {k: (v or {}).get("b", 0.0) for k, v in table.items()},
                 "grid_max": GRID_MAX,
+                # 这一轴有没有判断力（持出 NLL 打不打得过常数预测器）。
+                # **老的温度表没这个键 → None**，那和 `false` 是两件事：
+                # 前者是"这张表还没上报"，后者是"上报了：它确实没判断力"。混成一个
+                # 布尔就会让旧表被读成"全线告警"，或让新表的真告警被读成"没数据"。
+                "informative": {k: (v or {}).get("informative") for k, v in table.items()},
             },
         })
 

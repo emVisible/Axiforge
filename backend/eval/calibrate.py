@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import urllib.request
+from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -51,6 +53,10 @@ from eval.moderation_eval import load_samples  # noqa: E402
 SIDECAR = os.environ.get("LAYA_SIDECAR_URL", "http://127.0.0.1:8685")
 OUT = Path(__file__).resolve().parent / "calibration.json"
 MIN_ROWS = 4
+#: 「这条轴有没有判断力」的门槛：持出 NLL 至少要比常数预测器低这么多 nat。
+# 取 0.02 是刻意收紧的——勉强打平常数的轴在 approve 的取 min 里是纯负作用：
+# 它自己不表态，却把别人的高置信一起拉下线。
+INFORMATIVE_MARGIN = 0.02
 
 
 def ask(kind: str, title: str, body: str, questions: dict) -> dict:
@@ -202,8 +208,16 @@ def main() -> int:
         use_affine = loo_a < loo_t - 1e-4
         T, b = (aT, ab) if use_affine else (tT, 0.0)
         loo = loo_a if use_affine else loo_t
+        # **这条轴到底有没有判断力**：拿它和"完全不看模型"比——常数的最优 NLL 就是
+        # 经验正例率的熵。持出 NLL 打不过它，说明缩放后那个数不携带信息，只是把一个
+        # 未知数硬摊成一个常数。这必须单独记一笔，因为 approve 的置信度是各轴取 min：
+        # 一条没有判断力的轴会把整条自动通道的天花板压到 1-常数 附近（实测见 ADR-028 D25）。
+        rate = pos / len(pairs)
+        nll_const = -(rate * math.log(rate) + (1 - rate) * math.log(1 - rate))
+        informative = loo < nll_const - INFORMATIVE_MARGIN
         table[name] = {"T": T, "b": b, "method": "affine" if use_affine else "temperature",
-                       "n": len(pairs), "pos": pos,
+                       "n": len(pairs), "pos": pos, "informative": informative,
+                       "nll_const": round(nll_const, 4),
                        "nll_in_before": round(before, 4),
                        "nll_in_after": round(after, 4),
                        "nll_loo": round(loo, 4),
@@ -211,7 +225,8 @@ def main() -> int:
                        "nll_loo_affine": round(loo_a, 4)}
         print(f"  {name:<24} {('仿射' if use_affine else '温度'):<4} T={T:<6} b={b:<6} "
               f"n={len(pairs):<3} 正={pos:<3} in {before:.3f}→{after:.3f}  "
-              f"持出 温度 {loo_t:.3f} / 仿射 {loo_a:.3f}")
+              f"持出 温度 {loo_t:.3f} / 仿射 {loo_a:.3f} / 常数 {nll_const:.3f}"
+              f"{'' if informative else '  ← 没有判断力（打不过常数）'}")
 
     for name, label_of in (
         ("age_rating", lambda r: r.get("rating")),
@@ -228,10 +243,17 @@ def main() -> int:
         loo_rows = [rows[:i] + rows[i + 1:] for i in range(len(rows))]
         loo = sum(scale_categorical(p, t, fit_temperature_categorical(rest)[0])[1] / len(rows)
                   for (p, t), rest in zip(rows, loo_rows))
-        table[name] = {"T": T, "n": len(rows),
+        # 与二元轴同一个判据：打不过"只看标签频率、不看模型"的常数预测器，就是没有判断力。
+        counts = Counter(t for _, t in rows)
+        nll_const = -sum((c / len(rows)) * math.log(c / len(rows)) for c in counts.values())
+        informative = loo < nll_const - INFORMATIVE_MARGIN
+        table[name] = {"T": T, "n": len(rows), "informative": informative,
+                       "nll_const": round(nll_const, 4),
                        "nll_in_before": round(before, 4), "nll_in_after": round(after, 4),
                        "nll_loo": round(loo, 4)}
-        print(f"  {name:<24} T={T:<5} n={len(rows):<3} in {before:.3f}→{after:.3f}  持出 {loo:.3f}")
+        print(f"  {name:<24} T={T:<5} n={len(rows):<3} in {before:.3f}→{after:.3f}  "
+              f"持出 {loo:.3f} / 常数 {nll_const:.3f}"
+              f"{'' if informative else '  ← 没有判断力（打不过常数）'}")
 
     if not table:
         print("\n没有任何一题可标定：不写表。空表比假表好——门控会继续转人工。")
@@ -241,12 +263,18 @@ def main() -> int:
     covered = sorted(table)
     missing = sorted(set(questions) - set(covered))
     print(f"\n写入 {out_path}（覆盖 {len(covered)}/{len(questions)} 题）")
+    flat = sorted(q for q, v in table.items() if v.get("informative") is False)
+    if flat:
+        # 覆盖满不等于能执行：这些轴的缩放后概率打不过常数预测器，而 approve 的置信度
+        # 是各轴取 min——它们一边不表态一边把整条自动通道压住（ADR-028 D25 有实测数）。
+        print(f"  没有判断力：{len(flat)}/{len(covered)} 题（{'、'.join(flat)}）"
+              f"——中台会把它们点名显示，别把这份表读成「可以自动执行了」。")
     if missing:
         print(f"  未覆盖：{'、'.join(missing)} —— 客户端会因此判定整链未标定，仍转人工。")
     if args.from_answers:
         print("  口径：拟合用的是各条**当时真的生效**的未缩放分布，标签来自人对那次判定的处置。")
-        print("  仍要说清的是分母：这些正样本只覆盖「机器自己想到的那些轴」（处置面板没有逐轴勾选），")
-        print("  所以这份表的置信度偏乐观，拿它去放宽不可逆动作的线之前要先看 what-if 的 conflicts。")
+        print("  处置面板已经能逐轴勾选，所以机器没想到的轴也进得来；仍要说清分母：")
+        print("  现在这些标签全出自一个人，没有第二人一致度，所以它是自标注不是金集。")
     else:
         print("  注意：这是手工样本集上的拟合，持出 NLL 也只是留一，不是生产可用。")
         print("  生产温度表请用 `calibrate.py --from-answers <导出的 jsonl>` 重拟。")

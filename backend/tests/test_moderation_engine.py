@@ -541,6 +541,48 @@ def test_calibration_reports_flag_questions_stuck_at_the_grid_ceiling():
     # 旧 sidecar 不报 grid_max：不猜哪些被截断，宁可显示"未上报"
     legacy = engine_with({"questions": ["severity"], "T": {"severity": 5.0}}).calibration()
     assert legacy["censored"] == [] and legacy["grid_max"] == 0.0
+    assert legacy["flattened"] == [] and legacy["flattening_reported"] is False
+
+
+def test_axes_that_do_not_beat_a_constant_predictor_are_named():
+    """`informative=false` 的题必须单独点名，且**旧表不许被读成"全都有判断力"**。
+
+    D25 的实测背景：34 行标注下有 8/10 题的持出 NLL 打不过"只看标签频率、不看模型"的
+    常数预测器，而覆盖面那枚徽标仍然报 10/10 绿灯。绿灯与"这条轴其实正在按 min
+    压住整条自动通道"是两件事，界面必须能同时说出口。
+    """
+    from app.domains.moderation.providers.laya_sidecar import LayaSidecarEngine
+
+    def engine_with(cal):
+        e = LayaSidecarEngine(base_url="http://127.0.0.1:1")
+        e._health = lambda: {"ok": True, "calibration": cal}  # type: ignore[method-assign]
+        return e
+
+    rep = engine_with({
+        "questions": ["illegal_act_instruction", "spam_promotion"],
+        "T": {"illegal_act_instruction": 15.85, "spam_promotion": 1.23},
+        "grid_max": 20.0,
+        "informative": {"illegal_act_instruction": False, "spam_promotion": True},
+    }).calibration()
+    assert rep["flattened"] == ["illegal_act_instruction"]
+    assert rep["flattening_reported"] is True
+    # 覆盖是满的，判断力不是：两个读数必须各说各的
+    assert rep["missing"] and rep["covered"]
+
+    # 全是 true 的新表 → 报空列表且"上报过"，界面才允许打绿灯
+    clean = engine_with({
+        "questions": ["spam_promotion"], "T": {"spam_promotion": 1.2}, "grid_max": 20.0,
+        "informative": {"spam_promotion": True},
+    }).calibration()
+    assert clean["flattened"] == [] and clean["flattening_reported"] is True
+
+    # 旧表带这个键但值是 null（sidecar 对缺字段的条目就是这么发的）：
+    # 把 None 当 false 会让一张只是"没上报"的旧表全线报红。
+    nulls = engine_with({
+        "questions": ["spam_promotion"], "T": {"spam_promotion": 1.2}, "grid_max": 20.0,
+        "informative": {"spam_promotion": None},
+    }).calibration()
+    assert nulls["flattened"] == [] and nulls["flattening_reported"] is False
 
 
 def test_unreachable_sidecar_reports_every_declared_question_missing():

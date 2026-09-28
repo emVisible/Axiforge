@@ -403,6 +403,11 @@ export interface EngineCalibration {
   temperatures: Record<string, number>;
   grid_max: number;
   censored: string[];
+  /** 持出 NLL 打不过"只看标签频率"的常数预测器的题：这个数在当前标注量下不携带信息，
+   *  而 approve 的置信度是各轴取 min，所以它正按 min 否决整条自动通道。 */
+  flattened?: string[];
+  /** 这张温度表有没有上报判断力字段。false＝旧表，不能读成"全都有判断力"。 */
+  flattening_reported?: boolean;
   path: string;
   error: string;
 }

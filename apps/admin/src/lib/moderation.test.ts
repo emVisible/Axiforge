@@ -11,6 +11,7 @@ import {
   questionLabel,
   suggestionLabel,
   viaLabel,
+  whatIfSampleNote,
   whatIfVerdict,
 } from "@/lib/moderation";
 
@@ -154,6 +155,18 @@ describe("阈值假设的读数", () => {
 
   it("会自动执行且与人工全部一致才是 ok", () => {
     expect(whatIfVerdict({ ...base, auto_reject: 2 }).tone).toBe("ok");
+  });
+
+  it("样本被窗口截断时，读数要连着样本量一起说", () => {
+    // 真机量到的形状：默认只看最新 500 条，而队列有 900+ 条待处置。
+    const n = whatIfSampleNote({ scanned: 500, population: 950 });
+    expect(n).toContain("全库 950 条");
+    expect(n).toContain("只取最新 500 条");
+  });
+
+  it("全都扫过了就不许再挂一句「只取最新」——那是假的心虚", () => {
+    expect(whatIfSampleNote({ scanned: 950, population: 950 })).toBe("");
+    expect(whatIfSampleNote({ scanned: 12, population: 12 })).toBe("");
   });
 });
 

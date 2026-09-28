@@ -75,7 +75,9 @@ async def moderation_vocabulary():
 async def moderation_what_if(
     approve: float = Query(default=0.75, ge=0.0, le=1.0),
     reject: float = Query(default=0.95, ge=0.0, le=1.0),
-    scan: int = Query(default=500, ge=1, le=2000),
+    #: 窗口默认覆盖全库（实测 979 条读全量 ~10ms，与读 500 条无差别），
+    #: 上限留在那里当增长的闸；真被截断时 `population` 会让面板说出来。
+    scan: int = Query(default=2000, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
 ):
     """**只读**的阈值假设：这条线画到这里，已处置过的案件里有几条会被机器自动执行、

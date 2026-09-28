@@ -380,6 +380,16 @@ async def test_what_if_endpoint_reads_stored_answers_without_changing_anything(
         assert mine[0]["effective_approve"] == 0.75
         assert body["conflicts"] >= 1
 
+        # 窗口截断必须读得出来。这条队列表在生产上有 900+ 条待处置，而默认只看最新 500 条；
+        # 少了 population，"这条线只影响 3 条"就把"在我看得见的这些里"说成了"全部"。
+        tight = (await client.get(
+            "/api/v1/admin/moderation/what-if", params={"scan": 1}, headers=ADMIN)).json()
+        assert tight["scanned"] == 1, "scan 是硬窗口，得真的生效"
+        direct = (await db_session.execute(
+            select(func.count()).select_from(ModerationCase))).scalar_one()
+        assert tight["population"] == direct, "population 必须是同一张表的行数，不是猜的"
+        assert tight["population"] >= tight["scanned"]
+
         after = (
             await db_session.execute(
                 select(func.count()).select_from(ModerationCase).where(

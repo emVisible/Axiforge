@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, Card, DataTable, Input, type DataTableColumn } from "@axiforge/ui";
 import { adminApi, type WhatIfReport, type WhatIfRow } from "@/api/adminClient";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
-import { actionLabel, targetTypeLabel, whatIfVerdict } from "@/lib/moderation";
+import { actionLabel, targetTypeLabel, whatIfSampleNote, whatIfVerdict } from "@/lib/moderation";
 
 interface Props {
   /** 线上正在用的那两条线，用来把"假定"与"现状"分开显示。 */
@@ -161,7 +161,7 @@ export default function ModerationWhatIfPanel({ current }: Props) {
 
       {report && (
         <p className="mt-3 text-2xs text-ink-muted">
-          扫描 {report.scanned} 条案件，可回放 {report.evaluated} 条 ·
+          扫描 {report.scanned} 条案件，可回放 {report.evaluated} 条{whatIfSampleNote(report)} ·
           自动放行 {report.auto_approve} · 自动驳回 {report.auto_reject} ·
           与人工一致 {report.agrees} · <span className="text-rose-600">相反 {report.conflicts}</span> ·
           没人判过 {report.undecided}

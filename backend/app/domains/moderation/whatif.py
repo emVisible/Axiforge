@@ -70,6 +70,11 @@ class WhatIfReport:
     conflicts: int
     undecided: int
     rows: List[WhatIfRow]
+    #: 库里案件**总数**。`scanned`（= evaluated + skipped）小于它，就说明这份证据
+    #: 只覆盖最近那一窗，读数得连着样本量一起看——分页修复（D12）同一课：
+    #: 没被读到的案件在界面上等于不存在。放在末位是因为它带默认值，
+    #: 数据类里无默认值的字段不许排在有默认值的之后。
+    population: int = 0
 
 
 def _agreement(hypothetical: str, case: ModerationCase) -> Tuple[str, str]:

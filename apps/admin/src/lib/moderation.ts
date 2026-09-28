@@ -191,3 +191,16 @@ export function engineSilenceNote(reasons: string[] | null | undefined): string 
   const hits = (reasons ?? []).filter((r) => r.includes(ENGINE_SILENCE_MARK));
   return hits.length > 0 ? hits[hits.length - 1] : "";
 }
+
+/**
+ * what-if 读数的样本量尾巴。窗口截断必须跟在那句"会自动执行 N 条"旁边说，
+ * 否则"这条线只影响 3 条"实际意思是"在我看得见的这 500 条里影响 3 条"——
+ * 队列分页那一轮（D12）学的同一课：没被读到的案件在界面上等于不存在。
+ */
+export function whatIfSampleNote(
+  r: Pick<WhatIfReport, "scanned" | "population">,
+): string {
+  return r.scanned < r.population
+    ? ` · 全库 ${r.population} 条，这里只取最新 ${r.scanned} 条`
+    : "";
+}

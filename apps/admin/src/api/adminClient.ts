@@ -160,6 +160,8 @@ export interface WhatIfReport {
   reject_line: number;
   evaluated: number;
   scanned: number;
+  /** 库里案件总数。`scanned < population` 说明这份证据只覆盖最近一窗。 */
+  population: number;
   skipped: Record<string, number>;
   auto_approve: number;
   auto_reject: number;
@@ -424,7 +426,9 @@ export const adminApi = {
   moderationStats: () => request<ModerationStats>("/moderation/stats"),
   moderationVocabulary: () => request<ModerationVocabulary>("/moderation/vocabulary"),
   /** 只读的阈值假设：拿已落库的答案重放，不改策略、不写库。 */
-  moderationWhatIf: (approve: number, reject: number, scan = 500) =>
+  /** 阈值假设。`scan` 不传时由服务端那一个默认值决定窗宽——
+   *  这里再写一份 500 就是第二个真相源，两边改一忘一时读到的窗会静默不同。 */
+  moderationWhatIf: (approve: number, reject: number, scan?: number) =>
     request<WhatIfReport>(`/moderation/what-if${qs({ approve, reject, scan })}`),
   moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
     request<ModerationCase>(`/moderation/cases/${id}/resolve`, {

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -373,8 +374,16 @@ class ModerationService:
             "calibration": await self._calibration_reports(),
         }
 
-    async def whatif(self, *, approve: float, reject: float, scan: int = 500) -> dict:
-        """阈值假设：读最近 ``scan`` 条案件，在它们**已落库的答案**上重放假定的线。"""
+    async def whatif(self, *, approve: float, reject: float, scan: int) -> dict:
+        """阈值假设：读最近 ``scan`` 条案件，在它们**已落库的答案**上重放假定的线。
+
+        `scan` 不设默认值：窗口大小只在路由那一处声明（`Query(default=2000)`），
+        这里再写一份就是两个真相源，改一个忘一个时界面读的窗宽会静默变化。
+
+        `population` 一起回：窗口截断必须在读数的同一屏说出来。这条队列实测有 900+ 条待处置，
+        而默认只看最新 500 条——少了这个数，"这条线只影响 3 条"其实是"在我看得见的 500 条里
+        影响 3 条"，两者差一倍以上（参照实现的 what-if 连样本量都不报）。
+        """
         from app.domains.moderation.whatif import evaluate
 
         rows = (
@@ -385,7 +394,12 @@ class ModerationService:
                 .limit(scan)
             )
         ).scalars().all()
-        return evaluate(list(rows), approve=approve, reject=reject)
+        population = (await self.db.execute(
+            select(func.count()).select_from(ModerationCase))).scalar_one()
+        return replace(
+            evaluate(list(rows), approve=approve, reject=reject),
+            population=int(population or 0),
+        )
 
     async def _calibration_reports(self) -> List[dict]:
         """能报标定覆盖面的引擎各报一条。词表没有温度表，所以它不在列表里——

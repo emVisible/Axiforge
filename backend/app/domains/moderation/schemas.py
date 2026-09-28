@@ -80,6 +80,8 @@ class WhatIfResponse(BaseModel):
     reject_line: float
     evaluated: int
     scanned: int
+    #: 库里案件总数；`scanned < population` 就是这份证据只看了最近一窗，读数要连着样本量说。
+    population: int
     skipped: Dict[str, int]
     auto_approve: int
     auto_reject: int

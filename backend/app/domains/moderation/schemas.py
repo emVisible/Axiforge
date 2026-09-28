@@ -135,6 +135,36 @@ class EngineCalibration(BaseModel):
     error: str = ""
 
 
+class LabelTargetRow(BaseModel):
+    case_id: str
+    subject_type: str
+    subject_id: str
+    state: str
+    #: 这条轴报警的概率（落库里那份缩放后的值；排序读的也是它，理由见 service.queue）
+    probability: float
+    #: 这条案件有没有"缩放前"那份分布。没有它，处置完之后拟合仍旧拿不到样本。
+    has_raw: bool
+
+
+class LabelTargetAxis(BaseModel):
+    question: str
+    #: 这条轴当前有没有判断力（持出 NLL 打不打得过常数预测器）。
+    #: `None` ＝ 这张温度表没上报这一维——"看不见"与"报了是负的"必须分得开。
+    informative: Optional[bool] = None
+    pending_candidates: int
+    top: List[LabelTargetRow] = []
+
+
+class LabelTargetsResponse(BaseModel):
+    """每条轴"该标哪几行"。只指路，不代答：真值仍由人在行内逐轴勾。"""
+
+    engine: str
+    pending_total: int
+    #: 报了"没有判断力"的轴有几条——面板拿它做标题行那句"还差标注"。
+    flattened: List[str] = []
+    axes: List[LabelTargetAxis] = []
+
+
 class PolicyThresholds(BaseModel):
     version: str
     auto_approve: float

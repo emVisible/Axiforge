@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Float, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.moderation.contracts import (
@@ -38,7 +38,7 @@ from app.domains.moderation.models import (
     STATE_RESOLVED,
 )
 from app.domains.moderation.providers.lexicon import LEXICON_VERSION
-from app.domains.moderation.questions import QUESTIONS_VERSION
+from app.domains.moderation.questions import QUESTIONS_VERSION, question_types
 from app.domains.moderation.registry import get_engine
 
 logger = logging.getLogger(__name__)
@@ -296,8 +296,14 @@ class ModerationService:
         return case
 
     async def queue(self, state: Optional[str] = None, limit: int = 50,
-                    order: str = "risk", offset: int = 0) -> dict:
+                    order: str = "risk", offset: int = 0,
+                    axis: Optional[str] = None) -> dict:
         """人工队列（分页）。默认按"最该先看"排，不是按最新排。
+
+        `order="axis"` + `axis=<题名>` 服务的是**标注配额**那条路：按某条轴报警的可能性
+        降序，队列最上面那批就是"标它最可能出正样本"的行（D26）。按缩放后的值排是安全的：
+        温度/仿射对同一条轴是单调变换，**排序与缩放前一致**，而缩放前那份只有 D20 之后的案件
+        才有——按它排会把整批旧案件挤出去，那些其实照样值得标。
 
         第一级排序键是**有没有明确条款**——这是一个事实（某条规则确实指认了内容），
         不是自报数。必须用它，因为实测词表案件的 `confidence` 全是 0.0：
@@ -319,6 +325,13 @@ class ModerationService:
         # （PG 的 now() 取事务开始时间），只排到时间会在翻页时重复或漏项。
         if order == "new":
             base = base.order_by(ModerationCase.created_at.desc(), ModerationCase.id.desc())
+        elif order == "axis":
+            # 答不出这条轴的行（词表案件、D13 前的旧形状行）沉到队尾而不是消失：
+            # 它们仍然要被人处置，只是对"标这条轴"没有指向性。
+            prob = cast(ModerationCase.answers[axis]["noul"].astext, Float)
+            base = base.order_by(prob.desc().nulls_last(),
+                                 ModerationCase.created_at.desc(),
+                                 ModerationCase.id.desc())
         else:
             base = base.order_by(clause_weight.desc(),
                                  ModerationCase.confidence.desc().nulls_last(),
@@ -329,6 +342,58 @@ class ModerationService:
             await self.db.execute(base.offset(offset).limit(limit))
         ).scalars().all()
         return {"items": list(rows), "total": int(total)}
+
+    async def label_targets(self, per_axis: int = 5) -> dict:
+        """每条轴"该标哪几行"——把 D25 那个读数变成一个能做的动作。
+
+        读数说"10 题里 8 题打不过常数预测器"，能改变它的只有标注量；而标注量卡在
+        "1440 条待处置里我该看哪 5 条"。这里按每条轴报警的可能性降序给出队头，
+        并带上两个诚实标记：这条轴现在有没有判断力（来自温度表那一份，不另算），
+        以及这一行有没有"缩放前"的分布（没有的话，处置完拟合仍旧拿不到样本）。
+
+        只指路，不代答：候选行不等于"这条轴成立"，真值仍由人在行内逐轴勾。
+        """
+        reports = await self._calibration_reports()
+        informative: dict = {}
+        reported = False
+        engine = ""
+        for r in reports:
+            if not r.get("reachable"):
+                continue
+            engine = engine or str(r.get("engine") or "")
+            reported = reported or bool(r.get("flattening_reported"))
+            for q in r.get("covered", []):
+                informative.setdefault(str(q), True)
+            for q in r.get("flattened", []):
+                informative[str(q)] = False
+
+        pending = ModerationCase.state == STATE_PENDING
+        pending_total = int((await self.db.execute(
+            select(func.count()).select_from(ModerationCase).where(pending))).scalar_one())
+        axes: List[dict] = []
+        for name, qtype in question_types().items():
+            if qtype != "noul":
+                continue
+            prob = cast(ModerationCase.answers[name]["noul"].astext, Float)
+            where = (pending, prob.is_not(None))
+            count = int((await self.db.execute(
+                select(func.count()).select_from(ModerationCase).where(*where))).scalar_one())
+            rows = (await self.db.execute(
+                select(ModerationCase).where(*where)
+                .order_by(prob.desc(), ModerationCase.created_at.desc(), ModerationCase.id.desc())
+                .limit(per_axis))).scalars().all()
+            axes.append({
+                "question": name,
+                "informative": (informative.get(name) if reported else None),
+                "pending_candidates": count,
+                "top": [{
+                    "case_id": str(c.id), "subject_type": c.subject_type,
+                    "subject_id": c.subject_id, "state": c.state,
+                    "probability": float((c.answers.get(name) or {}).get("noul") or 0.0),
+                    "has_raw": isinstance(((c.answers.get(name) or {}).get("raw")) or None, dict),
+                } for c in rows],
+            })
+        return {"engine": engine, "pending_total": pending_total, "axes": axes}
 
     async def get(self, case_id: UUID) -> Optional[ModerationCase]:
         return await self.db.get(ModerationCase, case_id)

@@ -12,10 +12,15 @@ from app.core.admin_auth import require_admin
 from app.database import get_db
 from app.domains.moderation.background import batch_status, cancel_batch, start_batch
 from app.domains.moderation.content import load_subject_content
-from app.domains.moderation.questions import QUESTIONS_VERSION, REGISTERED_CLAUSES
+from app.domains.moderation.questions import (
+    QUESTIONS_VERSION,
+    REGISTERED_CLAUSES,
+    question_types,
+)
 from app.domains.moderation.registry import build_policy
 from app.domains.moderation.schemas import (
     CaseResponse,
+    LabelTargetsResponse,
     QueuePage,
     RequeueRequest,
     RequeueStatus,
@@ -48,11 +53,34 @@ def _svc(db: AsyncSession) -> ModerationService:
 async def moderation_queue(
     state: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
-    order: str = Query(default="risk", pattern="^(risk|new)$"),
+    order: str = Query(default="risk", pattern="^(risk|new|axis)$"),
     offset: int = Query(default=0, ge=0),
+    axis: Optional[str] = Query(default=None, description="order=axis 时要按哪条轴的可能性排序"),
     db: AsyncSession = Depends(get_db),
 ):
-    return await _svc(db).queue(state=state, limit=limit, order=order, offset=offset)
+    if order == "axis":
+        qtype = question_types().get(axis or "")
+        if qtype is None:
+            raise HTTPException(422, f"未注册的题目：{axis}")
+        # 只有 noul 轴存了可比较的标量概率；choice/score 的概率在 `probabilities` 里，
+        # 按哪一档排是另一个判断，别在这里悄悄替它选。
+        if qtype != "noul":
+            raise HTTPException(422, f"{axis} 不是 noul 轴，不能按它排序")
+    return await _svc(db).queue(state=state, limit=limit, order=order, offset=offset, axis=axis)
+
+
+@moderation_router.get("/label-targets", response_model=LabelTargetsResponse)
+async def moderation_label_targets(
+    per_axis: int = Query(default=5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """每条轴"该标哪几行"：报警可能性最高的若干条待处置案件 + 这条轴现在的判断力状态。
+
+    存在的理由是 D25 那条读数的下一步：知道"8/10 题打不过常数预测器"之后，
+    缺的是一个能把标注量补到那些题上的动作。这里只指路（排序 + 计数），
+    不代答——真值仍然由人在行内逐轴勾（`human_clauses`）。
+    """
+    return await _svc(db).label_targets(per_axis=per_axis)
 
 
 @moderation_router.get("/stats", response_model=StatsResponse)

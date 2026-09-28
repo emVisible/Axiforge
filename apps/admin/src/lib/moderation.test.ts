@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import type { EngineCalibration, ModerationVocabulary, RequeueStatus } from "@/api/adminClient";
+import type {
+  EngineCalibration,
+  LabelTargetAxis,
+  ModerationVocabulary,
+  RequeueStatus,
+} from "@/api/adminClient";
 import {
   EMPTY_VOCABULARY,
   actionLabel,
   answerDisplay,
+  axisSortNote,
   calibrationSummary,
   clauseLabel,
   humanClausesPayload,
   initialTruth,
   engineSilenceNote,
+  labelAxisNote,
   maskToken,
   questionLabel,
   requeueSummary,
@@ -291,6 +298,43 @@ describe("类型化答案的显示", () => {
       text: "—",
       legacy: false,
     });
+  });
+});
+
+describe("标注配额的逐轴读数", () => {
+  const axis = (over: Partial<LabelTargetAxis> = {}): LabelTargetAxis => ({
+    question: "pii_real_person",
+    informative: false,
+    pending_candidates: 7,
+    top: [
+      { case_id: "c1", subject_type: "comment", subject_id: "s1", state: "pending",
+        probability: 0.62, has_raw: true },
+      { case_id: "c2", subject_type: "comment", subject_id: "s2", state: "pending",
+        probability: 0.41, has_raw: false },
+    ],
+    ...over,
+  });
+
+  it("三种判断力状态说的是三件不同的下一步，压成一个布尔就会标错轴", () => {
+    expect(labelAxisNote(VOCAB, axis()).text).toContain("打不过常数预测器");
+    expect(labelAxisNote(VOCAB, axis()).tone).toBe("warn");
+    expect(labelAxisNote(VOCAB, axis({ informative: true })).text).toContain("已有判断力");
+    expect(labelAxisNote(VOCAB, axis({ informative: null })).text).toContain("判断力未上报");
+    // 题名走词汇表，不印内部 id
+    expect(labelAxisNote(VOCAB, axis()).text).toContain("真人隐私");
+    expect(labelAxisNote(VOCAB, axis()).text).not.toContain("pii_real_person");
+  });
+
+  it("队头里缺缩放前分布的条数必须报出来——那种行处置完拟合仍旧拿不到样本", () => {
+    expect(labelAxisNote(VOCAB, axis()).text).toContain("队头 2 条里只有 1 条带缩放前分布");
+    expect(labelAxisNote(VOCAB, axis({ top: [axis().top[0]] })).text).not.toContain("只有");
+  });
+
+  it("按轴排序时那行说明不许让人把它读成风险高低", () => {
+    expect(axisSortNote(VOCAB, null)).toBe("");
+    const note = axisSortNote(VOCAB, "pii_real_person");
+    expect(note).toContain("真人隐私");
+    expect(note).toContain("不是结论");
   });
 });
 

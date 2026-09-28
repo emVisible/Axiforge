@@ -1,6 +1,7 @@
 import type {
   AdminReport,
   EngineCalibration,
+  LabelTargetAxis,
   ModerationAnswer,
   ModerationVocabulary,
   QueueStaleness,
@@ -259,6 +260,41 @@ export function initialTruth(
   return row.human_clauses !== null
     ? { asserted: true, picked: [...row.human_clauses] }
     : { asserted: false, picked: [...row.clause_ids] };
+}
+
+/**
+ * 一条轴的"该不该先标它"读数。三种状态是三件不同的下一步，压成一个布尔就会有人
+ * 去标那些已经能用的轴：
+ * - `false`：这条轴的缩放后概率打不过"完全不看模型"的常数预测器——标它才补得回判断力；
+ * - `true`：已经有判断力，再标是加密度（价值低一档）；
+ * - `null/undefined`：这张温度表没上报这一维，是"看不见"不是"没问题"。
+ *
+ * 顺带报 `has_raw` 的条数：处置一条**没有缩放前分布**的旧行，拟合仍旧拿不到样本，
+ * 那一次人工劳动对温度表是零贡献（不是零价值——案件该处置还是得处置）。
+ */
+export function labelAxisNote(
+  v: ModerationVocabulary,
+  axis: LabelTargetAxis,
+): { text: string; tone: "ok" | "warn" | "muted" } {
+  const named = questionLabel(v, axis.question);
+  const withRaw = axis.top.filter((r) => r.has_raw).length;
+  const rawNote =
+    axis.top.length && withRaw < axis.top.length
+      ? `｜队头 ${axis.top.length} 条里只有 ${withRaw} 条带缩放前分布`
+      : "";
+  if (axis.informative === false) {
+    return { text: `${named}：打不过常数预测器，标它才补得回判断力${rawNote}`, tone: "warn" };
+  }
+  if (axis.informative == null) {
+    return { text: `${named}：判断力未上报（旧温度表），先重拟${rawNote}`, tone: "muted" };
+  }
+  return { text: `${named}：已有判断力，再标是加密度${rawNote}`, tone: "ok" };
+}
+
+/** 按某条轴排序时那行说明。它必须一直在，因为"排在最上面"很容易被读成"最危险"。 */
+export function axisSortNote(v: ModerationVocabulary, axis: string | null): string {
+  if (!axis) return "";
+  return `正在按「${questionLabel(v, axis)}」报警的可能性排序——它只决定先看哪条，不是结论，也不是风险高低`;
 }
 
 /**

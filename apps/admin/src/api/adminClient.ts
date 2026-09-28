@@ -412,6 +412,31 @@ export interface EngineCalibration {
   error: string;
 }
 
+export interface LabelTargetRow {
+  case_id: string;
+  subject_type: string;
+  subject_id: string;
+  state: string;
+  /** 这条轴报警的概率（落库里缩放后那一份）。 */
+  probability: number;
+  /** 这一行有没有"缩放前"的分布——没有它，处置完之后拟合仍旧拿不到样本。 */
+  has_raw: boolean;
+}
+
+export interface LabelTargetAxis {
+  question: string;
+  /** null/undefined ＝ 这张温度表没上报判断力，与 false 是两件事。 */
+  informative?: boolean | null;
+  pending_candidates: number;
+  top: LabelTargetRow[];
+}
+
+export interface LabelTargetsReport {
+  engine: string;
+  pending_total: number;
+  axes: LabelTargetAxis[];
+}
+
 export const adminApi = {
   stats: () => request<DashboardStats>("/dashboard/stats"),
   reports: ({ status = "pending", limit = 50, offset = 0 }: ReportPageParams = {}) =>
@@ -471,10 +496,14 @@ export const adminApi = {
   moderationQueue: (
     state?: string,
     limit = 50,
-    order: "risk" | "new" = "risk",
+    order: "risk" | "new" | "axis" = "risk",
     offset = 0,
-  ) => request<PaginatedResponse<ModerationCase>>(`/moderation/queue${qs({ state, limit, order, offset })}`),
+    axis?: string,
+  ) => request<PaginatedResponse<ModerationCase>>(`/moderation/queue${qs({ state, limit, order, offset, axis })}`),
   moderationStats: () => request<ModerationStats>("/moderation/stats"),
+  /** 每条轴"该标哪几行"：报警可能性最高的若干条待处置 + 这条轴现在有没有判断力。 */
+  moderationLabelTargets: (perAxis = 12) =>
+    request<LabelTargetsReport>(`/moderation/label-targets${qs({ per_axis: perAxis })}`),
   moderationVocabulary: () => request<ModerationVocabulary>("/moderation/vocabulary"),
   /** 只读的阈值假设：拿已落库的答案重放，不改策略、不写库。 */
   /** 阈值假设。`scan` 不传时由服务端那一个默认值决定窗宽——

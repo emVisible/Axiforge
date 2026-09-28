@@ -17,6 +17,7 @@ import {
 } from "@/api/adminClient";
 import ModerationWhatIfPanel from "@/components/ModerationWhatIfPanel";
 import ModerationDispositionCell from "@/components/ModerationDispositionCell";
+import ModerationLabelQueuePanel from "@/components/ModerationLabelQueuePanel";
 import ModerationRequeuePanel from "@/components/ModerationRequeuePanel";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
@@ -24,6 +25,7 @@ import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
 import {
   actionLabel,
   answerDisplay,
+  axisSortNote,
   calibrationSummary,
   clauseLabel,
   stalenessSummary,
@@ -63,7 +65,8 @@ function EngineBadge({ row }: { row: ModerationCase }) {
 
 export default function ModerationPage() {
   const [state, setState] = useState("pending");
-  const [order, setOrder] = useState<"risk" | "new">("risk");
+  const [order, setOrder] = useState<"risk" | "new" | "axis">("risk");
+  const [axis, setAxis] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [page, setPage] = useState(0);
@@ -72,12 +75,13 @@ export default function ModerationPage() {
   // 换筛选条件或换排序都必须回到第一页，否则会停在一个不属于当前结果集的偏移上
   useEffect(() => {
     setPage(0);
-  }, [state, order]);
+  }, [state, order, axis]);
 
   const list = useAdminList<PaginatedResponse<ModerationCase>>({
-    queryKey: adminQueryKeys.moderationQueue(state, order, page),
+    queryKey: adminQueryKeys.moderationQueue(state, order, page, axis ?? ""),
     fetcher: () =>
-      adminApi.moderationQueue(state || undefined, PAGE_SIZE, order, page * PAGE_SIZE),
+      adminApi.moderationQueue(
+        state || undefined, PAGE_SIZE, order, page * PAGE_SIZE, axis ?? undefined),
   });
   const stats = useAdminList({
     queryKey: adminQueryKeys.moderationStats(),
@@ -259,7 +263,12 @@ export default function ModerationPage() {
             <button
               key={o.key}
               type="button"
-              onClick={() => setOrder(o.key)}
+              onClick={() => {
+                setOrder(o.key);
+                // 回到常规排序就要退出按轴排序：否则 axis 会留在状态里，
+                // 界面显示"最新"而数据其实还是按某条轴排的。
+                setAxis(null);
+              }}
               className={`rounded-full px-2.5 py-0.5 ${
                 order === o.key
                   ? "bg-brand-muted text-brand"
@@ -278,6 +287,19 @@ export default function ModerationPage() {
           它只决定先看哪条，不是风险度量也不是结论：词表与模型的置信度量纲不同，跨引擎不可比。
         </p>
       )}
+
+      {axis && (
+        <p className="mb-3 text-2xs text-ink-faint">{axisSortNote(vocab, axis)}</p>
+      )}
+
+      <ModerationLabelQueuePanel
+        vocab={vocab}
+        activeAxis={order === "axis" ? axis : null}
+        onPickAxis={(a) => {
+          setAxis(a);
+          setOrder(a ? "axis" : "risk");
+        }}
+      />
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input

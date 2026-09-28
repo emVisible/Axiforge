@@ -9,6 +9,7 @@ import {
   engineSilenceNote,
   maskToken,
   questionLabel,
+  stalenessSummary,
   suggestionLabel,
   viaLabel,
   whatIfSampleNote,
@@ -179,8 +180,7 @@ describe("举报人凭据的显示", () => {
   });
 });
 
-describe("引擎没答话的那行依据", () => {
-  // 2026-09-27 真机 sidecar 崩溃时落库的原文（案件 154973d5 的依据末行）
+describe("引擎没答话的那行依据", () => {  // 2026-09-27 真机 sidecar 崩溃时落库的原文（案件 154973d5 的依据末行）
   const reasons = [
     "model=multilingual",
     "规则「仇恨 / 隐私 / 违法教程」→ 自动驳回 置信 0.98",
@@ -194,5 +194,31 @@ describe("引擎没答话的那行依据", () => {
   it("健康案件的依据里读不出东西来——不许把正常结论误报成引擎死了", () => {
     expect(engineSilenceNote(["model=multilingual", "temperature fitted"])).toBe("");
     expect(engineSilenceNote(undefined)).toBe("");
+  });
+});
+
+describe("队列结论的版本新鲜度", () => {
+  // 2026-09-28 dev 库真机量到的形状（994 条待处置）
+  const stale = {
+    total: 994,
+    stale_questions: 264,
+    stale_lexicon: 111,
+    current_questions: "questions-3",
+    current_lexicon: "lexicon-f9cbaf14",
+    without_authoritative_verdict: 977,
+  };
+
+  it("旧题集与旧词表各自点名，并说清当前是哪一版", () => {
+    const v = stalenessSummary(stale);
+    expect(v.tone).toBe("warn");
+    expect(v.text).toContain("264 条是 questions-3 之前的题集判的");
+    expect(v.text).toContain("111 条挂着旧词表版本");
+  });
+
+  it("全都在当前版本上时读 ok，而不是留一片空白或假报警", () => {
+    const fresh = { ...stale, stale_questions: 0, stale_lexicon: 0 };
+    expect(stalenessSummary(fresh).tone).toBe("ok");
+    expect(stalenessSummary(fresh).text).toContain("994 条");
+    expect(stalenessSummary({ ...stale, total: 0 }).text).toBe("");
   });
 });

@@ -333,6 +333,17 @@ export interface ModerationCase {
   resolution_note: string | null;
 }
 
+/** 队列结论的版本新鲜度：判定只在保存那一刻发生，改版不会自己回头重算。 */
+export interface QueueStaleness {
+  total: number;
+  stale_questions: number;
+  stale_lexicon: number;
+  current_questions: string;
+  current_lexicon: string;
+  /** 结论不是权威引擎给的（词表判的或全体弃权）——"自动判断覆盖了多少内容"的真分母。 */
+  without_authoritative_verdict: number;
+}
+
 export interface ModerationStats {
   by_state: Record<string, number>;
   by_engine: Record<string, number>;
@@ -345,6 +356,7 @@ export interface ModerationStats {
   };
   /** 能报标定面的引擎各一条（词表没有温度表，所以不在这里）。 */
   calibration: EngineCalibration[];
+  staleness: QueueStaleness;
 }
 
 /** 温度表覆盖面。`missing` 与 `censored` 是两件事：前者没标定，后者标定被网格截断。 */

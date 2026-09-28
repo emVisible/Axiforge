@@ -388,6 +388,52 @@ async def test_queue_order_is_total_even_when_created_at_ties(db_session):
         await db_session.commit()
 
 
+async def test_stats_counts_conclusions_left_on_old_versions(db_session):
+    """改版不会自己回头重算：「待处置 994 条」不等于「994 条同等新鲜的证据」。
+
+    真机量过的形状：994 条里 264 条是 `questions-2` 时代判的、111 条挂着旧词表版本号，
+    而中台此前一个字都不说。这里用**增量**断言（dev 库上别的用例也在写行），
+    并在序列前 drain 后台判定——上一轮那条分页 flake 就是这个成因。
+    """
+    from uuid import UUID
+
+    from app.domains.moderation.background import drain_pending
+    from app.domains.moderation.providers.lexicon import LEXICON_VERSION, LexiconEngine
+    from app.domains.moderation.questions import QUESTIONS_VERSION
+
+    await drain_pending()
+    svc = ModerationService(db_session, ModerationEngine([LexiconEngine()], Policy()))
+    before = await svc._staleness()
+
+    now = datetime.now(timezone.utc)
+    spec = [
+        ("fresh", QUESTIONS_VERSION, LEXICON_VERSION, True),    # 新版本 + 权威引擎判的
+        ("stale-q", "questions-2", LEXICON_VERSION, False),     # 旧题集
+        ("stale-l", QUESTIONS_VERSION, "lexicon-1", False),     # 旧词表
+    ]
+    ids = [UUID("00000000-0000-0000-0000-%012d" % i) for i in (91, 92, 93)]
+    try:
+        for (tag, qv, lv, auth), cid in zip(spec, ids):
+            db_session.add(ModerationCase(
+                id=cid, subject_type="comment", subject_id=f"stale-{tag}-{uuid.uuid4().hex[:6]}",
+                author_id="a", fingerprint=f"fp-stale-{tag}", state="pending",
+                engine="laya:sidecar" if auth else "lexicon", answers={}, reasons=[],
+                clause_ids=[], created_at=now, policy_version="policy-1",
+                questions_version=qv, lexicon_version=lv, authoritative=auth,
+            ))
+        await db_session.commit()
+
+        after = await svc._staleness()
+        assert after["current_questions"] == QUESTIONS_VERSION
+        assert after["stale_questions"] - before["stale_questions"] == 1, "旧题集那条要数进来"
+        assert after["stale_lexicon"] - before["stale_lexicon"] == 1, "旧词表那条要数进来"
+        assert after["without_authoritative_verdict"] - before["without_authoritative_verdict"] == 2
+        assert after["total"] - before["total"] == 3
+    finally:
+        await db_session.execute(delete(ModerationCase).where(ModerationCase.id.in_(ids)))
+        await db_session.commit()
+
+
 class Reporting(Switchable):
     """带标定覆盖面可上报的假引擎（实现 `calibration()`，即 CalibrationReporter）。"""
 

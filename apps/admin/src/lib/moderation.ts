@@ -2,6 +2,7 @@ import type {
   AdminReport,
   EngineCalibration,
   ModerationVocabulary,
+  QueueStaleness,
   WhatIfReport,
 } from "@/api/adminClient";
 
@@ -157,6 +158,24 @@ const VIA_SUFFIX_FREE: Record<string, string> = {
   engine_abstained: "所有引擎弃权",
   engine_unavailable: "审核引擎不可用",
 };
+
+/**
+ * 队列结论的版本新鲜度读数。存在的理由：判定只在内容被保存那一刻发生，
+ * 题集/词表改版**不会自己回头重算**——"待处置 994 条"看起来像 994 条同等新鲜的证据，
+ * 实测其中 264 条是旧题集判的。这条文案说的就是"要重判才会刷新"这个动作缺口。
+ */
+export function stalenessSummary(
+  s: QueueStaleness | null | undefined,
+): { text: string; tone: "ok" | "warn" } {
+  if (!s || s.total === 0) return { text: "", tone: "ok" };
+  const parts: string[] = [];
+  if (s.stale_questions > 0) parts.push(`${s.stale_questions} 条是 ${s.current_questions} 之前的题集判的`);
+  if (s.stale_lexicon > 0) parts.push(`${s.stale_lexicon} 条挂着旧词表版本`);
+  if (parts.length === 0) {
+    return { text: `结论都在当前版本上（${s.total} 条）`, tone: "ok" };
+  }
+  return { text: `版本已推进但结论没重算：${parts.join("、")}`, tone: "warn" };
+}
 
 /**
  * 阈值假设的一行读数。status 而不是布尔：

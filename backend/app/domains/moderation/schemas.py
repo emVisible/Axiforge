@@ -127,12 +127,26 @@ class PolicyThresholds(BaseModel):
     human_band: float
 
 
+class QueueStaleness(BaseModel):
+    """队列里有多少条结论**是在旧版本上判的**。判定只在保存那一刻发生，
+    题集/词表改版不会自己回头重算，所以"待处置 N 条"不等于"N 条同等新鲜"。"""
+
+    total: int
+    stale_questions: int
+    stale_lexicon: int
+    current_questions: str
+    current_lexicon: str
+    #: 结论不是权威引擎给的（词表判的或全体弃权）——"自动判断到底覆盖了多少内容"的真分母
+    without_authoritative_verdict: int
+
+
 class StatsResponse(BaseModel):
     by_state: dict
     by_engine: dict
     engines: List[EngineHealth]
     policy: PolicyThresholds
     calibration: List[EngineCalibration] = []
+    staleness: QueueStaleness
 
 
 class VocabularyResponse(BaseModel):

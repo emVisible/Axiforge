@@ -14,7 +14,14 @@ import ModerationWhatIfPanel from "@/components/ModerationWhatIfPanel";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
-import { actionLabel, calibrationSummary, clauseLabel, targetTypeLabel, viaLabel } from "@/lib/moderation";
+import {
+  actionLabel,
+  calibrationSummary,
+  clauseLabel,
+  stalenessSummary,
+  targetTypeLabel,
+  viaLabel,
+} from "@/lib/moderation";
 
 const STATE_TABS: { key: string; label: string }[] = [
   { key: "pending", label: "待人工" },
@@ -212,6 +219,22 @@ export default function ModerationPage() {
                   </span>
                 );
               })}
+              {(() => {
+                const stale = stalenessSummary(stats.data.staleness);
+                if (!stale.text) return null;
+                return (
+                  <span
+                    className={`rounded-full border px-2 py-0.5 ${
+                      stale.tone === "ok"
+                        ? "border-emerald-500/40 text-emerald-600"
+                        : "border-amber-500/40 text-amber-600"
+                    }`}
+                    title="判定只在内容保存那一刻发生：题集/词表改版不会自己回头重算，要让结论变新鲜只能重判"
+                  >
+                    {stale.text}
+                  </span>
+                );
+              })()}
               <span
                 className="rounded-full border border-border px-2 py-0.5 text-ink-muted"
                 title="低于通过线/高于驳回线都不自动执行；未标定的题只要有一题没覆盖，整链转人工"

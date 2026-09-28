@@ -38,6 +38,7 @@ from app.domains.moderation.models import (
     STATE_RESOLVED,
 )
 from app.domains.moderation.providers.lexicon import LEXICON_VERSION
+from app.domains.moderation.questions import QUESTIONS_VERSION
 from app.domains.moderation.registry import get_engine
 
 logger = logging.getLogger(__name__)
@@ -372,6 +373,36 @@ class ModerationService:
                 "human_band": self.engine.policy.human_band,
             },
             "calibration": await self._calibration_reports(),
+            "staleness": await self._staleness(),
+        }
+
+    async def _staleness(self) -> dict:
+        """队列里有多少条结论**是在旧版本上判的**，以及有多少条根本没走到模型那一层。
+
+        存在的理由：判定只在内容被保存的那一刻发生，题集/词表/温度表改版之后，
+        队列里的旧结论不会自己变——`§12` 的幂等键保证了"重新送审会重算"，
+        但没人触发就没人重算。少了这个数，"队列里有 994 条待处置"看起来像
+        994 条同等新鲜的证据，而实测其中 264 条是 `questions-2` 时代判的。
+        """
+        total, stale_q, stale_lex, never_asked = (
+            await self.db.execute(
+                select(
+                    func.count(),
+                    func.count().filter(ModerationCase.questions_version != QUESTIONS_VERSION),
+                    func.count().filter(ModerationCase.lexicon_version != LEXICON_VERSION),
+                    func.count().filter(ModerationCase.authoritative.is_(False)),
+                )
+            )
+        ).one()
+        return {
+            "total": int(total),
+            "stale_questions": int(stale_q),
+            "stale_lexicon": int(stale_lex),
+            "current_questions": QUESTIONS_VERSION,
+            "current_lexicon": LEXICON_VERSION,
+            #: 这次结论不是权威引擎给的（词表判的、或全体弃权）。它是"自动判断
+            #: 到底覆盖了多少内容"的真分母——比 auto_rate 更早的一环。
+            "without_authoritative_verdict": int(never_asked),
         }
 
     async def whatif(self, *, approve: float, reject: float, scan: int) -> dict:

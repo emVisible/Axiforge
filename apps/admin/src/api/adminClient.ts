@@ -428,6 +428,12 @@ export interface LabelTargetAxis {
   /** null/undefined ＝ 这张温度表没上报判断力，与 false 是两件事。 */
   informative?: boolean | null;
   pending_candidates: number;
+  /** 按答案快照去重后的候选数：看十条同一篇稿子，在标注量上只算一条。 */
+  distinct_candidates: number;
+  /** 已被处置且拟合真会用上的行数 / 其中正样本 / 其中逐轴勾过的。 */
+  label_samples: number;
+  label_positives: number;
+  label_explicit: number;
   top: LabelTargetRow[];
 }
 

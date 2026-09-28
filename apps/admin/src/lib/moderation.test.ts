@@ -305,7 +305,11 @@ describe("标注配额的逐轴读数", () => {
   const axis = (over: Partial<LabelTargetAxis> = {}): LabelTargetAxis => ({
     question: "pii_real_person",
     informative: false,
-    pending_candidates: 7,
+    pending_candidates: 492,
+    distinct_candidates: 24,
+    label_samples: 2,
+    label_positives: 1,
+    label_explicit: 1,
     top: [
       { case_id: "c1", subject_type: "comment", subject_id: "s1", state: "pending",
         probability: 0.62, has_raw: true },
@@ -323,6 +327,13 @@ describe("标注配额的逐轴读数", () => {
     // 题名走词汇表，不印内部 id
     expect(labelAxisNote(VOCAB, axis()).text).toContain("真人隐私");
     expect(labelAxisNote(VOCAB, axis()).text).not.toContain("pii_real_person");
+  });
+
+  it("可拟样本三条数一起报：处置过 ≠ 拟合用得上，勾过 ≠ 沿用机器条款", () => {
+    const text = labelAxisNote(VOCAB, axis()).text;
+    expect(text).toContain("可拟样本 2 条（正 1·勾过 1）");
+    expect(labelAxisNote(VOCAB, axis({ label_samples: 0, label_positives: 0, label_explicit: 0 }))
+      .text).toContain("可拟样本 0 条（正 0·勾过 0）");
   });
 
   it("队头里缺缩放前分布的条数必须报出来——那种行处置完拟合仍旧拿不到样本", () => {

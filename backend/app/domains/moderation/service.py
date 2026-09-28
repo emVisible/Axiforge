@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ from app.domains.moderation.contracts import (
     Verdict,
 )
 from app.domains.moderation.engine import ModerationEngine, Outcome
+from app.domains.moderation.labels import axis_label_counts
 from app.domains.moderation.models import (
     ModerationCase,
     ModerationDecisionLog,
@@ -370,28 +372,47 @@ class ModerationService:
         pending = ModerationCase.state == STATE_PENDING
         pending_total = int((await self.db.execute(
             select(func.count()).select_from(ModerationCase).where(pending))).scalar_one())
+        # "现在有几个可拟样本"用的是导出/拟合那同一个函数（labels.axis_label_counts），
+        # 不在这里另算一遍——两端各算一遍迟早会报出两个不同的"样本"。
+        labelled_rows = (await self.db.execute(
+            select(ModerationCase).where(ModerationCase.state.in_(
+                (STATE_RESOLVED, STATE_DISMISSED))))).scalars().all()
+        counts = axis_label_counts(labelled_rows)
         axes: List[dict] = []
         for name, qtype in question_types().items():
             if qtype != "noul":
                 continue
             prob = cast(ModerationCase.answers[name]["noul"].astext, Float)
             where = (pending, prob.is_not(None))
-            count = int((await self.db.execute(
-                select(func.count()).select_from(ModerationCase).where(*where))).scalar_one())
             rows = (await self.db.execute(
                 select(ModerationCase).where(*where)
                 .order_by(prob.desc(), ModerationCase.created_at.desc(), ModerationCase.id.desc())
-                .limit(per_axis))).scalars().all()
+            )).scalars().all()
+            # 队头按**答案快照**去重：同一篇稿子在 dev 库里能挂十几条案件（实测 492 行
+            # 其实只对应一小撮内容），不去重就是让运营把同一篇看十几遍，
+            # 而"看过十几遍"在标注量上一分不值——独立证据数才是数。
+            seen: set = set()
+            unique: List[ModerationCase] = []
+            for c in rows:
+                key = json.dumps(c.answers, sort_keys=True, ensure_ascii=False)
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique.append(c)
             axes.append({
                 "question": name,
                 "informative": (informative.get(name) if reported else None),
-                "pending_candidates": count,
+                "pending_candidates": len(rows),
+                "distinct_candidates": len(unique),
+                "label_samples": counts[name]["samples"],
+                "label_positives": counts[name]["positives"],
+                "label_explicit": counts[name]["explicit"],
                 "top": [{
                     "case_id": str(c.id), "subject_type": c.subject_type,
                     "subject_id": c.subject_id, "state": c.state,
                     "probability": float((c.answers.get(name) or {}).get("noul") or 0.0),
                     "has_raw": isinstance(((c.answers.get(name) or {}).get("raw")) or None, dict),
-                } for c in rows],
+                } for c in unique[:per_axis]],
             })
         return {"engine": engine, "pending_total": pending_total, "axes": axes}
 

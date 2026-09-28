@@ -152,6 +152,14 @@ class LabelTargetAxis(BaseModel):
     #: `None` ＝ 这张温度表没上报这一维——"看不见"与"报了是负的"必须分得开。
     informative: Optional[bool] = None
     pending_candidates: int
+    #: 按答案快照去重之后的候选数。它才是"再看几条能多得多少独立证据"的答案——
+    #: 同一篇稿子挂十条案件，看十条在标注量上只算一条。
+    distinct_candidates: int
+    #: 已经被人处置、且拟合真的会用上的行数（判据与导出／`calibrate` 同源）。
+    label_samples: int
+    label_positives: int
+    #: 其中"逐轴勾过"的条数。它低就说明正样本仍只覆盖机器自己想到的轴。
+    label_explicit: int
     top: List[LabelTargetRow] = []
 
 

@@ -90,7 +90,9 @@ export default function ModerationLabelQueuePanel({ vocab, activeAxis, onPickAxi
               >
                 {note.text}
               </span>
-              <span className="text-ink-faint">候选 {a.pending_candidates} 条</span>
+              <span className="text-ink-faint">
+                不同稿子 {a.distinct_candidates} 篇 · 案件 {a.pending_candidates} 条
+              </span>
               {a.top.length > 0 && (
                 <span className="font-mono text-ink-faint">
                   队头最高 {(a.top[0].probability * 100).toFixed(0)}%

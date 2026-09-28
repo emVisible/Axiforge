@@ -282,13 +282,22 @@ export function labelAxisNote(
     axis.top.length && withRaw < axis.top.length
       ? `｜队头 ${axis.top.length} 条里只有 ${withRaw} 条带缩放前分布`
       : "";
+  // 「可拟样本」用的是导出／拟合那同一个判据（缺缩放前分布的行整行不算），
+  // 所以它不等于"处置过几条"：处置十条旧形状的行，这一栏照样是 0。
+  const fit = `｜可拟样本 ${axis.label_samples} 条（正 ${axis.label_positives}·勾过 ${axis.label_explicit}）`;
   if (axis.informative === false) {
-    return { text: `${named}：打不过常数预测器，标它才补得回判断力${rawNote}`, tone: "warn" };
+    return {
+      text: `${named}：打不过常数预测器，标它才补得回判断力${fit}${rawNote}`,
+      tone: "warn",
+    };
   }
   if (axis.informative == null) {
-    return { text: `${named}：判断力未上报（旧温度表），先重拟${rawNote}`, tone: "muted" };
+    return {
+      text: `${named}：判断力未上报（旧温度表），先重拟${fit}${rawNote}`,
+      tone: "muted",
+    };
   }
-  return { text: `${named}：已有判断力，再标是加密度${rawNote}`, tone: "ok" };
+  return { text: `${named}：已有判断力，再标是加密度${fit}${rawNote}`, tone: "ok" };
 }
 
 /** 按某条轴排序时那行说明。它必须一直在，因为"排在最上面"很容易被读成"最危险"。 */

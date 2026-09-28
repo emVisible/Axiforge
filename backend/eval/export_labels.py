@@ -31,48 +31,9 @@ from app.database import async_session  # noqa: E402
 from app.domains.moderation.models import ModerationCase  # noqa: E402
 from app.domains.moderation.questions import question_types  # noqa: E402
 
-#: 人工结论 → 期望动作。dismissed 表示"机器报错了"，即该内容其实可放行。
-OUTCOME_TO_EXPECTED = {"resolved": "reject", "dismissed": "approve"}
-
-
-def case_payload(r: ModerationCase) -> dict:
-    """一条导出行。**键名必须与 `eval/moderation_samples.jsonl` 一致**——
-    拟合与评测读的是同一套键（`clauses` / `answers` / `expected`），
-    这里少一个键，`calibrate.py` 不会报错而是**整行跳过**：
-    它明写"没有条款标注的行不能凭空当成七条轴都不存在"。
-    以前这份导出就从来没发过 `clauses`，于是"攒够标注 → 重拟"这条路
-    真要跑起来会得到一份 0 样本的温度表。
-
-    `clauses` 的语义是"人背书过的条款集合"，不是"机器报过的条款"，两种来源分开标记
-    （`label_kind`）：
-    - `explicit`：处置时逐轴勾过（`human_clauses` 非 NULL，**含空列表**）。
-      空列表是这批数据里最值钱的负样本——人明确说"机器报的条款一个都不成立"。
-    - `endorsed`：没勾过。`resolved` → 机器当时标的条款原样带出；
-      `dismissed` → 空集，于是七条轴各记一个 0（过报应当付出的代价）。
-      这一类的正样本永远只覆盖"机器自己想到的那些轴"：漏报变不出正样本，
-      所以它拟出来的温度偏乐观。`endorsed` 占比高就说明该去补勾选，而不是急着放宽门控。
-    """
-    explicit = getattr(r, "human_clauses", None) is not None
-    if explicit:
-        clauses = list(r.human_clauses)
-    elif r.state == "resolved":
-        clauses = list(r.clause_ids)
-    else:
-        clauses = []
-    return {
-        "case_id": str(r.id),
-        "subject_type": r.subject_type,
-        "subject_id": r.subject_id,
-        "engine": r.engine,
-        "answers": r.answers,
-        "clauses": clauses,
-        "label_kind": "explicit" if explicit else "endorsed",
-        "expected": OUTCOME_TO_EXPECTED.get(r.state, "human_review"),
-        "human_state": r.state,
-        "policy_version": r.policy_version,
-        "questions_version": r.questions_version,
-        "calibrated_at_decide": r.calibrated,
-    }
+# 换算规则在 domain 里（`app.domains.moderation.labels`），这里只搬运不重定义：
+# 面板报的「有几个可拟样本」与导出／拟合实际拿到的条数，必须是同一个函数算出来的。
+from app.domains.moderation.labels import case_payload  # noqa: E402
 
 
 async def collect() -> list[dict]:

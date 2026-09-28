@@ -78,6 +78,12 @@ def _answer_snapshot(verdict: Verdict) -> dict:
         row = {"type": a.qtype, _VALUE_KEY[a.qtype]: a.value, "confidence": round(a.confidence, 4)}
         if isinstance(a.raw, dict):
             row["probabilities"] = {str(k): round(float(v), 6) for k, v in a.raw.items()}
+        # 缩放前的原始分布。`normalize_answers` 只认 type/noul|score|choice/confidence/
+        # probabilities 这几个键，多带一个 `raw` 不影响 what-if 的回放（实测在断言里钉着），
+        # 但它让"用生产处置攒标注"这条路有一条不复合温度的拟合口径。
+        raw_ans = verdict.raw_answers.get(name)
+        if isinstance(raw_ans, dict):
+            row["raw"] = raw_ans
         out[name] = row
     return out
 

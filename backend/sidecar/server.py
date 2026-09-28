@@ -104,6 +104,13 @@ def decide_once(state, questions: dict, lang_guess=None, *, calibrate: bool = Tr
     # 得到的是两次缩放的复合，看着"更准"但不可复现，而且每次重拟都会再缩一次。
     answers, done = rescale_answers(raw, calibration_table() if calibrate else {})
     return {"ok": True, "answers": answers,
+            # 缩放前那份原样留给上游落库。两个理由叠在一起：
+            # ① 拟合必须在未缩放的分布上做——在已缩放的分布上再拟一次得到的是两次缩放的复合，
+            #    看着"更准"但每次重拟都会再缩一遍，且不可复现；
+            # ② 处置标注的真值锚在"人当时看到的那次判定"上，而生产判定用的是缩放后的分布，
+            #    所以现场再问一次（`calibrate:false`）拿到的并不是人判过的那一份。
+            # 两个口径都要能拟，就得把 raw 随案件一起留下。
+            "answers_raw": raw,
             "routing": res.get("routing", routed),
             "calibrated_questions": sorted(done),
             "latency_ms": int((time.time() - t0) * 1000),

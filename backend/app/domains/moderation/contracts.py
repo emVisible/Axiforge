@@ -97,6 +97,10 @@ class Verdict:
     #: 它与 abstained 不同：不是"我没什么可说"，而是"我有话但不能由我执行"；
     #: 也不该复用 calibrated=False 去表达——那会把"看不全"报成"没标定"。
     refusal: str = ""
+    #: 引擎缩放前的原始分布（题名 → 原样答案）。落库它是为了让"用生产处置攒出来的标注"
+    #: 有一条不复合温度的拟合口径：`answers` 是缩放后的、人当时判的就是它，
+    #: 而拟合要的是缩放前那一份——两个都得留着，缺一个就只能靠现场再问一次冒充。
+    raw_answers: Dict[str, object] = field(default_factory=dict)
 
     @staticmethod
     def abstain(engine: str, reason: str) -> "Verdict":

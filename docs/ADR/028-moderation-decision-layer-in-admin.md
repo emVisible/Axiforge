@@ -875,6 +875,50 @@ D18 那个坑的通用形态是：**下游对坏输入的行为是"整行跳过"
 核验：`pytest` 141 passed（本文件累计新增 6 条：3 条契约 + 3 条 readiness），
 `pnpm gates` exit 0，变异两次各打红预期的那条。
 
+### D20 落地：把"缩放前那份分布"随案件落库，让生产标注真的能重拟（2026-09-28 第五轮）
+
+D18 剩下的那一小段在这里做完，做法不是给 `calibrate.py` 加一个"读落库答案"的开关就完事——
+那样会撞回 ADR 已经写死的那条性质：**温度缩放是复合的**（`softmax(log p/Ta/Tb)`），
+在已缩放的分布上再拟一次得到的是两次缩放的复合，每次重拟都会再缩一遍。
+生产判定落库的恰恰是缩放后的那份（`rescale_answers` 之后才返回），所以"用处置攒标注"这条路
+要么拟合复合分布（错），要么现场再问一次（那拟的就不是人判过的那台模型/那一次判定）。
+
+改法是让它两个都不用选：**sidecar 把缩放前的原样一起返回，客户端把它随答案落库。**
+
+| 位置 | 改动 |
+| --- | --- |
+| `sidecar/server.py:105` | `/decide` 多回一个 `answers_raw`（缩放前原样），带注释说明为什么两个都要留 |
+| `contracts.Verdict.raw_answers` | 结论里带这份原始分布（默认空 dict，词表与旧 sidecar 自然为空） |
+| `laya_sidecar.moderate` | `replace(verdict, raw_answers=data["answers_raw"])` |
+| `service._answer_snapshot` | 每条答案多带一个 `raw` 子对象；`normalize_answers` 不认这个键，因此 what-if 回放不受影响（这一条有断言钉着，并且真造满 10 题验过） |
+| `eval/calibrate.py` | 新增 `--from-answers <jsonl>` 口径 B + `--out` 路径参数；缺 `raw` 的行**整行丢**，不拿缩放后的值顶替 |
+
+真机端到端（dev 栈，sidecar + backend 都跑新代码）：
+
+```
+rejudge → engine laya:sidecar  conf 0.5411  via human_only_clause:hate_incitement
+落库快照  题目数 10  带 raw 的题数 10
+  sexual_content: noul 0.17701（缩放后，门控读的）  raw.noul 0.502（拟合该读的）
+export_labels → 1 条标注；逐轴 readiness：hate/illegal 正=1、其余全 0 → 两条 ⚠ 分别说清
+calibrate --from-answers → 读 1 条 → 10 轴全部「跳过（n=1<4 / 只有一边）」
+                          → "没有任何一题可标定：不写表。空表比假表好" exit 1
+calibrate（原现场再问路径）→ 覆盖 10/10 题、写 /tmp，未被改坏
+```
+
+`sexual_content` 那一行是这一轮最值钱的读数：**同一次判定，缩放前 0.502、缩放后 0.177，差 2.8 倍**。
+以前若要"用生产处置攒温度表"，只能拿 0.177 去拟合，那是在已缩放的分布上再缩一次。
+
+两次口径都没有碰在线的 `eval/calibration.json`（都走 `--out /tmp/…`）。
+
+判据与被红过的位置：`pytest` 141 → **143**，两条新断言各见过一次红——
+把 `_answer_snapshot` 的 raw 去掉 → `KeyError: 'raw'`；
+把 `samples_from_rows` 改成"缺 raw 就退回缩放后那份" → `dropped==1` 那条红。
+`pnpm gates` exit 0。
+
+**仍未做的**：处置面板的逐轴勾选（拿掉"正样本只覆盖机器自己想到的轴"这个偏差）、
+以及把 readiness/拟合口径接到中台界面（现在还是命令行）。前者是 #47 与金集那条路的地基。
+
+
 ---
 
 ## 交接快照（2026-09-28，这一轮停在这里）

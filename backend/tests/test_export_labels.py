@@ -78,3 +78,62 @@ def test_readiness_counts_distribution_backed_rows_for_choice_axes():
     bare = case_payload(_case("resolved", []))
     bare["answers"] = {"age_rating": {"type": "choice", "choice": "all", "confidence": 0.9}}
     assert fit_readiness([with_probs, bare])["age_rating"]["samples"] == 1
+
+
+def test_the_raw_distribution_survives_the_snapshot_without_breaking_replay():
+    """落库要同时留两份：门控读缩放后那份（与人当时看到的一致），拟合读 raw。
+
+    多带一个 `raw` 键不许让快照失去可回放性——what-if 走的是 `normalize_answers`，
+    它一旦把这个键当成越界答案，整条案件就会从重放里消失。
+    （这条测试顺带量到一个事实：`normalize_answers` 要求**题集齐全**，只放一题的快照
+    会被判成「缺少 X 的答案」——所以这里必须造满 10 题。）
+    """
+    from app.domains.moderation.contracts import Answer, Verdict
+    from app.domains.moderation.questions import (
+        ALLOWED_CHOICE,
+        BOOL_QUESTIONS,
+        normalize_answers,
+        question_types,
+    )
+    from app.domains.moderation.service import _answer_snapshot
+
+    answers, raw = {}, {}
+    for name, qtype in question_types().items():
+        if qtype == "noul":
+            answers[name] = Answer(name, "noul", 0.75, 0.75, 0.75)
+            raw[name] = {"type": "noul", "noul": 0.42}
+        elif qtype == "score":
+            answers[name] = Answer(name, "score", 1.0, 0.8, {"0": 0.2, "1": 0.6, "2": 0.2})
+            raw[name] = {"type": "score", "score": 0.9,
+                         "probabilities": {"0": 0.3, "1": 0.5, "2": 0.2}}
+        else:
+            pick = sorted(ALLOWED_CHOICE[name])[0]
+            answers[name] = Answer(name, "choice", pick, 0.9, {pick: 0.9})
+            raw[name] = {"type": "choice", "choice": pick, "probabilities": {pick: 0.7}}
+
+    snap = _answer_snapshot(Verdict(answers=answers, raw_answers=raw))
+    assert snap["sexual_content"]["noul"] == 0.75, "回放用的仍是缩放后那份"
+    assert snap["sexual_content"]["raw"]["noul"] == 0.42
+
+    back, problems = normalize_answers(snap)
+    assert problems == [], f"多一个 raw 键不该让快照不可回放：{problems}"
+    assert float(back["sexual_content"].value) == 0.75
+    assert BOOL_QUESTIONS, "前提：题集里得有二元轴"
+
+
+def test_from_answers_mode_fits_on_the_pre_scaling_distribution():
+    """`--from-answers` 的判据：拿到的概率必须是缩放前的，缺 raw 的行整行丢。"""
+    from eval.calibrate import binary_pairs, samples_from_rows
+
+    rows = [
+        {"answers": {"sexual_content": {"type": "noul", "noul": 0.75, "confidence": 0.75,
+                                       "raw": {"type": "noul", "noul": 0.42}}},
+         "clauses": ["sexual_explicit"]},
+        {"answers": {"sexual_content": {"type": "noul", "noul": 0.75, "confidence": 0.75}},
+         "clauses": []},
+    ]
+    samples, dropped = samples_from_rows(rows)
+    assert dropped == 1, "没有 raw 的行不能拿缩放后的值顶替——那是两次缩放的复合"
+    assert len(samples) == 1
+    pairs = binary_pairs(samples, "sexual_content")
+    assert pairs == [(0.42, 1)], pairs

@@ -188,4 +188,6 @@ class LayaSidecarEngine:
         verdict = decide_from_answers(
             answers, engine=self.name, calibrated=calibrated, extra_reasons=reasons
         )
+        # 缩放前那份跟着结论落库，`calibrate --from-answers` 靠它才能不在已缩放的分布上再拟一次
+        verdict = replace(verdict, raw_answers=dict(data.get("answers_raw") or {}))
         return replace(verdict, latency_ms=latency_ms)

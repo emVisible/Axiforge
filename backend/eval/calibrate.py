@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -77,6 +78,34 @@ def collect(questions: dict) -> List[Tuple[dict, dict]]:
     for row in load_samples():
         out.append((row, ask(row["kind"], row.get("title", ""), row.get("body", ""), questions)))
     return out
+
+
+def samples_from_rows(rows: list) -> Tuple[List[Tuple[dict, dict]], int]:
+    """`export_labels.py` 导出的标注行 → samples，用**缩放前**那份分布。
+
+    与 `collect()` 的区别不只是数据来源，是口径：
+    - `collect()` 现场再问一次，拿到的是"当前这台模型 + 当前这张表"的分布，
+      而它拟合的标签是人当初对**另一次判定**的意见——两者可能已经不是同一次了；
+    - 这里读 `answers[q]["raw"]`，正是人当时看到的那一份的未缩放形态。
+    缺 `raw` 的行**整行丢掉**而不是退回用缩放后的值顶替：在已缩放的分布上再拟一次
+    得到的是两次缩放的复合（`softmax(log p/Ta/Tb)`），每次重拟都会再缩一遍。
+    """
+    samples: List[Tuple[dict, dict]] = []
+    dropped = 0
+    for row in rows:
+        answers = {name: payload["raw"]
+                   for name, payload in (row.get("answers") or {}).items()
+                   if isinstance(payload, dict) and isinstance(payload.get("raw"), dict)}
+        if not answers:
+            dropped += 1
+            continue
+        samples.append((row, answers))
+    return samples, dropped
+
+
+def load_labelled_rows(path: str) -> list:
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
 
 
 def binary_pairs(samples, name: str) -> List[Tuple[float, int]]:
@@ -137,9 +166,25 @@ def loo_affine(pairs: list) -> float:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--from-answers", default="", metavar="JSONL",
+                    help="读 eval/export_labels.py 导出的处置标注，用落库的**缩放前**分布拟合；"
+                         "不给这个参数则现场问 sidecar 取未标定分布（那拟合的是当前模型，不是人判过的那次）")
+    ap.add_argument("--out", default="", metavar="PATH",
+                    help="输出温度表路径；默认写 eval/calibration.json。"
+                         "验证性重拟请指到 /tmp，别覆盖在线加载的那张表")
+    args = ap.parse_args()
+    out_path = Path(args.out) if args.out else OUT
+
     questions = build_questions()
-    samples = collect(questions)
-    print(f"取到 {len(samples)} 条原始分布（sidecar 未标定路径）")
+    if args.from_answers:
+        rows = load_labelled_rows(args.from_answers)
+        samples, dropped = samples_from_rows(rows)
+        print(f"读 {len(rows)} 条处置标注 → 取到 {len(samples)} 条缩放前分布，"
+              f"丢掉 {dropped} 条（快照里没有 raw：那批案件判于键结构补上之前）")
+    else:
+        samples = collect(questions)
+        print(f"取到 {len(samples)} 条原始分布（sidecar 未标定路径，现场再问）")
 
     table: Dict[str, dict] = {}
     for name in BOOL_QUESTIONS:
@@ -192,14 +237,19 @@ def main() -> int:
         print("\n没有任何一题可标定：不写表。空表比假表好——门控会继续转人工。")
         return 1
 
-    OUT.write_text(json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8")
     covered = sorted(table)
     missing = sorted(set(questions) - set(covered))
-    print(f"\n写入 {OUT}（覆盖 {len(covered)}/{len(questions)} 题）")
+    print(f"\n写入 {out_path}（覆盖 {len(covered)}/{len(questions)} 题）")
     if missing:
         print(f"  未覆盖：{'、'.join(missing)} —— 客户端会因此判定整链未标定，仍转人工。")
-    print("  注意：这是 34 行单人标注集上的拟合，持出 NLL 也只是留一，不是生产可用。")
-    print("  生产温度表要用 eval/export_labels.py 导出的人工处置记录重拟。")
+    if args.from_answers:
+        print("  口径：拟合用的是各条**当时真的生效**的未缩放分布，标签来自人对那次判定的处置。")
+        print("  仍要说清的是分母：这些正样本只覆盖「机器自己想到的那些轴」（处置面板没有逐轴勾选），")
+        print("  所以这份表的置信度偏乐观，拿它去放宽不可逆动作的线之前要先看 what-if 的 conflicts。")
+    else:
+        print("  注意：这是手工样本集上的拟合，持出 NLL 也只是留一，不是生产可用。")
+        print("  生产温度表请用 `calibrate.py --from-answers <导出的 jsonl>` 重拟。")
     return 0
 
 

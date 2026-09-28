@@ -2,9 +2,11 @@
 
 为什么要跑这个：门控的比较式是 `verdict.confidence >= auto_approve_threshold`，
 而那个 confidence 目前等于「八条负面证据里最弱的一条」（`policy._no_risk_confidence`）。
-2026-09-28 实测：全库 laya 案件 confidence 上限 **0.787**、`>=0.90` 是 **0 条**、
-中位数 0.545。也就是说"自动通过"不是被阈值挡住的——**是那个数在结构上到不了线**：
-八条轴取 min 是个合取判据，只要有一条轴对干净内容给到 0.45，整篇的"清白置信"就封顶 0.55。
+2026-09-28 在 dev 台账（当时 505 条 laya 案件）实测：confidence 上限 **0.787**、
+`>=0.90` 是 **0 条**、中位数 0.545。也就是说"自动通过"不是被阈值挡住的——
+**是那个数在结构上到不了线**：八条轴取 min 是个合取判据，只要有一条轴对干净内容给到 0.45，
+整篇的"清白置信"就封顶 0.55。
+（同一批口径在 76 行对照语料、重拟之后的表上是 中位 0.70 / 上限 0.85——见 ADR-028 D29。）
 
 这个脚本把几种口径放在**同一批 Laya 真实答案**上对比，每条线报四个数：
 ① 会放行几条；② 其中几条标注不是"可放行"（**误放**，唯一真正贵的那个）；
@@ -13,12 +15,15 @@
 只有 ②一直守住 0，①才是收益而不是运气；④ 占满的时候，这张表证不了任何事——
 而 `--from-db` 那一栏实测就是这么空的。
 
-一条必须说清的限制：`moderation_samples.jsonl` 的 expected 是**单人按 ADR-018 口径撰写的标注**，
-34 行、无第二人复核。它能回答"哪种口径在这批证据上更不自洽"，
-不足以回答"上线后误放率是多少"。所以这里的结论只用来**选口径**，不用来**批准上线**。
+一条必须说清的限制：`moderation_samples.jsonl` 的 expected 是**单人按 ADR-018 题面撰写的标注**，
+76 行、无第二人复核。它能回答"哪种口径在这批证据上更不自洽"，不足以回答"上线后误放率是多少"。
+所以这里的结论只用来**选口径**，不用来**批准上线**。
+其中 42 行是 D29 加的**对照三元组**（每条 noul 轴一组"该报 / 不该报 / 边界"，带 `pair` 与 `role`，
+边界项必须写 `note` 交代立场）。它们的作用不是让数字变好看，而是让"模型与人在同一行上不同意"
+这件事被读数抓出来——实测已经抓到一条（见 ADR-028 D29）。
 
 用法：
-    uv run python eval/approve_ladder.py              # 34 行自标注集（第一次真问 Laya，34 次 decide）
+    uv run python eval/approve_ladder.py              # 语料全部行（第一次真问 Laya，每行一次 decide）
     uv run python eval/approve_ladder.py --fresh      # 丢掉缓存重问
     uv run python eval/approve_ladder.py --from-db     # 改读队列里已落库的答案，标注＝人工处置
 缓存默认 `/tmp/approve_ladder_cache.json`（拟合类产物不入库，缓存同理）。
@@ -110,7 +115,11 @@ CANDIDATES: Dict[str, Callable[[Dict], float]] = {
 
 
 def fetch_answers(cache: Path, fresh: bool) -> Dict[str, dict]:
-    """34 行样本 → 每行的类型化答案快照（与落库同形，能被 normalize_answers 读回来）。"""
+    """样本集全部行 → 每行的类型化答案快照（与落库同形，能被 normalize_answers 读回来）。
+
+    缓存里必须带上 `clauses`：报出"某行会被误放"之后，如果只能看到模型的答案、
+    看不到当初那条标注是什么，这个读数就没法被查账（2026-09-28 找 human-09 时撞上的）。
+    """
     if cache.exists() and not fresh:
         return json.loads(cache.read_text(encoding="utf-8"))
     from app.domains.moderation.providers.laya_sidecar import LayaSidecarEngine
@@ -125,7 +134,11 @@ def fetch_answers(cache: Path, fresh: bool) -> Dict[str, dict]:
         if v.abstained:
             print(f"  跳过 {row['id']}：{v.reasons[:2]}")
             continue
-        out[row["id"]] = {"expected": row["expected"], "answers": _answer_snapshot(v)}
+        out[row["id"]] = {
+            "expected": row["expected"],
+            "answers": _answer_snapshot(v),
+            "clauses": row.get("clauses") or [],
+        }
         print(f"  {row['id']} expected={row['expected']} 答 {len(out[row['id']]['answers'])} 题")
     cache.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     return out

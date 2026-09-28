@@ -32,6 +32,39 @@ def test_dataset_covers_all_four_groups():
     assert len(rows) >= 30, "样本太少时准确率没有意义"
 
 
+def test_every_noul_axis_has_a_contrast_group():
+    """每条 noul 轴都要有一组"该报 / 不该报"的对照行——#53 的产物，防止它悄悄烂掉。
+
+    只有正样本的语料救不活一条轴。拟合需要的是**同词反例**：
+    "描写一场抢劫"与"教人怎么抢劫"表面词几乎一样，题面要的却只有后者。
+    2026-09-28 实测：加进 42 行对照之后 8 条空转轴只翻正 1 条（`hate_targeted`），
+    其余 7 条仍打不过常数预测器——因为新增的干净行把正样本占比稀释了，
+    常数变得更强，**门槛本身被抬高**。所以这个门禁守的是"每条轴都有反例可比"，
+    而"翻正几条"是拟合那边的事。
+    """
+    from app.domains.moderation.questions import clause_for, question_types
+
+    rows = load_samples()
+    grouped: dict = {}
+    for r in rows:
+        if r.get("pair"):
+            grouped.setdefault(r["pair"], []).append(r)
+
+    for name, qtype in question_types().items():
+        if qtype != "noul":
+            continue
+        clause = clause_for(name)
+        group = grouped.get(name, [])
+        pos = [r for r in group if clause in (r.get("clauses") or [])]
+        neg = [r for r in group if clause not in (r.get("clauses") or [])]
+        assert pos, f"{name} 的对照组缺'该报'那一侧"
+        assert neg, f"{name} 的对照组缺'不该报'那一侧（同词反例才是能救活轴的东西）"
+        # 边界项必须写下立场，否则它只是一个没被说破的猜测
+        for r in group:
+            if r.get("role") == "edge":
+                assert r.get("note"), f"{r['id']} 标了 edge 却没写判据"
+
+
 def test_auto_err_is_zero():
     """机器自己执行、且执行错了：唯一直接伤到用户的错误类型，必须为 0。"""
     s = _score()

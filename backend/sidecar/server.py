@@ -31,6 +31,7 @@ import argparse
 import inspect
 import json
 import os
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -41,6 +42,9 @@ _router = None
 _device = "unknown"
 _loaded: list = []
 _default = os.environ.get("LAYA_DEFAULT", "multilingual")
+
+#: 串行化推理的锁。见 `decide_once` 里那段实测根因说明。
+_INFER_LOCK = threading.Lock()
 
 DEFAULT_TABLE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "eval", "calibration.json")
@@ -86,19 +90,27 @@ def calibration_table() -> dict:
 
 def decide_once(state, questions: dict, lang_guess=None, *, calibrate: bool = True) -> dict:
     t0 = time.time()
-    router = _router_singleton(preload=False)
-    route_kw: dict = {}
-    if lang_guess and "lang_guess" in inspect.signature(router.route).parameters:
-        route_kw["lang_guess"] = lang_guess
-    routed = router.route(state, questions, **route_kw)
-    model = routed["model"]
-    predict_kw: dict = {}
-    if "lang_guess" in inspect.signature(router.predict).parameters:
-        predict_kw["lang_guess"] = lang_guess
-    res = router.predict(state, questions, **predict_kw)
+    # 推理必须串行。这不是保守，是实测：批量重判开 4 并发时，每条请求各自在同一个
+    # Metal command buffer 上开 encoder，稳定触发断言
+    # `A command encoder is already encoding to this command buffer`（AGXG16G…CommandBuffer），
+    # 进程直接死掉，剩下 147/150 次判定全记成"sidecar 不可达：RemoteDisconnected"。
+    # 之前那次"无法归因的单实例崩溃"根因就是它——只要有两个请求重叠就会发生。
+    # 服务用的是 ThreadingHTTPServer（为了 /health 在推理时仍能响应），所以锁在这里，
+    # 而不是把服务器换成单线程。
+    with _INFER_LOCK:
+        router = _router_singleton(preload=False)
+        route_kw: dict = {}
+        if lang_guess and "lang_guess" in inspect.signature(router.route).parameters:
+            route_kw["lang_guess"] = lang_guess
+        routed = router.route(state, questions, **route_kw)
+        model = routed["model"]
+        predict_kw: dict = {}
+        if "lang_guess" in inspect.signature(router.predict).parameters:
+            predict_kw["lang_guess"] = lang_guess
+        res = router.predict(state, questions, **predict_kw)
 
-    global _loaded
-    _loaded = list(router.loaded)
+        global _loaded
+        _loaded = list(router.loaded)
     raw = res.get("answers", {})
     # calibrate=False 是给拟合脚本用的：在已经缩放过的分布上再拟一次温度，
     # 得到的是两次缩放的复合，看着"更准"但不可复现，而且每次重拟都会再缩一次。

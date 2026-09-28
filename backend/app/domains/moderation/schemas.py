@@ -140,6 +140,30 @@ class QueueStaleness(BaseModel):
     without_authoritative_verdict: int
 
 
+class RequeueRequest(BaseModel):
+    """批量重判的输入。`allow_close` 默认关——见路由那段为什么。"""
+
+    scope: str = Field(pattern="^(stale|unjudged|pending)$", default="unjudged")
+    limit: int = Field(default=200, ge=1, le=5000)
+    #: 允许批量把待人工翻成"机器已结案"。默认 false：结论照刷新，state 不动。
+    allow_close: bool = False
+
+
+class RequeueStatus(BaseModel):
+    running: bool
+    queued: int
+    #: 走到权威引擎并落了结论的条数——攒标注真正要的就是这个数
+    judged: int
+    #: 只有词表说话（模型没答话/超窗/未启用）。它与 judged 分开，
+    #: 否则"跑了 150 条"会掩盖"库里只多了 1 条模型证据"。
+    lexicon_only: int
+    would_close: int
+    no_content: int
+    no_case: int
+    failed: int
+    cancelled: bool
+
+
 class StatsResponse(BaseModel):
     by_state: dict
     by_engine: dict

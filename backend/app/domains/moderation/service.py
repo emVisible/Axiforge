@@ -16,10 +16,10 @@ import hashlib
 import logging
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.moderation.contracts import (
@@ -142,8 +142,16 @@ class ModerationService:
         title: str,
         body: str,
         author_id: str = "",
+        allow_close: bool = True,
     ) -> Optional[ModerationCase]:
-        """审一条内容并留痕。返回 None 只表示审核未启用或引擎全部故障。"""
+        """审一条内容并留痕。返回 None 只表示审核未启用或引擎全部故障。
+
+        `allow_close=False` 是给**批量刷新**用的：结论照落库（答案、置信度、条款、版本），
+        但**不碰 state**。批量把一个队列从"待人工"翻成"机器已结案"是清空人工视野的动作，
+        它该由人逐条决定；而攒标定数据只需要前者。
+        注意这不是安全开关——`auto_closed` 在代码里只是台账，没有任何下游读它去真下架或发布内容
+        （真实的下架/驳回只发生在 admin 的显式动作里）。所以它管的是"人的队列"，不是"内容的安全"。
+        """
         if not self.engine.providers:
             return None
 
@@ -211,10 +219,14 @@ class ModerationService:
                 for field, value in stale.items():
                     setattr(existing, field, value)
                 existing.decided_at = datetime.now(timezone.utc)
-                existing.state = (
-                    STATE_AUTO_CLOSED if snap["final_action"] != ACTION_HUMAN
-                    else STATE_PENDING
-                )
+                if allow_close:
+                    existing.state = (
+                        STATE_AUTO_CLOSED if snap["final_action"] != ACTION_HUMAN
+                        else STATE_PENDING
+                    )
+                # allow_close=False 时 state 一律不动：批量刷新既不该把待人工翻成"机器已结案"
+                # （那等于清掉人的视野），也不该把已结案的翻回待人工（那等于重开人的决定）。
+                # 结论字段照新——攒标定数据要的就是这些。
             # 这一次调用得出了什么就记什么；引擎异常（snap 为空）时记案件现状，
             # 因为这一次确实没有产生新结论。
             src = snap or {
@@ -241,7 +253,9 @@ class ModerationService:
             return existing
 
         verdict = outcome.verdict if outcome else Verdict.abstain("chain", error_note)
-        auto_executed = bool(outcome) and outcome.action != ACTION_HUMAN
+        # 批量刷新（allow_close=False）新建的案件一律留在待人工：机器看过、有答案、有置信度，
+        # 但"这条不用人看"这句话只能由门控在正常路径上说，不能由一次批量替人决定。
+        auto_executed = bool(outcome) and outcome.action != ACTION_HUMAN and allow_close
         case = ModerationCase(
             subject_type=subject_type,
             subject_id=str(subject_id),
@@ -437,6 +451,45 @@ class ModerationService:
             evaluate(list(rows), approve=approve, reject=reject),
             population=int(population or 0),
         )
+
+    async def requeue_candidates(self, *, scope: str = "unjudged",
+                                 limit: int = 200) -> List[Tuple[str, str]]:
+        """按口径挑出"该重判"的主体坐标，作为批量刷新的输入。
+
+        返回的是 `(subject_type, subject_id)` 而不是案件 id：批量走的是与保存路径
+        同一个派发（后台自己取全文），所以它的输入必须与案件表无关——
+        同一条内容有多版案件时也只判一次。
+
+        三种口径是给三种下一步用的：`stale` 是"版本推进了结论没重算"（D17 那枚 chip 的量），
+        `unjudged` 是"压根没走到模型那一层"（攒标定数据真正缺的就是这个），
+        `pending` 是"把所有待人工内容重刷一遍"。
+        """
+        cond = {
+            "stale": or_(ModerationCase.questions_version != QUESTIONS_VERSION,
+                         ModerationCase.lexicon_version != LEXICON_VERSION),
+            "unjudged": ModerationCase.authoritative.is_(False),
+            "pending": ModerationCase.state == STATE_PENDING,
+        }.get(scope)
+        if cond is None:
+            raise ValueError(f"未知的重判口径：{scope}")
+        # 用 GROUP BY 而不是 DISTINCT：DISTINCT 配 `ORDER BY 一个没被选出的列` 在 PG 里非法，
+        # 而"按最新优先"恰恰要按 created_at 排。写成 DISTINCT + 按主体坐标排序的实测后果是
+        # 从上千条里取到一个**任意切片**——刚判过的东西永远排在批量输入之外。
+        # 末级键只能用被 GROUP BY 的列（`id` 是 uuid，PG 没有 max(uuid)，拿它做聚合排序
+        # 会直接 ProgrammingError；这条是第一次真跑这条 SQL 时才暴露的）。
+        rows = (
+            await self.db.execute(
+                select(ModerationCase.subject_type, ModerationCase.subject_id)
+                .where(cond)
+                .group_by(ModerationCase.subject_type, ModerationCase.subject_id)
+                .order_by(func.max(ModerationCase.created_at).desc(),
+                          ModerationCase.subject_type.desc(),
+                          ModerationCase.subject_id.desc())
+                .limit(limit)
+            )
+        ).all()
+        return [(str(r[0]), str(r[1])) for r in rows]
+
 
     async def _calibration_reports(self) -> List[dict]:
         """能报标定覆盖面的引擎各报一条。词表没有温度表，所以它不在列表里——

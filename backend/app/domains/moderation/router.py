@@ -10,12 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.admin_auth import require_admin
 from app.database import get_db
+from app.domains.moderation.background import batch_status, cancel_batch, start_batch
 from app.domains.moderation.content import load_subject_content
 from app.domains.moderation.questions import QUESTIONS_VERSION
 from app.domains.moderation.registry import build_policy
 from app.domains.moderation.schemas import (
     CaseResponse,
     QueuePage,
+    RequeueRequest,
+    RequeueStatus,
     ResolveRequest,
     WhatIfResponse,
     WhatIfRowResponse,
@@ -149,6 +152,44 @@ async def moderation_rejudge(case_id: UUID, db: AsyncSession = Depends(get_db)):
                                  "或正文超出模型窗口）")
     await db.commit()
     return again
+
+
+@moderation_router.post("/requeue", response_model=RequeueStatus)
+async def moderation_requeue_start(
+    body: RequeueRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """批量重判：把"机器其实没看过"和"版本推进了但结论没重算"的那批内容真判一遍。
+
+    默认 `allow_close=false`——**结论照刷新，state 一律不动**。
+    这条链的 `auto_closed` 在代码里只是台账（没有任何下游读它去真下架或发布内容），
+    但它决定的是"人还要不要看这条"：一次批量把待人工队列清空，等于替运营决定
+    "这些不用看了"，那不该是批量任务的副作用。攒标定数据要的是答案与处置，不是结案。
+
+    进程内状态，重启即丢（与 `background.py` 第 3 条同源）：批量刷新是可重入的
+    ——再点一次就把剩下的补上，不存在"半个作业"要恢复。
+    """
+    candidates = await _svc(db).requeue_candidates(scope=body.scope, limit=body.limit)
+    if not candidates:
+        return RequeueStatus(**batch_status(), queued=0)
+    if not start_batch(candidates, allow_close=body.allow_close):
+        raise HTTPException(409, "已经有一批重判在跑；先看 GET /requeue，必要时 POST /requeue/cancel")
+    # queued 用真正取到的坐标数（请求里的 limit 可能被库里不足截断）
+    return RequeueStatus(**{**batch_status(), "queued": len(candidates)})
+
+
+@moderation_router.get("/requeue", response_model=RequeueStatus)
+async def moderation_requeue_status():
+    """批量进度。跑过一次之后各计数含义见 `RequeueStatus`：
+    `would_close` 是"这批里有几条机器已经给出可执行结论"——那才是需要人先看一眼的量。"""
+    return RequeueStatus(**batch_status())
+
+
+@moderation_router.post("/requeue/cancel", response_model=RequeueStatus)
+async def moderation_requeue_cancel():
+    """让在跑的批量在下一条处停下（在途的那几条会跑完，硬断会把 session 留在中间态）。"""
+    cancel_batch()
+    return RequeueStatus(**batch_status())
 
 
 @moderation_router.post("/cases/{case_id}/reopen", response_model=CaseResponse)

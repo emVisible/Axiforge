@@ -799,6 +799,61 @@ AFTER  (复活)    engine laya:sidecar conf 0.7871 model_state=laya:multilingual
 去掉 `parts.push` 那次变异只打红正向那条）；admin `tsc` 0 error；`pnpm gates` exit 0；
 chip 在真浏览器里读到的是上面那句原文。
 
+### D21 落地：批量重判上线，第一次跑到的是 34 条真模型证据（2026-09-28 第六轮）
+
+`POST /api/v1/admin/moderation/requeue`（+ `GET /requeue` 进度、`POST /requeue/cancel`）。
+口径按讨论定的那样收：**默认 `allow_close=false`** —— 结论照刷新（答案、置信度、条款、版本号全落库），
+`state` 一律不动。这条链的 `auto_closed` 在代码里只是台账（grep 过：没有任何下游读它去真下架或发布内容，
+真实下架只发生在 admin 的显式动作里），但"这条不用人看了"这句话不该由一次批量替运营说完。
+批量与单条共用 `_inflight` 在途去重，同时只许跑一个批量（第二次 POST 回 409）。
+
+**第一次真跑（并发 4，150 条）把这台 sidecar 打死了，而且留下了此前无法归因的那条断言：**
+
+```
+-[AGXG16GFamilyCommandBuffer tryCoalescingPreviousComputeCommandEncoder…]:1091:
+failed assertion `A command encoder is already encoding to this command buffer'
+```
+
+计数器报 `judged=147`，库里核对的结果是：**laya 结论只多了 1 条**，其余 147 条案件的依据全是
+「`laya:sidecar 未答话：sidecar 不可达：RemoteDisconnected`」（D14 那条留痕在这一次兑现了价值）。
+两件事同时被这次跑出证实：
+
+1. **根因**：sidecar 用的是 `ThreadingHTTPServer`，而 Laya 的 MPS 推理**不是线程安全的**——
+   两个请求重叠就崩。之前那次"单实例、无稳定触发条件"的崩溃就是它。
+   修法是 `decide_once` 里一把 `threading.Lock` 包住 route/predict，
+   而不是把服务器换成单线程（`/health` 在推理期间还要能答）。
+2. **读数骗人**：`judged` 以前把"只有词表说话"也算成判完。现在 `outcome_tag()` 分成互斥单值
+   `judged / lexicon_only / would_close / no_content / no_case / failed`，
+   并且单独有测试钉住定义（`lexicon_only` 不许并进 `judged`——攒标注要的是权威判定）。
+
+**修完之后重跑 40 条（同并发 4，推理侧被锁串行化）**：20.1s 跑完，
+`judged=34 lexicon_only=3 no_content=3 failed=0`，sidecar 活着（`/stats` 两档引擎 healthy=true）。
+
+**这一轮真正拿到的数据**（库里核对，不是计数器）：
+
+| 指标 | 批量前 | 批量后 |
+| --- | --- | --- |
+| 带类型化答案的案件 | 17 | **52** |
+| 其中带缩放前 `raw`（可喂 `--from-answers`） | 2 | **36** |
+| what-if 可回放条数 | 6 | **41** |
+| 自动执行 / 与人工冲突 | 0 / 0 | **0 / 0**（`undecided=41`） |
+
+以及一条对 D4 有用的读数，它把"为什么 0.75 线也不执行任何东西"说清了：
+52 条模型结论的置信度**中位 0.545、p90 0.781、≥0.90 一条都没有**；
+而 ≥0.75 的那 6 条，`via` 全是 `human_only_clause:hate_incitement / illegal_instruction`——
+**挡住它们的不是通过线，是"这三类必须人来判"的否决线**。所以把线从 0.90 挪到 0.75
+在当前这批内容上不会多执行任何一条，D4 的争论点其实不在这条线上。
+`undecided=41` 才是下一步的入口：机器已经给出 41 条可核对的判断，缺的是人对着它们处置。
+
+**顺手照出并修掉的 SQL 缺陷**：`requeue_candidates` 最初写 `DISTINCT + ORDER BY created_at`
+（PG 里非法），改成 `GROUP BY 主体坐标 + ORDER BY max(created_at)`；而末级排序键不能用 `id`，
+因为 PG 没有 `max(uuid)` —— 这条是第一次真跑这条 SQL 才暴露的，测试里那条 SQL 之前从没被执行过。
+
+核验：`pytest` 143 → **148**（新增 5 条：state 不被批量翻走 / 作用域挑人与去重 /
+计数互斥与"同时只跑一个" / 取消 / `outcome_tag` 定义），
+其中"把 `allow_close` 摘掉"与"把 `lexicon_only` 并进 judged"两处变异各打红一条预期的红；
+`pnpm gates` exit 0。批量端点目前只有 API，队列页那个按钮与进度条还没接（见 #47 剩余项）。
+
 ### 现在到"真的自动"之间还差什么
 
 按顺序，且第 2 步之前不要谈自动化率：

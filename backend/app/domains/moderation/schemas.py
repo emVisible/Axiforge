@@ -168,8 +168,6 @@ class LabelTargetsResponse(BaseModel):
 
     engine: str
     pending_total: int
-    #: 报了"没有判断力"的轴有几条——面板拿它做标题行那句"还差标注"。
-    flattened: List[str] = []
     axes: List[LabelTargetAxis] = []
 
 

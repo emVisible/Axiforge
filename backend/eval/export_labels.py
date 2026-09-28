@@ -29,6 +29,7 @@ from sqlalchemy import select  # noqa: E402
 
 from app.database import async_session  # noqa: E402
 from app.domains.moderation.models import ModerationCase  # noqa: E402
+from app.domains.moderation.questions import question_types  # noqa: E402
 
 #: 人工结论 → 期望动作。dismissed 表示"机器报错了"，即该内容其实可放行。
 OUTCOME_TO_EXPECTED = {"resolved": "reject", "dismissed": "approve"}
@@ -86,6 +87,48 @@ async def collect() -> list[dict]:
     return out
 
 
+def fit_readiness(rows: list[dict]) -> dict[str, dict[str, int]]:
+    """这份导出**能不能真的拟出东西**——在跑 `calibrate.py` 之前就说出来。
+
+    存在的理由就是这一轮刚踩到的那个坑：`clauses` 键没导出时，拟合侧的行为是整行跳过，
+    于是"导出 40 条标注"会一路顺利到拟出**一张空表**为止都没有任何红。
+    noul 轴这里**直接调拟合侧的同一个函数**（`calibrate.binary_pairs`）而不是另写一套判据——
+    两份判据迟早会一天只改一份，那时候 readiness 报绿灯而拟合仍拿到 0 样本。
+    """
+    from eval.calibrate import binary_pairs
+
+    out: dict[str, dict[str, int]] = {}
+    for name, qtype in question_types().items():
+        if qtype == "noul":
+            pairs = binary_pairs([(r, r.get("answers") or {}) for r in rows], name)
+            out[name] = {"type_noul": 1, "samples": len(pairs),
+                         "positives": sum(int(lab) for _, lab in pairs)}
+        else:
+            # choice/score 要的是整条分布：只有标量值的行拟不动（旧快照正是这样）。
+            have = sum(1 for r in rows
+                       if isinstance(((r.get("answers") or {}).get(name) or {}).get("probabilities"), dict))
+            out[name] = {"type_noul": 0, "samples": have, "positives": 0}
+    return out
+
+
+def report_readiness(rows: list[dict]) -> None:
+    ready = fit_readiness(rows)
+    dead = [n for n, r in ready.items() if r["samples"] == 0]
+    only_pos = [n for n, r in ready.items() if r["type_noul"] and r["samples"] and not r["positives"]]
+    no_neg = [n for n, r in ready.items() if r["type_noul"] and r["samples"] and r["positives"] == r["samples"]]
+    print("逐轴可拟样本（noul 轴用拟合侧同一个判据算，不是这里另算一遍）：")
+    for name, r in sorted(ready.items()):
+        print(f"  {name:<26} 样本 {r['samples']:>4}  正 {r['positives']:>4}"
+              if r["type_noul"] else f"  {name:<26} 带分布 {r['samples']:>4}")
+    if dead:
+        print(f"⚠ 这几题一条样本都拟不动：{', '.join(dead)}"
+              "——拟合会直接跳过它们，温度表上不会出现这些轴。")
+    if only_pos:
+        print(f"⚠ 只有负样本（全 0）：{', '.join(only_pos)}——需要有人处置出这些条款才会出现正样本。")
+    if no_neg:
+        print(f"⚠ 只有正样本（全 1）：{', '.join(no_neg)}——标定无法学到这轴的假阳性。")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "moderation_labels.jsonl"))
@@ -110,6 +153,7 @@ def main() -> int:
     print(f"其中带概率向量的 {with_probs} 条——age_rating / severity 只能从这些里重拟。")
     if with_probs == 0:
         print("这批导出全部来自「快照未存向量」的旧案件，二元轴之外拟不出任何东西。")
+    report_readiness(rows)
     return 0
 
 

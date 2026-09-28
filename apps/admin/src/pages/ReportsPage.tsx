@@ -202,7 +202,7 @@ export default function ReportsPage() {
       const silence = engineSilenceNote(after?.reasons);
       showToast(
         silence
-          ? `这台模型没答话，已保留上次结论：${silence}`
+          ? `这台模型没答话——${after?.authoritative ? "上次模型结论已保留" : "这次只到词表那一层"}：${silence}`
           : after?.decided_at === before
             ? "已按全文送判：结论未变，判断记录加了一行"
             : "模型结论已更新",

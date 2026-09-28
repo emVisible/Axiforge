@@ -310,6 +310,18 @@ function qs(params: Record<string, string | number | undefined>): string {
 }
 
 
+/** 落库的单条类型化答案。形状与后端 `_answer_snapshot` 同源，不是一套统一 `value`。 */
+export interface ModerationAnswer {
+  type: string;
+  noul?: number;
+  score?: number;
+  choice?: string;
+  confidence?: number;
+  probabilities?: Record<string, number>;
+  /** 温度缩放前的原始分布（D20 起才有；旧案件没有这一项）。 */
+  raw?: Record<string, unknown>;
+}
+
 export interface ModerationCase {
   id: string;
   subject_type: string;
@@ -324,7 +336,11 @@ export interface ModerationCase {
   authoritative: boolean;
   calibrated: boolean;
   clause_ids: string[];
-  answers: Record<string, { type: string; value: unknown; confidence: number }>;
+  /** 人逐轴确认过的条款真值。`null`＝没勾过（沿用机器条款），`[]`＝明确说一条都不成立。 */
+  human_clauses: string[] | null;
+  /** 与 `_answer_snapshot` 同形：标量按题型放在 `noul|score|choice` 下，不是统一的 `value`。
+   *  这里曾经写着 `value`，于是依据表里 389/400 条案件的"取值"列渲染成 undefined。 */
+  answers: Record<string, ModerationAnswer>;
   reasons: string[];
   policy_version: string;
   questions_version: string;

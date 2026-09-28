@@ -9,18 +9,25 @@ import {
   Pagination,
   type DataTableColumn,
 } from "@axiforge/ui";
-import { adminApi, type ModerationCase, type PaginatedResponse } from "@/api/adminClient";
+import {
+  adminApi,
+  type ModerationCase,
+  type ModerationVocabulary,
+  type PaginatedResponse,
+} from "@/api/adminClient";
 import ModerationWhatIfPanel from "@/components/ModerationWhatIfPanel";
+import ModerationDispositionCell from "@/components/ModerationDispositionCell";
 import ModerationRequeuePanel from "@/components/ModerationRequeuePanel";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import { useAdminList } from "@/hooks/useAdminList";
 import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
 import {
   actionLabel,
+  answerDisplay,
   calibrationSummary,
   clauseLabel,
-  humanClausesPayload,
   stalenessSummary,
+  questionLabel,
   targetTypeLabel,
   viaLabel,
 } from "@/lib/moderation";
@@ -59,10 +66,6 @@ export default function ModerationPage() {
   const [order, setOrder] = useState<"risk" | "new">("risk");
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  // 逐轴真值。两个状态分开存：`assertTruth` 决定这个键发不发，
-  // `truth` 是勾了哪些轴——勾选但一条都不选要真的发出空数组（那是最有价值的负样本）。
-  const [assertTruth, setAssertTruth] = useState(false);
-  const [truth, setTruth] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const vocab = useModerationVocabulary();
 
@@ -83,9 +86,8 @@ export default function ModerationPage() {
 
   const act = async (id: string, fn: () => Promise<unknown>) => {
     await fn();
-    // 逐轴真值是一次性的表态：留着它，下一行的处置会被这条没读过的勾选污染。
-    setAssertTruth(false);
-    setTruth([]);
+    // 处置理由同样是"一次一条"的输入：留着它，下一行会被这条没读过的理由污染。
+    setNote("");
     list.invalidate();
     stats.invalidate();
     void id;
@@ -146,38 +148,13 @@ export default function ModerationPage() {
       header: "处置",
       render: (r) => (
         <div className="flex flex-wrap items-center gap-1.5">
-          {r.state === "pending" || r.state === "auto_closed" ? (
-            <>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() =>
-                  void act(r.id, () => adminApi.moderationResolve(
-                    r.id, "resolved", note, humanClausesPayload(assertTruth, truth)))
-                }
-              >
-                确认处置
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  void act(r.id, () => adminApi.moderationResolve(
-                    r.id, "dismissed", note, humanClausesPayload(assertTruth, truth)))
-                }
-              >
-                误报
-              </Button>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => void act(r.id, () => adminApi.moderationReopen(r.id, note))}
-            >
-              回退复核
-            </Button>
-          )}
+          <ModerationDispositionCell
+            key={`${r.id}-${r.state}-${(r.human_clauses ?? []).join(",")}`}
+            row={r}
+            vocab={vocab}
+            note={note}
+            onDone={act}
+          />
           <Button
             size="sm"
             variant="ghost"
@@ -302,34 +279,6 @@ export default function ModerationPage() {
         </p>
       )}
 
-      {assertTruth && (
-        <div className="mb-3 rounded-lg border border-border bg-canvas p-3">
-          <p className="mb-2 text-2xs text-ink-muted">
-            这一批勾选是**这次处置的逐轴真值**，会随处置一起落库并被导出用来重拟温度表。
-            不勾＝"我没逐轴看过"（导出沿用机器标的条款）；勾了但一条都不选＝"机器报的条款
-            一个都不成立"——后者是这批数据里最值钱的负样本。
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {(vocab.axis_clauses ?? []).map((c) => {
-              const on = truth.includes(c);
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setTruth(on ? truth.filter((x) => x !== c) : [...truth, c])}
-                  className={`rounded-full border px-2.5 py-1 text-2xs transition-colors ${
-                    on ? "border-brand bg-brand-muted text-brand"
-                       : "border-border text-ink-muted hover:text-ink"
-                  }`}
-                >
-                  {clauseLabel(vocab, c)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <input
           value={note}
@@ -337,22 +286,9 @@ export default function ModerationPage() {
           placeholder="处置理由（会写进案件留痕，供复盘与申诉）"
           className="w-full max-w-md rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-brand"
         />
-        <label
-          className="flex items-center gap-2 text-2xs text-ink-muted"
-          title="勾上才会把逐轴真值随处置一起发出去；不勾＝沿用机器标的条款"
-        >
-          <input
-            type="checkbox"
-            checked={assertTruth}
-            onChange={(e) => setAssertTruth(e.target.checked)}
-          />
-          我逐轴核对过这条内容的条款真值
-        </label>
-        {assertTruth && (
-          <span className="text-2xs text-ink-faint">
-            当前选了 {truth.length} 条 · 一个都不选也是有意义的表态
-          </span>
-        )}
+        <span className="text-2xs text-ink-faint">
+          理由只作用于下一条处置，点完会自动清空；逐轴真值在每一行的「逐轴真值」里勾。
+        </span>
       </div>
 
       {list.error && <ErrorDisplay message={list.error} onRetry={list.reload} />}
@@ -391,6 +327,7 @@ export default function ModerationPage() {
       {openId && (
         <EvidencePanel
           row={(list.data?.items ?? []).find((r) => r.id === openId)}
+          vocab={vocab}
           onClose={() => setOpenId(null)}
         />
       )}
@@ -411,7 +348,11 @@ export default function ModerationPage() {
 }
 
 /** 判断依据面板：把"为什么是这条结论"完整摊开——参照实现的队列只回 action/confidence/engine。 */
-function EvidencePanel({ row, onClose }: { row?: ModerationCase; onClose: () => void }) {
+function EvidencePanel({ row, vocab, onClose }: {
+  row?: ModerationCase;
+  vocab: ModerationVocabulary;
+  onClose: () => void;
+}) {
   if (!row) return null;
   return (
     <div className="mt-3 rounded-xl border border-border bg-surface p-4">
@@ -448,14 +389,27 @@ function EvidencePanel({ row, onClose }: { row?: ModerationCase; onClose: () => 
             </tr>
           </thead>
           <tbody>
-            {Object.entries(row.answers).map(([k, a]) => (
-              <tr key={k} className="border-t border-border/60">
-                <td className="px-2 py-1 font-mono">{k}</td>
-                <td className="px-2 py-1">{a.type}</td>
-                <td className="px-2 py-1">{String(a.value)}</td>
-                <td className="px-2 py-1 font-mono">{fmt(a.confidence)}</td>
-              </tr>
-            ))}
+            {Object.entries(row.answers).map(([k, a]) => {
+              const d = answerDisplay(a);
+              return (
+                <tr key={k} className="border-t border-border/60">
+                  <td className="px-2 py-1">{questionLabel(vocab, k)}</td>
+                  <td className="px-2 py-1">{a.type}</td>
+                  <td className="px-2 py-1 font-mono">
+                    {d.text}
+                    {d.legacy && (
+                      <span
+                        className="ml-1 text-ink-faint"
+                        title="这条快照是题集 D13 之前的形状，取值能读出来，但不进回放与拟合"
+                      >
+                        旧形状
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1 font-mono">{fmt(a.confidence ?? null)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

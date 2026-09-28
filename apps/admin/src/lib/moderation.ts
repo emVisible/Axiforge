@@ -1,6 +1,7 @@
 import type {
   AdminReport,
   EngineCalibration,
+  ModerationAnswer,
   ModerationVocabulary,
   QueueStaleness,
   RequeueStatus,
@@ -197,6 +198,50 @@ export function requeueSummary(s: RequeueStatus): {
   const tone: "ok" | "warn" | "danger" =
     s.failed > 0 ? "danger" : s.judged === 0 || s.lexicon_only > 0 || s.cancelled ? "warn" : "ok";
   return { tone, text: parts.join(" · ") };
+}
+
+/**
+ * 一条类型化答案该怎么显示。标量按题型放在不同键下（`noul|score|choice`），
+ * 没有统一的 `value`——以前界面读 `a.value`，于是依据表里新形状的行整列 `undefined`。
+ *
+ * 但库里三种形状**并存**（实测：D13 前的 `{type,value}`、D13 后的分型键、D20 后多一个 `raw`），
+ * 而这一屏的职责就是"让运营核对机器说了什么"，所以对旧行也不许显示成空白：
+ * 读得到就报出来，同时用 `legacy` 标出"这是废弃形状"。
+ * 这只是显示层的兜底，**判据路径不放水**：what-if 与拟合仍旧整行跳过旧行。
+ *
+ * 兜底只认三种已知题型：`type` 都不认识的行是坏数据不是旧数据，
+ * 把它那个裸 `value` 标成「旧形状」是在给一个无法解释的数编一个来源。
+ */
+const ANSWER_TYPES = ["noul", "score", "choice"] as const;
+
+export function answerDisplay(a: ModerationAnswer | undefined | null): {
+  text: string;
+  legacy: boolean;
+} {
+  if (!a || typeof a !== "object") return { text: "—", legacy: false };
+  const typed = a.type === "noul" ? a.noul : a.type === "score" ? a.score : a.type === "choice" ? a.choice : undefined;
+  if (typeof typed === "number") return { text: typed.toFixed(2), legacy: false };
+  if (typeof typed === "string" && typed) return { text: typed, legacy: false };
+  if (!ANSWER_TYPES.includes(a.type as (typeof ANSWER_TYPES)[number])) {
+    return { text: "—", legacy: false };
+  }
+  const legacy = (a as { value?: unknown }).value;
+  if (typeof legacy === "number") return { text: legacy.toFixed(2), legacy: true };
+  if (typeof legacy === "string" && legacy) return { text: legacy, legacy: true };
+  return { text: "—", legacy: false };
+}
+
+/**
+ * 逐轴真值控件该以什么为初值。
+ * 已确认过的行读回自己勾的那些（含"一条都不成立"的空集），没确认过的行以机器条款起步——
+ * 起步不等于认可：不点"我核对过"就仍然发 `undefined`（见 humanClausesPayload）。
+ */
+export function initialTruth(
+  row: { clause_ids: string[]; human_clauses: string[] | null },
+): { asserted: boolean; picked: string[] } {
+  return row.human_clauses !== null
+    ? { asserted: true, picked: [...row.human_clauses] }
+    : { asserted: false, picked: [...row.clause_ids] };
 }
 
 /**

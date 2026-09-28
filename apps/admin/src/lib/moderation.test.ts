@@ -4,9 +4,11 @@ import type { EngineCalibration, ModerationVocabulary, RequeueStatus } from "@/a
 import {
   EMPTY_VOCABULARY,
   actionLabel,
+  answerDisplay,
   calibrationSummary,
   clauseLabel,
   humanClausesPayload,
+  initialTruth,
   engineSilenceNote,
   maskToken,
   questionLabel,
@@ -221,7 +223,66 @@ describe("批量重判的读数", () => {
   });
 });
 
+describe("类型化答案的显示", () => {
+  // 2026-09-28 从真库的一条案件里抄下来的三种形状（键按题型分，没有统一的 value）
+  it("noul / score / choice 各自读自己的键，数字保留两位", () => {
+    expect(answerDisplay({ type: "noul", noul: 0.08619228209583947 })).toEqual({
+      text: "0.09",
+      legacy: false,
+    });
+    expect(answerDisplay({ type: "score", score: 1.000922232363851 })).toEqual({
+      text: "1.00",
+      legacy: false,
+    });
+    expect(answerDisplay({ type: "choice", choice: "all" })).toEqual({
+      text: "all",
+      legacy: false,
+    });
+  });
+
+  it("读不到该题型的键时显示「—」而不是 undefined——依据表不能整列空白", () => {
+    // 这正是旧代码的失败形状：它读 `a.value`，而快照里从来没这个键
+    expect(answerDisplay({ type: "noul" })).toEqual({ text: "—", legacy: false });
+    expect(answerDisplay(undefined)).toEqual({ text: "—", legacy: false });
+  });
+
+  it("题集 D13 前的 {type,value} 行照样报出取值，并标出是旧形状", () => {
+    // 这一屏的职责是"核对机器说了什么"，旧行显示「—」等于把话藏起来。
+    // 实测 dev 库里三种形状并存（新形状 389/400，旧形状 11 条）。
+    expect(answerDisplay({ type: "noul", value: 0.086 } as never)).toEqual({
+      text: "0.09",
+      legacy: true,
+    });
+    expect(answerDisplay({ type: "choice", value: "all" } as never)).toEqual({
+      text: "all",
+      legacy: true,
+    });
+  });
+
+  it("题型本身不认识就不兜底：坏数据不该被戴上「旧形状」这个来源", () => {
+    expect(answerDisplay({ type: "weird", value: 1 } as never)).toEqual({
+      text: "—",
+      legacy: false,
+    });
+  });
+});
+
+describe("逐轴真值控件的初值", () => {
+  it("没确认过的行以机器条款起步，但不算表态", () => {
+    expect(initialTruth({ clause_ids: ["doxxing"], human_clauses: null }))
+      .toEqual({ asserted: false, picked: ["doxxing"] });
+  });
+
+  it("确认过的行读回自己勾的——空列表是「一条都不成立」，不是没勾", () => {
+    expect(initialTruth({ clause_ids: ["doxxing"], human_clauses: [] }))
+      .toEqual({ asserted: true, picked: [] });
+    expect(initialTruth({ clause_ids: [], human_clauses: ["spam_promotion"] }))
+      .toEqual({ asserted: true, picked: ["spam_promotion"] });
+  });
+});
+
 describe("处置时的逐轴真值", () => {
+
   it("没勾选就不发这个键——发空数组等于替运营说「一条都不成立」", () => {
     expect(humanClausesPayload(false, [])).toBeUndefined();
     expect(humanClausesPayload(false, ["spam_promotion"])).toBeUndefined();

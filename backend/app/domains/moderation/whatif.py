@@ -75,6 +75,8 @@ class WhatIfReport:
     #: 没被读到的案件在界面上等于不存在。放在末位是因为它带默认值，
     #: 数据类里无默认值的字段不许排在有默认值的之后。
     population: int = 0
+    #: `evaluated` 覆盖的不同内容数（按内容指纹去重）。它才是这条读数的样本量。
+    distinct_contents: int = 0
 
 
 def _agreement(hypothetical: str, case: ModerationCase) -> Tuple[str, str]:
@@ -97,6 +99,9 @@ def evaluate(cases: Sequence[ModerationCase], *, approve: float,
                     version=f"what-if/{approve:.2f}-{reject:.2f}")
     rows: List[WhatIfRow] = []
     skipped: Dict[str, int] = {}
+    #: 可回放案件覆盖的**不同内容**。案件数会因为重复文本膨胀，独立样本数不会——
+    #: dev 库实测 292 条可回放只对应 32 篇不同稿子，两者差一个数量级。
+    replayed_contents: set = set()
 
     def skip(reason: str) -> None:
         skipped[reason] = skipped.get(reason, 0) + 1
@@ -122,6 +127,7 @@ def evaluate(cases: Sequence[ModerationCase], *, approve: float,
         effective = policy.resolved(case.subject_type)
         action, via = gate(verdict, effective, authoritative=case.authoritative)
         agreement, human = _agreement(action, case)
+        replayed_contents.add(case.fingerprint)
         rows.append(WhatIfRow(
             case_id=str(case.id), subject_type=case.subject_type, subject_id=case.subject_id,
             state=case.state, actual_action=case.final_action, hypothetical_action=action,
@@ -138,6 +144,7 @@ def evaluate(cases: Sequence[ModerationCase], *, approve: float,
         agrees=sum(1 for r in rows if r.agreement == "agree"),
         conflicts=sum(1 for r in rows if r.agreement == "conflict"),
         undecided=sum(1 for r in rows if r.agreement == "undecided"),
+        distinct_contents=len(replayed_contents),
         # 只把"这条线会真的动手"的行交给界面：全量回传只会淹没那两三行。
         rows=[r for r in rows if r.hypothetical_action != ACTION_HUMAN],
     )

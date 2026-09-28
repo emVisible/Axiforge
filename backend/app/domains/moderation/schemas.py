@@ -82,6 +82,9 @@ class WhatIfResponse(BaseModel):
     scanned: int
     #: 库里案件总数；`scanned < population` 就是这份证据只看了最近一窗，读数要连着样本量说。
     population: int
+    #: `evaluated` 覆盖的**不同内容**数。292 条可回放可能只对应 32 篇稿子——
+    #: 案件数会被重复文本膨胀，独立样本数不会，所以它才是拟合与决策的分母。
+    distinct_contents: int
     skipped: Dict[str, int]
     auto_approve: int
     auto_reject: int

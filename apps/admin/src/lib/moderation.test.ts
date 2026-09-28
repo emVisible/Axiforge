@@ -12,6 +12,7 @@ import {
   stalenessSummary,
   suggestionLabel,
   viaLabel,
+  whatIfEvidenceNote,
   whatIfSampleNote,
   whatIfVerdict,
 } from "@/lib/moderation";
@@ -168,6 +169,16 @@ describe("阈值假设的读数", () => {
   it("全都扫过了就不许再挂一句「只取最新」——那是假的心虚", () => {
     expect(whatIfSampleNote({ scanned: 950, population: 950 })).toBe("");
     expect(whatIfSampleNote({ scanned: 12, population: 12 })).toBe("");
+  });
+
+  it("可回放条数与不同内容数不一致时，要说清真正的分母", () => {
+    // dev 库实测：292 条可回放只对应 32 篇不同稿子
+    expect(whatIfEvidenceNote({ evaluated: 292, distinct_contents: 32 }))
+      .toContain("不同内容仅 32 篇");
+  });
+
+  it("一条案件一篇稿子时不报这句——不许制造假的怀疑", () => {
+    expect(whatIfEvidenceNote({ evaluated: 32, distinct_contents: 32 })).toBe("");
   });
 });
 

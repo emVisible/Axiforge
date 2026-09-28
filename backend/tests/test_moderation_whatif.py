@@ -126,3 +126,18 @@ def test_what_if_never_bypasses_the_per_kind_tightening():
     assert round(as_project.rows[0].confidence, 2) == same_evidence
     assert as_comment.auto_approve == 0, "评论仍按 0.95 判"
     assert as_comment.rows == []
+
+
+def test_the_sample_size_is_distinct_content_not_case_count():
+    """dev 库实测：292 条可回放只对应 32 篇不同稿子。案件数会被重复文本膨胀。
+
+    这条断言钉的是"分母"——没有它，面板上一句"可回放 292 条"会被读成 n=292，
+    而拟合与决策真正能依赖的只有 32。
+    """
+    a, b, c = case(), case(), case()
+    a.fingerprint = b.fingerprint = "fp-duplicated"
+    c.fingerprint = "fp-other"
+    rep = evaluate([a, b, c], approve=0.75, reject=0.95)
+    assert rep.evaluated == 3
+    assert rep.distinct_contents == 2
+    assert rep.distinct_contents <= rep.evaluated

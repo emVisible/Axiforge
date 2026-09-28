@@ -223,3 +223,15 @@ export function whatIfSampleNote(
     ? ` · 全库 ${r.population} 条，这里只取最新 ${r.scanned} 条`
     : "";
 }
+
+/**
+ * "可回放 N 条"里的真实分母。案件数会被重复文本膨胀：dev 库实测 292 条可回放
+ * 只对应 32 篇不同稿子。不说这句，面板上的数字就会被当成 n=292 去支撑挪阈值。
+ */
+export function whatIfEvidenceNote(
+  r: Pick<WhatIfReport, "evaluated" | "distinct_contents">,
+): string {
+  return r.evaluated > r.distinct_contents
+    ? `（不同内容仅 ${r.distinct_contents} 篇，重复文本不增加样本量）`
+    : "";
+}

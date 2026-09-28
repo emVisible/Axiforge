@@ -162,6 +162,8 @@ export interface WhatIfReport {
   scanned: number;
   /** 库里案件总数。`scanned < population` 说明这份证据只覆盖最近一窗。 */
   population: number;
+  /** `evaluated` 覆盖的**不同内容**数：它才是这条读数的样本量（案件数会因重复文本膨胀）。 */
+  distinct_contents: number;
   skipped: Record<string, number>;
   auto_approve: number;
   auto_reject: number;

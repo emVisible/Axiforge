@@ -158,8 +158,11 @@ async def test_saving_a_project_narrative_reaches_the_review_queue(client: Async
     from app.domains.moderation.background import drain_pending
 
     await drain_pending()  # 判定在后台：保存返回 ≠ 案件已落地
+    # order=new 是必须的：dev 库现在有 1200+ 条待处置，默认按风险排时
+    # 刚建的这条会在某一页之外——那时"这一页没有它"会被读成"判定没落库"。
+    # （读分页却当成全表，正是 D12 修掉的那类缺陷，这次打在我自己的测试上。）
     queue = await client.get("/api/v1/admin/moderation/queue",
-                             params={"limit": 200}, headers=admin)
+                             params={"limit": 200, "order": "new"}, headers=admin)
     assert queue.status_code == 200
     cases = [c for c in queue.json()["items"] if c["subject_id"] == project_id]
     assert len(cases) == 1, "一次保存该留一条案件（ADR-028 的旁路留痕）"

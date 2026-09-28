@@ -32,6 +32,9 @@ class CaseResponse(BaseModel):
     authoritative: bool
     calibrated: bool
     clause_ids: List[str]
+    #: 人逐轴确认过的条款真值。`null` 与 `[]` 不同：前者是没勾过（沿用机器条款），
+    #: 后者是人明确说"一条都不成立"。界面要能区分，否则运营以为自己已经表过态。
+    human_clauses: Optional[List[str]] = None
     answers: dict
     reasons: List[str]
     policy_version: str
@@ -97,6 +100,9 @@ class WhatIfResponse(BaseModel):
 class ResolveRequest(BaseModel):
     outcome: str = Field(pattern="^(resolved|dismissed)$")
     note: str = ""
+    #: 逐轴真值。不给＝没勾过（导出沿用机器标的条款）；给列表（含空列表）＝人明确确认过。
+    #: 校验放在路由层：条款名单只在服务端有一份（`questions.REGISTERED_CLAUSES`）。
+    human_clauses: Optional[List[str]] = None
 
 
 class EngineHealth(BaseModel):
@@ -184,6 +190,8 @@ class VocabularyResponse(BaseModel):
     """
 
     clauses: Dict[str, str]
+    #: 处置面板"逐轴真值"该列哪几条：由轴→条款映射投影而来，前端不自己抄一份。
+    axis_clauses: List[str]
     suggestions: Dict[str, str]
     rules: Dict[str, str]
     #: 类型化问题的短名（"未标定轴"、温度表覆盖面这些位置要用）

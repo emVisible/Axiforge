@@ -912,6 +912,47 @@ failed assertion `A command encoder is already encoding to this command buffer'
 `distinct` 一处修正：`/requeue` 与真实规模（200 条）跑完 `judged=197 / lexicon_only=0 /
 no_content=3 / failed=0`，sidecar 在锁串行化之后活过了整轮。
 
+### D23 落地：处置面板的逐轴真值——第一批"机器没想到的正样本"出现了（2026-09-28 第八轮）
+
+前面所有标定工作都压在一个没说出口的偏差上：`clauses` 标签来自**机器自己报的条款**，
+所以正样本永远只覆盖"机器想到的轴"。漏报（人觉得有、机器没报）变不出正样本，
+于是拟出的温度**系统性偏乐观**——而温度偏乐观直接等于门控偏松。这一轮把这个入口补上。
+
+| 位置 | 改动 |
+| --- | --- |
+| `ModerationCase.human_clauses` | 新列，`JSONB NULL`。**`NULL` 与 `[]` 是两件事**：前者＝没逐轴确认过（导出沿用机器条款），后者＝人明确说"机器报的一条都不成立" |
+| 迁移 `20260928_004` | 幂等（`create_all` 基线的库跳过）；dev 库 upgrade 两次都 0，列可空已核 |
+| `resolve()` / `POST /resolve` | 多收 `human_clauses`；未注册条款在**路由层** 422（名单只在 `REGISTERED_CLAUSES` 一份，抄进 Pydantic 就是第二个真相源） |
+| `/vocabulary` | 新增 `axis_clauses`：只有背后有二元轴的 7 条（`rating_mismatch` 不是轴，被排除）。轴→条款映射只有服务端有，前端抄一份的表现是"新加的轴永远勾不到" |
+| `export_labels.case_payload` | `clauses` 优先取 `human_clauses`，并新增 `label_kind: explicit\|endorsed`；导出时打印两种来源各多少条，`explicit=0` 直接报警 |
+| 队列页 | 「我逐轴核对过这条内容的条款真值」+ 一排中文条款 chip；**处置完成后控件自动清空**（留着它会把没读过的勾选污染到下一条） |
+
+端到端真跑（浏览器点 → 接口 → 库 → 导出 → 拟合侧）：
+
+```
+词表投影   axis_clauses 7 条（clauses 总 8 条，排除 rating_mismatch）
+浏览器     勾"逐轴核对过" → 选「真人隐私」→ 点误报 → 控件复位
+库里       human_clauses=["doxxing"]，而机器当时报的是 ["hate_incitement","illegal_instruction"]
+导出       2 条标注 · pii_real_person 轴 样本 2 正 1   ← 这个正样本以前造不出来
+拟合侧     --from-answers 取到 1 条、丢 1 条（那条判于 raw 落库之前，不许拿缩放后的顶替）
+```
+
+`pii_real_person` 那个 **正样本 1** 是这一轮的全部理由：机器没报这条轴，人说了有。
+以前的数据里这种样本恒为 0，`binary_pairs` 会一直只拿到负样本，
+温度表就学不会"这条轴其实存在"。
+
+另一处读数纪律：`label_kind` 让 `endorsed`（沿用机器条款）不再冒充人工真值——
+没有它，导出里两种质量完全不同的标签会被混在一起拟合，而拟合结果看不出区别。
+
+核验：`pytest` 149 → **153**（新增 4 条：`NULL` vs `[]`、`endorsed` 语义不变、跨 session 复读、
+接口 422 + 读回）；`vitest` 27（新增 2 条：未勾选不发键 / 勾选后空数组要真发）；
+`pnpm gates` exit 0；admin `tsc` 0 error。变异两处各见过红（`resolve` 把 `[]` 落成 `NULL`、
+`humanClausesPayload` 未勾选时返回 `[]`）。
+
+**仍然欠的**：① 多人一致——同一批内容目前仍只有一个人（运营=用户）勾过，金集要的是重复标注；
+② `explicit` 的占比现在才 3/1262，这条入口的可见性（它在处置理由旁边）值得在下一轮看数据再定；
+③ 处置面板没有回显"这条我之前勾过什么"（`human_clauses` 已在接口返回里，界面还没画）。
+
 ### 现在到"真的自动"之间还差什么
 
 按顺序，且第 2 步之前不要谈自动化率：

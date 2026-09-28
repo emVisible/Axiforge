@@ -19,6 +19,7 @@ import {
   actionLabel,
   calibrationSummary,
   clauseLabel,
+  humanClausesPayload,
   stalenessSummary,
   targetTypeLabel,
   viaLabel,
@@ -58,6 +59,10 @@ export default function ModerationPage() {
   const [order, setOrder] = useState<"risk" | "new">("risk");
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  // 逐轴真值。两个状态分开存：`assertTruth` 决定这个键发不发，
+  // `truth` 是勾了哪些轴——勾选但一条都不选要真的发出空数组（那是最有价值的负样本）。
+  const [assertTruth, setAssertTruth] = useState(false);
+  const [truth, setTruth] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const vocab = useModerationVocabulary();
 
@@ -78,6 +83,9 @@ export default function ModerationPage() {
 
   const act = async (id: string, fn: () => Promise<unknown>) => {
     await fn();
+    // 逐轴真值是一次性的表态：留着它，下一行的处置会被这条没读过的勾选污染。
+    setAssertTruth(false);
+    setTruth([]);
     list.invalidate();
     stats.invalidate();
     void id;
@@ -144,7 +152,8 @@ export default function ModerationPage() {
                 size="sm"
                 variant="secondary"
                 onClick={() =>
-                  void act(r.id, () => adminApi.moderationResolve(r.id, "resolved", note))
+                  void act(r.id, () => adminApi.moderationResolve(
+                    r.id, "resolved", note, humanClausesPayload(assertTruth, truth)))
                 }
               >
                 确认处置
@@ -153,7 +162,8 @@ export default function ModerationPage() {
                 size="sm"
                 variant="ghost"
                 onClick={() =>
-                  void act(r.id, () => adminApi.moderationResolve(r.id, "dismissed", note))
+                  void act(r.id, () => adminApi.moderationResolve(
+                    r.id, "dismissed", note, humanClausesPayload(assertTruth, truth)))
                 }
               >
                 误报
@@ -292,13 +302,57 @@ export default function ModerationPage() {
         </p>
       )}
 
-      <div className="mb-3">
+      {assertTruth && (
+        <div className="mb-3 rounded-lg border border-border bg-canvas p-3">
+          <p className="mb-2 text-2xs text-ink-muted">
+            这一批勾选是**这次处置的逐轴真值**，会随处置一起落库并被导出用来重拟温度表。
+            不勾＝"我没逐轴看过"（导出沿用机器标的条款）；勾了但一条都不选＝"机器报的条款
+            一个都不成立"——后者是这批数据里最值钱的负样本。
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {(vocab.axis_clauses ?? []).map((c) => {
+              const on = truth.includes(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setTruth(on ? truth.filter((x) => x !== c) : [...truth, c])}
+                  className={`rounded-full border px-2.5 py-1 text-2xs transition-colors ${
+                    on ? "border-brand bg-brand-muted text-brand"
+                       : "border-border text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {clauseLabel(vocab, c)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="处置理由（会写进案件留痕，供复盘与申诉）"
           className="w-full max-w-md rounded-lg border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-brand"
         />
+        <label
+          className="flex items-center gap-2 text-2xs text-ink-muted"
+          title="勾上才会把逐轴真值随处置一起发出去；不勾＝沿用机器标的条款"
+        >
+          <input
+            type="checkbox"
+            checked={assertTruth}
+            onChange={(e) => setAssertTruth(e.target.checked)}
+          />
+          我逐轴核对过这条内容的条款真值
+        </label>
+        {assertTruth && (
+          <span className="text-2xs text-ink-faint">
+            当前选了 {truth.length} 条 · 一个都不选也是有意义的表态
+          </span>
+        )}
       </div>
 
       {list.error && <ErrorDisplay message={list.error} onRetry={list.reload} />}

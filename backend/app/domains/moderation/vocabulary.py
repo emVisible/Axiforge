@@ -17,10 +17,12 @@ from typing import Dict, List
 from app.domains.moderation.contracts import ACTIONS, ACTION_LABELS
 from app.domains.moderation.policy import RULES
 from app.domains.moderation.questions import (
+    BOOL_QUESTIONS,
     CLAUSE_LABELS,
     HUMAN_ONLY_CLAUSES,
     QUESTION_LABELS,
     SUGGESTION_LABELS,
+    clause_for,
 )
 
 assert set(ACTION_LABELS) == set(ACTIONS), "结论取值域改了，短名没跟上"
@@ -34,8 +36,13 @@ def vocabulary() -> Dict[str, object]:
     clauses: Dict[str, str] = dict(CLAUSE_LABELS)
     rules: Dict[str, str] = {r.key: r.label for r in RULES}
     human_only: List[str] = sorted(HUMAN_ONLY_CLAUSES)
+    # 处置面板的"逐轴真值"该列哪几条：只有背后有二元轴的那些条款才是人真能核对的命题
+    # （`rating_mismatch` 是量级/评分的产物，没有对应的二元问题）。这份映射只有服务端有，
+    # 前端自己抄一份就是 D5 那笔债的复发——加一条轴时漏改的表现是"那一条永远勾不到"。
+    axis_clauses: List[str] = sorted({c for c in (clause_for(q) for q in BOOL_QUESTIONS) if c})
     return {
         "clauses": clauses,
+        "axis_clauses": axis_clauses,
         "suggestions": dict(SUGGESTION_LABELS),
         "rules": rules,
         "questions": dict(QUESTION_LABELS),

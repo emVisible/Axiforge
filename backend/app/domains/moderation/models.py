@@ -94,6 +94,11 @@ class ModerationCase(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     resolved_by: Mapped[Optional[str]] = mapped_column(String(128))
     resolution_note: Mapped[Optional[str]] = mapped_column(Text)
+    #: 人逐轴确认过的条款真值。`NULL` 与 `[]` 是两件事：
+    #: NULL = 没勾过，导出时回落到"确认处置即认可机器标的条款"；
+    #: `[]` = 人明确说"这些轴一个都不成立"（那正是漏报的反面，也是标定缺的那类负样本）。
+    #: 没有这一列，正样本永远只覆盖"机器自己想到的轴"，拟出的温度偏乐观。
+    human_clauses: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
 
 
 class ModerationDecisionLog(Base):

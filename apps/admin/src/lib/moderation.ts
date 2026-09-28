@@ -59,6 +59,7 @@ export function countSiblingReports(items: AdminReport[], selected: AdminReport)
 /** 词汇表未到位时的空表。标签函数会落回内部 id——那是可见的缺口，不是兜底文案。 */
 export const EMPTY_VOCABULARY: ModerationVocabulary = {
   clauses: {},
+  axis_clauses: [],
   suggestions: {},
   rules: {},
   actions: {},
@@ -159,6 +160,19 @@ const VIA_SUFFIX_FREE: Record<string, string> = {
   engine_abstained: "所有引擎弃权",
   engine_unavailable: "审核引擎不可用",
 };
+
+/**
+ * 处置时逐轴真值该发什么。这里的两个"空"完全不同，混掉就毁了标定数据：
+ * - `undefined` → 请求体里根本没这个键 → 库里 NULL → 导出按"沿用机器条款"处理；
+ * - `[]` → 人明确说"机器报的条款一条都不成立" → 这批数据里最值钱的负样本。
+ * 所以未勾选时绝不发空数组，勾选了就算全不选也要发出去。
+ */
+export function humanClausesPayload(
+  asserted: boolean,
+  selected: string[],
+): string[] | undefined {
+  return asserted ? [...selected] : undefined;
+}
 
 /**
  * 批量重判的读数。这里的原则与 D14 同一条：**"跑完了"不等于"模型看过了"**。

@@ -12,7 +12,7 @@ from app.core.admin_auth import require_admin
 from app.database import get_db
 from app.domains.moderation.background import batch_status, cancel_batch, start_batch
 from app.domains.moderation.content import load_subject_content
-from app.domains.moderation.questions import QUESTIONS_VERSION
+from app.domains.moderation.questions import QUESTIONS_VERSION, REGISTERED_CLAUSES
 from app.domains.moderation.registry import build_policy
 from app.domains.moderation.schemas import (
     CaseResponse,
@@ -115,9 +115,18 @@ async def moderation_resolve(
     任何调用方都能冒充管理员结案；② 也不能把 `require_admin` 的返回值写进库，
     它返回的就是 Bearer token 原文，落库等于把 ADMIN_TOKEN 复制进每一行案件。
     ADR-018 的正式 RBAC 还没做，这里先记角色；等 user_accounts.role 生效时换成主体 id。
+
+    `human_clauses` 在这里校验而不是在模型层写 `pattern`：合法名单只有一份且在
+    `questions.REGISTERED_CLAUSES`，抄一份到 Pydantic 里就是第二个真相源，
+    加条款时会漏改这一处，而漏改的表现是"勾了新轴被 422"。
     """
+    if body.human_clauses is not None:
+        unknown = [c for c in body.human_clauses if c not in REGISTERED_CLAUSES]
+        if unknown:
+            raise HTTPException(422, f"未注册的条款：{'、'.join(unknown)}")
     case = await _svc(db).resolve(
-        case_id, outcome=body.outcome, actor=ADMIN_PRINCIPAL, note=body.note
+        case_id, outcome=body.outcome, actor=ADMIN_PRINCIPAL, note=body.note,
+        human_clauses=body.human_clauses,
     )
     if not case:
         raise HTTPException(404, "案件不存在")

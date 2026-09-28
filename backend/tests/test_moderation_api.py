@@ -134,6 +134,44 @@ async def test_resolve_rejects_unknown_outcome(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_per_axis_truth_roundtrips_and_rejects_unknown_clauses(client: AsyncClient):
+    """逐轴真值（#48）：跨请求可读回，未注册条款要 422 而不是静默收下。
+
+    静默收下会更糟：那条轴在导出里变成一个谁都没确认过的正样本。
+    """
+    comment_id = await post_comment(client, "点击链接注册送 大额返利")
+    case = (await queue_for(client, comment_id))[0]
+
+    # 注意用的是**条款名**而不是轴名：轴 `pii_real_person` 对应的条款是 `doxxing`。
+    # 界面上的勾选来自词汇表的 clauses，不许把轴名发过来。
+    bad = await client.post(
+        f"/api/v1/admin/moderation/cases/{case['id']}/resolve",
+        json={"outcome": "resolved", "human_clauses": ["spam_promotion", "pii_real_person"]},
+        headers=ADMIN,
+    )
+    assert bad.status_code == 422, bad.text
+    assert "pii_real_person" in bad.text
+
+    ok = await client.post(
+        f"/api/v1/admin/moderation/cases/{case['id']}/resolve",
+        json={"outcome": "resolved", "human_clauses": ["spam_promotion", "doxxing"]},
+        headers=ADMIN,
+    )
+    assert ok.status_code == 200, ok.text
+    reread = await client.get(f"/api/v1/admin/moderation/cases/{case['id']}", headers=ADMIN)
+    assert reread.json()["human_clauses"] == ["spam_promotion", "doxxing"], \
+        "只 flush 不提交时这里会读回 null——那就是「勾了但没存上」"
+
+    cleared = await client.post(
+        f"/api/v1/admin/moderation/cases/{case['id']}/resolve",
+        json={"outcome": "dismissed", "human_clauses": []},
+        headers=ADMIN,
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["human_clauses"] == [], "空列表必须能与「没勾过」区分开"
+
+
+@pytest.mark.asyncio
 async def test_stats_reports_engine_authoritativeness(client: AsyncClient):
     res = await client.get("/api/v1/admin/moderation/stats", headers=ADMIN)
     assert res.status_code == 200

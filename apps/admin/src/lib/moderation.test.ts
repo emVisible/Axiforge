@@ -6,6 +6,7 @@ import {
   actionLabel,
   calibrationSummary,
   clauseLabel,
+  humanClausesPayload,
   engineSilenceNote,
   maskToken,
   questionLabel,
@@ -21,6 +22,7 @@ import {
 /** 后端 `/admin/moderation/vocabulary` 那份投影的测试替身（取值域一致，措辞同源）。 */
 const VOCAB: ModerationVocabulary = {
   clauses: { spam_promotion: "导流垃圾", doxxing: "真人隐私", rating_mismatch: "分级不符" },
+  axis_clauses: ["doxxing", "spam_promotion"],
   suggestions: { spam_promotion: "导流垃圾", none: "无问题" },
   rules: { high_severity: "危害量级偏高", spam_only: "导流垃圾" },
   actions: { approve: "自动通过", reject: "自动驳回", human_review: "转人工" },
@@ -216,6 +218,18 @@ describe("批量重判的读数", () => {
     expect(requeueSummary({ ...base, judged: 0, lexicon_only: 0, failed: 9 }).tone).toBe("danger");
     expect(requeueSummary({ ...base, running: true }).tone).toBe("running");
     expect(requeueSummary({ ...base, queued: 0 }).text).toBe("还没跑过批量重判");
+  });
+});
+
+describe("处置时的逐轴真值", () => {
+  it("没勾选就不发这个键——发空数组等于替运营说「一条都不成立」", () => {
+    expect(humanClausesPayload(false, [])).toBeUndefined();
+    expect(humanClausesPayload(false, ["spam_promotion"])).toBeUndefined();
+  });
+
+  it("勾了但一条都不选，必须真的发出空数组（那是最有价值的负样本）", () => {
+    expect(humanClausesPayload(true, [])).toEqual([]);
+    expect(humanClausesPayload(true, ["doxxing"])).toEqual(["doxxing"]);
   });
 });
 

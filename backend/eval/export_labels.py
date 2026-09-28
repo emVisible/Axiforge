@@ -43,21 +43,30 @@ def case_payload(r: ModerationCase) -> dict:
     以前这份导出就从来没发过 `clauses`，于是"攒够标注 → 重拟"这条路
     真要跑起来会得到一份 0 样本的温度表。
 
-    `clauses` 的语义是"人背书过的条款集合"，不是"机器报过的条款"：
-    - `resolved`（确认处置）→ 机器当时标的条款被人认了 → 原样带出；
-    - `dismissed`（判为误报）→ 那些条款被人否了 → 空集，于是这七条轴各记一个 0，
-      这正是过报应当付出的代价。
-    一个必须说清的偏差：这样得到的正样本永远只覆盖"机器自己想到的那些轴"，
-    人没有逐轴打勾的入口，所以它**低估假阳性**、拟出来的温度偏乐观。
-    要把这个偏差拿掉得给处置面板加逐轴勾选（ADR-028 §"还差什么"第 3 步的金集版本）。
+    `clauses` 的语义是"人背书过的条款集合"，不是"机器报过的条款"，两种来源分开标记
+    （`label_kind`）：
+    - `explicit`：处置时逐轴勾过（`human_clauses` 非 NULL，**含空列表**）。
+      空列表是这批数据里最值钱的负样本——人明确说"机器报的条款一个都不成立"。
+    - `endorsed`：没勾过。`resolved` → 机器当时标的条款原样带出；
+      `dismissed` → 空集，于是七条轴各记一个 0（过报应当付出的代价）。
+      这一类的正样本永远只覆盖"机器自己想到的那些轴"：漏报变不出正样本，
+      所以它拟出来的温度偏乐观。`endorsed` 占比高就说明该去补勾选，而不是急着放宽门控。
     """
+    explicit = getattr(r, "human_clauses", None) is not None
+    if explicit:
+        clauses = list(r.human_clauses)
+    elif r.state == "resolved":
+        clauses = list(r.clause_ids)
+    else:
+        clauses = []
     return {
         "case_id": str(r.id),
         "subject_type": r.subject_type,
         "subject_id": r.subject_id,
         "engine": r.engine,
         "answers": r.answers,
-        "clauses": list(r.clause_ids) if r.state == "resolved" else [],
+        "clauses": clauses,
+        "label_kind": "explicit" if explicit else "endorsed",
         "expected": OUTCOME_TO_EXPECTED.get(r.state, "human_review"),
         "human_state": r.state,
         "policy_version": r.policy_version,
@@ -154,6 +163,12 @@ def main() -> int:
     if with_probs == 0:
         print("这批导出全部来自「快照未存向量」的旧案件，二元轴之外拟不出任何东西。")
     report_readiness(rows)
+    kinds = [r.get("label_kind") for r in rows]
+    explicit = sum(1 for k in kinds if k == "explicit")
+    print(f"标注来源：逐轴勾过 {explicit} 条 · 沿用机器条款 {len(rows) - explicit} 条")
+    if explicit == 0:
+        print("⚠ 全部是「沿用机器条款」：这批数据里没有一条是人逐轴确认过的，"
+              "正样本只能覆盖机器自己想到的轴，拟出的温度偏乐观。")
     return 0
 
 

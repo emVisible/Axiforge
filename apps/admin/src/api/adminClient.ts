@@ -129,6 +129,8 @@ export interface AutoJudgement {
  *  前端不再自己抄一份——两份表漂移时两端都不报错，最坏情况是把内部 id 印给运营。 */
 export interface ModerationVocabulary {
   clauses: Record<string, string>;
+  /** 处置面板「逐轴真值」该列哪几条（服务端由轴→条款映射投影，前端不自己抄）。 */
+  axis_clauses: string[];
   suggestions: Record<string, string>;
   rules: Record<string, string>;
   actions: Record<string, string>;
@@ -467,10 +469,17 @@ export const adminApi = {
   moderationRequeueStatus: () => request<RequeueStatus>("/moderation/requeue"),
   moderationRequeueCancel: () =>
     request<RequeueStatus>("/moderation/requeue/cancel", { method: "POST" }),
-  moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "") =>
+  moderationResolve: (id: string, outcome: "resolved" | "dismissed", note = "",
+                      humanClauses?: string[]) =>
     request<ModerationCase>(`/moderation/cases/${id}/resolve`, {
       method: "POST",
-      body: JSON.stringify({ outcome, note }),
+      // `humanClauses === undefined` 与 `[]` 是两个意思：前者"没逐轴确认过"，
+      // 后者"确认过且一条都不成立"。序列化时不能把 undefined 变成 []。
+      body: JSON.stringify(
+        humanClauses === undefined
+          ? { outcome, note }
+          : { outcome, note, human_clauses: humanClauses },
+      ),
     }),
   /** 让模型现在重判一次（读全文，不是面板那份摘录）。 */
   moderationRejudge: (id: string) =>

@@ -334,12 +334,18 @@ class ModerationService:
         return await self.db.get(ModerationCase, case_id)
 
     async def resolve(
-        self, case_id: UUID, *, outcome: str, actor: str, note: str = ""
+        self, case_id: UUID, *, outcome: str, actor: str, note: str = "",
+        human_clauses: Optional[List[str]] = None,
     ) -> Optional[ModerationCase]:
         """人工处置，outcome ∈ resolved | dismissed。
 
         `actor` 必须由鉴权层提供，不接受客户端自报：参照实现让客户端传 actor
         且默认 `"admin"`（`server.py:201`），任何调用方都能冒充管理员结案。
+
+        `human_clauses` 是**逐轴真值**：`None` 表示这次没有逐轴确认（导出时按
+        "确认处置＝认可机器标的条款"处理），给出列表（**包括空列表**）表示人明确说过
+        这几条成立。没有它，标定数据的正样本只覆盖"机器自己想到的轴"，
+        漏报永远不会变成正样本，拟出的温度就偏乐观。
         """
         if outcome not in ("resolved", "dismissed"):
             return None
@@ -350,6 +356,8 @@ class ModerationService:
         case.resolved_at = datetime.now(timezone.utc)
         case.resolved_by = actor
         case.resolution_note = note or None
+        if human_clauses is not None:
+            case.human_clauses = list(human_clauses)
         # 顶层用例自己提交：`get_db` 只 close 不 commit，只 flush 的话
         # 会话结束就回滚——运营点了"确认处置"看到 200，库里其实还是 pending。
         # 中台其它写路径（admin_service 的六个动作）都是这个约定，这里曾是唯一的例外。

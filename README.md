@@ -56,7 +56,7 @@ pnpm dev
 | `pnpm check:circular` | dpdm 循环依赖 = 0 |
 | `pnpm check:desktop` | Tauri 壳的 `cargo check`（Rust 侧类型与权限面）。**刻意不进 `pnpm gates`**：gates 只跑 JS，合并进去会让没有 Rust 工具链的人连门禁都跑不动；实测本地 21s（预热 target），冷缓存需拉 Tauri 依赖树 |
 | `pnpm e2e` | Playwright 行为基线（独立库 `axiforge_e2e`，自包含起服务） |
-| `pnpm test:api` | 后端集成测试 |
+| `pnpm test:api` | 后端集成测试。**跑在 `<DATABASE_URL 库名>_test` 上**（缺库会自动建，需要 CREATE DATABASE 权限），每个会话把表清成空集，开发库零接触——测试造的审核案件带 `raw`，混进 dev 台账会被 `calibrate --from-answers` 当成真标注（ADR-028 D28） |
 | `pnpm setup` | 初始化 PostgreSQL 数据库与表 |
 | `pnpm db:up` / `db:down` | 启动 / 停止 Docker PostgreSQL |
 

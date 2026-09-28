@@ -1339,12 +1339,67 @@ SimpleNamespace 假冒案件的断言立刻红——"只是搬移"的重构也�
 
 ---
 
-## 交接快照（2026-09-28 第十二轮收口，这一轮停在这里）
+### D28 落地：测试套件与开发库分开（2026-09-28 第十二轮补）
 
-**已交付并本地提交（本轮提交后 `origin/desktop..desktop` = 70 个提交，全程未 push）**：
+上面那条 finding 当天就补掉了。做法是 `tests/conftest.py` 把 `settings.database_url` 的库名换成
+`<库名>_test`，并在会话开始时把那个库清成空表——命名跟着项目里已有的约定走
+（`pnpm e2e` 早就用独立库 `axiforge_e2e`，CI 注释里还写着"零接触 axiforge_test"）。
+
+**顺序是有要求的，这一点值得记下来**：`app.config` 在第一次被导入时就把 `Settings()` 固化成模块级单例，
+而 `app.database` 是在自己被导入时才读它。所以 conftest 必须先取原始 URL、再改 env、
+再重建 `app.config.settings`，然后才允许导入 `app.database` / `app.main`。
+反过来写（先 import 再改 env）表现是**测试仍然写 dev 库，而且一句报错都没有**。
+
+**中途改掉的一个更危险的做法**：第一版是每会话 `DROP DATABASE` + `CREATE DATABASE`。
+它在本地很好用，但 CI 的 API job 已经先对 `axiforge_test` 跑过 `alembic upgrade head`——
+整库重建会把那次迁移连同 `alembic_version` 一起抹掉，于是**"迁移能跑通"这个证据从 CI 里静默消失，
+而套件仍然是绿的**。这正是本项目反复栽过的形状：判据看起来更强，其实把另一条判据吃掉了。
+改成"库不存在才建、存在就 `TRUNCATE … RESTART IDENTITY CASCADE`（`alembic_version` 不动）"之后：
+保住了迁移证据，测试还跑在**迁移出来的 schema** 上而不是 `create_all` 的近似上。
+
+**护栏读服务端事实**。两条，缺一不可：
+`prepare_database` 在动手前检查推导出的库名必须以 `_test` 结尾，否则直接拒绝起套件；
+再用 `select current_database()` 复核连接真的落在 `_test` 上。
+第二条不是重复——它挡的是"配置被绕但字符串看着对"那一类（显式 env、代码默认值、另一个 session 工厂）。
+
+真机验证（都是数出来的增量，不是"跑过了"）：
+
+```
+清库后的 dev 库：cases=6 / projects=2638
+跑一遍 uv run pytest（默认推导，无 env）→ 162 passed
+再量 dev 库：cases=6 / projects=2638          ← 一个字节都没变
+axiforge_test：cases=34                        ← 正是以前落到 dev 的那 34 条
+
+模拟 CI 路径：dropdb+createdb axiforge_test → alembic upgrade head（34 张表）
+             → DATABASE_URL=…/axiforge_test uv run pytest → 162 passed
+```
+
+**变异验证（这次的红是"该拦住的真拦住了"）**：把 `test_database_url` 里追加 `_test` 的那两行删掉，
+模拟"有人把隔离改坏"。结果套件在 `prepare_database` 就抛
+`RuntimeError: 拒绝在非测试库里清表（目标库是 axiforge）`，**dev 库 cases/projects 保持 6/2638 不变**；
+恢复后 162 passed。这条实验同时也是"为什么不 DROP DATABASE"的现场证据——
+第一版在那个变异下会直接删掉开发库。
+
+新增断言 3 条（`tests/test_database_isolation.py`）：连接串指向的库名以 `_test` 结尾、
+库名推导是幂等的且保留凭据、以及服务端自报 `current_database()` 是 `_test`。
+`pytest` 159 → **162**、`pnpm gates` exit 0。
+
+**仍未做**：CI 的 `Setup API and database` 现在同时做"建库+迁移"，而 conftest 也会在建库缺失时自己建——
+两条路都能 work，但 CI 里那步 `alembic upgrade head` 的真实价值现在才第一次被测试路径用到
+（以前它跑的库和测试用的库是同一个，测试会往里面写）。要不要在 CI 里加一步"迁移证据 vs 测试库"的区分说明，
+留给下一轮碰 CI 时一起做。
+
+`backend/uv.lock` 与 `llm/providers/__init__.py` 是用户自己的改动，全程未被卷入任何提交；
+`Clearance/` 未纳入版本管理，本轮只读未改（只用了它的 venv 起 sidecar）。
+
+
+
+## 交接快照（2026-09-28 第十二轮收口 · 含 D28 测试库隔离，这一轮停在这里）
+
+**已交付并本地提交（本轮提交后 `origin/desktop..desktop` = 72 个提交，全程未 push）**：
 最近五轮是 `cf3736a` 重判接到队列页 · `7c737f1` 逐轴真值 · `5e95159` 真值按行走 + 抽屉取值形状兜底 ·
 `216f873` 标注配额面板 + 按轴排序 · 本轮（`labels.py` 收成单一权威 + 面板报「不同稿子 / 可拟样本 / 勾过」）。
-停止时的状态：`pytest` 159 passed、admin `vitest` 39 passed、admin `tsc` 0 error、`pnpm gates` exit 0、
+停止时的状态：`pytest` 162 passed、admin `vitest` 39 passed、admin `tsc` 0 error、`pnpm gates` exit 0、
 工作树除用户自己的两个文件（`backend/uv.lock`、`llm/providers/__init__.py`）外干净。
 
 **这套东西现在能做什么**：四个入口（作品保存 / 角色发布 / 评论 / 举报）+ 手动重判 + 批量重判
@@ -1409,8 +1464,5 @@ dev 库按前缀清了一遍：`creator-mod-*` / `creator-d*` / `pytest-mod` 三
 （`author_id='a'` 18 条是本轮新加的标注配额测试，`creator-mod-01` 14 条来自 API／服务测试）。
 也就是说 dev 台账上"有没有标注"这件事会被测试自己污染，而这些测试行**是带 `raw` 的**，
 会真的进到 `export_labels → calibrate --from-answers` 的样本里，把假标签拟合进温度表。
-这是 #53 的前置：要么给后端测试一套独立的库，要么让导出侧过滤"这条案件是不是测试造的"——
-后者是拿命名约定当判据，不建议。清库只解决"现在"，隔离才解决"下次跑测试之后"。
-
-`backend/uv.lock` 与 `llm/providers/__init__.py` 是用户自己的改动，全程未被卷入任何提交；
-`Clearance/` 未纳入版本管理，本轮只读未改（只用了它的 venv 起 sidecar）。
+这是 #53 的前置：**已做，见 D28**。测试套件现在跑在 `<库名>_test` 上，
+清库之后再跑一遍全量 pytest，dev 库实测 cases 6→6、projects 2638→2638 一字未变。

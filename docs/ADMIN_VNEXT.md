@@ -154,6 +154,41 @@ uv run python eval/calibrate.py --from-answers eval/moderation_labels.jsonl --ou
 
 ---
 
+## v2.5 补：中台的组件颜色此前从未生效（2026-09-28 修）
+
+**现象**：中台里"成功"和"失败"的浮层提示长得一模一样，Badge 只有底色没有文字色。
+**根因**：Tailwind v4 只生成**扫得到的源里出现过的**类名。`apps/web/src/index.css` 有
+`@source "../../../packages/ui/src";`，`apps/admin/src/index.css` 没有——于是
+`packages/ui` 组件里写的色板类名在中台产物里**规则数为 0**。探针实测（注入类名读计算样式）：
+`bg-red-50` / `text-red-800` / `text-rose-300` / `text-emerald-700` 全部透明底 + 继承墨色；
+而中台自己 src 里写过的 `bg-surface`、`bg-rose-500/15` 正常解析。构建、lint、单测全绿，
+没有任何一处会报——这类缺陷只能靠"在产物层读计算值"照出来（读样式表字符串会被子串匹配骗：
+`.bg-rose-50` 命中的其实是 `.bg-rose-500/15`）。
+
+**改了三处，必须一起改**：
+
+1. `apps/admin/src/index.css` 补上那行 `@source`。
+2. `packages/ui/components/Toast.tsx` 补暗色配色。它原本**只有一套亮色类名**——
+   单补第 1 条会让它在暗色主题里画出一块亮色（Badge 一直是两套按 `data-theme` 选，Toast 漏了）。
+   现在与 Badge 同源：`useResolvedSurfaceTheme()` 选亮/暗两张表，危险色暗侧用 `rose` 不用 `red`。
+3. 新增门禁 `pnpm check:ui-source`（进 `pnpm gates`）：凡是引入 `@axiforge/ui` 令牌的应用 CSS 入口，
+   都必须扫 `packages/ui/src`。变异验证：把那行换成别的源 → 门禁立刻红并点名应用。
+
+**放行前量过的对比度**（浏览器里把颜色画进 canvas 取像素算 WCAG 比，明暗两套主题各 6 组）：
+亮色 `Badge emerald 5.09 / rose 5.49 / amber 4.85 / blue 6.28 / Toast success 7.23 / error 7.64`，
+暗色 `10.26 / 8.87 / 10.49 / 9.06 / 10.26 / 8.87` —— 12 组全部达 AA 正文（≥4.5），
+最紧的是亮色 amber Badge 4.85:1。所以这次"让颜色第一次真的上色"没有引入不达标的配对。
+运行时也验过：暗色主题点「让模型重判」，浮层底色解析为 `emerald-500/15`、文字 `emerald-300`；
+亮色同一动作是 `emerald-50` + `emerald-800`。队列页抽样的 12 个彩色 span 现在 12/12 有底色。
+
+**仍欠的**：静态对比度门禁 `check-contrast.mjs` 只认 `tokens.css` 里的 `--ax-*` 令牌，
+**看不见组件里直接写死的 Tailwind 色板值**（`emerald-50`、`rose-500/15` 这类）。
+这次的 12 组是我手工在浏览器里量的，没有进 CI——也就是说下次有人改这些类名，
+门禁不会拦。要闭掉这一步得二选一：给门禁加 oklch/oklab 解析器并把色板配对登记进去，
+或者把这些 tone 收进 `tokens.css` 变成真正的语义令牌（后者更对，但要动设计决定）。
+
+---
+
 ## 非目标
 
 - 实时大屏、BI 自助分析

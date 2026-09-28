@@ -1,4 +1,9 @@
 @import "tailwindcss";
+
+/* 共享组件里的类名必须被扫到，否则 packages/ui 里写过的颜色在中台产物里根本没有规则。
+   apps/web 早就有这一行，apps/admin 没有——于是同一个组件在两个应用里长得不一样，
+   而且两端都不报错（Toast 的成功/失败提示视觉同款就是这么来的）。 */
+@source "../../../packages/ui/src";
 @import "@axiforge/ui/styles/tokens.css";
 
 @layer base {

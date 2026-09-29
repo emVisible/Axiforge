@@ -80,11 +80,17 @@ async def main(project_ids: list[str], out_dir: Path):
             for r in (project.asset_refs or []):
                 if r.asset_type != "item": continue
                 it = await db.get(AssetItem, r.asset_id)
-                if it:
-                    items.append({"id": str(it.id), "assetId": str(r.asset_id),
-                                  "asset": {"id": str(it.id), "name": it.name,
-                                            "category": it.category,
-                                            "imagePath": it.image_path}})
+                # 与桌面投影逐字同形（apps/web/src/shared/storage/compilerInput.ts:84）：
+                # 悬空引用**留在清单里**、asset 给 null，由两端编译器各自跳过。
+                # 早前这里 `if it:` 把悬空那条整个丢掉，于是金样本喂进 TS 的输入
+                # 并不是桌面真实会喂的那一份——「跳过悬空」这条分支在跨语言对照里等于没测。
+                items.append({
+                    "id": str(r.id),
+                    "assetId": str(r.asset_id),
+                    "asset": {"id": str(it.id), "name": it.name,
+                              "category": it.category,
+                              "imagePath": it.image_path} if it else None,
+                })
 
             compiler_input = {
                 "id": str(project.id), "title": project.title,
@@ -113,8 +119,15 @@ async def main(project_ids: list[str], out_dir: Path):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    out = Path("packages/core/src/__golden__")
-    if "--out" in sys.argv:
-        out = Path(sys.argv[sys.argv.index("--out") + 1])
-    asyncio.run(main(args, out))
+    argv = sys.argv[1:]
+    # 默认落在仓库根的 packages/core/src/__golden__：早前这里写的是相对 cwd 的路径，
+    # 而脚本要从 backend/ 跑，于是文档里那条重生成命令按默认参数一跑就偏了。
+    out = Path(__file__).resolve().parents[2] / "packages" / "core" / "src" / "__golden__"
+    if "--out" in argv:
+        i = argv.index("--out")
+        # --out 的值不是 project id：`[a for a in argv if not a.startswith("--")]` 会把路径本身
+        # 也当成一个 id 交给 UUID()，因此这道闸门先前必定以 exit 1 收尾（三份金样本能写出来
+        # 只是因为它们在崩掉之前已经完成）。
+        out = Path(argv[i + 1])
+        del argv[i:i + 2]
+    asyncio.run(main(argv, out))

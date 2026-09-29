@@ -634,6 +634,25 @@
 - [x] 附带修掉：道具/场景**资产详情页**绕过分派口（S13-2 期间漏的半条腿）
   —— 已交付 2026-09-27。`SceneAssetDetailPage` 的 get/update/delete 与 `ItemDetailPage` 的 update/delete 仍直连 `sceneAssetApi`/`itemApi`，而**清单页早已本地化**——于是桌面能看见、能点开、改完点保存却写进一个够不到的后端。两处顺带修掉同一个假「已保存」：`setItem({ ...item, ...form })` 是乐观合并，界面立刻显示新值而写入根本没成，现改为采用回读的那一份。判据补进 E15（`/studio/scenes/no-such-scene`）。
   教训：**本地化是按"读路径"完成的，不是按"页面"完成的**——一个页面里 get/list/create/update/delete 五支各自选路，只改读的那支就等于把半条腿焊进了主干。
+- [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。
+  起因是宪章里我自己写过的那句教训（S13-2b 补记）：金样本证明"当前两边一致"，证明不了"每条分支两边都走"。
+  **实测三份示范作金样本对那两条真缺陷所在的分支是零覆盖**：`input.json` 里 `sceneRefId` 全是 `null`、
+  `assetRefs`/`items` 全是 0、`playMeta` 全是 `{}`。
+  新增 `packages/core/src/__golden__/b1a7c0d0-【对照】分支兜底/`（播种脚本 `backend/scripts/seed_branch_parity.py`，
+  固定 UUID 可反复重跑），把兜底的四种组合各铺一遍（自有值优先 / 空串算没值 / 资产字段也空 / 资产查不到）、
+  道具引用一条存在 + 一条**悬空**、术语表三条（正常、缺 `id`、空 `term`）。
+  **顺带修掉 `dump_golden.py` 三处真实缺陷**（都是"重生成命令自己不可执行"级别的问题）：
+  ① `--out` 的值没从 id 列表里摘出来，于是按脚本自己 docstring 的写法一跑就以 exit 1 收尾
+  （三份老金样本能写出来，只因为它们在崩掉之前已经完成）；② 默认输出路径相对 cwd，而脚本要从 `backend/` 跑，
+  不带 `--out` 时会写到仓库外面；③ 道具预解析 `if it:` 把悬空引用**整个丢掉**，
+  导致金样本喂给 TS 的输入并不是桌面真实会喂的那一份（桌面投影 `compilerInput.ts:84` 是"留着、`asset: null`"）。
+  现在 dumper 与投影逐字同形，"跳过悬空"这条分支才第一次进入跨语言对照。
+  **牙是这么证的**（还原后 82 passed）：`||` 退回 `??` → 金样本那条 + 场景分支单测共红 2 条；
+  悬空道具不再跳过 → 红 2 条（**修 ③ 之前这条只有单测红、金样本不红**，正是那条丢掉悬空的写法造成的空转）；
+  术语表去掉 `trim` → 红 2 条。
+  复现：`createdb axiforge_golden` → `alembic upgrade head` → `seed_branch_parity.py` → `dump_golden.py <id>`；
+  **scratch 库已删**，开发库 `axiforge` 全程零接触（实测 `pg_database` 只剩原有四个 axiforge* 库）。
+
 - [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。
   `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
   为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、

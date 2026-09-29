@@ -1,0 +1,205 @@
+{
+  "irVersion": 1,
+  "projectId": "b1a7c0d0-0000-4000-8000-000000000001",
+  "title": "【对照】分支兜底",
+  "startBeatId": "b1a7c0d0-0000-4000-8000-000000000050",
+  "beats": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000050",
+      "sceneId": "b1a7c0d0-0000-4000-8000-000000000041",
+      "sceneTitle": "空串算没值",
+      "stage": "b1a7c0d0-0000-4000-8000-000000000041",
+      "actors": [
+        "b1a7c0d0-0000-4000-8000-000000000010"
+      ],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "bg",
+          "image": "scenes/parity-under.png",
+          "transition": null
+        },
+        {
+          "op": "bgm",
+          "track": "night_hum",
+          "fadeMs": null,
+          "loop": true
+        },
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": "朝",
+          "text": "别站在灯下。",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": false,
+      "endingLabel": null
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000051",
+      "sceneId": "b1a7c0d0-0000-4000-8000-000000000043",
+      "sceneTitle": "资产查不到",
+      "stage": "b1a7c0d0-0000-4000-8000-000000000043",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "narration",
+          "text": "两条路。",
+          "voice": null,
+          "rich": null
+        },
+        {
+          "op": "choice",
+          "options": [
+            {
+              "label": "走左边",
+              "to": null,
+              "condition": {
+                "flag": "left"
+              }
+            },
+            {
+              "label": "走右边",
+              "to": null,
+              "condition": null
+            }
+          ]
+        }
+      ],
+      "effects": [],
+      "isEnding": false,
+      "endingLabel": null
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000052",
+      "sceneId": "b1a7c0d0-0000-4000-8000-000000000042",
+      "sceneTitle": "资产字段也空",
+      "stage": "b1a7c0d0-0000-4000-8000-000000000042",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "天亮。",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    }
+  ],
+  "transitions": [
+    {
+      "from": "b1a7c0d0-0000-4000-8000-000000000050",
+      "to": "b1a7c0d0-0000-4000-8000-000000000051",
+      "label": "继续"
+    },
+    {
+      "from": "b1a7c0d0-0000-4000-8000-000000000051",
+      "to": "b1a7c0d0-0000-4000-8000-000000000052",
+      "label": null
+    }
+  ],
+  "characters": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000010",
+      "name": "朝",
+      "imagePath": null,
+      "expressions": null
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000011",
+      "name": "陌生人",
+      "imagePath": null,
+      "expressions": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000040",
+      "title": "自有值优先",
+      "location": "站内",
+      "atmosphere": "干燥",
+      "backgroundImage": null
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000041",
+      "title": "空串算没值",
+      "location": "方舟·地下",
+      "atmosphere": "潮湿",
+      "backgroundImage": "scenes/parity-under.png"
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000042",
+      "title": "资产字段也空",
+      "location": "月台",
+      "atmosphere": null,
+      "backgroundImage": null
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000043",
+      "title": "资产查不到",
+      "location": null,
+      "atmosphere": null,
+      "backgroundImage": null
+    }
+  ],
+  "items": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000030",
+      "name": "旧钥匙",
+      "category": "道具",
+      "imagePath": "items/parity-key.png"
+    }
+  ],
+  "worldSetting": "近未来移动都市「交汇港」",
+  "glossary": [
+    {
+      "id": "g1",
+      "term": "交汇港",
+      "definition": "漂浮在大陆边缘的港口都市"
+    },
+    {
+      "id": "g1",
+      "term": "无 id 词条",
+      "definition": "缺 id 时按下标补"
+    }
+  ],
+  "characterProfiles": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000010",
+      "name": "朝",
+      "imagePath": null,
+      "summary": null,
+      "essence": "守夜人",
+      "identity": null,
+      "appearance": null,
+      "tags": []
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000011",
+      "name": "陌生人",
+      "imagePath": null,
+      "summary": null,
+      "essence": null,
+      "identity": null,
+      "appearance": null,
+      "tags": []
+    }
+  ],
+  "codexScope": [
+    "b1a7c0d0-0000-4000-8000-000000000010",
+    "b1a7c0d0-0000-4000-8000-000000000011"
+  ]
+}

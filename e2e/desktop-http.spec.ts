@@ -491,7 +491,34 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
  * `StoredStory` + SQLite v4 + `storySaves` 分派口，此前只在契约用例里成立过，没被点过一次。
  * 全程零 `/api/v1` 加零未捕获异常是这条链的地板，不是天花板。
  */
-test.describe("E30 桌面态：建剧本页与印记层的字段有可读名字", () => {
+test.describe("E31 桌面态：演出层的「表情」字段有可读名字", () => {
+  /*
+   * #65 的第十处。不并进 E17：那条链末尾要播正文，给同一拍加演出指令会改变演出结果；
+   * 独立用例自己建一个工程，判据只取"控件被这个名字指到"。
+   * 「表情」的 id 用 `expression-${i}` 而不是 useId——它在 map 出来的行里，钩子不能进循环。
+   */
+  test("建工程 → 演出段加一条「立绘进场」→ 表情按名字取到，全程零 /api/v1", async ({ page }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
+    await expect(page.evaluate(() => "__TAURI_INTERNALS__" in window)).resolves.toBe(true);
+    await page.getByRole("button", { name: "新建剧本" }).click();
+    await page.getByPlaceholder("剧本标题").fill("演出层字段");
+    await page.getByRole("button", { name: "创建" }).click();
+    await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
+
+    await page.getByRole("button", { name: "演出" }).click();
+    await page.getByRole("button", { name: "+ 立绘进场" }).click();
+    await expect(page.getByRole("textbox", { name: "表情", exact: true })).toBeVisible({ timeout: 8000 });
+    expect(hits, `这条链发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});
+
+test.describe("E30 桌面态：建剧本页与轨迹层的字段有可读名字", () => {
   /*
    * 这两处不在 E17 那条链上：剧本列表的「新建剧本」是内联快速创建，
    * ProjectCreatePage（/studio/projects/new）与角色编辑器的「轨迹」层各有各的入口。

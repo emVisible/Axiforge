@@ -1268,6 +1268,35 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 所以新开一条 **E30**：`/studio/projects/new` 与 `/studio/characters/new` → 点「轨迹」层 →
 > 两个字段都能按 exact 可访问名取到，且这两页零 `/api/v1`。两次单摘 `htmlFor` 的变异分别红在各自那一行。
 
+> **#65 的第十处：演出层「表情」（2026-09-29）+ 分档复记**
+>
+> `ScriptEditor` 的「表情」是裸 `<label>` + 原生 `<input list=…>`。id 用 `expression-${i}` 而不是
+> `useId()`——它在 `map` 出来的指令行里，钩子不能进循环（这行旁边本来就有同形状的 `sprites-${i}`）。
+> 判据单独开一条 **E31**（建工程 → 演出段点「+ 立绘进场」→ `getByRole(textbox, name="表情", exact)` →
+> 全程零 `/api/v1`）；不并进 E17 的理由写进用例注释：那条链末尾要播正文，给同一拍加演出指令会改变演出结果。
+> 变异单摘 `htmlFor` 红在 `waiting for getByRole('textbox', { name: '表情', exact: true })`。
+>
+> 复记分档（同一支脚本）：共 **24** 处 `<label>` —— 已关联 `htmlFor` **8**、包裹型合法 **10**、
+> 非 htmlFor 形态 **6**（其中 2 处是命名分组 ConditionEditor/EffectEditor）⇒
+> **真正待分派 4 处**：studio/components/ScriptEditor.tsx:574、studio/components/ConditionSimulator.tsx:71、studio/components/ConditionSimulator.tsx:126、studio/flow/NodeInspectorPanel.tsx:336
+>
+> 顺手改掉 E30 用例标题里的一处错误说法：那个层在界面上叫「轨迹」（`CharacterEditor` 的 layer label），
+> 我先前写成「印记」，标题与代码不符会误导下一个读的人。
+
+> **G1 棘轮这一次是真的挡了我，我按它的处置说明做（2026-09-29）**
+>
+> 给「表情」补关联只加了两行，`ScriptEditor.tsx` 就从 615 涨到 617 越过棘轮，`pnpm gates` 退出码 1。
+> 棘轮给的处置是「按域外提成协作模块，不要在文件内继续堆」——照做：把 `OP_META` / `OP_LABEL` /
+> `POSITIONS` / `defaultInstruction` 这 55 行纯数据与纯函数外提成
+> `apps/web/src/features/studio/components/instructionOps.ts`（62 行新文件，限 400）。
+> `ScriptEditor.tsx` 降到 568 行，随后 `check-file-size --update` 把这个更紧的档位锁定。
+>
+> 两条交付教训（都是我自己造的）：① 外提时忘了给四个符号加 `export`，
+> 运行时表现为「演出段打不开」，E31 红在 `waiting for getByRole('button', { name: '演出' })`——
+> 类型与模块图的改动必须过 `tsc -b` 与一次真点击，二者各抓到过另一半；
+> ② `useId()` 不能进 `map` 的循环，所以这一处的 id 是 `expression-${i}`（旁边本来就有同形状的 `sprites-${i}`）。
+> 复跑：gates 0 / `e2e:desktop` 27 passed / `e2e` 40 passed（56.4s）/ renderer 重建 0。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

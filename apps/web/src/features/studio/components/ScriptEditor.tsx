@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { Instruction, InstructionOp, ChoiceOption } from "@axiforge/core";
+import {
+  OP_LABEL,
+  OP_META,
+  POSITIONS,
+  defaultInstruction,
+} from "./instructionOps";
 import { Input, Select, Textarea, cn, labelSm, Button } from "@/shared/components/ui";
 import { applyDraft, requestDraft } from "@/shared/api/draftDispatch";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
@@ -23,61 +29,6 @@ interface ScriptEditorProps {
   highlightIndex?: number | null;
 }
 
-const OP_META: { op: InstructionOp; label: string }[] = [
-  { op: "say", label: "台词" },
-  { op: "narration", label: "旁白" },
-  { op: "show", label: "立绘进场" },
-  { op: "move", label: "立绘移动" },
-  { op: "hide", label: "立绘退场" },
-  { op: "bg", label: "背景" },
-  { op: "transition", label: "转场" },
-  { op: "camera", label: "镜头" },
-  { op: "fx", label: "特效" },
-  { op: "bgm", label: "音乐" },
-  { op: "se", label: "音效" },
-  { op: "voice", label: "语音" },
-  { op: "wait", label: "等待" },
-  { op: "choice", label: "分支" },
-];
-
-const OP_LABEL: Record<string, string> = Object.fromEntries(
-  OP_META.map((m) => [m.op, m.label]),
-);
-
-const POSITIONS = ["left", "center", "right"];
-
-function defaultInstruction(op: InstructionOp): Instruction {
-  switch (op) {
-    case "say":
-      return { op: "say", characterId: null, text: "" };
-    case "narration":
-      return { op: "narration", text: "" };
-    case "show":
-      return { op: "show", characterId: "", expression: "", position: "center" };
-    case "move":
-      return { op: "move", characterId: "", position: "center", ms: 300 };
-    case "hide":
-      return { op: "hide", characterId: "" };
-    case "bg":
-      return { op: "bg", image: "" };
-    case "transition":
-      return { op: "transition", kind: "fade", ms: 400 };
-    case "camera":
-      return { op: "camera", action: "zoom", scale: 1.2, ms: 300 };
-    case "fx":
-      return { op: "fx", effect: "flash", ms: 600 };
-    case "bgm":
-      return { op: "bgm", track: "", loop: true };
-    case "se":
-      return { op: "se", sound: "" };
-    case "voice":
-      return { op: "voice", sound: "" };
-    case "wait":
-      return { op: "wait", ms: 500 };
-    case "choice":
-      return { op: "choice", options: [{ label: "" }] };
-  }
-}
 
 const TRANSITION_KINDS = ["fade", "dissolve", "wipe", "cut"];
 const CAMERA_ACTIONS = ["zoom", "pan", "shake", "reset"];
@@ -448,10 +399,12 @@ export default function ScriptEditor({
                     roles.find((r) => r.characterRefId === inst.characterId)
                       ?.spriteKeys || [];
                   const listId = `sprites-${i}`;
+                  const expressionId = `expression-${i}`;
                   return (
                     <div>
-                      <label className={cn(labelSm, "mb-1 block")}>表情</label>
+                      <label htmlFor={expressionId} className={cn(labelSm, "mb-1 block")}>表情</label>
                       <input
+                        id={expressionId}
                         list={keys.length ? listId : undefined}
                         className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
                         value={inst.expression ?? ""}

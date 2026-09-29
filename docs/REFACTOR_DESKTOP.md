@@ -580,6 +580,12 @@
   不另存本地 state），剪辑台删除的 toast 从「删除失败」改成带原因。
   **`useProject`/`useUpdateProject` 零消费者**（全仓 grep 只有定义），因此没有给它们加分派腿——
   不为不存在的调用方造第二处真相源。
+  **2026-09-29 收口**：这两个 hook 后来直接删掉了（实测全仓 `useProject` / `useUpdateProject` 消费者均为 0，
+  `shared/hooks/index.ts` 是 `export *` 所以没有具名再导出要跟着改）。留着的代价不是「多两行」而是**埋雷**：
+  两支的 `queryFn`/`mutationFn` 都是无条件 `projectApi.*`，谁哪天接上去就是一个桌面上必败的调用，
+  而且它长得像已有能力——正是 S13-7「一个功能只剩一条数据通路」要消掉的那类 HTTP 挂点。
+  顺手记一条查法：路由级棘轮（E14）只覆盖「进入路由时的装载路径」，`/studio/projects/new` 与
+  `/studio/characters/:id/edit` 两支页面都不在那份清单里，所以要靠静态数消费者来判，别把棘轮当成全覆盖。
   验收：`projectSaves.test.ts` 10 条（用真 `MemoryStorageProvider` 建完再 `listProjects` 读回，
   证元信息真落库），4 次变异各自见过红——分派短路反过来（红 6 条）、`metaPatch` 返回空（红 3 条）、
   `unwrap` 吞错（红 2 条）、不做补偿回滚（红 2 条）；还原后 10 passed。

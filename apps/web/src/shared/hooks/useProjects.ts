@@ -5,7 +5,7 @@ import { getCreatorId } from '@/shared/lib/creatorId';
 import { getStorageProvider, projectMetaToResponse } from '@/shared/storage';
 import { createProject as dispatchCreate, deleteProject as dispatchDelete } from '@/shared/storage/projectSaves';
 import { isTauriEnvironment } from '@/shared/storage/tauriSqlBackend';
-import type { ProjectCreate, ProjectUpdate } from '@/shared/types';
+import type { ProjectCreate } from '@/shared/types';
 
 export const PROJECT_KEYS = {
   all: ['projects'] as const,
@@ -32,28 +32,10 @@ export const useProjects = (params?: { author_id?: string }) =>
     },
   });
 
-export const useProject = (id: string) =>
-  useQuery({
-    queryKey: PROJECT_KEYS.detail(id),
-    queryFn: () => projectApi.get(id),
-    enabled: !!id,
-    staleTime: 30_000,
-    refetchOnWindowFocus: true,
-  });
-
 export const useCreateProject = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: ProjectCreate) => dispatchCreate(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: PROJECT_KEYS.all }),
-  });
-};
-
-export const useUpdateProject = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ProjectUpdate }) =>
-      projectApi.update(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: PROJECT_KEYS.all }),
   });
 };

@@ -16,18 +16,20 @@ import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from "
 import { join, relative } from "node:path";
 
 const root = process.cwd();
-const srcRoot = join(root, "apps/web/src");
+// 三个界面语汇层一起扫：创作端、中台、共享组件库（2026-09-29 实测 admin 3 处 / ui 6 处标签全合法，扩面零代价）
+const SRC_ROOTS = ["apps/web/src", "apps/admin/src", "packages/ui/src"];
 const baselinePath = join(root, "scripts/label-association-baseline.json");
 const CONTROL = /<(input|textarea|select|Input|Textarea|Select|SearchInput|ToggleInput|TagEditor|SearchSelect)\b/;
 
 const files = [];
-(function walk(dir) {
+function walk(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p);
     else if (name.endsWith(".tsx")) files.push(p);
   }
-})(srcRoot);
+}
+for (const rel of SRC_ROOTS) walk(join(root, rel));
 
 const found = [];
 const reasons = new Map();

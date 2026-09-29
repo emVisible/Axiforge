@@ -54,7 +54,7 @@ pnpm dev
 | `pnpm typecheck` / `test:unit` / `coverage` / `lint` | 上述门禁的分项 |
 | `pnpm check:purity` | 断言 `core`/`axs`/`editor-core` 零 React/DOM/网络/平台依赖 |
 | `pnpm check:circular` | dpdm 循环依赖 = 0 |
-| `pnpm check:labels` | 表单标签的编程关联棘轮：`htmlFor` / 命名分组（id 须真被 `aria-labelledby` 引用）/ 包裹型之外新增一处即失败（具名豁免在 `scripts/label-association-baseline.json`） |
+| `pnpm check:labels` | 表单标签的编程关联棘轮：扫 `apps/web` / `apps/admin` / `packages/ui` 三个界面层（204 个 tsx），`htmlFor` / 命名分组（id 须真被 `aria-labelledby` 引用）/ 包裹型之外新增一处即失败（具名豁免在 `scripts/label-association-baseline.json`） |
 | `pnpm check:dispatch` | 分派口（`shared/storage/*Saves.ts`）里每个导出 async 函数都必须有本地分支——桌面唯一化后，"只走云端"的新函数就是给桌面留一个静默失败的入口 |
 | `pnpm check:desktop` | Tauri 壳的 `cargo check`（Rust 侧类型与权限面）。**刻意不进 `pnpm gates`**：gates 只跑 JS，合并进去会让没有 Rust 工具链的人连门禁都跑不动；实测本地 21s（预热 target），冷缓存需拉 Tauri 依赖树 |
 | `pnpm e2e` | Playwright 行为基线（独立库 `axiforge_e2e`，自包含起服务）。**同树互斥**：起跑前抢 `.e2e-lock`，已被占用就退出并打印持有者 PID |

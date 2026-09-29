@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Plus, Star, Trash2 } from "lucide-react";
 
 import {
@@ -25,6 +25,7 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
   const [items, setItems] = useState<AchievementDef[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const conditionSelectId = useId();
   /** 读取失败与「确实没有定义」必须可区分，否则错误会伪装成空态 */
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -125,8 +126,9 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
             onChange={(e) => void save(item, { description: e.target.value })}
           />
           <div>
-            <label className={cn(labelSm, "mb-1 block")}>解锁条件</label>
+            <label htmlFor={conditionSelectId} className={cn(labelSm, "mb-1 block")}>解锁条件</label>
             <select
+              id={conditionSelectId}
               className="w-full rounded-md border border-border bg-canvas px-2 py-1.5 text-xs"
               value={(item.condition as { type?: string })?.type ?? "node_completed"}
               onChange={(e) => {

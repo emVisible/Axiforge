@@ -258,6 +258,17 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
      * 用 Enter 提交而不是点「+」——角色/道具段也有同名按钮，取加号会撞严格模式；
      * 回读仍然换页再进，不在当前页签存在感（同一页里乐观渲染也能"看起来对"）。
      */
+    /*
+     * #65 的第七处：成就面板里「解锁条件」是裸 <label> + 原生 select。
+     * 这一跳顺带把「成就写侧在桌面走本地库」也点了：整条链末尾的 hits 断言会盯着有没有 /api/v1。
+     */
+    await page.getByRole("button", { name: "成就" }).click();
+    await page.getByText("项目成就：Beat 完成时按条件自动解锁，也可用于分支 gating。")
+      .locator("xpath=following-sibling::button")
+      .click();
+    await expect(page.getByRole("combobox", { name: "解锁条件", exact: true })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("button", { name: "关闭" }).click();
+
     await page.getByPlaceholder("新舞台…").fill("离线路台");
     await page.getByPlaceholder("新舞台…").press("Enter");
     await expect(page.getByText("离线路台").first()).toBeVisible({ timeout: 8000 });

@@ -4,6 +4,7 @@ import { ChevronDown, UserRound } from "lucide-react";
 
 import { useUser } from "@/app/providers/UserContext";
 import { routes } from "@/shared/lib/routes";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 
 interface UserAccountMenuProps {
   variant?: "light" | "dark";
@@ -29,6 +30,8 @@ export default function UserAccountMenu({ variant = "light" }: UserAccountMenuPr
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-label="账户菜单"
+        aria-expanded={open}
         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs transition-colors ${triggerClass}`}
       >
         {avatar ? (
@@ -69,6 +72,12 @@ export default function UserAccountMenu({ variant = "light" }: UserAccountMenuPr
               >
                 账户设置
               </Link>
+              {/*
+                * 桌面态 profile 恒 null，这个链接的 href 会落成 `/author/`（空 id），
+                * 目标页整页要协作服务且没有 DiscoverPage 那道闸门——点了只会进一个报错的作者页。
+                * 与 AppHeader 里「发现」/GlobalSearch 用同一个约定处理：桌面不给入口。
+                */}
+              {!isLocalOnlyDeployment() && (
               <Link
                 to={routes.author(profile?.creator_id || "")}
                 className={`block rounded-lg px-2 py-1.5 text-xs transition-colors ${
@@ -78,6 +87,7 @@ export default function UserAccountMenu({ variant = "light" }: UserAccountMenuPr
               >
                 我的主页
               </Link>
+              )}
             </div>
           </div>
         </>

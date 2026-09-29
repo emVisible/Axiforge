@@ -164,6 +164,34 @@ test.describe("E18 云端专属入口在桌面态隐藏，而不是演成空态"
  * 注意它守的是**不静默**，不是"本地能生成建议"——本地这条通路还没有
  * （`packages/axs/prompts/` 只有 `prose-to-axs.json`，建档要新做一份提示词，属 ADR-029 未决项）。
  */
+test.describe("E37 账户菜单里的云端入口在桌面不给", () => {
+  test("浏览器态两个入口都在，桌面态只留账户设置", async ({ page }) => {
+    /*
+     * 「我的主页」在桌面是死入口：profile 恒 null → href 落成 `/author/`（空 id），
+     * 目标页又整页要协作服务。同文件的「发现」与 GlobalSearch 早就用同一个约定挡了，
+     * 这两条漏了。两半都测，桌面那一半先断「账户设置」可见——菜单没渲染也会得到 count 0，
+     * 那是假绿（E35 刚栽过一次）。
+     */
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    await page.goto("/studio/projects", { waitUntil: "load" });
+    await page.getByRole("button", { name: "账户菜单" }).click();
+    await expect(page.getByRole("link", { name: "账户设置" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("link", { name: "我的主页" })).toBeVisible({ timeout: 8000 });
+
+    hits.length = 0; // 浏览器那一半本来就要发 session 请求
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
+    await page.getByRole("button", { name: "账户菜单" }).click();
+    await expect(page.getByRole("link", { name: "账户设置" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("link", { name: "我的主页" })).toHaveCount(0);
+    expect(hits, `桌面态这一页发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});
+
 test.describe("E36 账户设置在桌面是显式缺席，而不是六个必然失败的按钮", () => {
   test("浏览器态有这些动作，桌面态只剩本地身份与一句说明", async ({ page }) => {
     /*
@@ -544,10 +572,10 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
      * 定位器踩过一次：按 class 限定卡片（div.relative.overflow-hidden）会捞到外层容器，
      * 结果点在 HUD 的「创作者」按钮上等稳定性等到超时——改用槽位自己的可访问名。
      */
-    await page.getByRole("button", { name: "菜单" }).click();
+    await page.getByRole("button", { name: "菜单", exact: true }).click();
     await page.getByRole("button", { name: "存档" }).click();
     await page.getByRole("button", { name: /存档 1/ }).first().click();
-    await page.getByRole("button", { name: "菜单" }).click();
+    await page.getByRole("button", { name: "菜单", exact: true }).click();
     await page.getByRole("button", { name: "读档" }).click();
     const slot1 = page.getByRole("button", { name: /存档 1/ }).first();
     await expect(slot1).toContainText("离线路上的第一句", { timeout: 8000 });

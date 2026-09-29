@@ -491,6 +491,30 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
  * `StoredStory` + SQLite v4 + `storySaves` 分派口，此前只在契约用例里成立过，没被点过一次。
  * 全程零 `/api/v1` 加零未捕获异常是这条链的地板，不是天花板。
  */
+test.describe("E30 桌面态：建剧本页与印记层的字段有可读名字", () => {
+  /*
+   * 这两处不在 E17 那条链上：剧本列表的「新建剧本」是内联快速创建，
+   * ProjectCreatePage（/studio/projects/new）与角色编辑器的「轨迹」层各有各的入口。
+   * 「主题标签」「关键事件」原本是裸 <label> + Input，读屏只念得出 placeholder。
+   */
+  test("两个手搓标签接上编程关联后，控件按名字取到", async ({ page }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/projects/new?storage=memory", { waitUntil: "load" });
+    await expect(page.evaluate(() => "__TAURI_INTERNALS__" in window)).resolves.toBe(true);
+    await expect(page.getByRole("textbox", { name: "主题标签", exact: true })).toBeVisible({ timeout: 8000 });
+
+    await page.goto("/studio/characters/new?storage=memory", { waitUntil: "load" });
+    await page.getByRole("button", { name: "轨迹" }).first().click();
+    await expect(page.getByRole("textbox", { name: "关键事件", exact: true })).toBeVisible({ timeout: 8000 });
+    expect(hits, `这条链发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});
+
 test.describe("E21 桌面态建角色 → 传记 → 新建篇章", () => {
   test("四个字段建出角色，传记标签点得开，篇章建得出来", async ({ page }) => {
     const hits: string[] = [];

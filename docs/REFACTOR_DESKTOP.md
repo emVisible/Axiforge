@@ -1252,6 +1252,22 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > （拿走能力而不是拿走错误处理），链子红在 `waiting for getByText('离线路台口')`。
 > 结论：**桌面建场景是本地通路，且这条通路现在有点击层证据**；S13-6 后端退场时这条不必再留 HTTP 替身。
 
+> **#65 的口径改成"按形状分档"，并补上第八、九处（2026-09-29）**
+>
+> 之前用 `grep -v htmlFor` 数出来的"剩 N 处"是**高估**：它把合法包裹型和已经改成命名分组的都算进去了。
+> 改成机械分档（脚本按 `<label>` 到 `</label>` 之间的片段里有没有控件来判）：
+> 共 **24** 处 `<label>`，其中已关联 `htmlFor` **7**、包裹型（合法，不动）**10**、
+> 剩下非 htmlFor 形态的 **7** 处逐条列在这里：features/studio/components/ScriptEditor.tsx:453、features/studio/components/ScriptEditor.tsx:572、features/studio/components/ConditionSimulator.tsx:71、features/studio/components/ConditionSimulator.tsx:126、features/studio/flow/ConditionEditor.tsx:46、features/studio/flow/NodeInspectorPanel.tsx:336、features/studio/flow/EffectEditor.tsx:42。
+> 里面 `ConditionEditor`/`EffectEditor` 两处已经是命名分组（`id` + `aria-labelledby`，本就不该有 `htmlFor`），
+> 真正待分派的是 `ScriptEditor`（表情=字段标签、分支选项=组标题）、`ConditionSimulator`（模拟变量、出边预演）
+> 与 `NodeInspectorPanel:336`（分支标签）这几处——它们都要先在桌面里把对应的层/面板点开才看得见。
+>
+> 第八、九处本轮做完：`ProjectCreatePage` 的「主题标签」与 `TraceEditor`（轨迹层）的「关键事件」，
+> 各补 `htmlFor` + `id`。它们**不在 E17 那条链上**——剧本列表的「新建剧本」是内联快速创建，
+> 不是 `ProjectCreatePage`（我一开始把判据插进 E17，红在 `主题标签` 取不到，才发现入口搞错了），
+> 所以新开一条 **E30**：`/studio/projects/new` 与 `/studio/characters/new` → 点「轨迹」层 →
+> 两个字段都能按 exact 可访问名取到，且这两页零 `/api/v1`。两次单摘 `htmlFor` 的变异分别红在各自那一行。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

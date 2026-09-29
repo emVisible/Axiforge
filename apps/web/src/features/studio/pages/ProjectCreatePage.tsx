@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useNavigate } from "react-router";
 import { useCreateProject } from "@/shared/hooks/useProjects";
 import Shell from "@/shared/components/Shell";
@@ -33,6 +33,7 @@ export default function ProjectCreatePage() {
   const [genre, setGenre] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const tagLabelId = useId();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,11 +110,12 @@ export default function ProjectCreatePage() {
               </Select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink">
+              <label htmlFor={tagLabelId} className="mb-1.5 block text-sm font-medium text-ink">
                 主题标签
               </label>
               <div className="mb-2 flex gap-2">
                 <Input
+                  id={tagLabelId}
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) =>

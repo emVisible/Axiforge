@@ -267,6 +267,15 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
       .locator("xpath=following-sibling::button")
       .click();
     await expect(page.getByRole("combobox", { name: "解锁条件", exact: true })).toBeVisible({ timeout: 8000 });
+    /*
+     * 成就的写侧回读：面板里改标题是「输入即保存」（onChange 里 await updateAchievement 再 refresh），
+     * 所以关掉再重开面板是一次真正的存储读（listAchievements 在挂载时跑）。
+     * 判据取重开后那个输入框的 value，不取"刚才打过字"的那个 DOM。
+     */
+    await page.getByRole("textbox", { name: "标题", exact: true }).fill("离线路标");
+    await page.getByRole("button", { name: "关闭" }).click();
+    await page.getByRole("button", { name: "成就" }).click();
+    await expect(page.getByRole("textbox", { name: "标题", exact: true })).toHaveValue("离线路标", { timeout: 8000 });
     await page.getByRole("button", { name: "关闭" }).click();
 
     await page.getByPlaceholder("新舞台…").fill("离线路台");

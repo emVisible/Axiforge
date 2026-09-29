@@ -10,9 +10,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const dir = join(process.cwd(), "apps/web/src/shared/storage");
-const targets = readdirSync(dir).filter(
-  (n) => (n.endsWith("Saves.ts") || n.startsWith("assetPool")) && n.endsWith(".ts") && !n.endsWith(".test.ts"),
-);
+// 分派口的识别按命名约定 <域>Saves.ts / assetPool*，外加这个已知偏差（成就域没按约定命名）。
+// 刻意不含 http* / tauri* / index：那是单一后端的实现侧与 Provider 工厂，要求它们有本地分支是范畴错误。
+const DISPATCH_FILES = /^(.*Saves\.ts|assetPool.*\.ts|achievementDefs\.ts)$/;
+const targets = readdirSync(dir).filter((n) => DISPATCH_FILES.test(n) && !n.endsWith(".test.ts"));
 
 const offenders = [];
 let total = 0;

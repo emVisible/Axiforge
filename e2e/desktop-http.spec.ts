@@ -504,6 +504,32 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
  * `StoredStory` + SQLite v4 + `storySaves` 分派口，此前只在契约用例里成立过，没被点过一次。
  * 全程零 `/api/v1` 加零未捕获异常是这条链的地板，不是天花板。
  */
+test.describe("E32 桌面态：结构工作台的连线面板有可读分组名", () => {
+  /*
+   * #65 的第九处收尾。「分支标签」是章节标题（它下面的 Input 自带 label），
+   * 所以修法不是 htmlFor 而是命名分组；面板只有选中一条连线才出现，
+   * 而剪辑/剧本两个模式都把 selectedEdge 硬写成 null——必须切到「结构」模式。
+   */
+  test("建工程 → 切「结构」→ 点一条边 → 连线面板的分组名取到，全程零 /api/v1", async ({ page }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
+    await page.getByRole("button", { name: "新建剧本" }).click();
+    await page.getByPlaceholder("剧本标题").fill("结构工作台");
+    await page.getByRole("button", { name: "创建" }).click();
+    await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
+
+    await page.getByRole("button", { name: "结构" }).first().click();
+    await page.locator(".react-flow__edge").first().click({ force: true });
+    await expect(page.getByRole("group", { name: "分支标签" })).toBeVisible({ timeout: 8000 });
+    expect(hits, `这条链发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});
+
 test.describe("E31 桌面态：演出层的「表情」字段有可读名字", () => {
   /*
    * #65 的第十处。不并进 E17：那条链末尾要播正文，给同一拍加演出指令会改变演出结果；

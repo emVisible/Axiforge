@@ -1,7 +1,6 @@
 {
   "allowed": [
-    "apps/web/src/features/studio/components/ScriptEditor.tsx :: 分支选项",
-    "apps/web/src/features/studio/flow/NodeInspectorPanel.tsx :: 分支标签"
+    "apps/web/src/features/studio/components/ScriptEditor.tsx :: 分支选项"
   ],
   "note": "具名豁免；新增未列出的裸标签即失败"
 }

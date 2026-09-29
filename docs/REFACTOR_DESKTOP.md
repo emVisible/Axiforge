@@ -1384,6 +1384,22 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 >
 > 这两处之外，`check:labels` 的基线就只剩这两条豁免；两条都做完后应当把它删空，让门禁归零。
 
+> **#65 只剩一处：连线面板的「分支标签」改成命名分组（2026-09-29，E32）**
+>
+> 读代码定性命门：`selectedEdge` 在 `CutStudioView.tsx:621` 与 `CutWorkspace.tsx:158` 被硬写成 `null`，
+> 剪辑/剧本两个模式永远打不开连线面板；只有「结构」模式（`ProjectEditorPage.tsx:127` 的
+> `value="flow" / label="结构"`）经 `FlowWorkspace.tsx:69` 传真值。所以判据必须切模式再点一条边。
+> 那一块下面的 `Input` 自带 `label="自定义标签"`，「分支标签」其实是章节标题——
+> 正解是命名分组（`role="group"` + `aria-labelledby`，静态 id，因为面板同页只挂一个），不是 `htmlFor`。
+> 新用例 E32：建工程 → 切「结构」→ 点第一条边 → `getByRole(group, name="分支标签")`；
+> 变异摘掉 `role="group"` 红在这一行；全程零 `/api/v1`。
+>
+> `check:labels` 的豁免基线随之从 2 条收到 **1 条**（只剩 `ScriptEditor :: 分支选项`，被 #68 堵住）。
+> 这里还修了分类器一个真实缺陷：它只认 `id={…}`，把静态 `id="…"` 判成违规——
+> 命名分组的 id 可以来自 `useId()` 也可以是静态串。改完重跑基线，并再插一次裸标签证明它仍然有牙
+> （红在 `AnchorEditor.tsx :: 分类器探针`，还原后绿）。
+> 复跑：gates 0（十一道）/ e2e:desktop 28 passed / e2e 41 passed（57.0s）/ renderer 重建 0。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

@@ -40,7 +40,7 @@ for (const file of files) {
       if (lines[j].includes("</label>")) break;
     }
     if (open.includes("htmlFor")) continue;
-    if (open.includes("id={")) continue;
+    if (/\bid=\{?["\w]/.test(open)) continue;
     if (CONTROL.test(body)) continue;
     const m = body.match(/<label[^>]*>([\s\S]*?)<\/label>/);
     const text = (m ? m[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "").slice(0, 24);

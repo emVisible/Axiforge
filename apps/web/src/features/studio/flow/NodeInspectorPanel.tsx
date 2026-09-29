@@ -332,8 +332,8 @@ export default function NodeInspectorPanel({
             <h3 className="text-sm font-semibold text-ink">连线属性</h3>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            <div>
-              <label className={cn(labelSm, "mb-2 block")}>分支标签</label>
+            <div role="group" aria-labelledby="edge-branch-label-group">
+              <label id="edge-branch-label-group" className={cn(labelSm, "mb-2 block")}>分支标签</label>
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {EDGE_LABELS.map((l) => (
                   <button

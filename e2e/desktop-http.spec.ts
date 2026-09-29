@@ -290,6 +290,29 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByRole("link", { name: "角色" }).click();
     await page.getByRole("link", { name: "创建角色" }).first().click();
     await page.getByRole("button", { name: /英雄/ }).first().click();
+    /*
+     * 这一栏由 ToggleInput 渲染，此前只是"看着有个标签"：标签与控件没有编程关联。
+     * #63 接上 aria-labelledby 后，三个分支都要被同一个名字找到，一个都不许漏：
+     * 预设分支（SearchSelect 的主控件是 button）、自定义的 textarea 分支（概括）、
+     * 自定义的 input 分支（人生主题）。只验一种就是偏袒一条腿——
+     * 实测上一轮我以为自己验了 input 分支，其实那页根本没渲染它，变异跑了个空绿。
+     *
+     * 判据用 role + 可访问名，不用 toHaveAttribute：名字是浏览器算出来的，
+     * 属性在但指错元素照样红；而 getByLabel 会退回 placeholder，抓不到腿被摘掉。
+     * 开关按钮按「同一行的兄弟节点」定位（这一页有十几个同名按钮，取 first() 会点到别的栏）。
+     * 三条都要 exact：getByRole 的名字默认子串匹配，而 placeholder 兜底名里就含着这些字
+     * （"一句话概括角色 *" 含「概括」）——不 exact 时把 aria-labelledby 摘掉仍然绿（实测如此）。
+     */
+    const customToggleOf = (labelText: string) =>
+      page
+        .locator(`label:text-is("${labelText}")`)
+        .locator("xpath=following-sibling::button");
+    await expect(page.getByRole("button", { name: "概括", exact: true })).toBeVisible({ timeout: 8000 });
+    await customToggleOf("概括").click();
+    await expect(page.getByRole("textbox", { name: "概括", exact: true })).toBeVisible({ timeout: 8000 });
+    await customToggleOf("人生主题").click();
+    await expect(page.getByRole("textbox", { name: "人生主题", exact: true })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("textbox", { name: "概括", exact: true }).fill("背负过往、却仍在寻找答案");
     await page.getByPlaceholder("角色如何称呼").fill("凛");
     await page.getByRole("button", { name: "保存角色" }).click();
     await expect(page).toHaveURL(/\/studio\/characters\/mine$/, { timeout: 8000 });
@@ -331,6 +354,16 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByLabel("名称", { exact: true }).fill("铜钥匙");
     await page.getByRole("button", { name: "创建" }).click();
     await expect(page.getByText("铜钥匙").first()).toBeVisible({ timeout: 8000 });
+    /*
+     * TagEditor 那两条标签也是纯视觉的：<label> 与 Input 分开渲染、没有编程关联（#63 的另一半）。
+     * 只有进了道具详情的编辑态才看得到它，所以顺路点开一次；
+     * 断的是"控件被那个名字指到"（exact，理由见 E17 里那段：placeholder 兜底名会骗过子串匹配）。
+     */
+    await page.getByRole("link", { name: /铜钥匙/ }).first().click();
+    await page.getByRole("button", { name: "编辑" }).click();
+    await expect(page.getByRole("textbox", { name: "机制标签", exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("textbox", { name: "效果标签", exact: true })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "道具列表" }).click();
     await page.getByRole("link", { name: "剧本" }).click();
     await page.getByText("桌面可建").first().click();
     await page.getByRole("button", { name: /道具\s*0/ }).first().click();

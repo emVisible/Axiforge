@@ -1095,6 +1095,35 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 类名有效性在产物层验：`dist/assets/index-*.css` 里有 `.text-danger{color:var(--color-danger)}`。
 > 此前我在 S13-2d/S13-2f 里写过「与本文件既有的 text-red-500 同一色档」，那个判断是错的，按上面这条改掉了。
 
+> **复合控件的标签关联补齐（2026-09-29，#63）**
+>
+> 上一颗 `7b21a33` 把 `Input`/`Select`/`Textarea` 三个原语用 `htmlFor` 连上了标签，
+> 但**复合控件**仍是纯视觉的：`TagEditor`（道具详情的机制/效果标签）、
+> `ToggleInput`（建角色的六层设定，预设/自定义双形态）、`SearchSelect`（预设形态的主控件是 button）
+> 各自渲染 `<label>` 却不指向任何控件——读屏在这几栏只念得出占位符。
+> 三个组件统一改成：`useId()` 给可见 `<label>` 一个 id，再把 `aria-labelledby` 透到**当前真正渲染出来的那个控件**上
+> （`ToggleInput` 的三个分支：SearchSelect / Textarea / Input 各一条，漏一支就是漏一条腿）。
+>
+> **判据长在哪个分支上，这条修复才算数**——这里我犯过一次并记在案：
+> 第一次用 `toHaveAttribute("aria-labelledby")` 断自定义形态，把 ToggleInput 的 **Input 分支**属性摘掉后
+> 用例**仍然全绿**。两条原因叠在一起：① 建角色页的「概括」是 `type="textarea"`，那一页根本没渲染 Input 分支，
+> 变异打在死代码上；② 换成 `getByRole` 后仍绿，因为 Playwright 的名字匹配**默认子串**，
+> 而控件在没有关联时的兜底可访问名正是 placeholder `一句话概括角色 *`——它里面就含「概括」两个字。
+> 现在三条腿各配 `exact: true` 的角色+可访问名断言，四次变异逐条见过红：
+> Textarea 分支（红在 `textbox 概括`）、Input 分支（红在 `textbox 人生主题`，这一栏的 placeholder 不含栏目名，
+> 所以它才是真正的判据）、SearchSelect（红在 `button 概括`）、TagEditor（红在 `textbox 机制标签`）。
+> 教训一句话：**断言"控件被这个名字指到"，不要断言"这个属性存在"——后者连指错元素都抓不到。**
+>
+> 顺带一条没动的事实分母：`apps/web/src` 里还有 **24 处 `<label>` 同行不带 `htmlFor`**，
+> 其中一部分是包住房控件的 wrapping 型（合法，例如「公开到角色大厅」那个勾选框），
+> 剩下的散装表头（`ScriptEditor` 的表情/分支选项、`ConditionSimulator`、`ItemsPage` 的两个筛选器等）
+> 需要逐个分派才能定"该修还是该收进组件"，本轮没有顺手改——按范围纪律记在这里。
+>
+> 实测（本颗最后一次全链复跑，数字由命令产生）：`pnpm gates` 退出码 0（九道全绿，含 e2e 的 tsc）；
+> `pnpm e2e` **38 passed**（49.3s）；`pnpm e2e:desktop` **25 passed**（1.0m，零后端）；
+> `pnpm --filter @axiforge/web build` 成功，产物 `dist/assets/ui-*.js` 里 `aria-labelledby` 在位
+> （只重建了 renderer——cargo 那段本轮未跑，改的是 TSX 属性透传，不涉及壳）。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

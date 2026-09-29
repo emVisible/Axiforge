@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import SearchSelect from "./SearchSelect";
 import Input from "./Input";
 import Textarea from "./Textarea";
@@ -22,6 +22,7 @@ export default function ToggleInput({
   type = "input",
   rows = 2,
 }: ToggleInputProps) {
+  const labelId = useId();
   const [mode, setMode] = useState<"select" | "input">(
     options.length > 0 ? "select" : "input",
   );
@@ -30,7 +31,7 @@ export default function ToggleInput({
     <div>
       {label && (
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-sm font-medium text-gray-700">{label}</label>
+          <label id={labelId} className="text-sm font-medium text-gray-700">{label}</label>
           {options.length > 0 && (
             <button
               type="button"
@@ -46,6 +47,7 @@ export default function ToggleInput({
       )}
       {mode === "select" && options.length > 0 ? (
         <SearchSelect
+          aria-labelledby={labelId}
           value={value}
           onChange={onChange}
           options={options}
@@ -53,6 +55,7 @@ export default function ToggleInput({
         />
       ) : type === "textarea" ? (
         <Textarea
+          aria-labelledby={labelId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
@@ -60,6 +63,7 @@ export default function ToggleInput({
         />
       ) : (
         <Input
+          aria-labelledby={labelId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}

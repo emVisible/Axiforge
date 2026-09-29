@@ -9,6 +9,7 @@ interface SearchSelectProps {
   onChange: (value: string) => void;
   options: string[];
   placeholder?: string;
+  "aria-labelledby"?: string;
 }
 
 export default function SearchSelect({
@@ -16,6 +17,7 @@ export default function SearchSelect({
   onChange,
   options,
   placeholder = "选择或搜索...",
+  "aria-labelledby": ariaLabelledby,
 }: SearchSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -48,6 +50,7 @@ export default function SearchSelect({
   return (
     <div ref={containerRef} className="relative">
       <button
+        aria-labelledby={ariaLabelledby}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(

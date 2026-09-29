@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import { relationApi } from '@/shared/api/relations';
 import type { RelationCreate } from '@/shared/types/character';
 
@@ -50,6 +51,8 @@ export const useRelationPresets = () => {
   return useQuery({
     queryKey: RELATION_KEYS.presets,
     queryFn: () => relationApi.presets(),
+    // 桌面不取：详情页里 AddRelationDialog 整块 Modal 常驻挂载，只隐藏「+ 添加关系」按钮拦不住这条查询
+    enabled: !isLocalOnlyDeployment(),
     staleTime: Infinity,
   });
 };

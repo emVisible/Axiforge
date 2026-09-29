@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   versionApi,
@@ -22,6 +23,8 @@ export default function VersionPanel({ characterId }: VersionPanelProps) {
   const { data: versions, isLoading } = useQuery({
     queryKey: ["versions", characterId],
     queryFn: () => versionApi.list(characterId),
+    // 桌面不取：版本历史 Modal 在详情页是常驻挂载的，入口按钮上的 !localOnly 拦不住这个 hook
+    enabled: !isLocalOnlyDeployment(),
   });
 
   const rollbackMutation = useMutation({

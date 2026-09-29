@@ -152,7 +152,7 @@ export default function CharacterDetailPage() {
   const { data: versions } = useQuery({
     queryKey: ["versions", character?.id],
     queryFn: () => versionApi.list(character!.id),
-    enabled: !!character,
+    enabled: !!character && !localOnly,
   });
   const versionsCount = versions?.length || 0;
   const handleExportMarkdown = async () => {

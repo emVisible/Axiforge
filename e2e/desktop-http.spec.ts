@@ -249,3 +249,55 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     expect(hits, `点击路径上发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
   });
 });
+
+/**
+ * E21 桌面态：建角色 → 传记 → 新建篇章（#59 那条「本地化做完却没有入口」的点击层对手）。
+ *
+ * 值得整条搬进用例的理由：`characterTabs.test.ts` 那三条量的是纯函数层（该不该给入口），
+ * 而这条量的是**真给了入口之后，用户点得到、写得进、读得回**——S13-1 的
+ * `StoredStory` + SQLite v4 + `storySaves` 分派口，此前只在契约用例里成立过，没被点过一次。
+ * 全程零 `/api/v1` 加零未捕获异常是这条链的地板，不是天花板。
+ */
+test.describe("E21 桌面态建角色 → 传记 → 新建篇章", () => {
+  test("四个字段建出角色，传记标签点得开，篇章建得出来", async ({ page }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    const crashes: string[] = [];
+    page.on("pageerror", (e) => crashes.push(String(e).slice(0, 160)));
+
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/characters/new?storage=memory", { waitUntil: "load" });
+    await expect(page.evaluate(() => "__TAURI_INTERNALS__" in window)).resolves.toBe(true);
+
+    /*
+     * 先点一个模板：`handleSave` 要求 `anchor.essence`（概括）非空，而「概括」这一栏在
+     * 锚点层折叠区里、默认不渲染（实测只填姓名+描述会停在原页并弹「请至少填写锚点中的「概括」」）。
+     * 模板一次把六层填满，用例因此不必再去开折叠器——这也顺手把「模板能建角」这条桌面主路径测了。
+     */
+    await page.getByRole("button", { name: /英雄/ }).first().click();
+    await page.getByPlaceholder("角色如何称呼").fill("凛");
+    await page.getByRole("button", { name: "保存角色" }).click();
+
+    // 回读才作数：卡片出现在「我的角色」里，才谈得上点进详情（写入没落库时这里先红）
+    await expect(page).toHaveURL(/\/studio\/characters\/mine$/, { timeout: 8000 });
+    const card = page.getByText("凛").first();
+    await expect(card).toBeVisible({ timeout: 8000 });
+    await card.click();
+
+    const tab = page.getByRole("button", { name: "传记" });
+    await expect(tab, "传记标签不在=本地通路齐了却没入口（本轮修掉的那一类）").toBeVisible({ timeout: 8000 });
+    await tab.click();
+    await expect(page.getByText("还没有书写任何篇章")).toBeVisible({ timeout: 8000 });
+
+    await page.getByRole("button", { name: "+ 新建篇章" }).click();
+    await page.getByPlaceholder("如：第一章·起源").fill("第一章·地下");
+    await page.getByRole("button", { name: "创建并编辑" }).click();
+    await expect(page).toHaveURL(/\/stories\/[^/]+\/edit$/, { timeout: 8000 });
+
+    expect(crashes, `桌面链路上抛了未捕获异常：${crashes.join(" | ")}`).toEqual([]);
+    expect(hits, `点击路径上发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});

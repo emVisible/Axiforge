@@ -151,7 +151,7 @@ export default function ProjectListPage() {
         description="创建和管理叙事剧本"
         action={
           <div className="flex items-center gap-2">
-            {!localOnly && <DiscoverBrowseLink tab="projects" />}
+            <DiscoverBrowseLink tab="projects" />
             <Button
               size="sm"
               variant="ghost"

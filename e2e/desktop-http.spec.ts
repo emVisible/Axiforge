@@ -164,6 +164,30 @@ test.describe("E18 云端专属入口在桌面态隐藏，而不是演成空态"
  * 注意它守的是**不静默**，不是"本地能生成建议"——本地这条通路还没有
  * （`packages/axs/prompts/` 只有 `prose-to-axs.json`，建档要新做一份提示词，属 ADR-029 未决项）。
  */
+test.describe("E35 Discover 浏览入口在桌面态全站消失", () => {
+  test("同一个组件：浏览器里有，道具页与场景页在桌面都没有", async ({ page }) => {
+    /*
+     * 这条守的是"入口与目标同生共死"：/discover 在桌面是显式缺席的（DiscoverPage 的
+     * isLocalOnlyDeployment 分支），可 ItemsPage / SceneAssetsPage 仍挂着通向它的链接，
+     * 而 ProjectListPage 挡了——同一个组件三种做法，就是漏。闸门收进组件之后这里才测得动：
+     * 两半都要测（只测桌面那一半，在整块被删掉的改动下也会绿）。
+     */
+    await page.goto("/studio/items", { waitUntil: "load" });
+    await expect(page.getByText("去 Discover 浏览更多")).toBeVisible({ timeout: 8000 });
+    await page.goto("/studio/scenes", { waitUntil: "load" });
+    await expect(page.getByText("去 Discover 浏览更多")).toBeVisible({ timeout: 8000 });
+
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/items?storage=memory", { waitUntil: "load" });
+    // 先证明这一页真的渲染到了工具条（否则 toHaveCount(0) 会因为页面没出来而假绿——实测如此）
+    await expect(page.getByRole("button", { name: "新建道具" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("去 Discover 浏览更多")).toHaveCount(0);
+    await page.goto("/studio/scenes?storage=memory", { waitUntil: "load" });
+    await expect(page.getByRole("button", { name: "新建场景" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("去 Discover 浏览更多")).toHaveCount(0);
+  });
+});
+
 test.describe("E19 桌面态的 AI 建档建议显式缺席", () => {
   test("点「AI 填充六层建议」不发 /api/v1，并给出一条可读原因", async ({ page }) => {
     const hits: string[] = [];

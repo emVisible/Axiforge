@@ -1434,6 +1434,29 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 要求它们"有本地分支"是范畴错误——门禁作用域错比的漏更贵。
 > 复跑：gates 0 / e2e:desktop 连续两次各 28 passed / e2e 41 passed / renderer 重建 0。
 
+> **E35 · Discover 入口闸门收进组件，并留下 S13-3 的实测清单（2026-09-29）**
+>
+> 一处真实的不一致（我自己 grep 复核过，不是听来的）：同一个 `<DiscoverBrowseLink>`，
+> `ProjectListPage.tsx:154` 用 `{!localOnly && …}` 挡住了，而 `ItemsPage.tsx:147`、
+> `SceneAssetsPage.tsx:138` 没挡——桌面上这两页挂着通向 `/discover` 的入口，
+> 而 `/discover` 在桌面是**显式缺席**（`DiscoverPage.tsx:49` 的 `isLocalOnlyDeployment()` 分支）。
+> 修法是把闸门收进组件本身（唯一权威），并删掉调用点那份重复判断；
+> 判据 E35 两半都测：浏览器态两页都看得到这个入口，桌面态两页都是 0。
+> **这条判据差点是假绿**：第一版桌面那一半只断 `toHaveCount(0)`，摘掉闸门后仍然全绿——
+> 因为那一页没渲染到工具条也会得到 0。补了同页的正控（`新建道具` / `新建场景` 按钮可见）之后，
+> 再摘闸门才红在 `Received: 1`。「入口与目标同生共死」这条不变量从此有了牙。
+>
+> S13-3 判死清单的输入（**我自己复核过的**：`ProfilePage.tsx`、`AuthorPage.tsx` 两文件内
+> `isLocalOnlyDeployment|isTauriEnvironment|localOnly` 命中数都是 0，即这两个页面整体没有桌面闸门；
+> 下面的具体调用与行号是子代理扫描报告，我未逐条复核，采纳前需再验）：
+> - `/profile` 的 6 个动作（头像、昵称、绑定邮箱、邮箱恢复身份、导出数据、注销账户）都直连 `userApi`；
+>   注销那条的 catch 分支仍会清本地身份并 reload。路由在 CLEAN_ROUTES 里＝装载零请求，但**点击没测过**。
+> - `/author/:id` 整页走 `creatorApi.hub` / `setFeatured` / `projectApi.fork`，且没有 `DiscoverPage` 那道闸门；
+>   `UserAccountMenu.tsx:73` 的「我的主页」在桌面 `profile` 恒 null → href 落成 `/author/`（空 id）。
+> - `/discover/*` 的五个详情页与评论区（`DiscoverCommentSection`）没有桌面闸门，只能 URL 直达；
+>   `PlayerPage.tsx:813` 与 `:916` 有两处「去发现更多」链接常驻在播放错误态/续玩屏上。
+> 这些要不要摘、摘成"显式缺席"还是干脆删页面，都是 S13-3 的定档范围——我按纪律只把清单量出来，不替它决定。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

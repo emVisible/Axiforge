@@ -17,6 +17,7 @@ import { routes } from "@/shared/lib/routes";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import { aiApi } from "@/shared/api/ai";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 
 export default function CreateCharacterPage() {
   const navigate = useNavigate();
@@ -74,6 +75,16 @@ export default function CreateCharacterPage() {
   if (!draft || !ready) return null;
 
   const handleAiSuggest = async () => {
+    /*
+     * 建档建议依赖服务端的模型通路（`/editor/ai/suggest-character` + Python provider 链）。
+     * 本地这条还不存在：`packages/axs/prompts/` 目前只有一份 `prose-to-axs.json`，
+     * 没有建档提示词，所以这不是"接一下线"就能本地化的，是要新做一项能力（ADR-029 未决项）。
+     * 放在名称校验之前：桌面版根本没有这个能力，先让用户填一个不会送去任何地方的名字才是误导。
+     */
+    if (isLocalOnlyDeployment()) {
+      showToast("桌面版还没有本地建档建议通路（缺一份建档提示词），此项仍依赖服务端模型", "error");
+      return;
+    }
     if (!draft.anchor?.name?.trim()) {
       showToast("请先填写角色名称", "error");
       return;

@@ -157,6 +157,40 @@ test.describe("E18 云端专属入口在桌面态隐藏，而不是演成空态"
 });
 
 /**
+ * E19 建档建议在桌面是「显式缺席」，不是发一条必然失败的请求。
+ *
+ * 这条把 S13-2d 里「点击之后的 `aiApi.suggestCharacter` 仍没测到」那句边界真的补上了：
+ * 有了内存宿主才能点，而点的结果必须是零云端请求 + 一条说清原因提示。
+ * 注意它守的是**不静默**，不是"本地能生成建议"——本地这条通路还没有
+ * （`packages/axs/prompts/` 只有 `prose-to-axs.json`，建档要新做一份提示词，属 ADR-029 未决项）。
+ */
+test.describe("E19 桌面态的 AI 建档建议显式缺席", () => {
+  test("点「AI 填充六层建议」不发 /api/v1，并给出一条可读原因", async ({ page }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/characters/new?storage=memory", { waitUntil: "load" });
+
+    const button = page.getByRole("button", { name: "AI 填充六层建议" });
+    await expect(button).toBeVisible({ timeout: 8000 });
+    /*
+     * 这里刻意不先填角色名：锚点的「姓名/称谓」在模板选择那一步之后，取到它要把整条建角流程搬进用例。
+     * 之所以仍然测得到，是因为能力检查被放在名称校验**之前**（CreateCharacterPage.handleAiSuggest），
+     * 所以"闸门被拿掉"这一改动会立刻让断言红在提示语上（实测：去掉闸门后红在那条提示语的 toBeVisible 上）。
+     * 零云端请求那一半在本用例里是附带的强判据，真正的判据是提示语的在场。
+     */
+    await button.click();
+
+    await expect(page.getByText("桌面版还没有本地建档建议通路")).toBeVisible({ timeout: 8000 });
+    expect(hits, `桌面态仍请求了云端：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});
+
+/**
  * E17 桌面点击路径（S13-5 的内存本地库宿主）。
  *
  * E14/E15 只能断言「装载路径」：注入的 `__TAURI_INTERNALS__` 骗得过 `isTauriEnvironment()`

@@ -622,6 +622,15 @@
   - **真机验证（本机 Ollama 0.34.4 + batiai/gemma4-e4b:q4）**：通路是通的——浏览器 fetch → /api/generate → 多行 canonical AXS 回来 → 界面如实显示。这一跑还抓出一个显示缺陷：反馈区用 `<p>` 把模型的换行折叠成了一行流水账，已加 `whitespace-pre-wrap`（AXS 的行就是语义单位，折行等于把脚本显示成散文）。
   - **两条如实的未证 / 已知短板**：① 真壳里的来源是 `tauri://localhost`，浏览器测试测不到它，所以文档里那条 `OLLAMA_ORIGINS` 必设项**仍是纸面推断**，要在壳里跑一次才算证；② 4B 量化小模型会写出 `旁白: (微笑): 台词` 这类半合规行，也会偶发地把提示词里的 `标题：` 当格式抄过来。`applyDraft` 现在只拦"括号方言"和"解析不出任何指令"两种，这类**能解析但质量差**的输出会照样成草稿——那是模型能力问题，不是通路问题，但别把它说成"AI 辅助已达标"。
   - **仍欠**：`/editor/ai/suggest-character`（AI 建档建议）在桌面仍是 HTTP；Python provider 链要等 S13-6 一起退场。
+    → **2026-09-29 更新（S13-4b 的一部分）**：桌面上这一支已不再发那条必然失败的请求，
+    而是**显式缺席**——`handleAiSuggest` 在 `isLocalOnlyDeployment()` 下先给一条可读原因
+    （「桌面版还没有本地建档建议通路（缺一份建档提示词），此项仍依赖服务端模型」）。
+    为什么不是"接一下线就行"：本地这条通路要新做一项能力——`packages/axs/prompts/` 目前只有一份
+    `prose-to-axs.json`，建档需要自己的提示词 + 输出 schema + 规则引擎兜底，属 ADR-029 未决项，
+    由产品判断要不要做（做就是 S13-4 的第三支，不做就随 Python provider 链一起在 S13-6 退场）。
+    判据：**E19** 断言点该按钮后有那条提示语且零 `/api/v1`；把闸门改成 `false &&` 之后红在提示语的
+    `toBeVisible` 上（实测两轮，还原后绿）。名称字段在模板选择那一步之后，所以用例不填名——
+    能力检查因此被放在名称校验之前，这条判据才不靠流程顺序成立。
 - [x] 附带修掉：道具/场景**资产详情页**绕过分派口（S13-2 期间漏的半条腿）
   —— 已交付 2026-09-27。`SceneAssetDetailPage` 的 get/update/delete 与 `ItemDetailPage` 的 update/delete 仍直连 `sceneAssetApi`/`itemApi`，而**清单页早已本地化**——于是桌面能看见、能点开、改完点保存却写进一个够不到的后端。两处顺带修掉同一个假「已保存」：`setItem({ ...item, ...form })` 是乐观合并，界面立刻显示新值而写入根本没成，现改为采用回读的那一份。判据补进 E15（`/studio/scenes/no-such-scene`）。
   教训：**本地化是按"读路径"完成的，不是按"页面"完成的**——一个页面里 get/list/create/update/delete 五支各自选路，只改读的那支就等于把半条腿焊进了主干。
@@ -635,7 +644,7 @@
   **测试宿主没有进生产物**（实测，不是声明）：`pnpm --filter @axiforge/web build` 后
   `dist/assets/*.js`（10:38 刚构建）里 `get("storage")` 与 `"memory"` 各 **0 命中**，
   而同一批文件里 `"还没有剧本"` 1 命中——对照组证明 grep 面有效，`import.meta.env.DEV` 静态替换后整段被 DCE。
-  仍欠：`nexus` 的 `sendToInbox`、`aiApi.suggestCharacter` 两条真实云调用的处置（判死或本地化）；
+  仍欠：`nexus` 的 `sendToInbox` 与 `aiApi.suggestCharacter` 的**最终处置**（判死或真本地化）——后者在 2026-09-29 已改为显式缺席并进了 E19，但它缺的那份建档提示词仍未决，见上面 S13-4 的更新段；
   角色的设定导出/复制两个按钮在桌面是点了没反应（`CharacterById` 路由可达、且不在任何 `localOnly` 闸门内）；
   以及把 34→35 条 e2e 的**主目标**从浏览器 run mode 挪到壳内冒烟。
   **一处按证据作废**：普查里「工程模板 tab 仍是 `projectApi.listTemplates` + `catch(() => [])`，桌面会演成空态」
@@ -757,6 +766,21 @@
 > 一条改判（原 #25「让 web 也改调 TS 内核」）：在桌面唯一化之后，这条的正确归宿不是"web 换内核"，
 > 而是**Python 编译器随 web 一起退场**（ADR-029 决策 4/5）。给要被删的那一侧新建调用路径是净负收益，
 > 而双端分叉的风险已由金样本 + 分支用例 + `sceneRef` 那类专项回归守着。
+
+> **收尾快照 5（2026-09-29 收束，tag `desktop-wip-20260929f`）**
+
+`desktop` 分支这一轮共七颗：`10e04d9` S13-2d、`eef97ff` S13-2e、`cafe63c` S13-2f、
+`f4b4840` E18 + 作废一条不成立前提、`afc22bb` ADR-029（S13-8）、本颗 S13-4b 的一部分（建档建议显式缺席 + E19）。
+
+最后一次全链复跑（数字全部由命令产生）：
+`pnpm gates` GATES_EXIT=0，九道全绿，单测 455 passed + 1 skipped；
+`pnpm e2e` E2E_EXIT=0，**37 passed (46.7s)**（E17/E18/E19 是本回合新增的三条点击/入口判据）；
+`cd backend && uv run pytest -q` PYTEST_EXIT=0，165 passed；
+`pnpm check:desktop` DESKTOP_CHECK_EXIT=0；`pnpm build:desktop` BUILD_EXIT=0，
+产物 `Axiforge.app` + `Axiforge_0.1.0_aarch64.dmg`（5,319,503 B）。
+
+清单状态：S13-1、S13-2a–f、S13-8 为 `[x]`；S13-2d 与 S13-5 为 `[~]`（各留真实未决项）；
+S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一步都需要 ADR-029「未决」里那五条判断。
 
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 

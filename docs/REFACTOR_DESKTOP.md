@@ -257,6 +257,15 @@
 
 - [ ] `PlayerPage.tsx`（1370 行）→ IR 渲染器分层：播放状态机（纯逻辑入 `packages/core` 或 editor-core L2 同级）、指令执行器、舞台视图、系统菜单/存档面板；渲染文件全部 ≤400 行
 - [ ] `useProjectEditor.ts`（1164 → **1089 行**，v0.8 M3 进行中）→ 域拆分。判据已从「按四域名词预切」改为两条真判据：**依赖方向**（不读图内容者归视图域）与**纯度**（纯计算先外提，可单测且零行为风险）。已交付 `useCanvasView` 与 `editorProjection`（后者补上投影层此前零单测的空洞）；余 persistence 与 node-inspector 两域（宪章 1b G1 偏差记录的欠账，Phase 2 时承诺未兑现）
+  **2026-09-29 进展与一条如实的改判**：本轮按「纯度」判据外提了 Inspector 的读写侧三个纯函数
+  （`inspectorFromNarrative` / `patchFromForm` / `conditionGroupFromItems`）进 `editorProjection.ts`，
+  补 9 条用例、3 次变异见过红（写侧不再归一布尔、空条件组写成恒真组、读侧不再兜 `trigger_condition` 缺 `conditions`）。
+  文件 1089 → **1081 行**（口径按 `check:size`：它数 `split("\n").length`，比 `wc -l` 多一；棘轮已收到 1081 锁住这一寸）。但**剩下的 persistence 不是一次文件搬运**：纯计算早已在
+  `editorProjection` / `stageLayout` / `exportProjectMarkdown` 里，留在 hook 中的部分与 React state 交叉引用，
+  `saveAll` 一次要同时拿 draft、dragPositions、rolesMap、providerRef、toast、refresh 六样——
+  按「依赖方向」判据它不属于「不读图内容者」，硬拆只会得到一根传十几个 setter 的假模块。
+  下一步需要先给这块定一个命令式 seam（reducer 或显式的 save 编排对象），再谈拆文件。这条保持未勾，
+  并把「先设计后搬运」写在这里，免得下一轮又照名字切一刀。
 - [x] 道具与场景资产域本地化（v0.8：契约 + schema v3 + 分派口 + 双支单测）：`asset_items` / `asset_scenes` 随 v3 进本地库，桌面侧栏这两页不再离线报「读取失败」（Phase 6 已把错误态显式化，不再伪装成空态）。**当时同一批没做的 `project_asset_refs` 直到 S13-2c（schema v5，2026-09-29）才补齐**——那一条欠账的形状不是"页面报错"而是"写进去读不回来"，比报错更难发现
 - [x] 四态原语：`packages/ui` 新增 `QueryStatePanel` + `pickQuerySlot`（穷尽 switch，缺一态即编译不过），状态词表与判定分离，宿主 `resolveQueryState` 复用同一词表；已迁移角色页与剧本清单页两个既有消费者，其余页面按 Phase 8 逐屏巡检迁移
 - [~] 本地工程元数据补齐 —— **原文前提的一半已不成立，按实测改判**：原文写「SQLite `projects` 表只有 id/title/is_public/axs_source/author_id/时间戳，缺 `description`/`cover_image`/`theme_tags`/`mechanism`/`genre`/`is_meta` 等列」。这六列**已随 v0.8 schema v3 进入本地库**（`sqlite/backend.ts` 的 `COLUMN_PATCHES` 带「缺列才 ALTER」的幂等迁移），`projectMetaToResponse` 已逐字段透传而非填空值，契约套件断言 `themeTags` 写→读往返。故「一律显示暂无描述」不再成立。
@@ -549,7 +558,7 @@
 > S13-2 的三个子刀（2a/2b/2c）至此全部落地。
 >
 > 实测验收状态（不是声明，都是刚跑出来的数）：
-> - `pnpm gates` 九道全绿（`pnpm coverage` 已并入）；单测 core 80 / axs 37 / editor-core 151 / web 124（另有 1 条显式跳过：需后端在线的示范作导出工具）/ admin 39 —— 合计 431 passed + 1 skipped
+> - `pnpm gates` 九道全绿（`pnpm coverage` 已并入）；单测 core 80 / axs 37 / editor-core 151 / web 128（另有 1 条显式跳过：需后端在线的示范作导出工具）/ admin 39 —— 合计 435 passed + 1 skipped
 > - `uv run pytest -q` 后端 165 passed；`pnpm e2e` **33 passed**（E1–E16，独立库 `axiforge_e2e`，自包含起服务后自动收）
 > - `packages/core` 覆盖率 92.79% 语句 / 79.71% 分支——G2 要求「行+分支 ≥90%」，**语句轴过、分支轴未过**，按 [~] 如实挂着
 > - 本轮每条新判据都配了一次「让它先红」的变异：把代码改回缺陷形状，只有对应用例失败、其余全绿才算数（其中三次注入本身语法失败，重做后才有结论——失败的变异不算证据）

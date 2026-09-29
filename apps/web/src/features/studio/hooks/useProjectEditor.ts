@@ -29,7 +29,10 @@ import type {
 import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
 import { useCanvasView } from "./useCanvasView";
 import {
+  conditionGroupFromItems,
   flowNodeOf,
+  inspectorFromNarrative,
+  patchFromForm,
   projectRfEdges,
   projectRfNodes,
 } from "./editorProjection";
@@ -241,22 +244,12 @@ export function useProjectEditor(id: string) {
       setSelectedId(id);
       setSelectedEdgeId(null);
       setActivePanel("content");
-      const nd = draft.nodes.get(id)?.narrative ?? {};
-      setNodeForm({
-        title: (nd.title as string) || "",
-        description: (nd.description as string) || "",
-        is_anchor: Boolean(nd.is_anchor),
-        is_ending: Boolean(nd.is_ending),
-        ending_label: (nd.ending_label as string) || "",
-        speaker: (nd.speaker as string) || "",
-        dialogue: (nd.dialogue as string) || "",
-        narration: (nd.narration as string) || "",
-      });
-      const tc = nd.trigger_condition as Record<string, unknown> | null;
-      setConditions((tc?.conditions as ConditionItem[]) || []);
-      setEffects((nd.effects as EffectItem[]) || []);
-      setNodeProps((nd.props as string[]) || []);
-      setScript(((nd.script ?? []) as Instruction[]) || []);
+      const hydrated = inspectorFromNarrative(draft.nodes.get(id)?.narrative);
+      setNodeForm(hydrated.form);
+      setConditions(hydrated.conditions);
+      setEffects(hydrated.effects);
+      setNodeProps(hydrated.nodeProps);
+      setScript(hydrated.script);
     },
     [draft],
   );
@@ -535,11 +528,7 @@ export function useProjectEditor(id: string) {
       {
         kind: "node.patch",
         nodeId: selectedNode.id,
-        patch: {
-          ...nd,
-          is_anchor: Boolean(nd.is_anchor),
-          is_ending: Boolean(nd.is_ending),
-        },
+        patch: patchFromForm(nd),
       },
       editOrigin,
     );
@@ -549,10 +538,12 @@ export function useProjectEditor(id: string) {
     (newC: ConditionItem[]) => {
       setConditions(newC);
       if (!selectedNode) return;
-      const hc = newC.length > 0;
-      const tc = hc ? { type: "all", conditions: newC } : null;
       dispatch(
-        { kind: "node.patch", nodeId: selectedNode.id, patch: { trigger_condition: tc as Condition | null } },
+        {
+          kind: "node.patch",
+          nodeId: selectedNode.id,
+          patch: { trigger_condition: conditionGroupFromItems(newC) as Condition | null },
+        },
         editOrigin,
       );
     },

@@ -8,6 +8,13 @@ import { STAGE_PALETTE, stageColorIndex } from "../flow/stageColors";
 import { flowEdgeStroke } from "../flow/types";
 import type { CanvasViewMode } from "./useCanvasView";
 
+import type {
+  ConditionItem,
+  EffectItem,
+  NodeFormState,
+} from "../flow/types";
+
+
 /**
  * 画布投影：把内核 Draft 变成 React Flow 的 nodes/edges。
  *
@@ -137,4 +144,61 @@ export function projectRfEdges(input: {
       label: e.label || "",
       selected: selectedEdgeId === e.id,
     }));
+}
+
+// ============================================================
+// 检视器（Inspector）的读侧与写侧
+// ============================================================
+//
+// 这两半本来是散在 useProjectEditor 里的内联表达式。它们不碰 React 状态、
+// 也不读图的内容，按宪章 G1 的两条判据（依赖方向 / 纯度）属于「先外提」的那一类：
+// 外提之后可单测，且行为零变更。Inspector 是 narrativeData 与人眼之间唯一的
+// 翻译层——空值到底给 ""、null 还是 []，决定的是「重新打开工程后字段有没有悄悄变」。
+
+/** narrativeData 的 JSON 列可能是任何东西（含 null）：读侧一律给真实空值，不猜 */
+export function inspectorFromNarrative(nd: Record<string, unknown> | null | undefined): {
+  form: NodeFormState;
+  conditions: ConditionItem[];
+  effects: EffectItem[];
+  nodeProps: string[];
+  script: Instruction[];
+} {
+  const n = nd ?? {};
+  const tc = n.trigger_condition as Record<string, unknown> | null;
+  return {
+    form: {
+      title: (n.title as string) || "",
+      description: (n.description as string) || "",
+      is_anchor: Boolean(n.is_anchor),
+      is_ending: Boolean(n.is_ending),
+      ending_label: (n.ending_label as string) || "",
+      speaker: (n.speaker as string) || "",
+      dialogue: (n.dialogue as string) || "",
+      narration: (n.narration as string) || "",
+    },
+    conditions: (tc?.conditions as ConditionItem[]) || [],
+    effects: (n.effects as EffectItem[]) || [],
+    nodeProps: (n.props as string[]) || [],
+    script: ((n.script ?? []) as Instruction[]) || [],
+  };
+}
+
+/**
+ * 表单 → node.patch 载荷。`is_anchor` / `is_ending` 必须显式归一：
+ * 未勾选的复选框在部分路径上给的是 undefined，直接进 patch 会留下 `undefined` 而不是 false，
+ * 于是「取消勾选」在 JSON 列里等价于「从没勾过」——两者在导出与回放时可不等价。
+ */
+export function patchFromForm(nd: NodeFormState): Record<string, unknown> {
+  return {
+    ...nd,
+    is_anchor: Boolean(nd.is_anchor),
+    is_ending: Boolean(nd.is_ending),
+  };
+}
+
+/** 空条件列表写 null 而不是 `{type:"all",conditions:[]}`：后者在两端编译器里都恒真，语义不同 */
+export function conditionGroupFromItems(
+  items: ConditionItem[],
+): { type: "all"; conditions: ConditionItem[] } | null {
+  return items.length > 0 ? { type: "all", conditions: items } : null;
 }

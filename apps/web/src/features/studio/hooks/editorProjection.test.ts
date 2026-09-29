@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Draft, NarrativeNode } from "@axiforge/editor-core";
 
-import { projectRfEdges, projectRfNodes } from "./editorProjection";
+import {
+  conditionGroupFromItems,
+  inspectorFromNarrative,
+  patchFromForm,
+  projectRfEdges,
+  projectRfNodes,
+} from "./editorProjection";
+import type { ConditionItem, NodeFormState } from "../flow/types";
 
 const node = (id: string, stageId: string | null): NarrativeNode =>
   ({
@@ -90,5 +97,48 @@ describe("projectRfNodes", () => {
       scenesList: [scene("s1"), scene("s2")] as never,
     });
     expect(out.map((n) => n.id)).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("检视器读写侧（Inspector ↔ narrativeData）", () => {
+  it("缺字段一律给真实空值：不出现 undefined，也不把没有的 trigger_condition 读成空条件组", () => {
+    const empty = inspectorFromNarrative(undefined);
+    expect(empty.form).toEqual({
+      title: "", description: "", is_anchor: false, is_ending: false,
+      ending_label: "", speaker: "", dialogue: "", narration: "",
+    });
+    expect(empty.conditions).toEqual([]);
+    expect(empty.effects).toEqual([]);
+    expect(empty.nodeProps).toEqual([]);
+    expect(empty.script).toEqual([]);
+    expect(inspectorFromNarrative({}).script).toEqual([]);
+    // trigger_condition 在但 conditions 缺：读成空列表而不是 [undefined]
+    expect(inspectorFromNarrative({ trigger_condition: { type: "all" } }).conditions).toEqual([]);
+  });
+
+  it("脚本与属性原样带出；trigger_condition 里的条件被拆出来给表单", () => {
+    const got = inspectorFromNarrative({
+      title: "开场", is_anchor: 1, script: [{ op: "say", text: "在" }],
+      props: ["key"], trigger_condition: { type: "all", conditions: [{ type: "flag", key: "k" }] },
+    });
+    expect(got.form.title).toBe("开场");
+    expect(got.form.is_anchor).toBe(true);
+    expect(got.script).toEqual([{ op: "say", text: "在" }]);
+    expect(got.nodeProps).toEqual(["key"]);
+    expect(got.conditions).toEqual([{ type: "flag", key: "k" }]);
+  });
+
+  it("写侧把复选框的 undefined 归一成 false——取消勾选不能写成「从没勾过」", () => {
+    const base = {
+      title: "t", description: "", is_anchor: undefined, is_ending: undefined,
+      ending_label: "", speaker: "", dialogue: "", narration: "",
+    } as unknown as NodeFormState;
+    expect(patchFromForm(base)).toMatchObject({ is_anchor: false, is_ending: false, title: "t" });
+  });
+
+  it("空条件组写 null：{type:'all',conditions:[]} 在两端编译器里都恒真，语义不同", () => {
+    expect(conditionGroupFromItems([])).toBeNull();
+    const one = [{ type: "flag", key: "k", operator: "eq", value: "1" }] as ConditionItem[];
+    expect(conditionGroupFromItems(one)).toEqual({ type: "all", conditions: one });
   });
 });

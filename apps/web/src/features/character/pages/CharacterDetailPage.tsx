@@ -1,22 +1,18 @@
 import { useState, type ComponentType } from "react";
-import { Image as ImageIcon } from "lucide-react";
 import { getImageUrl } from "@/shared/lib/imageUrl";
 import { useParams, useNavigate, Link } from "react-router";
 import {
   Anchor,
-  BookOpen,
   Brain,
   Drama,
   Copy,
   Download,
   Eye,
-  FileText,
   GitFork,
   Globe,
   History,
   Link2,
   Lock,
-  Network,
   Pencil,
   ScrollText,
   Share2,
@@ -42,6 +38,7 @@ import { Skeleton } from "@/shared/components/ui";
 import StoryList from "@/features/character/components/StoryList";
 import CreateStoryDialog from "@/features/character/components/CreateStoryDialog";
 import VersionPanel from "@/features/character/components/VersionPanel";
+import { type CharacterTabKey, visibleCharacterTabs } from "@/features/character/lib/characterTabs";
 import { versionApi } from "@/shared/api/versions";
 import { buildCharacterExport } from "@/shared/storage/characterExport";
 import { saveBinaryFile } from "@/shared/storage";
@@ -127,19 +124,12 @@ const fieldLabels: Record<string, Record<string, string>> = {
   },
 };
 
-const mainTabs = [
-  { key: "info" as const, label: "角色信息", Icon: FileText },
-  { key: "relations" as const, label: "关系", Icon: Network },
-  { key: "stories" as const, label: "传记", Icon: BookOpen },
-  { key: "sprites" as const, label: "立绘", Icon: ImageIcon },
-];
-
 export default function CharacterDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: character, isLoading, error } = useCharacter(id!, { bumpView: true });
   const deleteCharacter = useDeleteCharacter();
-  /** 关系/传记/版本/Fork/删除依赖协作服务：桌面离线态不给入口（见 deployment.ts） */
+  /** 关系/版本/Fork 仍只有云端通路：桌面离线态不给入口（见 deployment.ts；标签那一栏的判据在 lib/characterTabs.ts） */
   const localOnly = isLocalOnlyDeployment();
   const forkCharacter = useForkCharacter();
 
@@ -148,7 +138,8 @@ export default function CharacterDetailPage() {
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
   const [isVersionOpen, setIsVersionOpen] = useState(false);
   const [activeLayer, setActiveLayer] = useState("anchor");
-  const [activeTab, setActiveTab] = useState<"info" | "relations" | "stories" | "sprites">(    "info",
+  const [activeTab, setActiveTab] = useState<CharacterTabKey>(
+    "info",
   );
   const [copiedId, setCopiedId] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -548,8 +539,7 @@ export default function CharacterDetailPage() {
 
       {/* Tab */}
       <div className="flex gap-1 mb-6 bg-canvas p-1 rounded-xl">
-        {mainTabs
-          .filter((t) => !localOnly || t.key === "info" || t.key === "sprites")
+        {visibleCharacterTabs(localOnly)
           .map(({ key, label, Icon }) => (
           <button
             key={key}

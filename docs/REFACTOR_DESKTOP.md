@@ -684,6 +684,23 @@
   ③ 节点挂的是重建后的**新舞台 id**，`saveNarrative` 不许把 `stage_id` 写成 NULL。
   两次变异各见过红，且都只红在 SQLite 那一支（Memory 同批仍绿）：把 `description` 改成盲写 NULL → 红在第①条；
   把 `saveNarrative` 的 `stage_id` 参数写死 `null` → 红在第③条（报错里给出的是 SQLite 的真 UUID，证明那一支确实跑的是 SQLite）。
+- [x] 附带：传记在桌面**没有入口**——已修 2026-09-29（静态普查查出来的第 6 个同类缺口）。
+  查法不是跑棘轮而是**静态数消费者**：把去留清单里标红的 5 个文件逐个看挂载点与闸门。结果——
+  `GlobalSearch` 有 `!isLocalOnlyDeployment()` 闸门（`AppHeader.tsx:84`，不是缺口）；`useTags` 只挂在 `discover/**`（云端页）；
+  `PromptExport`（192 行）**零挂载**，唯一数据通路是 `characterApi.export`——留成在册，没顺手删（删它等于删一个未接线的功能面，等定档）；
+  而 `CharacterDetailPage.tsx:552` 那条 `!localOnly || key === "info" || key === "sprites"` 里，**传记被当成云端功能滤掉了**，
+  可 S13-1 早就把传记落进本地契约（`StoredStory` + SQLite v4 + `storySaves` 分派口）。
+  也就是说：**本地化做完了，入口没跟上，界面上等于没有这个功能**——比「点进去报网络错误」更难发现，因为连失败都不发生。
+  第 142 行那句注释「关系/传记/版本/Fork/删除依赖协作服务」就是它自己的化石证据：写的时候传记确实只有云端通路。
+  修法不是往白名单里补一个字符串，而是把「这一栏凭什么算云端」搬到定义点上：新 `features/character/lib/characterTabs.ts`
+  给每个 tab 带 `cloudOnly`，`visibleCharacterTabs(localOnly)` 按它过滤（页面 701→691 行）。手抄白名单的问题不是长，是**离写侧太远**，写侧变了它不会响。
+  判据：`characterTabs.test.ts` 3 条（桌面态可见集 / 浏览器态全集 / 云端专属那一栏是**在册清单**不是派生布尔）。
+  两次变异各见过红：把 `stories.cloudOnly` 改成 `true` → 红 2 条；把过滤改回那条旧白名单（复刻刚修的 bug）→ 红在入口那条。
+  **没被门禁覆盖的部分写清楚**：这三条量的是纯函数层，桌面**壳内点击**那一层仍没判据——要装就得把「建角色 → 开详情」整条流程搬进 `?storage=memory` 宿主
+  （E19 已经证明锚点在模板步之后，取它要把建角流程搬进用例，成本不抵本轮收益，记在这里不当已完成）。
+  实测：`pnpm gates` GATES_EXIT=0（web 178→181 passed）、`pnpm e2e` E2E_EXIT=0（37 passed，浏览器态渲染无变化）、`tsc -b` 先于 vitest 跑且零报错。
+  **顺带一条判据陷阱**：`scripts/desktop-http-inventory.mjs` 需要 5174 上活着的服务；没有服务时它对每条路由都返回 `httpCalls: []` + 一条 `ERR_CONNECTION_REFUSED`，
+  看着像「全部干净」其实是「一条都没加载」。空结果不等于不存在——读它的输出前先看 `pageErrors`。
 - [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。
   起因是宪章里我自己写过的那句教训（S13-2b 补记）：金样本证明"当前两边一致"，证明不了"每条分支两边都走"。
   **实测三份示范作金样本对那两条真缺陷所在的分支是零覆盖**：`input.json` 里 `sceneRefId` 全是 `null`、

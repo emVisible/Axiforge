@@ -50,7 +50,7 @@ pnpm dev
 | `pnpm dev:desktop` | 起 Tauri 壳（自动拉起 web dev server）；DEV 下会跑壳内存储冒烟 |
 | `pnpm build:desktop` | 产出 `Axiforge.app` 与 `.dmg`（未签名） |
 | `pnpm build` | 构建前端（web + admin） |
-| `pnpm gates` | **一条命令跑完前端门禁**：tsc×4 → vitest×5（core/axs/editor-core/web/admin） → **coverage 阈值（G2：`core` 与 `editor-core` 行+分支 ≥90%）** → oxlint+颜色令牌 → 内核纯净度 → 循环依赖 → 行数棘轮 → 双主题对比度 → 共享组件源扫描（`check:ui-source`） |
+| `pnpm gates` | **一条命令跑完前端门禁（共十一道）**：tsc×4 → vitest×5（core/axs/editor-core/web/admin） → **coverage 阈值（G2：`core` 与 `editor-core` 行+分支 ≥90%）** → oxlint+颜色令牌 → 内核纯净度 → 循环依赖 → 行数棘轮 → 表单标签关联 → 分派口本地分支 → 双主题对比度 → 共享组件源扫描（`check:ui-source`） |
 | `pnpm typecheck` / `test:unit` / `coverage` / `lint` | 上述门禁的分项 |
 | `pnpm check:purity` | 断言 `core`/`axs`/`editor-core` 零 React/DOM/网络/平台依赖 |
 | `pnpm check:circular` | dpdm 循环依赖 = 0 |

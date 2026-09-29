@@ -3,8 +3,11 @@
  * 分派口（apps/web/src/shared/storage/*Saves.ts / assetPool*.ts）里每个导出的 async 函数
  * 都必须有本地分支。桌面唯一化之后，"只走云端"的新函数等于给桌面留一个点进去没反应的入口，
  * 而它不会报错——只会静默失败（ADR-029 / S13-6 的前置）。
- * 2026-09-29 实测基线：4 个分派口文件、26 个导出 async 函数，全部有本地分支，0 处云端专属，
- * 所以这里不放豁免清单。（先前我那份统计写成 38，是因为 glob 让 assetPoolSaves.ts 被数了两遍。）
+ * 2026-09-29 实测基线：5 个分派口文件、30 个导出 async 函数，全部满足三档合法之一，
+ * 所以这里不放豁免清单。（先前我那份统计写成 38，是因为 glob 让 assetPoolSaves.ts 被数了两遍；
+ * 再早的 26 漏了 achievementDefs.ts——它不按 <域>Saves.ts 命名，是已知偏差。）
+ * 已知不覆盖：证据取自"分派判定之后到函数末尾"，所以"本地分支返回空桩 + 云端分支真调 provider"
+ * 这种混合形状仍会过。要收紧得先做块级配对，本轮没有。
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

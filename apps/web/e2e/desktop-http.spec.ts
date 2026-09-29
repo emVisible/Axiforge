@@ -132,6 +132,30 @@ test.describe("E15 本地存储不可用时也不回落 HTTP", () => {
   }
 });
 
+test.describe("E18 云端专属入口在桌面态隐藏，而不是演成空态", () => {
+  test("剧本列表的工具条（模板 tab / 元剧本筛选）：浏览器里有、桌面态没有", async ({ page }) => {
+    /*
+     * 这条守的是 `ProjectListPage` 里那一整块 `{!localOnly && (…)}` 工具条——
+     * 模板 tab 与元剧本筛选都在里面。它测的不是"我新加的闸门"（没有新闸门：
+     * 这块本来就存在），而是**这条不变量**：云端专属能力在桌面不给入口，
+     * 于是 `listTemplates` 的 `catch(() => [])` 不会被触发、界面不会把"这台机器没这功能"
+     * 演成"暂无模板"的空态（deployment.ts 的约定）。
+     * 两半都要测：只测桌面那一半，在整块工具条被删掉的改动下也会绿——
+     * 我用 `{true && (` 把外层闸门打穿之后确认它确实会红，才敢留这条。
+     * 顺序是先浏览器后桌面：`addInitScript` 对该 page 之后的每次导航都生效。
+     */
+    await page.goto("/studio/projects", { waitUntil: "load" });
+    await expect(page.getByText("模板", { exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("元剧本", { exact: true })).toBeVisible({ timeout: 8000 });
+
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
+    await expect(page.getByText("还没有剧本")).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("模板", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("元剧本", { exact: true })).toHaveCount(0);
+  });
+});
+
 /**
  * E17 桌面点击路径（S13-5 的内存本地库宿主）。
  *

@@ -637,8 +637,16 @@
   而同一批文件里 `"还没有剧本"` 1 命中——对照组证明 grep 面有效，`import.meta.env.DEV` 静态替换后整段被 DCE。
   仍欠：`nexus` 的 `sendToInbox`、`aiApi.suggestCharacter` 两条真实云调用的处置（判死或本地化）；
   角色的设定导出/复制两个按钮在桌面是点了没反应（`CharacterById` 路由可达、且不在任何 `localOnly` 闸门内）；
-  工程模板 tab 仍是 `projectApi.listTemplates` + `catch(() => [])`；
   以及把 34→35 条 e2e 的**主目标**从浏览器 run mode 挪到壳内冒烟。
+  **一处按证据作废**：普查里「工程模板 tab 仍是 `projectApi.listTemplates` + `catch(() => [])`，桌面会演成空态」
+  这一条**前提不成立**——`ProjectListPage` 的工具条整块本来就被 `{!localOnly && (<>…</>)}` 包住
+  （模板 tab 与元剧本筛选都在里面，桌面进不到那个 tab，那条 effect 只在 `tab === "template"` 时触发）。
+  我是先写了一条断言它的服务端用例、再用恒真变异打出它的空转：把外层闸门改成 `{true && (` 之后
+  桌面那一半才红（`Received: 1`），说明这条不变量值得守，而**原报告里的那个小缺陷并不存在**。
+  最终留下的不是"修复"，而是 E18：断言工具条在浏览器有、桌面没有。
+  E18 实测随本批跑进套件（`pnpm e2e` 36 passed）。
+  顺带复核：角色页那两个导出/复制按钮**不在任何 `localOnly` 闸门里**（367/377 两处闸门在 388 的分隔线之前已闭合），
+  所以 S13-2f 的立项前提成立。
   这一步做完才允许浏览器 run mode 降级为纯测试宿主
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"

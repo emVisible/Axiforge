@@ -902,7 +902,7 @@
   3. **文档面** ✓（退场时只需改 README）。`docs/user/` 实测**零**服务端指向（只有 `desktop/` 与 `writing/` 两节）；
      `README.md` 命中 10 行（命令：`grep -n 'localhost:8000\|uvicorn\|docker\|dev:api\|alembic\|pnpm setup\|5432' README.md`）：16、26、27、36、37、49、60、90、96、106，覆盖 `pnpm setup` / `dev:api` / 端口表 / alembic 段，
      逐条改成桌面口径即可，不涉及结构重写。
-- [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"
+- [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有" —— 体量已实测（2026-09-29）：29 个云端分支文件 / 2538 行、25 个文件里 34 处分叉点；见 [WEB_SUNSET_RESTORE](./WEB_SUNSET_RESTORE.md) 的退场前置表。
 - [x] S13-8 修订战略文档 —— 已交付 2026-09-29：新增 [ADR-029](./ADR/029-desktop-only-build-target.md)
   （桌面是唯一构建与发布目标、web 与第二套数据通路退场、代价与未决逐条实测；链接 ADR-024/008/016/027/026）；
   `docs/ADR/README.md` 索引补上 **ADR-028 与 029 两行**（028 此前根本不在索引里，文件存在却查不到，

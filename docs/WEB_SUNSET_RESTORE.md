@@ -74,3 +74,24 @@ git checkout web-archive-20260926 -- <path>
 - 多用户鉴权、发布/发现、评论与内容治理、版本历史与协作、跨设备同步**本质上需要服务端**，
   无法靠"同步"搬到本地。每一项要单独决定：重定义成本地语义 / 直接砍掉 / 保留后端只为它。
 - FastAPI 后端与 Postgres 的去留。
+
+## 退场前置的体量实测（2026-09-29，全部由命令产出，不是估算）
+
+| 要摘的东西 | 实测 | 命令口径 |
+| --- | --- | --- |
+| 云端分支层（S13-7 的目标） | 29 个文件、2538 行 | `apps/web/src/shared/storage/http*.ts` + `apps/web/src/shared/api/*.ts` |
+| 运行模式分叉点 | 25 个文件、34 处 | `grep -rE "isTauriEnvironment\(|isLocalOnlyDeployment\("` 全 `apps/web/src` + `packages` |
+| 后端本体（S13-6 的目标） | 107 个 `.py`、10 个 domain | `find backend/app -name "*.py"` / `ls backend/app/domains` |
+| 验收基线 | 3 个 spec、38 条用例 | `pnpm e2e`（`playwright.config.ts` 的 `webServer` 起 `uv run uvicorn app.main:app --port 8000`） |
+
+**由此得到一条不是观点、是配置的结论**：`playwright.config.ts` 的 `webServer` 现在就依赖 uvicorn:8000。
+所以「删后端」会在**启动阶段**打掉整条 e2e 基线，而不是只让某几条用例变红——
+这正是不变量②「验收基线最后搬家」的实测理由，也是 S13-6 的硬前置：
+**S13-6 不可开工的原因不是等一句批准，而是等基线搬家（S13-5 后半）先落地。**
+
+给定档用的最小决策集因此只剩两问，且都能就地执行：
+1. 基线搬家走哪条路：把 38 条里的桌面相关部分改由**壳内冒烟 + `?storage=memory` 宿主**承担（本轮 E17/E20/E21/E22 已经证明这条路能测写入回读与播放），
+   还是接受 e2e 长期把后端当**测试宿主**保留（后端不面向用户、只在 CI 里活着）。
+2. 云本质功能（发现/作者页/Nexus/版本/评论）在桌面要不要留入口——见 `WEB_FEATURE_DISPOSITION` 与本轮新登记的那 4 处导航出口。
+
+第 1 问的答案决定 S13-5/S13-6/S13-7 的次序；第 2 问决定 S13-3 的范围。两问都不需要新能力，只需要定档。

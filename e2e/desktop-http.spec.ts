@@ -303,6 +303,47 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByText("桌面可建").first().click();
     await expect(page.getByRole("button", { name: /角色\s*1/ }).first()).toBeVisible({ timeout: 8000 });
 
+    /*
+     * E26：删舞台（`removeProjectScene`）。行的 × 只在 hover 时显形且全仓同名，
+     * 所以按「含这一台标题的 div.group」把按钮限定到那一行，别用 nth 位置猜。
+     * confirm 走 E17 已经注册的 dialog 自动接受。
+     * 屏障是计数抬头回到 1，判据仍然是换页再进后那一台**取不到**——收起/乐观隐藏都骗得过前者。
+     */
+    const sceneRow = page.locator("div.group", {
+      has: page.getByText("离线路台", { exact: true }),
+    });
+    await sceneRow.getByRole("button", { name: "×" }).click();
+    await expect(page.getByRole("button", { name: /舞台\s*1/ })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "剧本列表" }).click();
+    await page.getByText("桌面可建").first().click();
+    await expect(page.getByRole("button", { name: /舞台\s*1/ }).first()).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("离线路台")).toHaveCount(0);
+
+    /*
+     * E27：道具池造一件 → 挂进工程 → 移除引用（S13-2c 的 addAssetRef / removeAssetRef）。
+     * 道具池在内存宿主里本来是空的，所以先在道具页造一件——这条顺带把「建道具」也验了。
+     * 每段都以段落计数抬头为完成屏障（道具0 → 道具1 → 道具0），最后换页再进确认引用真的没了。
+     */
+    await page.getByRole("link", { name: "道具" }).click();
+    await page.getByRole("button", { name: "新建道具" }).click();
+    // getByLabel 在这一轮之前是取不到的：Input/Select/Textarea 的 <label> 没有 htmlFor，
+    // 标签与控件没有编程关联（读屏也念不出字段名）。这里改用它，顺手当这条修复的行为判据。
+    await page.getByLabel("名称", { exact: true }).fill("铜钥匙");
+    await page.getByRole("button", { name: "创建" }).click();
+    await expect(page.getByText("铜钥匙").first()).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "剧本" }).click();
+    await page.getByText("桌面可建").first().click();
+    await page.getByRole("button", { name: /道具\s*0/ }).first().click();
+    await page.getByPlaceholder("搜索道具…").fill("铜钥匙");
+    await page.getByRole("button", { name: /铜钥匙/ }).first().click();
+    await expect(page.getByRole("button", { name: /道具\s*1/ })).toBeVisible({ timeout: 8000 });
+    const itemRow = page.locator("div.group", { has: page.getByText("铜钥匙", { exact: true }) });
+    await itemRow.getByRole("button", { name: "移除" }).click();
+    await expect(page.getByRole("button", { name: /道具\s*0/ })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "剧本列表" }).click();
+    await page.getByText("桌面可建").first().click();
+    await expect(page.getByRole("button", { name: /道具\s*0/ }).first()).toBeVisible({ timeout: 8000 });
+
     await page.getByRole("link", { name: "试玩" }).first().click();
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
     // 播出来的必须是我刚写进那一拍的字：这条一跳同时验收「写入 → 编译 → 播出」整链

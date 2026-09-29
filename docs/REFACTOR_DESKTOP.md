@@ -1180,6 +1180,22 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 另：`OutlinerPanel` 那三处 `<label className="block">` 读代码确认**包住了自己的 textarea**，
 > 属于合法的 wrapping 型，不在要修的 24 处之列（分派要有证据，不能只按 grep 计数判）。
 
+> **#65 的交接清单（2026-09-29 复扫，数字由命令产生）**
+>
+> 本轮修掉 5 处（各配一条 exact 判据 + 一次单摘变异见过红）：`AnchorEditor` 的「标签」、
+> `ItemsPage` 的「机制标签」「效果标签」补 `htmlFor`；`ConditionEditor` 的「触发条件」与
+> `EffectEditor` 的「完成效果」改成 `role="group"` + `aria-labelledby`（它们下面是一整列行，
+> 没有"那一个控件"可指，`htmlFor` 是错的修法）。
+>
+> 复扫 `grep -rn "<label" apps/web/src --include=*.tsx | grep -v htmlFor` 还剩 **21 处**，按三档分派：
+>
+> - **字段标签（该补 htmlFor 或收进原语的 `label` 属性）**：ScriptEditor.tsx:453（表情）、ConditionSimulator.tsx:71（模拟变量）、AchievementPanel.tsx:128（解锁条件）、NodeInspectorPanel.tsx:236、SceneAssetsPage.tsx:214
+> - **组标题（该像本轮那样改命名分组）**：ScriptEditor.tsx:572（分支选项）、ConditionSimulator.tsx:126（出边预演）、NodeInspectorPanel.tsx:336（分支标签）、EffectEditor/ConditionEditor 的同族列表头（本轮已改）
+> - **包裹型（`<label>` 包住房控件，合法，别动）**：ItemsPage.tsx:329、SceneAssetsPage.tsx:248、OutlinerPanel.tsx:425/438/451、PromptExport.tsx:126/138、AnchorEditor.tsx:60
+>
+> 其中前两档需要人给一句"视觉要不要跟着变"（收进 `Input label=` 会改字号与空态），
+> 所以本轮只做零视觉漂移的最小关联；第二、三档的归属我已在上面各处按代码确认过形状，不靠 grep 计数判。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

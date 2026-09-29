@@ -1144,6 +1144,14 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > `pnpm e2e` **38 passed**（55.6s，E28 在云端宿主里同样成立）；`pnpm gates` GATES_EXIT=0。
 > 本轮零产品代码改动（变异与旁路日志都在提交前逐文件还原，`git diff` 已确认 PlayerPage 干净）。
 
+> **#65 开了个头：`AnchorEditor` 的「标签」那一栏补上 `htmlFor`（2026-09-29）**
+>
+> 桌面主路径（建角色页）上那处散装 `<label>` + `Input` 现在用 `useId()` 连起来了——
+> 走的是「补 htmlFor + 调用方覆盖 `Input` 内部 id」而不是「收进 `Input` 的 `label` 属性」，
+> 因为那一栏是 `flex items-center` 的一行（标签收进控件内部会把右边的「添加」按钮顶到标签高度上）。
+> 判据：`getByRole("textbox", { name: "标签", exact: true })`；变异（只摘 `htmlFor`、留 `id`）红在这一行。
+> 其余 23 处未动（含合法的 wrapping 型），仍按 #65 逐处分派。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

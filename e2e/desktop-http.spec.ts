@@ -313,6 +313,8 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await customToggleOf("人生主题").click();
     await expect(page.getByRole("textbox", { name: "人生主题", exact: true })).toBeVisible({ timeout: 8000 });
     await page.getByRole("textbox", { name: "概括", exact: true }).fill("背负过往、却仍在寻找答案");
+    // #65 的第一处：「标签」那一栏原本是散装 <label> + Input，补上 htmlFor 才读得出字段名
+    await expect(page.getByRole("textbox", { name: "标签", exact: true })).toBeVisible({ timeout: 8000 });
     await page.getByPlaceholder("角色如何称呼").fill("凛");
     await page.getByRole("button", { name: "保存角色" }).click();
     await expect(page).toHaveURL(/\/studio\/characters\/mine$/, { timeout: 8000 });

@@ -7,7 +7,13 @@
  */
 import { collectAssetRefs, packAxsp, remapCharacterIds, unpackAxsp } from "@axiforge/editor-core";
 import type { ProjectBundle, StoredCharacter } from "@axiforge/editor-core";
-import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
+import {
+  SqliteStorageProvider,
+  MemoryStorageProvider,
+  type ProjectMeta,
+  type StorageResult,
+  type StorageProvider,
+} from "@axiforge/editor-core";
 import type { Character, CharacterData } from "@/shared/types/character";
 import { HttpStorageProvider } from "./httpStorageProvider";
 import { isTauriEnvironment, TauriSqlBackend } from "./tauriSqlBackend";
@@ -121,6 +127,21 @@ export function getSeedOutcome(): SeedOutcome | null {
 }
 
 export async function createStorageProvider(): Promise<StorageProvider> {
+  /*
+   * S13-5 的测试宿主：`?storage=memory` 在浏览器里挂一个内存本地库。
+   * 为什么需要它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()`、
+   * 骗不过 Rust 连接，所以「桌面点击路径」（新建/删除剧本）结构上无法被 e2e 断言——
+   * 有了一条真能读写的路径，才谈得上测它。
+   * 只在 DEV 生效：`import.meta.env.DEV` 在生产构建里被静态替换成 `false`，整段成为死代码，
+   * 发布产物里连这个查询参数的字面量都不留（构建后可 grep dist 验证，见 REFACTOR_DESKTOP 的 S13-5 条）。
+   */
+  if (
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get("storage") === "memory"
+  ) {
+    setLocalAssetRoot(null);
+    return new MemoryStorageProvider();
+  }
   if (isTauriEnvironment()) {
     const assets = await TauriAssetStore.create();
     setLocalAssetRoot(assets.rootDir);

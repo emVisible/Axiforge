@@ -10,9 +10,9 @@
   "apps/web/src/features/character/components/RelationGraph.tsx": 572,
   "packages/core/src/engine.ts": 568,
   "packages/core/src/compiler.ts": 439,
-  "apps/web/src/features/studio/pages/ProjectListPage.tsx": 435,
   "packages/editor-core/src/document.ts": 432,
   "apps/web/src/features/studio/cut/timelineUtils.ts": 424,
   "apps/web/src/features/character/pages/StoryEditPage.tsx": 419,
-  "apps/web/src/features/studio/flow/NodeInspectorPanel.tsx": 418
+  "apps/web/src/features/studio/flow/NodeInspectorPanel.tsx": 418,
+  "apps/web/src/features/studio/pages/ProjectListPage.tsx": 408
 }

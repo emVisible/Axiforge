@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectApi } from '@/shared/api/editor';
 import { getCreatorId } from '@/shared/lib/creatorId';
 import { getStorageProvider, projectMetaToResponse } from '@/shared/storage';
+import { createProject as dispatchCreate, deleteProject as dispatchDelete } from '@/shared/storage/projectSaves';
 import { isTauriEnvironment } from '@/shared/storage/tauriSqlBackend';
 import type { ProjectCreate, ProjectUpdate } from '@/shared/types';
 
@@ -43,7 +44,7 @@ export const useProject = (id: string) =>
 export const useCreateProject = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: ProjectCreate) => projectApi.create(data),
+    mutationFn: (data: ProjectCreate) => dispatchCreate(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: PROJECT_KEYS.all }),
   });
 };
@@ -60,7 +61,7 @@ export const useUpdateProject = () => {
 export const useDeleteProject = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => projectApi.delete(id),
+    mutationFn: (id: string) => dispatchDelete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: PROJECT_KEYS.all }),
   });
 };

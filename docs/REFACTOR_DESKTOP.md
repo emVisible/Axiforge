@@ -558,7 +558,49 @@
   同一次搬运让 `lint:colors` 的低透明度文字棘轮从 47 降到 **45**（三段重复的 `text-white/30` 表头合成一处），
   新文件按仓库既有口径在 `ui-dim-text-baseline.json` 登记 3 处（`BacklogPanel` 2、`TimelinePanel` 2 同一先例）；
   **没有**为了让新文件从 0 开始而把 HUD 的 `text-white/20` 关闭键改亮——那是替用户改视觉，不是清偿债。
+- [x] S13-2e 工程域**写侧**本地化（桌面首屏的主流程）—— 已交付 2026-09-29。
+  起因是一次「同族缺陷普查」：本项目已经第三次撞上同一形状（读路径本地化、写路径忘了），
+  所以扫了全部 `@/shared/api` 直连点里桌面可达的那些。**结果是产品最上面那一环是断的**：
+  `App.tsx:26` 把桌面首屏定成 `/studio/projects`，而 `useProjects.ts` 当年只把 `list` 一支接到了
+  本地 Provider，`createProject`/`deleteProject` 仍直连 `projectApi`——桌面上点「新建剧本」
+  是发给一个不存在的服务端，且 `ProjectListPage` 用 `catch {}` 把失败演成「弹窗自己关了」，
+  连用户输入的标题一起清掉。四个入口全部命中：列表页快速建卡、`/studio/projects/new` 表单、
+  列表卡片删除、剪辑台删除。
+  落地形状沿用 `playerSaves.ts`：新增分派口 `shared/storage/projectSaves.ts`（`projectSavesDeps`
+  注入点 + `StorageResult.err` 一律升成可读 Error，不许塌成 undefined）。三个判断写在这里：
+  1. **元信息不许丢**：创建页发 description/mechanism/genre/theme_tags/world_setting，
+     而契约的 `CreateProjectInput` 只有 `title`。不动契约（三实现齐改是更大的一刀），
+     改成分派口内两步：`createProject` → `updateProjectMeta`，字段逐个透传（`undefined`=没填，不参与覆写）。
+  2. **补写失败就删掉刚建的工程**：留一个「只有标题」的工程比整体失败更难被发现，
+     与 `importBundle` 对 saveNarrative/addRole 失败的补偿同一形状；补偿自己再失败时把残留 id 写进错误文案。
+  3. **只填标题时不发第二次写入**（列表页快速建卡没有元信息，不该空转一趟）。
+  界面侧把失败显示出来：列表页建卡失败保持弹窗打开并写明原因（不再关窗清输入），
+  创建页改用 `mutate + onSuccess` 并直接显示 mutation 自己的 `error`（同一语义一处权威，
+  不另存本地 state），剪辑台删除的 toast 从「删除失败」改成带原因。
+  **`useProject`/`useUpdateProject` 零消费者**（全仓 grep 只有定义），因此没有给它们加分派腿——
+  不为不存在的调用方造第二处真相源。
+  验收：`projectSaves.test.ts` 10 条（用真 `MemoryStorageProvider` 建完再 `listProjects` 读回，
+  证元信息真落库），4 次变异各自见过红——分派短路反过来（红 6 条）、`metaPatch` 返回空（红 3 条）、
+  `unwrap` 吞错（红 2 条）、不做补偿回滚（红 2 条）；还原后 10 passed。
+  **一次教训**：新文件先跑 vitest 全绿、`pnpm gates` 的 `tsc` 才报 8 处 TS2540
+  （`ProjectMetaPatch` 字段是 readonly）——vitest 走 esbuild 只剥类型不做类型检查，
+  新增 TS 文件的顺序应是先 typecheck 再跑测试。
+- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。
+  `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
+  为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、
+  骗不过 Rust 连接，所以「点击之后的行为」在 e2e 里结构上不可断言——S13-2d 那份审计就卡在这。
+  E17 一条走完「新建剧本 → 落到工程页 → 后退列表看得见 → 删除 → 回到空态」并断言全程零 `/api/v1`
+  （后退而非第二次 `goto`：内存库随页面重载归零，`goto` 会把它变成假阴性）。
+  两次红证明它有牙：`create` 退回直连 `projectApi` → 红在「列表里看得见」；摘掉 `?storage=memory` 分支 → 红在首屏空态。
+  **测试宿主没有进生产物**（实测，不是声明）：`pnpm --filter @axiforge/web build` 后
+  `dist/assets/*.js`（10:38 刚构建）里 `get("storage")` 与 `"memory"` 各 **0 命中**，
+  而同一批文件里 `"还没有剧本"` 1 命中——对照组证明 grep 面有效，`import.meta.env.DEV` 静态替换后整段被 DCE。
+  仍欠：`nexus` 的 `sendToInbox`、`aiApi.suggestCharacter` 两条真实云调用的处置（判死或本地化）；
+  角色的设定导出/复制两个按钮在桌面是点了没反应（`CharacterById` 路由可达、且不在任何 `localOnly` 闸门内）；
+  工程模板 tab 仍是 `projectApi.listTemplates` + `catch(() => [])`；
+  以及把 34→35 条 e2e 的**主目标**从浏览器 run mode 挪到壳内冒烟。
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
+
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
   - **S13-4a 已交付 2026-09-27**（提示词单一真相源 + 桌面本机模型通路 + 配置 UI）：
     1. 提示词从 `backend/llm/prompts.py` 迁到 `packages/axs/prompts/prose-to-axs.json`，两端读同一份。迁移是机械 dump 而非手抄——手抄会错在看不见的地方（末两句原本紧接、没有换行）。两端各锁一个 sha256 摘要，把"只输出"改成"请只输出"两侧同时红，见过它红。
@@ -572,7 +614,9 @@
 - [x] 附带修掉：道具/场景**资产详情页**绕过分派口（S13-2 期间漏的半条腿）
   —— 已交付 2026-09-27。`SceneAssetDetailPage` 的 get/update/delete 与 `ItemDetailPage` 的 update/delete 仍直连 `sceneAssetApi`/`itemApi`，而**清单页早已本地化**——于是桌面能看见、能点开、改完点保存却写进一个够不到的后端。两处顺带修掉同一个假「已保存」：`setItem({ ...item, ...form })` 是乐观合并，界面立刻显示新值而写入根本没成，现改为采用回读的那一份。判据补进 E15（`/studio/scenes/no-such-scene`）。
   教训：**本地化是按"读路径"完成的，不是按"页面"完成的**——一个页面里 get/list/create/update/delete 五支各自选路，只改读的那支就等于把半条腿焊进了主干。
-- [ ] S13-5 验收基线搬家：把 13 条 e2e 覆盖的行为在「注入内存本地库」或壳内冒烟下重建，CI 改为以桌面构建为主目标；这一步做完才允许浏览器 run mode 降级为纯测试宿主
+- [~] S13-5 验收基线搬家：**内存本地库宿主已交付（见上方 S13-2e 之后的 E17 详记，同一批）**；
+  余下的是「CI 改为以桌面构建为主目标」与壳内冒烟成为主判据。
+  这一步做完才允许浏览器 run mode 降级为纯测试宿主
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"
 - [ ] S13-8 修订战略文档：新 ADR 记录本决策与代价并链接 ADR-024/016/027；`docs/ROADMAP_FINAL.md` 的楔子3 标注为随 web 退场而搁置；恢复锚点见 [WEB_SUNSET_RESTORE](./WEB_SUNSET_RESTORE.md)，逐功能去留见 [WEB_FEATURE_DISPOSITION](./WEB_FEATURE_DISPOSITION.md)
@@ -600,16 +644,47 @@
 >   4B 量化模型「能解析但质量差」的输出仍会直接成草稿
 >
 > **三条需要用户决策才能动的新事实**（都不是我能替你定的）：
+
 > 1. **dev 库 `axiforge.projects` 有 2638 条测试残留**（作者 `pytest` 1626 / `pytest-admin` 240 / `u1`·`owner-a`·`official`·`creator-x` 各 160；标题如「存档剧本」「编译剧本」「pytest剧本」）。
 >    `a0b0cb7` 那次只清了 1765 条审核案件，工程本体没清；`created_at` 最大 2026-09-28，即 #54 的测试库隔离之后**今天零写入**（实测 dev 无 09-29 行）。
 >    清理是删数据：要按作者白名单来，且先 dump 再 restore 到临时库比行数才算数。等一句「清」。
 > 2. `GlossaryEditor.tsx` 在 apps/web 里**零消费者**（全仓 grep 只有它自己的定义）。术语表因此存在两处缺席：界面上喂不进去，桌面投影也不带（`bundleToCompilerInput` 的 `playMeta: {}`）。
 >    要么补上入口与本地列，要么判死删组件——删功能要数活读者，这里读者是 0，但它是"待接"还是"该删"是产品判断。
+>    **本条前提已按产物层重量一次（2026-09-29），结论比原条目更窄**：三个随包示范作
+>    `apps/web/public/seeds/showcase-{1,2,3}.axsp` 里 `project.json` 的键只有
+>    `axsSource/edges/meta/nodes/roles/scenes`，**没有 `playMeta`**（实测 unzip + JSON 键名）。
+>    也就是说：光修桌面投影交付不了任何东西——缺的是写入侧（没人能产这份数据），不是读取侧。
+>    服务端那边确实有：`seed_showcase.py:209` 给示范作①写了 `play_meta.glossary`（一条「交汇港」），
+>    所以今天**网页试玩有这一条释义、桌面试玩没有**，但桌面看不到它的原因在容器不带该字段，而非编译器。
+>    决策因此变成三档而非两档：接（补 UI + 契约字段 + 容器字段 + 重生成示范包）/ 判死（删组件与字段）/ 维持现状；
+>    每档都要动的面差别很大，等你定。
 > 3. 覆盖率不在 `pnpm gates` 里（只有 `pnpm coverage`）。G2 目前靠人自觉，门禁不锁的指标会漂回原样；把它锁进 CI 属 M4 的固定税。
 
-**非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。
+> **收尾快照 2（2026-09-29 S13-2d/2e 两刀，tag `desktop-wip-20260929c`）**
+>
+> 提交：`10e04d9` S13-2d（跨作品 Codex 读侧 + 审计结论 + `PlayerStatePanel` 外提）；
+> 本颗 S13-2e（工程域写侧本地化 + `?storage=memory` 宿主 + E17）。
+>
+> 实测验收状态（都是刚跑出来的命令与数字）：
+> - `pnpm gates` GATES_EXIT=0，九道全绿；单测 core 80 / axs 37 / editor-core 151 / web 141（+1 显式跳过）/ admin 39 = **448 passed + 1 skipped**
+> - `pnpm e2e` E2E_EXIT=0，**35 passed (45.7s)**（比上一版 34 多 E17 一条）
+> - `cd backend && uv run pytest -q` PYTEST_EXIT=0，**165 passed**（本批未改后端，此处为同日复跑）
+> - `pnpm build:desktop` BUILD_EXIT=0：`cargo` release 26.54s，产出 `Axiforge.app` 与 `Axiforge_0.1.0_aarch64.dmg`（5,319,503 B，10:19）；
+>   产物新鲜度不是靠 mtime 一句话——`.app` 内二进制含 `PlayerPage-DSiQE96l`，这个名字只存在于当天 10:18 的 `apps/web/dist`
+>   （第一次探针选错了：中文原文 0 命中，因为 Tauri 把资产压缩进二进制，索引里只留文件名）
+> - 变异证据：`projectSaves.test.ts` 4 次（红 6/3/2/2 条）、E17 2 次（红在「列表里看得见」与首屏空态），还原后各自复跑全绿
+> - DEV-only 测试宿主不进生产物：`dist/assets/*.js` 里 `get("storage")` 与 `"memory"` 各 0 命中，
+>   同批文件里 `"还没有剧本"` 1 命中作正对照
+>
+> 本批普查（桌面可达路径里绕过分派口的直连 HTTP）其余结论已挂在上面 S13-5 的「仍欠」里：
+> 角色设定导出/复制两按钮、`nexusApi.sendToInbox`、模板 tab 的 `projectApi.listTemplates` + `catch(() => [])`。
+>
+> **第四条需要用户决策的事实**：**桌面壳（Rust 侧）在 CI 上零信号**——`pnpm check:desktop` 刻意不在 `gates` 里
+> （`971b9c8` 的理由成立：没有 Rust 工具链的人就连门禁都跑不动），而 `.github/workflows/ci.yml` 里没有任何 desktop job。
+> 可选处置是加一个 `macos-latest` 的 `cargo check`（Linux 需要 webkit2gtk 等系统依赖，且 `targets: "all"` 在 Linux 上会去碰 deb/AppImage 链路），
+> 但本会话无法观察远端 CI（`gh` 未登录、私有库匿名 API 返回 404），**未跑过一次的 CI 配置不该被声称有效**，所以没写进 `.github/`，等一句「加」。
 
-**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
+**非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---
 

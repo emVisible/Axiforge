@@ -33,6 +33,7 @@ import { getCreatorId } from "@/shared/lib/creatorId";
 import { createStorageProvider, importProjectFromAxsp, openBinaryFile } from "@/shared/storage";
 import { PROJECT_WORKFLOW } from "@/shared/lib/workflowSteps";
 import { projectApi } from "@/shared/api/editor";
+import ProjectCard from "../components/ProjectCard";
 
 const MECHANISMS = [
   "日常校园",
@@ -45,58 +46,6 @@ const MECHANISMS = [
   "赛博朋克",
 ];
 const GENRES = ["恋爱", "悬疑", "科幻", "奇幻", "历史", "恐怖", "喜剧", "正剧"];
-
-function ProjectCard({
-  project,
-  onDelete,
-}: {
-  project: ProjectResponse;
-  onDelete: () => void;
-}) {
-  return (
-    <EntityCard
-      to={`/studio/projects/${project.id}`}
-      title={project.title}
-      description={project.description || "暂无描述"}
-      onDelete={onDelete}
-      badges={
-        <>
-          {project.is_meta && (
-            <Badge variant="amber" size="sm">
-              元剧本
-            </Badge>
-          )}
-          <Badge variant={project.is_public ? "emerald" : "default"} size="sm">
-            {project.is_public ? "公开" : "私有"}
-          </Badge>
-          {project.mechanism && (
-            <Badge variant="default" size="sm">
-              {project.mechanism}
-            </Badge>
-          )}
-          {project.genre && (
-            <Badge variant="default" size="sm">
-              {project.genre}
-            </Badge>
-          )}
-          {project.theme_tags.slice(0, 3).map((t) => (
-            <Badge key={t} variant="brand" size="sm">
-              {t}
-            </Badge>
-          ))}
-        </>
-      }
-      meta={
-        [
-          project.scenes?.length ? `${project.scenes.length} 章节` : "",
-          project.roles?.length ? `${project.roles.length} 角色` : "",
-        ]
-          .filter(Boolean)
-          .join(" · ") || undefined
-      }
-    />
-  );
-}
 
 export default function ProjectListPage() {
   const [search, setSearch] = useState("");
@@ -111,6 +60,8 @@ export default function ProjectListPage() {
   const [filterGenre, setFilterGenre] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
+  /** 写侧失败的可读原因（创建/删除共用；桌面上的本地库故障必须看得见） */
+  const [opError, setOpError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterMeta, setFilterMeta] = useState(false);
   const navigate = useNavigate();
@@ -182,10 +133,14 @@ export default function ProjectListPage() {
       });
       setShowCreate(false);
       setTitle("");
+      setOpError(null);
       navigate(`/studio/projects/${project.id}`);
-    } catch {
-      setShowCreate(false);
-      setTitle("");
+    } catch (e) {
+      /*
+       * 原先这里是 `catch {}` + 关窗 + 清空标题：失败被演成「用户自己关掉了弹窗」，
+       * 输入也一起丢了。桌面首屏的「新建剧本」正是这样什么都不发生的。
+       */
+      setOpError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -222,7 +177,10 @@ export default function ProjectListPage() {
             <Button
               size="sm"
               icon={<Plus className="h-4 w-4" strokeWidth={1.75} />}
-              onClick={() => setShowCreate(true)}
+              onClick={() => {
+                setOpError(null);
+                setShowCreate(true);
+              }}
             >
               新建剧本
             </Button>
@@ -353,7 +311,18 @@ export default function ProjectListPage() {
           placeholder="剧本标题"
           autoFocus
         />
+        {opError && (
+          <p role="alert" className="mt-2 text-sm text-red-500">
+            {opError}
+          </p>
+        )}
       </Modal>
+
+      {opError && !showCreate && (
+        <p role="alert" className="mb-3 text-sm text-red-500">
+          {opError}
+        </p>
+      )}
 
       {tab === "template" ? (
         templates.length === 0 ? (
@@ -422,7 +391,11 @@ export default function ProjectListPage() {
                 key={proj.id}
                 project={proj}
                 onDelete={() => {
-                  if (confirm("删除？")) deleteProject.mutate(proj.id);
+                  if (!confirm("删除？")) return;
+                  setOpError(null);
+                  deleteProject.mutate(proj.id, {
+                    onError: (e) => setOpError(e instanceof Error ? e.message : String(e)),
+                  });
                 }}
               />
             ))}

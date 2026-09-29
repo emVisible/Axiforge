@@ -925,8 +925,8 @@ export function useProjectEditor(id: string) {
     try {
       await deleteProjectMutation.mutateAsync(id);
       navigate(routes.projects);
-    } catch {
-      showToast("删除失败", "error");
+    } catch (err) {
+      showToast(`删除失败：${err instanceof Error ? err.message : String(err)}`, "error");
     }
   }, [id, deleteProjectMutation, navigate]);
 

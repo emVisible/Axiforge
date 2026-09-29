@@ -131,3 +131,54 @@ test.describe("E15 本地存储不可用时也不回落 HTTP", () => {
     });
   }
 });
+
+/**
+ * E17 桌面点击路径（S13-5 的内存本地库宿主）。
+ *
+ * E14/E15 只能断言「装载路径」：注入的 `__TAURI_INTERNALS__` 骗得过 `isTauriEnvironment()`
+ * 却骗不过 Rust 连接，所以本地支在点击之后必然失败，点击本身无从验证。
+ * `?storage=memory` 让浏览器里真的有一条可读写的本地库（仅 DEV 生效，见 `createStorageProvider`），
+ * 于是「桌面首屏点新建」第一次成了可断言的行为——这一条抓的是 S13-2e 的真实缺陷：
+ * 工程域的创建/删除当时仍直连 `projectApi`，桌面上点「新建剧本」是发给一个不存在的服务端。
+ */
+test.describe("E17 桌面态点击路径写进本地库", () => {
+  test("新建剧本 → 落到工程页 → 列表里看得见 → 删除 → 列表回到空态，全程零 /api/v1", async ({
+    page,
+  }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    // 卡片上的删除按钮走 window.confirm，不接受就等于测试没测到删除
+    page.on("dialog", (d) => d.accept());
+
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
+
+    // 判据可达性：先证明这条路径真的走本地库，否则下面的「零请求」是假绿
+    await expect(page.evaluate(() => "__TAURI_INTERNALS__" in window)).resolves.toBe(true);
+    await expect(page.getByText("还没有剧本")).toBeVisible({ timeout: 8000 });
+
+    await page.getByRole("button", { name: "新建剧本" }).click();
+    await page.getByPlaceholder("剧本标题").fill("桌面可建");
+    await page.getByRole("button", { name: "创建" }).click();
+
+    await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
+
+    /*
+     * 用浏览器后退而不是第二次 goto：内存库随页面重载而归零，
+     * `goto` 会新建一个空库、把「刚建的工程看得见」这条断言变成假阴性。
+     * 后退是同一文档内的 popstate，Provider 的 memo 与刚写入的数据都还在。
+     */
+    await page.goBack({ waitUntil: "load" });
+    const card = page.getByText("桌面可建").first();
+    await expect(card).toBeVisible({ timeout: 8000 });
+
+    await card.hover();
+    await page.getByRole("button", { name: "删除" }).first().click();
+    await expect(page.getByText("还没有剧本")).toBeVisible({ timeout: 8000 });
+
+    expect(hits, `点击路径上发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});

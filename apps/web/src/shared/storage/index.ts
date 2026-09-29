@@ -5,7 +5,7 @@
  * - 浏览器：HTTP（既有 FastAPI 后端）
  * 云同步/协作服务后期以装饰器形态叠加，不改变本工厂签名。
  */
-import { collectAssetRefs, packAxsp, remapCharacterIds, unpackAxsp } from "@axiforge/editor-core";
+import { collectAssetRefs, packAxsp } from "@axiforge/editor-core";
 import type { ProjectBundle, StoredCharacter } from "@axiforge/editor-core";
 import {
   SqliteStorageProvider,
@@ -21,6 +21,10 @@ import { TauriAssetStore } from "./tauriAssetStore";
 import { setLocalAssetRoot } from "./assetContext";
 import { seedDesktopIfEmpty, type SeedOutcome } from "./desktopSeed";
 import { getCreatorId } from "@/shared/lib/creatorId";
+import { importProjectFromAxsp } from "./axspImport";
+
+// 外提到 axspImport.ts（G1 行数预算）；调用方的 import 路径保持不变
+export { importProjectFromAxsp };
 import type {
   ProjectEdgeResponse,
   ProjectNodeResponse,
@@ -247,81 +251,6 @@ export async function exportProjectAsAxsp(
     if (read.ok) assets[ref] = read.data;
   }
   return packAxsp({ project: bundle.data, characters, assets });
-}
-
-/**
- * 导入：素材先落盘（内容寻址，ref 两端一致）→ 角色建新档 → 按新 id 重映射引用
- * → 建工程。角色一律新建而非覆盖：导入不得改写接收方已有的同名角色。
- */
-export async function importProjectFromAxsp(
-  provider: StorageProvider,
-  bytes: Uint8Array | string,
-): Promise<StorageResult<ProjectMeta>> {
-  const unpacked = unpackAxsp(bytes);
-  if (!unpacked.ok) return unpacked;
-  const { project, characters, assets } = unpacked.data;
-
-  for (const [ref, raw] of Object.entries(assets)) {
-    const saved = await provider.saveAsset({
-      name: ref.split("/").pop() ?? ref,
-      mime: "application/octet-stream",
-      bytes: raw,
-    });
-    if (!saved.ok) return saved;
-  }
-
-  const idMap: Record<string, string> = {};
-  const owner = getCreatorId();
-  for (const c of characters) {
-    // 归属改判给接收方、公开位不继承：否则导入的角色在「我的角色」里查不到，
-    // 也不该由导出者决定它在别人机器上是否公开。
-    const created = await provider.saveCharacter({
-      ...c,
-      id: "",
-      authorId: owner,
-      isPublic: false,
-    });
-    if (!created.ok) return created;
-    idMap[c.id] = created.data.id;
-  }
-  const remapped = remapCharacterIds(project, idMap);
-
-  const created = await provider.createProject({ title: remapped.meta.title });
-  if (!created.ok) return created;
-  const newId = created.data.id;
-
-  const saved = await provider.saveNarrative(newId, {
-    axsSource: remapped.axsSource,
-    nodes: remapped.nodes,
-    edges: remapped.edges,
-  });
-  if (!saved.ok) {
-    await provider.deleteProject(newId);
-    return saved;
-  }
-  for (const role of remapped.roles) {
-    const r = await provider.addRole(newId, {
-      characterRefId: role.characterRefId,
-    });
-    if (!r.ok) {
-      await provider.deleteProject(newId);
-      return r;
-    }
-  }
-  // 道具引用原样带过去：容器不装道具本体（只装演员表和素材字节），
-  // 同机导入即解析得到名字，跨机导入留成悬空引用——编排台按 `道具 <id前缀>` 显示、可手动移除。
-  // 静默丢掉才是问题：导出者明明在这份工程里挂了三件道具。
-  for (const ref of remapped.assetRefs) {
-    const r = await provider.addAssetRef(newId, {
-      assetType: ref.assetType,
-      assetId: ref.assetId,
-    });
-    if (!r.ok) {
-      await provider.deleteProject(newId);
-      return r;
-    }
-  }
-  return created;
 }
 
 /** 平台二进制保存：桌面 dialog+fs；浏览器 blob 下载 */

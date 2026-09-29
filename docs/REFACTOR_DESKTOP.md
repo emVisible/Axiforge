@@ -634,6 +634,26 @@
 - [x] 附带修掉：道具/场景**资产详情页**绕过分派口（S13-2 期间漏的半条腿）
   —— 已交付 2026-09-27。`SceneAssetDetailPage` 的 get/update/delete 与 `ItemDetailPage` 的 update/delete 仍直连 `sceneAssetApi`/`itemApi`，而**清单页早已本地化**——于是桌面能看见、能点开、改完点保存却写进一个够不到的后端。两处顺带修掉同一个假「已保存」：`setItem({ ...item, ...form })` 是乐观合并，界面立刻显示新值而写入根本没成，现改为采用回读的那一份。判据补进 E15（`/studio/scenes/no-such-scene`）。
   教训：**本地化是按"读路径"完成的，不是按"页面"完成的**——一个页面里 get/list/create/update/delete 五支各自选路，只改读的那支就等于把半条腿焊进了主干。
+- [x] S13-2g `.axsp` 往返补全（元信息 + 舞台）—— 已交付 2026-09-29。
+  查的是分发链路本身：导出侧把整个 `ProjectBundle` 装进容器（含 `meta` 全字段与 `scenes`），
+  导入侧却只做 `createProject({title})` + `saveNarrative` + `addRole` + `addAssetRef`。两句话的差别是：
+  1. **工程元信息全丢**——描述/世界观/规则/机制/题材/标签导回来是空的。实测红样：
+     `description ""`、`worldSetting null`、`themeTags []`。本地列在 #21 那批就补齐了，
+     「能建能显示」因此把「导回来是空的」盖住了；世界观还直接进编译器，玩家页设定面板那一栏就空了。
+  2. **自定义舞台全丢**——契约的 `saveNarrative` 只管 nodes/edges/axsSource，舞台得逐个 `addProjectScene`
+     并回传新 id、再把节点 `stageId` 重映射。这一段整段没做。影响面比听起来大：**首启播种走的就是这个函数**，
+     而三份随包示范作各有 2 个舞台（bootstrap 主场景 + 甲板/公寓/咖啡馆），**5/7 个节点归属那个真实舞台**（实测逐包数过）
+     ——旧实现下桌面示范作的舞台整块消失、那 5 个节点失去归属、背景与地点一起没有。
+  实现落在新模块 `shared/storage/axspImport.ts`（`index.ts` 不在行数基线里、379 行只剩 21 行余量，
+  再往里塞就撞 G1；抽出去后 `index.ts` 379→305 行，并以再导出保持所有调用方的 import 路径不变）。
+  两步都带回滚：元信息或舞台建失败即 `deleteProject`，与 `importBundle` 既有补偿同形；
+  返回值也从「createProject 的半成品 meta」改成补写之后的那一份。
+  **顺带改掉一条把 bug 写成期望的旧断言**：`storage.test.ts` 此前断言 `copy.data.nodes` 与 `orig.data.nodes` 全等——
+  而旧实现的 `stageId` 照抄导出侧，指向一个**新工程里并不存在的舞台**，所以那条断言恰好把悬空引用锁成了正确行为。
+  改成「忽略 stageId 比节点 + 每个节点的舞台归属必须能在导入结果里解析到」，并在往返用例里按舞台名核对归属。
+  判据：`axspRoundTrip.test.ts` 2 条（元信息 / 舞台+道具引用+归属可解析）。
+  两次变异各见过红：不补写元信息 → 红在第 1 条；不重建舞台 → 红在第 2 条。还原后连同组合往返 17 passed。
+  实测（本批最后一次全链）：`pnpm gates` GATES_EXIT=0、单测 471 passed + 1 skipped（web 160→162）；`pnpm e2e` E2E_EXIT=0、37 passed (46.8s)；`index.ts` 379→305 行后 `check:size` 无需改基线。
 - [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。
   起因是宪章里我自己写过的那句教训（S13-2b 补记）：金样本证明"当前两边一致"，证明不了"每条分支两边都走"。
   **实测三份示范作金样本对那两条真缺陷所在的分支是零覆盖**：`input.json` 里 `sceneRefId` 全是 `null`、

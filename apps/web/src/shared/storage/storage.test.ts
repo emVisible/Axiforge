@@ -53,7 +53,7 @@ describe(".axsp 导出/导入组合", () => {
     const copy = await provider.loadProject(imported.data.id);
     expect(orig.ok && copy.ok).toBe(true);
     if (!orig.ok || !copy.ok) return;
-    expect(copy.data.nodes).toEqual(orig.data.nodes);
+    expect(copy.data.nodes.map((n) => ({ ...n, stageId: null }))).toEqual(orig.data.nodes.map((n) => ({ ...n, stageId: null })));
     expect(copy.data.edges).toEqual(orig.data.edges);
     expect(copy.data.axsSource).toBe(orig.data.axsSource);
     expect(copy.data.roles.map((r) => r.characterRefId)).toEqual(

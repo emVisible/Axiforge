@@ -844,7 +844,7 @@
   （`useProjectEditor.ts:545`，随 narrativeData 落本地、两端一致），边级条件只有 API/旧数据才写；
   为 UI 走不到的路径加 schema v6 + 契约方法 + 三实现属于给假设需求造工程。
 
-- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。
+- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。 **2026-09-29 实测推进**：新增 `playwright.desktop.config.ts` + `pnpm e2e:desktop`（只起 vite，不起 uvicorn，`testIgnore: /baselines/`）。无后端下 25 条桌面族用例全绿；不加 ignore 时 38 条会红 12 条，且 12 条**全部**来自 `baselines.spec.ts`——这就是「基线搬家」可执行的那一半，S13-6 的前置从口号变成一条命令。
   `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
   为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、
   骗不过 Rust 连接，所以「点击之后的行为」在 e2e 里结构上不可断言——S13-2d 那份审计就卡在这。

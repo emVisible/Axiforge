@@ -206,10 +206,7 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     const hits: string[] = [];
     const errs: string[] = [];
     page.on("console", (m) => {
-      // 只管桌面数据通路这一类；React 的 validateDOMNesting 警告是另一条（已在 REFACTOR_DESKTOP 登记）
-      if (m.type() === "error" && /AXIFORGE-PLAY-LOAD|__TAURI_INTERNALS__|invoke is not a function/.test(m.text())) {
-        errs.push(m.text().slice(0, 260));
-      }
+      if (m.type() === "error") errs.push(m.text().slice(0, 260));
     });
     page.on("request", (req) => {
       const path = new URL(req.url()).pathname;
@@ -245,7 +242,8 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
     // bootstrap 工程自带一拍戏（「故事从这里开始...」）：这句出现=离线编译真跑通了，不是空壳页面
     await expect(page.getByText("故事从这里开始")).toBeVisible({ timeout: 8000 });
-    expect(errs, `桌面播放链路抛了错误：${errs.join(" | ")}`).toEqual([]);
+    // 判据从「只筛数据通路那一类」升级成「整条桌面链路上零 console 错误」：播放器那条 <a><a> 修好之后才敢这么收
+    expect(errs, `桌面链路上有 console 错误：${errs.join(" | ")}`).toEqual([]);
     await page.goBack({ waitUntil: "load" });
 
     /*

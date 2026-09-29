@@ -763,6 +763,12 @@
   上一轮那句「加一行诊断要先减一行」按字面执行：没放宽棘轮，也没留下静默失败。
   **顺带测到一条与播放无关的**：播放器里有一条 React DOM 嵌套非法的 console 错误（`In HTML, %s cannot be a descendant of <%s>`），
   属于观感/健壮性而非桌面数据通路，没有折进判据，改成单独登记（task 清单里的「播放器 DOM 嵌套非法」一条）。
+  **那条也已同日修掉（#62）**：归因是「锚里套锚」——`PlayerHudBrand` 用一个 `Link` 包住 `AppBrand`，而 `AppBrand` 自己就是一个指向发现页的 `Link`，
+  于是渲染出嵌套的 `a`，React 打 `In HTML, a cannot be a descendant of <a>` 并留下 hydration 隐患。
+  修法去掉外层 `Link`、把「点品牌不许顺带翻一拍」的 `stopPropagation` 移到 `span` 上（这个停止冒泡是真实需求：播放器整屏 `onClick` 推进剧情）。
+  **判据顺手收紧**：E17 那条 console 断言从「只筛数据通路那一类」升级为**整条桌面链路零 console 错误**——
+  修掉这条非法嵌套之后才敢这么收；变异见过红（把 `span` 换回带 href 的 `a`）→ 红在那条断言，报的就是 `In HTML, %s cannot be a descendant of <%s>`。
+  写 JSX 注释时的一个坑记在这里：注释里不能出现 `<a>` 这种字面量，JSX 会当真去解析它（实测 `TS17008 JSX element 'a' has no corresponding closing tag`）。
   实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（38 passed, 48.5s）。
 
 - [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。

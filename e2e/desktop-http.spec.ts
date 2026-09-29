@@ -245,7 +245,7 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
      */
     await page.getByPlaceholder("世界观设定…").fill("方舟是一座会移动的城");
     await page.getByPlaceholder("世界观设定…").press("Tab");
-    await page.waitForTimeout(400);
+    await expect(page.getByText("已保存项目信息")).toBeVisible({ timeout: 8000 });
     await page.getByRole("link", { name: "剧本列表" }).click();
     await expect(page.getByText("桌面可建").first()).toBeVisible({ timeout: 8000 });
     await page.getByText("桌面可建").first().click();
@@ -260,17 +260,32 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
      */
     await page.getByPlaceholder("新舞台…").fill("离线路台");
     await page.getByPlaceholder("新舞台…").press("Enter");
-    await page.waitForTimeout(400);
+    await expect(page.getByText("离线路台").first()).toBeVisible({ timeout: 8000 });
     await page.getByRole("link", { name: "剧本列表" }).click();
     await page.getByText("桌面可建").first().click();
     await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
-    await expect(page.getByText("离线路台")).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("离线路台").first()).toBeVisible({ timeout: 8000 });
+    // 换页回读后，舞台段的计数抬头也该是 2（bootstrap 那台 + 新写这台）
+    await expect(page.getByRole("button", { name: /舞台\s*2/ })).toBeVisible({ timeout: 8000 });
+
+    /*
+     * E24：剧本正文的写入回读。前面几条证的是"容器"（工程/舞台/元信息/角色/传记），
+     * 而桌面创作真正的主数据是 Beat 里的台词与叙述——这条走的是 saveNarrative 那条腿。
+     * 仍然换页再进才作数：编辑面板里的 textarea 值在本地 state 就能"看起来对"。
+     */
+    await page.getByText(/01\s*开始/).first().click();
+    await page.getByPlaceholder("叙述性文字...").fill("离线路上的第一句");
+    await page.getByRole("button", { name: "保存", exact: true }).first().click();
+    await expect(page.getByText(/剧本已保存|已保存/).first()).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "剧本列表" }).click();
+    await page.getByText("桌面可建").first().click();
+    await page.getByText(/01\s*开始/).first().click();
+    await expect(page.getByPlaceholder("叙述性文字...")).toHaveValue("离线路上的第一句", { timeout: 8000 });
 
     await page.getByRole("link", { name: "试玩" }).first().click();
-    await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
-    // bootstrap 工程自带一拍戏（「故事从这里开始...」）：这句出现=离线编译真跑通了，不是空壳页面
-    await expect(page.getByText("故事从这里开始")).toBeVisible({ timeout: 8000 });
+    // 播出来的必须是我刚写进那一拍的字：这条一跳同时验收「写入 → 编译 → 播出」整链
+    await expect(page.getByText("离线路上的第一句")).toBeVisible({ timeout: 8000 });
     // 判据从「只筛数据通路那一类」升级成「整条桌面链路上零 console 错误」：播放器那条 <a><a> 修好之后才敢这么收
     expect(errs, `桌面链路上有 console 错误：${errs.join(" | ")}`).toEqual([]);
     await page.goBack({ waitUntil: "load" });

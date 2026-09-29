@@ -779,6 +779,15 @@
   **这里我第一次打了无效变异**：把 `const res = await p.updateProjectMeta(...)` 改成"照样调用、但去掉 `!res.ok` 的抛错"，用例照绿——那删的是错误处理不是能力。
   按「变异必须拿掉能力本身」重做（`void patch` + 伪造 ok）之后，红在 `Expected: 方舟是一座会移动的城 / Received: ""`，这才算证到。
   实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（38 passed）。
+- [x] E23：**编排台的舞台写侧在桌面被点了一次**（2026-09-29，S13-2a 那条本地腿 `addProjectScene` 终于有点击层证据）。
+  走法是内联输入「新舞台…」按 Enter 提交——不点「+」，因为角色/道具段也有同名按钮，取加号会撞 Playwright 严格模式。
+  回读沿用 E22 的口径：**写完离开再进来**（列表 → 工程页 → 断言那一台还在），不在当前页签存在感，
+  因为同一页里乐观渲染或查询缓存都能把"看起来成功了"演出来。顺带确认 `useProjectOutliner.addScene` 用的是 memo 过的
+  `getStorageProvider()`——上一轮那条 memo 纪律在这一支是干净的（实测过，不是推断）。
+  变异按「拿掉能力本身」打：把 `await p.addProjectScene(...)` 换成伪造 `{ok:true}` 后 `refresh()` 照跑，
+  红在 `getByText(离线路台)` 不可见——这条判据确实量的是字节有没有落库。
+  实测：gates GATES_EXIT=0、`pnpm e2e` 38 passed、`pnpm e2e:desktop` 25 passed（无后端）。
+
 
 
   1. `pnpm build:desktop` BUILD_EXIT=0，重新产出 `Axiforge.app` 与 `Axiforge_0.1.0_aarch64.dmg`。

@@ -253,6 +253,19 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByRole("button", { name: "项目", exact: true }).click();
     await expect(page.getByPlaceholder("世界观设定…")).toHaveValue("方舟是一座会移动的城", { timeout: 8000 });
 
+    /*
+     * E23：编排台的舞台写侧（S13-2a 那条本地腿 `addProjectScene`）在桌面被点一次。
+     * 用 Enter 提交而不是点「+」——角色/道具段也有同名按钮，取加号会撞严格模式；
+     * 回读仍然换页再进，不在当前页签存在感（同一页里乐观渲染也能"看起来对"）。
+     */
+    await page.getByPlaceholder("新舞台…").fill("离线路台");
+    await page.getByPlaceholder("新舞台…").press("Enter");
+    await page.waitForTimeout(400);
+    await page.getByRole("link", { name: "剧本列表" }).click();
+    await page.getByText("桌面可建").first().click();
+    await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
+    await expect(page.getByText("离线路台")).toBeVisible({ timeout: 8000 });
+
     await page.getByRole("link", { name: "试玩" }).first().click();
     await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });

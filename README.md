@@ -80,13 +80,15 @@ backend/
   app/main.py      FastAPI 入口（backend/main.py 为兼容 shim）
   app/domains/     character / narrative / assets / runtime / platform / llm / ginkgo / nexus
 docs/
+  HANDOFF_DESKTOP.md   桌面化重构的交接快照：当前边界、待决项按谁能推进分档、禁区
   REFACTOR_DESKTOP.md  desktop 分支执行宪章与阶段计划
   KERNEL_DESIGN.md     L2–L4 内核构建规约
   ADR/                 架构决策记录
   user/                用户文档（开发时见 http://localhost:5174/docs）
 ```
 
-分层与依赖方向铁律见 `docs/KERNEL_DESIGN.md`；桌面化战略与阶段验收见 `docs/REFACTOR_DESKTOP.md`。
+分层与依赖方向铁律见 `docs/KERNEL_DESIGN.md`；桌面化战略与阶段验收见 `docs/REFACTOR_DESKTOP.md`；
+**要接手桌面化剩下的工作，先读 `docs/HANDOFF_DESKTOP.md`**（它登记边界与待决形状，不替代上面两份）。
 
 ## Database
 

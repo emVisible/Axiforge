@@ -406,12 +406,21 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
 
     /*
      * #65 的第六处：场景页「新建场景」弹窗里的「标签」同样是裸 <label> + Input。
-     * 只开弹窗验关联、不点「创建」——建场景这条写腿是不是本地的是 S13-2b 的口径，不在这里替它定。
+     * 下面接着真建一条并换页回读（写腿是否本地就在这条上量）。
      */
     await page.getByRole("link", { name: "场景" }).first().click();
     await page.getByRole("button", { name: "新建场景" }).click();
     await expect(page.getByRole("textbox", { name: "标签", exact: true })).toBeVisible({ timeout: 8000 });
-    await page.getByRole("button", { name: "取消" }).click();
+    /*
+     * 顺带把这条写腿点实：建一条场景 → 换页再进 → 还在。
+     * 链尾的 `hits === []` 会盯着它有没有偷偷走云端（S13-2b 的桌面证据）。
+     */
+    await page.getByLabel("名称", { exact: true }).fill("离线路台口");
+    await page.getByRole("button", { name: "创建" }).click();
+    await expect(page.getByText("离线路台口").first()).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "剧本" }).click();
+    await page.getByRole("link", { name: "场景" }).first().click();
+    await expect(page.getByText("离线路台口").first()).toBeVisible({ timeout: 8000 });
     await page.getByRole("link", { name: "剧本" }).click();
     await page.getByText("桌面可建").first().click();
 

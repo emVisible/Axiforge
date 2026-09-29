@@ -4,7 +4,6 @@ import type { Node } from "reactflow";
 import {
   Clapperboard,
   Film,
-  Inbox,
   Link2,
   Network,
   Package,
@@ -21,8 +20,7 @@ import { getImageUrl } from "@/shared/lib/imageUrl";
 import type { ProjectResponse, ProjectRoleResponse, ProjectSceneResponse } from "@/shared/types/project";
 import type { ProjectMetaPatch } from "@axiforge/editor-core";
 import type { ProjectRoleOption } from "../../flow/types";
-import { nexusApi } from "@/shared/api/nexus";
-import { getCreatorId } from "@/shared/lib/creatorId";
+import NexusSendAction from "./NexusSendAction";
 import OutlinerSection, { OutlinerRow } from "./OutlinerSection";
 import { routes } from "@/shared/lib/routes";
 
@@ -88,28 +86,6 @@ export default function OutlinerPanel({
   const [newSceneTitle, setNewSceneTitle] = useState("");
   const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
   const [editBeatTitle, setEditBeatTitle] = useState("");
-  const [nexusBusy, setNexusBusy] = useState(false);
-  const [nexusHint, setNexusHint] = useState<string | null>(null);
-
-  const sendToNexus = async () => {
-    setNexusBusy(true);
-    setNexusHint(null);
-    try {
-      const excerpt = (project.description || project.world_setting || "").slice(0, 500);
-      await nexusApi.sendToInbox({
-        author_id: getCreatorId(),
-        title: project.title,
-        body: `# ${project.title}\n\n[[project:${project.id}]]\n\n${excerpt}`,
-        related_projects: [project.id],
-      });
-      setNexusHint("已发送到 Nexus 收件箱");
-    } catch {
-      setNexusHint("发送失败，请确认后端已启动");
-    } finally {
-      setNexusBusy(false);
-    }
-  };
-
   const toggle = (key: SectionKey) =>
     setOpen((s) => ({ ...s, [key]: !s[key] }));
 
@@ -539,18 +515,7 @@ export default function OutlinerPanel({
             <p>{project.is_public ? "公开" : "私有"}</p>
           </div>
           <div className="mt-1 flex flex-col gap-0.5 px-1">
-            <button
-              type="button"
-              disabled={nexusBusy}
-              onClick={() => void sendToNexus()}
-              className="rounded py-1 text-left text-3xs text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
-            >
-              <Inbox className="mr-1 inline h-3 w-3" />
-              {nexusBusy ? "发送中…" : "发送到 Nexus"}
-            </button>
-            {nexusHint && (
-              <p className="px-1 text-3xs text-brand">{nexusHint}</p>
-            )}
+            <NexusSendAction project={project} />
             {onExportMarkdown && (
               <button
                 type="button"

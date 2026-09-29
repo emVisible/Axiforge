@@ -225,6 +225,15 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
 
     /*
+     * E20（同批挂在这里，因为建好的工程只在同一文档内活着）：编排台「项目」栏默认是收起的，
+     * 直接断言「发送到 Nexus 不在」会空载成立，所以先展开、再用**同栏留下来的那个动作**证明这一栏真渲染了。
+     * Nexus 收件箱是服务端本质（跨工程存在），桌面没有对应语义 → 不给入口，与 E18 同一口径。
+     */
+    await page.getByRole("button", { name: "项目", exact: true }).click();
+    await expect(page.getByRole("button", { name: "导出 Markdown" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("button", { name: "发送到 Nexus" })).toHaveCount(0);
+
+    /*
      * 用浏览器后退而不是第二次 goto：内存库随页面重载而归零，
      * `goto` 会新建一个空库、把「刚建的工程看得见」这条断言变成假阴性。
      * 后退是同一文档内的 popstate，Provider 的 memo 与刚写入的数据都还在。

@@ -57,7 +57,7 @@ import type {
 import { draftFromProject } from "@/features/writer/lib/projection";
 import {
   bundleToResponse,
-  createStorageProvider,
+  getStorageProvider,
   exportProjectAsAxsp,
   saveBinaryFile,
 } from "@/shared/storage";
@@ -332,7 +332,7 @@ export function useProjectEditor(id: string) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const p = await createStorageProvider();
+      const p = await getStorageProvider();
       if (cancelled) {
         return;
       }

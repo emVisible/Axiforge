@@ -30,7 +30,7 @@ import {
 } from "@/shared/components/ui";
 import type { ProjectResponse } from "@/shared/types/project";
 import { getCreatorId } from "@/shared/lib/creatorId";
-import { createStorageProvider, importProjectFromAxsp, openBinaryFile } from "@/shared/storage";
+import { getStorageProvider, importProjectFromAxsp, openBinaryFile } from "@/shared/storage";
 import { PROJECT_WORKFLOW } from "@/shared/lib/workflowSteps";
 import { projectApi } from "@/shared/api/editor";
 import ProjectCard from "../components/ProjectCard";
@@ -160,7 +160,7 @@ export default function ProjectListPage() {
                 const bytes = await openBinaryFile(".axsp");
                 if (!bytes) return;
                 try {
-                  const provider = await createStorageProvider();
+                  const provider = await getStorageProvider();
                   const res = await importProjectFromAxsp(provider, bytes);
                   if (res.ok) {
                     navigate(`/studio/projects/${res.data.id}`);

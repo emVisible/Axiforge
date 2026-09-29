@@ -701,6 +701,29 @@
   实测：`pnpm gates` GATES_EXIT=0（web 178→181 passed）、`pnpm e2e` E2E_EXIT=0（37 passed，浏览器态渲染无变化）、`tsc -b` 先于 vitest 跑且零报错。
   **顺带一条判据陷阱**：`scripts/desktop-http-inventory.mjs` 需要 5174 上活着的服务；没有服务时它对每条路由都返回 `httpCalls: []` + 一条 `ERR_CONNECTION_REFUSED`，
   看着像「全部干净」其实是「一条都没加载」。空结果不等于不存在——读它的输出前先看 `pageErrors`。
+- [x] 附带：桌面**点击层判据此前结构上写不出来**的根因——已修 2026-09-29（全量普查的第 7 条，也是这轮最值钱的一条）。
+  这轮把抽样普查换成**全量**：`grep -rlE "\b[A-Za-z]+Api\." apps/web/src` 得到 44 个文件，再用一张自建 import 图（`@/` 解析到 src）
+  把每个文件反推到路由页面，逐个读外层闸门。结论分四类：已分派（`CharacterSearchSelect`、`useProjectDirectory` 都有 `isTauriEnvironment()` 腿，
+  `PlayerPage` 的 `recordView` 也在闸门后面）、浏览器/测试宿主本身（`shared/storage/http*`）、零挂载（`PromptExport` 192 行，见 #60），
+  以及**一条真缺口**：编排台「项目」栏里的「发送到 Nexus」`nexusApi.sendToInbox` 在桌面**必败**，而失败文案是「发送失败，请确认后端已启动」——
+  产品已经不发后端了，那是把人往不存在的修复方向上指。处置与 E18 同口径：桌面不给入口（组件去留等 S13-7 判，本轮不删）。
+  实现按 `check:size` 自己的提示外提成 `outliner/NexusSendAction.tsx`（面板 619→584 行，棘轮同时收紧；`CharacterDetailPage` 702→692 一并锁定）。
+
+  **顺着这条缺口挖到更大的两条**（它们解释了「桌面点击路径为什么一直没法测」）：
+  1. `useProjectEditor.ts:335` 与 `ProjectListPage.tsx:163` 调的是 **`createStorageProvider()` 而不是 memo 住的 `getStorageProvider()`**。
+     后果一：`?storage=memory` 只在 URL 上带着，客户端一导航就掉，于是后续重建 Provider 会落进 Tauri 支——
+     `TauriAssetStore.create()` 里的 `documentDir()` 抛 **未捕获** `TypeError: __TAURI_INTERNALS__.invoke is not a function`，剪辑台永远停在「加载中...」。
+     **E17 此前只敢断 URL、不敢断页面，根因就是这个。** 后果二（真壳里）：每次重建都重开一条 SQLite 连接与资产根，与同一文件自己那句
+     「重建 SQLite 连接没有意义」相反。改法就是两处换成 `getStorageProvider()`。
+  2. `main.tsx` 的壳内冒烟用的判据是 `"__TAURI_INTERNALS__" in window`——**那恰好是 e2e 注入的标记**（`DESKTOP_MARKER_INIT` 塞的是空对象）。
+     于是测试宿主里会去跑壳内冒烟，实测两条 console error + 未捕获异常。改成要求 `invoke` 真是函数：冒烟是壳内诊断，不该在测试宿主里跑。
+
+  判据 **E20**（挂在 E17 那条流程里，因为内存库随重载归零、建好的工程只在同一文档内活着）：先展开「项目」栏，
+  **再断言同栏留下的「导出 Markdown」在场**——这是可达性证明：不先证这一栏真渲染，「发送到 Nexus 数量为 0」会空载成立。
+  两次变异各见过红：闸门写成 `{true && (` → 红在 `toHaveCount(0)`；把 `getStorageProvider()` 换回 `createStorageProvider()` → 红在等不到「项目」按钮
+  （也就是说这条判据的可写性本身依赖上面那个修复，两件事是同一根链条）。
+  **没被判据覆盖的一半**：浏览器态「这个按钮应该在」没有断言（编排台在 e2e 里需要一个有数据的工程，成本高）。记在这里不当已完成。
+  实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（37 passed）、`tsc -b` 零报错。
 - [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。
   起因是宪章里我自己写过的那句教训（S13-2b 补记）：金样本证明"当前两边一致"，证明不了"每条分支两边都走"。
   **实测三份示范作金样本对那两条真缺陷所在的分支是零覆盖**：`input.json` 里 `sceneRefId` 全是 `null`、

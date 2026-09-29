@@ -8,7 +8,7 @@
 import { compileStory, type StoryPackage } from "@axiforge/core";
 import type { StorageProvider, StorageResult } from "@axiforge/editor-core";
 import { bundleToCompilerInput } from "./compilerInput";
-import { createStorageProvider } from "./index";
+import { getStorageProvider } from "./index";
 
 /**
  * 三个资产池一律**按引用取**，不是按可见性清单取。后端就是这么做的
@@ -23,7 +23,7 @@ export async function loadStoryOffline(
   projectId: string,
   provider?: StorageProvider,
 ): Promise<StoryPackage> {
-  const p = provider ?? (await createStorageProvider());
+  const p = provider ?? (await getStorageProvider());
   const bundle = await p.loadProject(projectId);
   if (!bundle.ok) {
     throw new Error(bundle.error.code === "not_found" ? "404" : bundle.error.detail);

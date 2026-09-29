@@ -735,7 +735,7 @@
   `useRelationPresets` 的 `enabled`、`VersionPanel` 的 `enabled`、详情页那条 versions 计数查询的 `enabled: !!character && !localOnly`。
   两次变异各见过红：去掉详情页的 `&& !localOnly` → 红在 `/characters/<id>/versions`；把 `stories.cloudOnly` 改成 `true` → 红在「传记标签不在=本地通路齐了却没入口」那句自带文案的断言上。
   实测：`pnpm gates` GATES_EXIT=0、`pnpm e2e` **37 → 38 passed** (48.0s)、详情页 691 行（在 692 的棘轮内，`enabled` 折进已有表达式没有新增行）。
-- [ ] **桌面态点「试玩」进不去戏**——刚建好的工程在 `/play/<id>` 显示「加载失败」。2026-09-29 实测到，**未修，等归因**（登记见 task #61）。
+- [x] **桌面态点「试玩」进不去戏**——刚建好的工程在 `/play/<id>` 显示「加载失败」。2026-09-29 实测到并当日归因修好（过程与教训见下）。
   证据：在 E17 的桌面流程里加一跳 试玩 时测到 `/play/proj-0001` 的正文是「加载失败 / 重试 / 去发现更多作品」，
   而**全程零 `/api/v1`**（所以不是网络回落），console 里也没有任何错误（catch 只 `setStatus`+`setLoadError`，不记日志）。
   同一个工程在编排台里显示 2 拍（`01 开始` / `02 结束`，`createProject` 自带的 bootstrap）。
@@ -749,6 +749,21 @@
   同批给 E21 追加了**编辑页往返**（保存更改 → 回到详情）：桌面零云端、实测绿；
   把 `useUpdateCharacter` 的本地腿短路成 `false &&` 之后红在「回到详情页」的 URL 断言上，也就是桌面上保存会直接失效——这条腿从此有点过的证据。
   实测：`pnpm e2e` E2E_EXIT=0（38 passed, 47.7s）。
+
+  **已修（同日，登记后一小时）**：归因到**同一个根因的第三个调用点**——`loadStoryOffline` 里的 `provider ?? await createStorageProvider()`
+  绕过 memo，播放时重建 Provider 落进 Tauri 支，`TauriAssetStore.create()` 的 `documentDir()` 抛 `invoke is not a function`，
+  被 `load()` 那个宽 try 吞成一句「加载失败」。三条已定结论里 ①「失败在本地路径内部」成立、②③ 也对，
+  但真正原因在**取 Provider 那一步**：离线编译与引擎 `start()` 在 node 探针里跑得好好的（bootstrap 工程编译出 `node-start` 一拍戏，文案「故事从这里开始...」）。
+  修法与前两处同源同口径：`offlineStory.ts` 与 `assetUpload.ts` 剩下的 `createStorageProvider()` 调用点换成 `getStorageProvider()`。
+  **纪律的完整版是「任何取本地 Provider 的调用点都走 memo」**——上一轮只修了两个点就以为收口了，这就是那轮的漏网。
+  判据：E17 里那一跳 试玩 **重新加回来了且绿**，断言播出了 bootstrap 那一拍的文案（出现即证明离线编译真跑通），
+  并且 console 里不许再出现 `AXIFORGE-PLAY-LOAD` / `__TAURI_INTERNALS__` 这一类数据通路错误（`errs` 只筛这一类，别的不吞进判据也不放过登记）。
+  变异见过红：把 `offlineStory` 换回 `createStorageProvider()` → 红在「故事从这里开始」那条可见性断言上。
+  诊断能力这次真的付了钱：catch 里加了 `console.error` 打 `AXIFORGE-PLAY-LOAD`，**用删掉一个空行来抵账**（1330 ≤ 棘轮 1331）——
+  上一轮那句「加一行诊断要先减一行」按字面执行：没放宽棘轮，也没留下静默失败。
+  **顺带测到一条与播放无关的**：播放器里有一条 React DOM 嵌套非法的 console 错误（`In HTML, %s cannot be a descendant of <%s>`），
+  属于观感/健壮性而非桌面数据通路，没有折进判据，改成单独登记（task 清单里的「播放器 DOM 嵌套非法」一条）。
+  实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（38 passed, 48.5s）。
 
 - [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。
   起因是宪章里我自己写过的那句教训（S13-2b 补记）：金样本证明"当前两边一致"，证明不了"每条分支两边都走"。

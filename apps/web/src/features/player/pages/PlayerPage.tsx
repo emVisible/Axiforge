@@ -362,7 +362,6 @@ export default function PlayerPage() {
     },
     [syncBgm, playOneShotsFromDirectives, trackUnlocks],
   );
-
   const load = useCallback(async () => {
     if (!projectId) return;
     try {
@@ -388,6 +387,7 @@ export default function PlayerPage() {
       beginStory(story, codex);
       setStatus("ready");
     } catch (err) {
+      console.error("AXIFORGE-PLAY-LOAD", err);
       const msg = err instanceof Error ? err.message : "";
       setLoadError(msg.includes("403") ? "private" : "generic");
       setStatus("error");

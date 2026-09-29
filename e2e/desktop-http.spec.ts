@@ -204,6 +204,13 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     page,
   }) => {
     const hits: string[] = [];
+    const errs: string[] = [];
+    page.on("console", (m) => {
+      // 只管桌面数据通路这一类；React 的 validateDOMNesting 警告是另一条（已在 REFACTOR_DESKTOP 登记）
+      if (m.type() === "error" && /AXIFORGE-PLAY-LOAD|__TAURI_INTERNALS__|invoke is not a function/.test(m.text())) {
+        errs.push(m.text().slice(0, 260));
+      }
+    });
     page.on("request", (req) => {
       const path = new URL(req.url()).pathname;
       if (path.startsWith("/api/v1/")) hits.push(path);
@@ -232,6 +239,14 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByRole("button", { name: "项目", exact: true }).click();
     await expect(page.getByRole("button", { name: "导出 Markdown" })).toBeVisible({ timeout: 8000 });
     await expect(page.getByRole("button", { name: "发送到 Nexus" })).toHaveCount(0);
+
+    await page.getByRole("link", { name: "试玩" }).first().click();
+    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
+    // bootstrap 工程自带一拍戏（「故事从这里开始...」）：这句出现=离线编译真跑通了，不是空壳页面
+    await expect(page.getByText("故事从这里开始")).toBeVisible({ timeout: 8000 });
+    expect(errs, `桌面播放链路抛了错误：${errs.join(" | ")}`).toEqual([]);
+    await page.goBack({ waitUntil: "load" });
 
     /*
      * 用浏览器后退而不是第二次 goto：内存库随页面重载而归零，

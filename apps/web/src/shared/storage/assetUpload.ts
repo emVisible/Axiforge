@@ -5,7 +5,7 @@
  */
 
 import type { StorageError, StorageProvider } from "@axiforge/editor-core";
-import { createStorageProvider } from "./index";
+import { getStorageProvider } from "./index";
 
 function describeError(error: StorageError): string {
   const detail = "detail" in error ? error.detail : "id" in error ? error.id : "";
@@ -18,7 +18,7 @@ export async function uploadFileAsAsset(
   provider?: StorageProvider,
 ): Promise<string> {
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const p = provider ?? (await createStorageProvider());
+  const p = provider ?? (await getStorageProvider());
   const saved = await p.saveAsset({
     name: file.name,
     mime: file.type || "application/octet-stream",

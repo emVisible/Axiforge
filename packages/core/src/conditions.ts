@@ -191,14 +191,21 @@ export function evaluateCondition(
   );
 }
 
-/** 深拷贝运行时变量（保证纯函数不可变） */
+/**
+ * 深拷贝运行时变量（保证纯函数不可变）。
+ *
+ * 四个子表一律 `?? {}`：类型上它们必填，但 `restore()` 的入参来自磁盘/云端的旧存档，
+ * 少一个键是真实可能（`relationships` 就是后加的）。原先只有 relationships 兜了底，
+ * 旧档缺 `characters` 时播放页直接 `Cannot convert undefined or null to object` 白屏——
+ * 边界上读来的数据按边界处理，不做类型上的乐观假设。
+ */
 export function cloneVariables(vars: RuntimeVariables): RuntimeVariables {
   const relationships = vars.relationships ?? {};
   return {
-    memory: { ...vars.memory },
-    flags: { ...vars.flags },
+    memory: { ...vars.memory ?? {} },
+    flags: { ...vars.flags ?? {} },
     characters: Object.fromEntries(
-      Object.entries(vars.characters).map(([k, v]) => [k, { ...v }]),
+      Object.entries(vars.characters ?? {}).map(([k, v]) => [k, { ...v }]),
     ),
     relationships: Object.fromEntries(
       Object.entries(relationships).map(([a, targets]) => [

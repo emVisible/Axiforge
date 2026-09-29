@@ -234,7 +234,16 @@
 - [x] M2-2 导出/导入接真实字节与演员表；E12 基线（12 条）
 - [x] M2-3 示范作随包分发与空库首启播种（`public/seeds/` + `seeded.json` 标记 + `SeedOutcome` 可观测；全新库实测 `seed=seeded:3`，二次启动 `skipped:non-empty`）
 - [x] M3 桌面可达域收口：角色域 Provider 化（hook 层按环境分派，web 零变更）、缺席域显式降级（概览/发现/全局搜索/筛选/版本·关系·传记·Fork·删除不给入口）、错误态抑制空态（`resolveQueryState` 四态互斥 + 用例）、首屏落本地工程列表 —— 打包壳截图确认：三部【示范】工程在列、云端入口已消失
-- [ ] M4 门禁固定税（CI 前端门禁 + dpdm + coverage）+ ADR-026 + 三层文档对账
+- [~] M4 门禁固定税（CI 前端门禁 + dpdm + coverage）+ ADR-026 + 三层文档对账
+  已交付（2026-09-29）：`dpdm`（`check:circular`）与 `pnpm coverage`（G2 阈值）现在都在 `pnpm gates` 里，
+  CI 的 `frontend-gates` 就跑这一条命令，并**删掉了它后面那份重复的 core-only 覆盖率步骤**
+  （两份会漂——过去真正被执行过的一直是第二份，gates 里压根没有覆盖率）。
+  同时补上触发条件：`on.push.branches` 原先只有 `[main, master]`，而 v0.8 起所有工作都直接推 `desktop`，
+  等于**这条分支上的提交一道 CI 都不跑**。ADR-026 与三层文档对账（README/BACKLOG/docs-user）此前已交付。
+  未交付的两件：① CI 以桌面构建为主目标（属 S13-5，见下）；② **本条 CI 改动本身还没在远端跑过一次**——
+  `gh` 在本机未登录，Actions 结果看不到，所以「desktop 推上去真的会跑、且在 ubuntu 上真的绿」目前是推断。
+  已知风险点：覆盖率阈值换到 CI 的 v8/Node20 环境可能算出略微不同的分支数，
+  若首跑因此变红，处置是补测试或按环境差异记录，而不是把阈值调低。
 
 **非目标**：不拆巨石（Phase 7 单列）、不做签名公证/自动更新（Phase 10）、不做音频素材入口。
 

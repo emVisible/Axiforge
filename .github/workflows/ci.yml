@@ -2,12 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # desktop 是当前唯一在推的工作分支（v0.8 起桌面化都在这里）。它原先不在列表里，
+    # 意味着直接推 desktop 的提交**一道 CI 都不跑**——门禁写在本地 pnpm gates 里，
+    # 但「推上去有没有人复查」这件事静默地不存在。
+    branches: [main, master, desktop]
   pull_request:
 
 jobs:
   frontend-gates:
-    name: 前端门禁（类型 / 单测 / lint / 内核纯净 / 循环依赖）
+    name: 前端门禁（类型 / 单测 / 覆盖率阈值 / lint / 内核纯净 / 循环依赖 / 行数棘轮 / 对比度）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,12 +23,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # 一条命令跑完宪章 G2/G4/G5/Q9 的全部可自动化部分：
-      # tsc --noEmit（4 个包）→ vitest（core/axs/editor-core/web）→ oxlint + 颜色令牌
-      # → packages 零平台依赖断言 → dpdm 循环依赖=0
+      # tsc --noEmit（4 个包）→ vitest（core/axs/editor-core/web/admin）
+      # → vitest coverage 阈值（core 与 editor-core 行+分支 ≥90%）→ oxlint + 颜色令牌
+      # → packages 零平台依赖断言 → dpdm 循环依赖=0 → 行数棘轮 → 双主题对比度 → 共享组件源扫描
+      #
+      # 这里原先还单独跑了一次 `--filter @axiforge/core test:coverage`：覆盖率已经进了 gates，
+      # 而且是两个包一起卡阈值。留两份就会漂——第二次跑的那个才是曾经真正被执行过的阈值。
       - name: Run gates
         run: pnpm gates
-      - name: Core coverage (G2)
-        run: pnpm --filter @axiforge/core test:coverage
 
   build-and-test:
     runs-on: ubuntu-latest

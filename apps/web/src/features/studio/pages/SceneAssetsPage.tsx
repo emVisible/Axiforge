@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { MapPin, Plus } from "lucide-react";
 
 import {
@@ -83,6 +83,7 @@ const emptyForm = {
 
 export default function SceneAssetsPage() {
   const [showCreate, setShowCreate] = useState(false);
+  const tagLabelId = useId();
   const [form, setForm] = useState(emptyForm);
 
   const { data: scenes, isLoading, error } = useSceneAssets({ author_id: getCreatorId() });
@@ -211,11 +212,12 @@ export default function SceneAssetsPage() {
             placeholder="场景特殊规则"
           />
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor={tagLabelId} className="mb-1.5 block text-xs font-medium text-ink-muted">
               标签
             </label>
             <div className="mb-2 flex items-center gap-2">
               <Input
+                id={tagLabelId}
                 value={form.tagInput}
                 onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
                 onKeyDown={(e) =>

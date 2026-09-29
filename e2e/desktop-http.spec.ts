@@ -393,6 +393,17 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByText("桌面可建").first().click();
     await expect(page.getByRole("button", { name: /道具\s*0/ }).first()).toBeVisible({ timeout: 8000 });
 
+    /*
+     * #65 的第六处：场景页「新建场景」弹窗里的「标签」同样是裸 <label> + Input。
+     * 只开弹窗验关联、不点「创建」——建场景这条写腿是不是本地的是 S13-2b 的口径，不在这里替它定。
+     */
+    await page.getByRole("link", { name: "场景" }).first().click();
+    await page.getByRole("button", { name: "新建场景" }).click();
+    await expect(page.getByRole("textbox", { name: "标签", exact: true })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("button", { name: "取消" }).click();
+    await page.getByRole("link", { name: "剧本" }).click();
+    await page.getByText("桌面可建").first().click();
+
     await page.getByRole("link", { name: "试玩" }).first().click();
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
     // 播出来的必须是我刚写进那一拍的字：这条一跳同时验收「写入 → 编译 → 播出」整链

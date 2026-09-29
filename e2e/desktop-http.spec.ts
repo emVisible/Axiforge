@@ -287,6 +287,16 @@ test.describe("E21 桌面态建角色 → 传记 → 新建篇章", () => {
     await expect(card).toBeVisible({ timeout: 8000 });
     await card.click();
 
+    /*
+     * 编辑页往返。`useUpdateCharacter` 的本地腿早就写好了，但从没被点过：
+     * 实测它干净（保存更改 → 回到详情页，全程零 /api/v1），把它的 `isTauriEnvironment()` 短路成
+     * `false &&` 之后这条就红在「回到详情页」的 URL 断言上——也就是桌面上保存会直接失效。
+     */
+    await page.getByRole("link", { name: "编辑", exact: true }).click();
+    await expect(page).toHaveURL(/\/studio\/characters\/[^/]+\/edit$/, { timeout: 8000 });
+    await page.getByRole("button", { name: "保存更改" }).click();
+    await expect(page).toHaveURL(/\/studio\/characters\/[^/]+$/, { timeout: 8000 });
+
     const tab = page.getByRole("button", { name: "传记" });
     await expect(tab, "传记标签不在=本地通路齐了却没入口（本轮修掉的那一类）").toBeVisible({ timeout: 8000 });
     await tab.click();

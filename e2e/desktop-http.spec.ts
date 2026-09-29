@@ -164,6 +164,34 @@ test.describe("E18 云端专属入口在桌面态隐藏，而不是演成空态"
  * 注意它守的是**不静默**，不是"本地能生成建议"——本地这条通路还没有
  * （`packages/axs/prompts/` 只有 `prose-to-axs.json`，建档要新做一份提示词，属 ADR-029 未决项）。
  */
+test.describe("E36 账户设置在桌面是显式缺席，而不是六个必然失败的按钮", () => {
+  test("浏览器态有这些动作，桌面态只剩本地身份与一句说明", async ({ page }) => {
+    /*
+     * 这一页六个动作（头像、昵称、邮箱绑定、邮箱恢复、导出数据、注销账户）全部直连 userApi。
+     * 桌面离线态它们只会把 catch 吞成「操作失败」——E14 那条只能证明"装载零请求"，
+     * 证明不了"没有可点的死入口"，所以这条两半都测：
+     * 浏览器那一半是正控（防的就是"整页被删掉也照样绿"），桌面那一半断缺席说明在位、动作按钮为 0。
+     */
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+    await page.goto("/profile", { waitUntil: "load" });
+    await expect(page.getByRole("button", { name: "保存昵称" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("button", { name: "导出我的数据" })).toBeVisible({ timeout: 8000 });
+
+    hits.length = 0; // 浏览器那一半本来就该发云端请求，不清零就是把测试自己的账算到桌面上
+    await page.addInitScript(DESKTOP_MARKER_INIT);
+    await page.goto("/profile?storage=memory", { waitUntil: "load" });
+    await expect(page.getByText("当前身份：")).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("账户设置需要协作服务")).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("button", { name: "保存昵称" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "导出我的数据" })).toHaveCount(0);
+    expect(hits, `桌面态这一页发了云端请求：${[...new Set(hits)].join(", ")}`).toEqual([]);
+  });
+});
+
 test.describe("E35 Discover 浏览入口在桌面态全站消失", () => {
   test("同一个组件：浏览器里有，道具页与场景页在桌面都没有", async ({ page }) => {
     /*

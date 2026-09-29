@@ -707,6 +707,32 @@
   接上后立刻报出 `e2e/baselines.spec.ts` 里一个从未被使用的 `replaceEdges` 导入（oxlint 早就警告过，但没人把它当错误）。
   牙：往 `desktop-http.spec.ts` 注入一处类型错误 → `pnpm typecheck` 报 4 处并 exit 1；还原 → exit 0。
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
+  **事前核查（2026-09-29 做完，三条都有实测结论；这一条不是「随时能删」）**：
+  1. **随包 `.axsp` 播种链路 = 桌面自足** ✓。取法是同源相对 `fetch("/seeds/manifest.json")`
+     （`desktopSeed.ts:16,49-50`），文件在 `apps/web/public/seeds/` → 进 `dist/seeds/` → 打进桌面包。
+     产物层证据：`Axiforge.app` 的内嵌资源索引里查到 `seeds/manifest.json`、`showcase-1.axsp`、`showcase-3.axsp` 各 1 命中
+     （第一次拿中文原文当探针是 0 命中——资产内容被压缩，只有文件名在索引里明文，探针选错过一次）。
+     结论：删后端不影响首启播种。
+  2. **但示范作内容的重建路径依赖后端** ✗ —— 这才是 S13-6 的真前置。
+     唯一干净的再生成路径是 `AXIFORGE_EXPORT_SEEDS=1 pnpm --filter @axiforge/web exec vitest run src/shared/storage/exportSeeds.test.ts`，
+     它第一步就是 `POST /editor/projects/seed/showcase`（该文件注释写明「复用应用自身的导出路径，不再写一份映射」，
+     因为 `ProjectResponse → ProjectBundle` 只允许一处权威）。后端一删，这条工具就废。
+     **而且两份权威今天已经漂了**（实测）：`seed_showcase.py:209` 给示范作① 写了 `play_meta.glossary`（一条「交汇港」），
+     而随包三份 `project.json` 的键只有 `axsSource/edges/meta/nodes/roles/scenes`，**没有 `playMeta`**；道具引用同理为 0。
+     也就是说包里那份内容并不是「按当前定义导出来的」，真重导一次会改动随包内容。
+     两档选项与代价（需要定档，不是我能替你选的）：
+     - **甲：把示范作定义与导出器搬进 TS**（三份内容成为构建期数据，`.axsp` 由本地生成）。
+       代价是一次真迁移（内容定义 + 导出映射 + 重导与 diff 复核），换来退场后仍可再生成；
+     - **乙：宣布随包 `.axsp` 从此就是权威**，`seed_showcase.py` 与导出工具随后端一起删。
+       代价是示范作只能手工重导更新，且要同时改掉 ADR-026 与本项目记忆里那句「重建要靠复用后端定义」。
+     不能拖着不选：现在的状态是**两份都在、且已经不一致**，比只有一份危险。     **漂移已钉成机器在册**：`apps/web/src/shared/storage/seedShape.test.ts`（8 条）——三份包的字段集、`assetRefs` 为空、manifest 与目录一一对应。
+     两次变异各见过红：归一化时多补一个 `playMeta` → 红 3 条（真重导过一次也要响，不许把这处漂移静默「修平」）；
+     manifest 多列一个不存在的包 → 红 1 条（播种按 manifest 取文件，多一项就是一条 404）。
+     在册口径写清是 **normalizeBundle 之后**的键集：`assetRefs` 那格就是补进来的空数组，
+     所以「包里没有道具引用」由 `assetRefs 为空` 那条断言守着，不靠键名缺失（我第一次写就把它当成缺失，红了才发现）。
+  3. **文档面** ✓（退场时只需改 README）。`docs/user/` 实测**零**服务端指向（只有 `desktop/` 与 `writing/` 两节）；
+     `README.md` 命中 10 行（命令：`grep -n 'localhost:8000\|uvicorn\|docker\|dev:api\|alembic\|pnpm setup\|5432' README.md`）：16、26、27、36、37、49、60、90、96、106，覆盖 `pnpm setup` / `dev:api` / 端口表 / alembic 段，
+     逐条改成桌面口径即可，不涉及结构重写。
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"
 - [x] S13-8 修订战略文档 —— 已交付 2026-09-29：新增 [ADR-029](./ADR/029-desktop-only-build-target.md)
   （桌面是唯一构建与发布目标、web 与第二套数据通路退场、代价与未决逐条实测；链接 ADR-024/008/016/027/026）；

@@ -156,6 +156,78 @@ export function runStorageAuthoringContractSuite(
       });
     });
 
+    describe("导入器写序列（Phase 13 S13-2g：随包播种走的正是这一串，两支都得扛住）", () => {
+      it("全 undefined 的补丁不清空已有元信息；删到零舞台再重建，节点能挂回新舞台 id", async () => {
+        const p = await makeProvider();
+        const created = await p.createProject({ title: "示范作" });
+        if (!created.ok) throw new Error("create failed");
+        const id = created.data.id;
+        const seeded = await p.updateProjectMeta(id, {
+          description: "旧库里写好的描述",
+          worldSetting: "交汇港的世界观",
+        });
+        expect(seeded.ok).toBe(true);
+
+        // 空包（随包三份示范作的 meta 只有 id/title/updatedAt）逐项 patch=undefined。
+        // 契约语义是 undefined=不动这一栏；演成「写 NULL」的话，导入一次就把本机已有元信息清空。
+        const emptyPatch = await p.updateProjectMeta(id, {
+          description: undefined,
+          coverImage: undefined,
+          themeTags: undefined,
+          mechanism: undefined,
+          genre: undefined,
+          isMeta: undefined,
+          worldSetting: undefined,
+          rules: undefined,
+        });
+        expect(emptyPatch.ok).toBe(true);
+        const afterMeta = await p.loadProject(id);
+        if (!afterMeta.ok) throw new Error("load failed");
+        expect(afterMeta.data.meta.title).toBe("示范作");
+        expect(afterMeta.data.meta.description).toBe("旧库里写好的描述");
+        expect(afterMeta.data.meta.worldSetting).toBe("交汇港的世界观");
+
+        // 导入要先把 createProject 自带的 bootstrap 删掉——它是**最后一个**舞台，
+        // 于是中间态是「零舞台工程」。实现方若有「至少留一个舞台」的护栏，播种就直接失败。
+        const before = await p.loadProject(id);
+        if (!before.ok) throw new Error("load failed");
+        expect(before.data.scenes.length).toBeGreaterThan(0);
+        for (const s of before.data.scenes) {
+          const removed = await p.removeProjectScene(id, s.id);
+          expect(removed.ok, `删舞台 ${s.title} 失败`).toBe(true);
+        }
+        const emptied = await p.loadProject(id);
+        if (!emptied.ok) throw new Error("load failed");
+        expect(emptied.data.scenes).toHaveLength(0);
+
+        // 再按包内顺序重建，节点挂的是**这台机器上的新 id**（包里的旧 id 在这里不存在）
+        const added = await p.addProjectScene(id, {
+          title: "咖啡馆",
+          location: "街角",
+          source: "inline",
+        });
+        expect(added.ok).toBe(true);
+        if (!added.ok) return;
+        const saved = await p.saveNarrative(id, {
+          axsSource: null,
+          nodes: [{
+            id: "n1",
+            stageId: added.data.id,
+            editorData: {},
+            narrativeData: { title: "推门", script: [{ op: "say", speaker: "堰纱", text: "你来了。" }] },
+            sortOrder: 0,
+          }],
+          edges: [],
+        });
+        expect(saved.ok).toBe(true);
+        const final = await p.loadProject(id);
+        if (!final.ok) throw new Error("load failed");
+        expect(final.data.scenes.map((s) => s.title)).toEqual(["咖啡馆"]);
+        expect(final.data.scenes[0]?.location).toBe("街角");
+        expect(final.data.nodes.find((n) => n.id === "n1")?.stageId).toBe(added.data.id);
+      });
+    });
+
     describe("工程道具引用增删（Phase 13 S13-2c：桌面离线也要能往编排台加道具）", () => {
       it("加→读回→删；同件重复加不去重；引用不随叙事图覆写消失", async () => {
         const p = await makeProvider();

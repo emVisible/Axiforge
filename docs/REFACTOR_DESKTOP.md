@@ -771,6 +771,30 @@
   写 JSX 注释时的一个坑记在这里：注释里不能出现 `<a>` 这种字面量，JSX 会当真去解析它（实测 `TS17008 JSX element 'a' has no corresponding closing tag`）。
   实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（38 passed, 48.5s）。
 
+- [x] 附带：**交付物层三条实测 + 导航出口普查**（2026-09-29，在 `e10cae2` 之后重跑，所以产物含本轮全部生产改动）。
+
+  1. `pnpm build:desktop` BUILD_EXIT=0，重新产出 `Axiforge.app` 与 `Axiforge_0.1.0_aarch64.dmg`。
+
+  2. **随包示范作确实在产物里**：`strings Contents/MacOS/axiforge-desktop` 里有 `seeds/manifest.json` 与 `seeds/showcase-1/2/3.axsp`；
+
+     而 `Contents/Resources` 只有 `icon.icns`——Tauri 把 `frontendDist` 整个嵌进可执行文件。
+
+     我一开始按常识去 `find …/Resources -name "*.axsp"`，得到 0 个文件，**那是找错地方，不是缺陷**；
+
+     差点据此报一条「示范作没随包」。教训同「空结果≠不存在」：产物层先确认东西存在哪一层，再谈有没有。
+
+     注：这证明的是路径进了二进制的资源索引，不等于壳内首启真能播种——那一条仍归 #16 的人工壳内验收。
+
+  3. 生产产物里 `storage=memory` 字面量 **0 次**（DEV 测试宿主被 `import.meta.env.DEV` 静态剥掉）。这条以前只是文档里的纸面推断，现在是实测。
+
+  **导航出口这一轴是新做的**（此前只普查过数据通路）：桌面可达界面里指向云本质页面的出口共 4 处——
+
+  `PlayerPage.tsx:813/816`（错误态 CTA「去发现更多作品」）、`PlayerPage.tsx:916`、`AppHeader.tsx:70`（「发现」导航）、
+
+  `UserAccountMenu.tsx:73`（作者主页）。实测 `/discover` 在桌面是 E14 在册的**零云端路由**（进去是显式缺席，不发请求），
+
+  所以这四处**不是数据通路泄漏**，而是同一道产品题：云本质页面在桌面要不要留入口——归 S13-3 定档，本轮只登记，不替产品判断顺手删。
+
 - [x] 附带：金样本第四份 —— 跨语言**分支**对照（2026-09-29，把 G6 从"当前样本一致"升级到"这些分支两边都走"）。
   起因是宪章里我自己写过的那句教训（S13-2b 补记）：金样本证明"当前两边一致"，证明不了"每条分支两边都走"。
   **实测三份示范作金样本对那两条真缺陷所在的分支是零覆盖**：`input.json` 里 `sceneRefId` 全是 `null`、

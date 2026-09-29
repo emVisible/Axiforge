@@ -383,6 +383,38 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page.getByText("离线路上的第一句")).toBeVisible({ timeout: 8000 });
     // 界面上不该出现源码注释：JSX 子位置裸写块注释会被当成文本节点渲染出来（我踩过，判据钉在这里）
     await expect(page.getByText(/\/\*|\*\//)).toHaveCount(0);
+
+    /*
+     * E28：自动存档在桌面这条腿（#64）。播放进度走分派口 playerSaves.writeSave，
+     * 此前只在契约用例里成立过，没被点过一次。
+     *
+     * 自动存档有 600ms 防抖，而防抖窗口内的"等一会儿再读"就是自己造 flake。这里把
+     * 「离开播放器 → 再进来」当轮询的一步：再进来时播放器会去读**活动存档**，读到就换
+     * 「继续游玩」那一屏、不开播。量的是存储回读而不是本页 state，所以屏障与判据是同一件事；
+     * 写入没落库时，这一屏永远不出现。
+     *
+     * 每一步都要 waitFor 而不是立刻 count()：进场本身是异步的（离线上架 → codex → getSave），
+     * 读到了还得等它渲染。直接问 count 会被这条骗到——实测连轮三轮都是 0，
+     * 而旁路日志证明存档早就读回来了（status=active / beat=node-start）。
+     */
+    await expect
+      .poll(
+        async () => {
+          await page.goBack({ waitUntil: "load" });
+          await page.getByRole("link", { name: "试玩" }).first().click();
+          return page
+            .getByRole("button", { name: "继续游玩" })
+            .waitFor({ state: "visible", timeout: 6000 })
+            .then(() => 1)
+            .catch(() => 0);
+        },
+        { timeout: 30000, intervals: [500] },
+      )
+      .toBe(1);
+    // 续玩提示上的摘要就是刚写进那一拍的字：存下来的不是空槽，也不是别的工程
+    await expect(page.getByText("离线路上的第一句")).toBeVisible({ timeout: 8000 });
+    await page.getByRole("button", { name: "从头开始" }).click();
+
     // 判据从「只筛数据通路那一类」升级成「整条桌面链路上零 console 错误」：播放器那条 <a><a> 修好之后才敢这么收
     expect(errs, `桌面链路上有 console 错误：${errs.join(" | ")}`).toEqual([]);
     await page.goBack({ waitUntil: "load" });

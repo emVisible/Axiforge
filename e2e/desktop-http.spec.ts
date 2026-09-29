@@ -365,6 +365,9 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     // getByLabel 在这一轮之前是取不到的：Input/Select/Textarea 的 <label> 没有 htmlFor，
     // 标签与控件没有编程关联（读屏也念不出字段名）。这里改用它，顺手当这条修复的行为判据。
     await page.getByLabel("名称", { exact: true }).fill("铜钥匙");
+    // #65 的第四五处：这一栏的「机制标签 / 效果标签」是裸 label，接上 htmlFor 后读屏才念得出字段名
+    await expect(page.getByRole("textbox", { name: "机制标签", exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("textbox", { name: "效果标签", exact: true })).toBeVisible({ timeout: 8000 });
     await page.getByRole("button", { name: "创建" }).click();
     await expect(page.getByText("铜钥匙").first()).toBeVisible({ timeout: 8000 });
     /*

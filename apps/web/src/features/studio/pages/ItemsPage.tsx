@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Plus, Package } from "lucide-react";
 
 import { useItems, useCreateItem, useDeleteItem } from "@/shared/hooks/useAssets";
@@ -95,6 +95,8 @@ const emptyForm = {
 export default function ItemsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const mechanismTagId = useId();
+  const effectTagId = useId();
   const [categoryFilter, setCategoryFilter] = useState("");
 
   const { data: items, isLoading, error } = useItems({ author_id: getCreatorId() });
@@ -240,11 +242,12 @@ export default function ItemsPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor={mechanismTagId} className="mb-1.5 block text-xs font-medium text-ink-muted">
               机制标签
             </label>
             <div className="mb-2 flex gap-2">
               <Input
+                id={mechanismTagId}
                 value={form.tagInput}
                 onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
                 onKeyDown={(e) => {
@@ -280,11 +283,12 @@ export default function ItemsPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor={effectTagId} className="mb-1.5 block text-xs font-medium text-ink-muted">
               效果标签
             </label>
             <div className="mb-2 flex gap-2">
               <Input
+                id={effectTagId}
                 value={form.effectInput}
                 onChange={(e) =>
                   setForm({ ...form, effectInput: e.target.value })

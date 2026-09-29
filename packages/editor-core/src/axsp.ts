@@ -133,7 +133,7 @@ export function unpackAxsp(bytes: Uint8Array | string): StorageResult<AxspBundle
     }
     assets[ref] = raw;
   }
-  return ok({ manifest: manifest.data, project: project.data, characters: characters.data, assets });
+  return ok({ manifest: manifest.data, project: normalizeBundle(project.data), characters: characters.data, assets });
 }
 
 /** v1 纯 JSON 信封只读解析（归一化为 v2 束形态：无角色、无内嵌素材） */
@@ -171,7 +171,7 @@ export function unpackAxspV1(text: string): StorageResult<AxspBundle> {
       assets: manifest.assets ?? [],
       characters: [],
     },
-    project: obj.project,
+    project: normalizeBundle(obj.project),
     characters: [],
     assets: {},
   });
@@ -244,6 +244,15 @@ function readJson<T>(
   } catch (cause) {
     return err({ code: "corrupted", entity: "axsp", detail: `${name} 非法 JSON`, cause });
   }
+}
+
+/**
+ * 包内工程束是外部 JSON，键的有无取决于导出它的那一版代码。
+ * S13-2c 之前的容器没有 `assetRefs`——缺键是旧版本而不是坏输入，按「包内没有引用」补齐，
+ * 且只在这一处补：让每个调用方各自 `?? []` 早晚会有一个漏掉，漏掉的那处直接抛异常。
+ */
+function normalizeBundle(project: ProjectBundle): ProjectBundle {
+  return Array.isArray(project.assetRefs) ? project : { ...project, assetRefs: [] };
 }
 
 /**

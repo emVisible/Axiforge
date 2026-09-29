@@ -155,5 +155,80 @@ export function runStorageAuthoringContractSuite(
         });
       });
     });
+
+    describe("工程道具引用增删（Phase 13 S13-2c：桌面离线也要能往编排台加道具）", () => {
+      it("加→读回→删；同件重复加不去重；引用不随叙事图覆写消失", async () => {
+        const p = await makeProvider();
+        const created = await p.createProject({ title: "道具" });
+        if (!created.ok) throw new Error("create failed");
+        const id = created.data.id;
+
+        const fresh = await p.loadProject(id);
+        if (!fresh.ok) throw new Error("load failed");
+        expect(fresh.data.assetRefs).toEqual([]);
+
+        const a = await p.addAssetRef(id, { assetType: "item", assetId: "item-1" });
+        expect(a.ok).toBe(true);
+        if (!a.ok) return;
+        const b = await p.addAssetRef(id, { assetType: "item", assetId: "item-1" });
+        expect(b.ok).toBe(true);
+        if (!b.ok) return;
+        // 后端就是裸 INSERT，不去重：客户端偷偷合并会让两端计数不一致
+        expect(b.data.id).not.toBe(a.data.id);
+
+        const withRefs = await p.loadProject(id);
+        if (!withRefs.ok) throw new Error("load failed");
+        expect(withRefs.data.assetRefs.map((r) => r.id).sort()).toEqual([a.data.id, b.data.id].sort());
+        expect(withRefs.data.assetRefs.every(
+          (r) => r.projectId === id && r.assetType === "item" && r.assetId === "item-1",
+        )).toBe(true);
+
+        // 叙事图和引用是两个域：剪辑台每次存稿都覆写 nodes/edges，
+        // 引用若跟着一起清掉，加进去的道具就活不过下一次保存。
+        const node = withRefs.data.nodes[0];
+        expect(node).toBeDefined();
+        const saved = await p.saveNarrative(id, {
+          axsSource: null,
+          nodes: [{ ...node!, id: "n-only", stageId: null, editorData: {}, narrativeData: {}, sortOrder: 0 }],
+          edges: [],
+        });
+        expect(saved.ok).toBe(true);
+
+        const afterSave = await p.loadProject(id);
+        if (!afterSave.ok) throw new Error("load failed");
+        expect(afterSave.data.assetRefs.map((r) => r.id).sort()).toEqual([a.data.id, b.data.id].sort());
+
+        const removed = await p.removeAssetRef(id, a.data.id);
+        expect(removed.ok).toBe(true);
+        const afterRemove = await p.loadProject(id);
+        if (!afterRemove.ok) throw new Error("load failed");
+        expect(afterRemove.data.assetRefs.map((r) => r.id)).toEqual([b.data.id]);
+
+        const again = await p.removeAssetRef(id, a.data.id);
+        if (!again.ok) expect(again.error.code).toBe("not_found");
+        else throw new Error("重复删除引用必须可见地失败，不能演成幂等成功");
+      });
+
+      it("引用 id 归属工程：换个工程删不动，往不存在的工程加也加不进", async () => {
+        const p = await makeProvider();
+        const first = await p.createProject({ title: "甲" });
+        const second = await p.createProject({ title: "乙" });
+        if (!first.ok || !second.ok) throw new Error("create failed");
+
+        const added = await p.addAssetRef(first.data.id, { assetType: "item", assetId: "item-1" });
+        if (!added.ok) throw new Error("add failed");
+
+        const cross = await p.removeAssetRef(second.data.id, added.data.id);
+        if (!cross.ok) expect(cross.error.code).toBe("not_found");
+        else throw new Error("跨工程删引用不该成功");
+        const still = await p.loadProject(first.data.id);
+        if (!still.ok) throw new Error("load failed");
+        expect(still.data.assetRefs.map((r) => r.id)).toEqual([added.data.id]);
+
+        const orphan = await p.addAssetRef("no-such-project", { assetType: "item", assetId: "item-1" });
+        if (!orphan.ok) expect(orphan.error.code).toBe("not_found");
+        else throw new Error("往不存在的工程加引用必须失败");
+      });
+    });
   });
 }

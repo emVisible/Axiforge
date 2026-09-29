@@ -312,7 +312,10 @@ async def add_asset_ref(
     data: ProjectAssetRefCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    return await ProjectService(db).add_asset_ref(project_id, data)
+    created = await ProjectService(db).add_asset_ref(project_id, data)
+    if created is None:
+        raise HTTPException(404, "Project not found")
+    return created
 
 
 @editor_project_router.delete("/{project_id}/assets/{ref_id}", status_code=204)
@@ -321,7 +324,7 @@ async def remove_asset_ref(
     ref_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    if not await ProjectService(db).remove_asset_ref(ref_id):
+    if not await ProjectService(db).remove_asset_ref(project_id, ref_id):
         raise HTTPException(404, "AssetRef not found")
 
 

@@ -9,7 +9,6 @@
  */
 import { projectApi } from "@/shared/api/editor";
 import { getApiBase } from "@/shared/api/client";
-import { characterApi } from "@/shared/api/characters";
 import { collectProjectNodes } from "@/features/writer/lib/projection";
 import {
   fail,
@@ -30,7 +29,6 @@ import {
   httpSaveScene,
   httpUnlockAchievement,
   httpWriteSave,
-  toStoredCharacter,
   metaPatchToUpdateBody,
 } from "./httpDomains";
 import {
@@ -44,10 +42,17 @@ import {
   httpRemoveProjectScene,
   toStoredProjectScene,
 } from "./httpProjectScenes";
+import { httpAddAssetRef, httpRemoveAssetRef } from "./httpAssetRefs";
+import {
+  httpGetCharacter,
+  httpListCharacters,
+  httpSaveCharacter,
+} from "./httpCharacters";
 import type {
   AssetInput,
   CreateProjectInput,
   NarrativePayload,
+  AssetRefInput,
   ProjectBundle,
   ProjectMeta,
   ProjectMetaPatch,
@@ -63,7 +68,7 @@ import type {
   StoredStory,
   VisibilityScope,
 } from "@axiforge/editor-core";
-import { classifyAssetRef, err, filterByVisibility, ok } from "@axiforge/editor-core";
+import { classifyAssetRef, err, ok } from "@axiforge/editor-core";
 import type {
   ProjectNodeResponse,
   ProjectResponse,
@@ -109,6 +114,12 @@ function toBundle(p: ProjectResponse): ProjectBundle {
     roles: (p.roles || []).map((r) => ({
       id: r.id,
       characterRefId: r.character_ref_id,
+    })),
+    assetRefs: (p.asset_refs || []).map((r) => ({
+      id: r.id,
+      projectId: r.project_id,
+      assetType: r.asset_type,
+      assetId: r.asset_id,
     })),
   };
 }
@@ -222,65 +233,24 @@ export class HttpStorageProvider implements StorageProvider {
     }
   }
 
-  /**
-   * 范围取数：我的走 listUser，公开走 listPublic（带 search），
-   * 两者都取时按 id 合并去重——与桌面实现共用同一「我的 ∪ 公开」语义。
-   */
-  async listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>> {
-    try {
-      const authorId = scope?.authorId ?? null;
-      const includePublic = scope?.includePublic ?? authorId === null;
-      const merged = new Map<string, StoredCharacter>();
-
-      if (authorId !== null) {
-        const mine = await characterApi.listUser(authorId);
-        for (const c of mine) merged.set(String(c.id), toStoredCharacter(c));
-      }
-      if (includePublic) {
-        const page = await characterApi.listPublic({
-          limit: 200,
-          ...(scope?.search ? { search: scope.search } : {}),
-        });
-        for (const c of page.items ?? []) {
-          const key = String(c.id);
-          if (!merged.has(key)) merged.set(key, toStoredCharacter(c));
-        }
-      }
-      return ok(filterByVisibility([...merged.values()], scope));
-    } catch (e) {
-      return fail(e, "characters", scope?.authorId ?? this.creatorId);
-    }
+  addAssetRef(id: string, ref: AssetRefInput) {
+    return httpAddAssetRef(id, ref);
   }
 
-  async getCharacter(id: string): Promise<StorageResult<StoredCharacter>> {
-    try {
-      return ok(toStoredCharacter(await characterApi.get(id)));
-    } catch (e) {
-      return fail(e, "character", id);
-    }
+  removeAssetRef(id: string, refId: string) {
+    return httpRemoveAssetRef(id, refId);
   }
 
-  async saveCharacter(
-    character: StoredCharacter,
-  ): Promise<StorageResult<{ id: string }>> {
-    try {
-      if (character.id) {
-        await characterApi.update(character.id, {
-          character_data: character.characterData as never,
-          image_path: character.imagePath === null ? undefined : character.imagePath,
-        } as never);
-        return ok({ id: character.id });
-      }
-      const created = await characterApi.create({
-        character_data: character.characterData as never,
-        image_path: character.imagePath ?? undefined,
-        author_id: character.authorId ?? this.creatorId,
-        is_public: character.isPublic,
-      } as never);
-      return ok({ id: String(created.id) });
-    } catch (e) {
-      return fail(e, "character", character.id || "(new)");
-    }
+  listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>> {
+    return httpListCharacters(scope, this.creatorId);
+  }
+
+  getCharacter(id: string): Promise<StorageResult<StoredCharacter>> {
+    return httpGetCharacter(id);
+  }
+
+  saveCharacter(character: StoredCharacter): Promise<StorageResult<{ id: string }>> {
+    return httpSaveCharacter(character, this.creatorId);
   }
 
   /** 素材走服务端上传口（web 冻结线行为）：ref = 服务端返回的 /uploads/... 绝对路径 */

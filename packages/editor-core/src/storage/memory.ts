@@ -19,6 +19,7 @@ import {
 import { filterByVisibility } from "./visibility";
 import type {
   AssetInput,
+  AssetRefInput,
   CreateProjectInput,
   LocalSaveSlot,
   NarrativePayload,
@@ -32,6 +33,7 @@ import type {
   StoredAchievement,
   StoredAsset,
   StoredAssetItem,
+  StoredAssetRef,
   StoredAssetScene,
   StoredStory,
   StoredCharacter,
@@ -44,6 +46,7 @@ import type {
 } from "./types";
 import { emptyProjectMetadata, err, ok } from "./types";
 import { MemoryPools } from "./memoryPools";
+import { MemoryLinks } from "./memoryLinks";
 import { MemoryStories } from "./memoryStories";
 import { bootstrapScenesAndNodes } from "./memorySeed";
 
@@ -54,6 +57,7 @@ interface ProjectRow {
   edges: StoredEdge[];
   scenes: StoredScene[];
   roles: StoredRole[];
+  assetRefs: StoredAssetRef[];
 }
 
 const nowIso = () => new Date().toISOString();
@@ -66,6 +70,12 @@ export class MemoryStorageProvider implements StorageProvider {
   );
 
   private readonly stories = new MemoryStories((prefix) => this.nextId(prefix));
+
+  /** 挂接域同样注入自身能力：行的所有权留在本类，跨模块只传读写能力 */
+  private readonly links = new MemoryLinks(
+    (id) => this.projects.get(id),
+    (prefix) => this.nextId(prefix),
+  );
 
   private projects = new Map<string, ProjectRow>();
   private characters = new Map<string, StoredCharacter>();
@@ -102,6 +112,7 @@ export class MemoryStorageProvider implements StorageProvider {
       edges,
       scenes,
       roles: [],
+      assetRefs: [],
     });
     return ok(meta);
   }
@@ -155,51 +166,33 @@ export class MemoryStorageProvider implements StorageProvider {
     return ok(undefined);
   }
 
-  async addProjectScene(
+  // ---------- 挂接域（舞台 / 角色 / 道具引用）：实现体在 memoryLinks.ts ----------
+
+  addProjectScene(
     id: string,
     scene: ProjectSceneInput,
   ): Promise<StorageResult<{ id: string }>> {
-    const row = this.projects.get(id);
-    if (!row) return err({ code: "not_found", entity: "project", id });
-    const sceneId = this.nextId("scene");
-    row.scenes = [...row.scenes, { ...scene, id: sceneId }];
-    return ok({ id: sceneId });
+    return this.links.addProjectScene(id, scene);
   }
 
-  async removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
-    const row = this.projects.get(id);
-    if (!row) return err({ code: "not_found", entity: "project", id });
-    if (!row.scenes.some((s) => s.id === sceneId)) {
-      return err({ code: "not_found", entity: "scene", id: sceneId });
-    }
-    row.scenes = row.scenes.filter((s) => s.id !== sceneId);
-    row.nodes = new Map(
-      [...row.nodes].map(([k, n]) => [k, n.stageId === sceneId ? { ...n, stageId: null } : n]),
-    );
-    return ok(undefined);
+  removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
+    return this.links.removeProjectScene(id, sceneId);
   }
 
-  async addRole(
-    id: string,
-    role: { characterRefId: string },
-  ): Promise<StorageResult<void>> {
-    const row = this.projects.get(id);
-    if (!row) return err({ code: "not_found", entity: "project", id });
-    if (row.roles.some((r) => r.characterRefId === role.characterRefId)) {
-      return err({
-        code: "io",
-        detail: `duplicate role characterRefId=${role.characterRefId}`,
-      });
-    }
-    row.roles = [...row.roles, { id: this.nextId("role"), characterRefId: role.characterRefId }];
-    return ok(undefined);
+  addRole(id: string, role: { characterRefId: string }): Promise<StorageResult<void>> {
+    return this.links.addRole(id, role);
   }
 
-  async removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
-    const row = this.projects.get(id);
-    if (!row) return err({ code: "not_found", entity: "project", id });
-    row.roles = row.roles.filter((r) => r.id !== roleId);
-    return ok(undefined);
+  removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
+    return this.links.removeRole(id, roleId);
+  }
+
+  addAssetRef(id: string, ref: AssetRefInput): Promise<StorageResult<{ id: string }>> {
+    return this.links.addAssetRef(id, ref);
+  }
+
+  removeAssetRef(id: string, refId: string): Promise<StorageResult<void>> {
+    return this.links.removeAssetRef(id, refId);
   }
 
   async listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>> {
@@ -351,6 +344,7 @@ export class MemoryStorageProvider implements StorageProvider {
       edges: row.edges,
       scenes: row.scenes,
       roles: row.roles,
+      assetRefs: row.assetRefs,
     };
   }
 
@@ -376,6 +370,7 @@ export class MemoryStorageProvider implements StorageProvider {
       edges,
       scenes: [...draft.scenes],
       roles: [...draft.roles],
+      assetRefs: [],
     });
   }
 }

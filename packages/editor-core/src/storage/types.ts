@@ -32,135 +32,6 @@ export const err = <T>(error: StorageError): StorageResult<T> => ({
 });
 
 
-// ------------------------------------------------------------
-// 记录形态（存储态；与传输态 DTO、使用态 Draft 三者解耦）
-// ------------------------------------------------------------
-
-export interface ProjectMeta {
-  readonly id: string;
-  readonly title: string;
-  readonly updatedAt: string;
-  readonly isPublic: boolean;
-  /**
-   * 云端本有的工程元数据，v0.8 起本地表同批补齐（宪章 Phase 7）。
-   * 一律必填：缺失≠空串/空数组，五义在契约一处定死。
-   */
-  readonly description: string;
-  readonly coverImage: string | null;
-  readonly themeTags: readonly string[];
-  readonly mechanism: string | null;
-  readonly genre: string | null;
-  readonly isMeta: boolean;
-  /**
-   * 世界观与规则正文：云端本有列，且 `world_setting` 会进编译器、
-   * 在玩家页设定面板显示——缺席它，桌面态那一栏就是永久空白。
-   */
-  readonly worldSetting: string | null;
-  readonly rules: string | null;
-}
-
-export interface StoredNode {
-  readonly id: string;
-  readonly stageId: string | null;
-  readonly editorData: Record<string, unknown>; // 含 position
-  readonly narrativeData: Record<string, unknown>; // 含 script: Instruction[]（JSON 列）
-  readonly sortOrder: number;
-}
-
-export interface StoredEdge {
-  readonly id: string;
-  readonly source: string;
-  readonly target: string;
-  readonly label: string | null;
-}
-
-export interface StoredRole {
-  readonly id: string;
-  readonly characterRefId: string;
-}
-
-export interface ProjectBundle {
-  readonly meta: ProjectMeta;
-  readonly axsSource: string | null;
-  readonly nodes: readonly StoredNode[];
-  readonly edges: readonly StoredEdge[];
-  readonly scenes: readonly StoredScene[];
-  readonly roles: readonly StoredRole[];
-}
-
-/** 一次原子叙事保存（nodes/edges/axs_source 同批提交，对应后端 sync 语义） */
-export interface NarrativePayload {
-  readonly axsSource: string | null;
-  readonly nodes: readonly StoredNode[];
-  readonly edges: readonly StoredEdge[];
-}
-
-export interface StoredCharacter {
-  readonly id: string;
-  readonly name: string;
-  readonly characterData: Record<string, unknown>; // 六层模型 JSON（ADR-001）
-  readonly imagePath: string | null;
-  /** 显式字段而非可选：缺失≠false，五义在此一处定死 */
-  readonly isPublic: boolean;
-  readonly authorId: string | null;
-}
-
-/**
- * 全局资产池三兄弟（角色 / 道具 / 场景）的共同形状：
- * filterByVisibility 只依赖这四个字段，故一处约束而非三处复制。
- */
-export interface VisibleRecord {
-  readonly id: string;
-  readonly name: string;
-  readonly isPublic: boolean;
-  readonly authorId: string | null;
-}
-
-/**
- * 可见范围。语义 = 「我的（给 authorId 时）∪ 公开（includePublic 时）」，
- * 两者都不给 = 全部公开（协作服务的默认对外视角）。
- * 角色 / 道具 / 场景共用此一处定义：同一语义不得有两套词汇。
- */
-export interface VisibilityScope {
-  readonly authorId?: string | null;
-  readonly includePublic?: boolean;
-  readonly search?: string;
-}
-
-/**
- * 工程尚无元数据时的取值，一处定义。
- * 六个空值若在多处各写一遍，「本地新建」与「导入」两条路径就会漂移。
- */
-export const emptyProjectMetadata = (): Omit<
-  ProjectMeta,
-  "id" | "title" | "updatedAt" | "isPublic"
-> => ({
-  description: "",
-  coverImage: null,
-  themeTags: [],
-  mechanism: null,
-  genre: null,
-  isMeta: false,
-  worldSetting: null,
-  rules: null,
-});
-
-export interface CreateProjectInput {  readonly title: string;
-  readonly isPublic?: boolean;
-}
-
-export interface ProjectMetaPatch {
-  readonly title?: string;
-  readonly axsSource?: string | null;
-  readonly description?: string;
-  readonly coverImage?: string | null;
-  readonly themeTags?: readonly string[];
-  readonly mechanism?: string | null;
-  readonly genre?: string | null;
-  readonly isMeta?: boolean;
-  readonly worldSetting?: string | null;
-  readonly rules?: string | null;
-}
 
 /**
  * 素材字节与落位结果（ADR-024 决策 3：素材是本地文件，DB 只存引用）。
@@ -190,15 +61,22 @@ export interface AssetStore {
 }
 
 import type {
+  AssetRefInput,
+  CreateProjectInput,
   LocalSaveSlot,
+  NarrativePayload,
+  ProjectBundle,
+  ProjectMeta,
+  ProjectMetaPatch,
   ProjectSceneInput,
   SaveSlotInput,
   StoredAchievement,
   StoredAssetItem,
   StoredAssetScene,
-  StoredScene,
+  StoredCharacter,
   StoredStory,
   UnlockedAchievement,
+  VisibilityScope,
 } from "./records";
 
 export * from "./records";
@@ -261,6 +139,28 @@ export interface StorageProvider {
   removeRole(
     id: string,
     roleId: string,
+  ): Promise<StorageResult<void>>;
+
+  /**
+   * 工程内新增道具引用（剪辑台侧栏「加入道具」）。
+   * 与 addRole 不同：**不做去重**——后端 `add_asset_ref` 就是一次裸 INSERT，
+   * 同一件道具加两次会真的留下两条引用。契约在这里跟着后端，而不是替它做"更聪明"的判断，
+   * 否则两端同一操作产生不同行数，桌面用户会比网页用户少看到重复项却没人解释为什么。
+   */
+  addAssetRef(
+    id: string,
+    ref: AssetRefInput,
+  ): Promise<StorageResult<{ id: string }>>;
+
+  /**
+   * 移除引用。后端对不存在的 ref 返回 404，所以这里也是 `not_found`，不做幂等吞掉——
+   * 吞掉会把"点错了行"报成"已经删好了"，而它其实什么都没删。
+   * 一处刻意的差别：后端 `remove_asset_ref` 只按 ref_id 删、不校验它属于哪个工程；
+   * 本地实现按 (project_id, ref_id) 删。跨工程删别人的引用在任何一端都不该是可用能力。
+   */
+  removeAssetRef(
+    id: string,
+    refId: string,
   ): Promise<StorageResult<void>>;
 
   /** 角色清单（范围语义见 VisibilityScope；无匹配=空数组，非错误） */

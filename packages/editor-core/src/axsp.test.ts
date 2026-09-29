@@ -21,6 +21,7 @@ const bundle: ProjectBundle = {
     ...emptyProjectMetadata(),
   },
   axsSource: "# 开始\n旁白：x\n",
+  assetRefs: [],
   nodes: [
     {
       id: "n1",
@@ -182,6 +183,29 @@ describe(".axsp 容器 v2", () => {
     );
     expect(noProject.ok).toBe(false);
     expect(detailOf(noProject)).toContain("project.json");
+  });
+
+  it("旧容器没有 assetRefs 键 → 解包处补成空数组（v2 与 v1 两个出口都要补）", () => {
+    const legacy = { ...bundle } as Record<string, unknown>;
+    delete legacy.assetRefs;
+    const manifest = {
+      format: AXSP_FORMAT,
+      version: AXSP_VERSION,
+      name: "旧包",
+      exportedAt: "",
+      assets: [],
+      characters: [],
+    };
+
+    const v2 = unpackAxsp(zipWithManifest({ manifest, project: legacy as unknown as ProjectBundle, characters: [] }));
+    expect(v2.ok).toBe(true);
+    if (v2.ok) expect(v2.data.project.assetRefs).toEqual([]);
+
+    const v1 = unpackAxspV1(
+      JSON.stringify({ manifest: { ...manifest, version: 1 }, project: legacy }),
+    );
+    expect(v1.ok).toBe(true);
+    if (v1.ok) expect(v1.data.project.assetRefs).toEqual([]);
   });
 });
 

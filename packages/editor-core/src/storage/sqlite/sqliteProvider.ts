@@ -25,6 +25,7 @@ import {
 import { asBool, parseJson, uuid } from "./rows";
 import type {
   AssetInput,
+  AssetRefInput,
   AssetStore,
   CreateProjectInput,
   LocalSaveSlot,
@@ -119,6 +120,14 @@ export class SqliteStorageProvider implements StorageProvider {
 
   removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
     return this.projectStore.removeRole(id, roleId);
+  }
+
+  addAssetRef(id: string, ref: AssetRefInput): Promise<StorageResult<{ id: string }>> {
+    return this.projectStore.addAssetRef(id, ref);
+  }
+
+  removeAssetRef(id: string, refId: string): Promise<StorageResult<void>> {
+    return this.projectStore.removeAssetRef(id, refId);
   }
 
   async listCharacters(scope?: VisibilityScope): Promise<StorageResult<StoredCharacter[]>> {

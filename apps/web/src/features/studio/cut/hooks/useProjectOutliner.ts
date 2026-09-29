@@ -1,14 +1,14 @@
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { projectApi } from "@/shared/api/editor";
 import { getStorageProvider } from "@/shared/storage";
 import { readItem } from "@/shared/storage/assetPoolSaves";
 import { PROJECT_KEYS } from "@/shared/hooks/useProjects";
 
 /**
- * 剪辑台侧栏的写操作。舞台与角色的增删走 L4 Provider（桌面=SQLite，浏览器=HTTP 实现），
- * 道具引用仍直连 HTTP——本地既没有 project_asset_refs 表，bundle 读回的
- * `asset_refs` 又恒为 []，只补写不补读会让加进去的道具在下次刷新时凭空消失。
+ * 剪辑台侧栏的写操作。舞台、角色与道具引用的增删全部走 L4 Provider
+ * （桌面=SQLite，浏览器=HTTP 实现）——三者的读路径同批接通，
+ * 否则就是"写进去读不回来"的静默降级（道具引用此前正是这样：
+ * 本地没有 project_asset_refs 表，bundle 投影把 asset_refs 恒写成 []）。
  */
 export function useProjectOutliner(projectId: string) {
   const qc = useQueryClient();
@@ -62,10 +62,9 @@ export function useProjectOutliner(projectId: string) {
 
   const addItemRef = useCallback(
     async (itemId: string) => {
-      await projectApi.addAssetRef(projectId, {
-        asset_type: "item",
-        asset_id: itemId,
-      });
+      const p = await getStorageProvider();
+      const r = await p.addAssetRef(projectId, { assetType: "item", assetId: itemId });
+      if (!r.ok) throw new Error(`道具加入失败：${r.error.code}`);
       await refresh();
     },
     [projectId, refresh],
@@ -73,7 +72,9 @@ export function useProjectOutliner(projectId: string) {
 
   const removeItemRef = useCallback(
     async (refId: string) => {
-      await projectApi.removeAssetRef(projectId, refId);
+      const p = await getStorageProvider();
+      const r = await p.removeAssetRef(projectId, refId);
+      if (!r.ok) throw new Error(`道具移出失败：${r.error.code}`);
       await refresh();
     },
     [projectId, refresh],

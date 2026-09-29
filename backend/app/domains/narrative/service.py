@@ -787,20 +787,28 @@ class ProjectService:
 
     async def add_asset_ref(
         self, project_id: UUID, data: ProjectAssetRefCreate
-    ) -> ProjectAssetRefResponse:
+    ) -> Optional[ProjectAssetRefResponse]:
+        # 工程不存在时先返回 None，而不是把 FK 约束顶成 500：
+        # 本地 SQLite 支的 addAssetRef 就是 not_found，两端得报同一个错。
+        if await self.db.get(Project, project_id) is None:
+            return None
         ref = ProjectAssetRef(project_id=project_id, **data.model_dump())
         self.db.add(ref)
         await self.db.commit()
         await self.db.refresh(ref)
         return ProjectAssetRefResponse.model_validate(ref)
 
-    async def remove_asset_ref(self, ref_id: UUID) -> bool:
-        ref = await self.db.get(ProjectAssetRef, ref_id)
-        if not ref:
-            return False
-        await self.db.delete(ref)
+    async def remove_asset_ref(self, project_id: UUID, ref_id: UUID) -> bool:
+        # 按 (工程, 引用) 删：只认 ref_id 的话，任何拿得到别人引用 id 的请求
+        # 都能借自己工程的路径删掉那一行——本地契约明确要求跨工程删不动。
+        result = await self.db.execute(
+            delete(ProjectAssetRef).where(
+                ProjectAssetRef.id == ref_id,
+                ProjectAssetRef.project_id == project_id,
+            )
+        )
         await self.db.commit()
-        return True
+        return result.rowcount > 0
 
     # ================================================================
     # Edge CRUD

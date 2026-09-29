@@ -21,6 +21,7 @@ import type {
   ProjectNodeResponse,
   ProjectResponse,
   ProjectRoleResponse,
+  ProjectAssetRefResponse,
   ProjectSceneResponse,
 } from "@/shared/types/project";
 
@@ -73,6 +74,18 @@ export function bundleToResponse(b: ProjectBundle): ProjectResponse {
     role_description: null,
     created_at: NOW(),
   }));
+  /**
+   * 投影成传输态给页面用。`created_at` 本地没存到行级（引用表只有插入时刻的粗粒度），
+   * 给的是 NOW()——消费方（道具列表、ref_count 角标）都不读它，读到的时间不该被当历史。
+   */
+  const assetRefs: ProjectAssetRefResponse[] = b.assetRefs.map((r) => ({
+    id: r.id,
+    project_id: r.projectId,
+    asset_type: r.assetType,
+    asset_id: r.assetId,
+    locked_version: null,
+    created_at: NOW(),
+  }));
   return {
     id: b.meta.id,
     title: b.meta.title,
@@ -90,7 +103,7 @@ export function bundleToResponse(b: ProjectBundle): ProjectResponse {
     author_id: "",
     scenes,
     roles,
-    asset_refs: [],
+    asset_refs: assetRefs,
     edges,
     nodes,
     axs_source: b.axsSource ?? undefined,
@@ -287,6 +300,19 @@ export async function importProjectFromAxsp(
   for (const role of remapped.roles) {
     const r = await provider.addRole(newId, {
       characterRefId: role.characterRefId,
+    });
+    if (!r.ok) {
+      await provider.deleteProject(newId);
+      return r;
+    }
+  }
+  // 道具引用原样带过去：容器不装道具本体（只装演员表和素材字节），
+  // 同机导入即解析得到名字，跨机导入留成悬空引用——编排台按 `道具 <id前缀>` 显示、可手动移除。
+  // 静默丢掉才是问题：导出者明明在这份工程里挂了三件道具。
+  for (const ref of remapped.assetRefs) {
+    const r = await provider.addAssetRef(newId, {
+      assetType: ref.assetType,
+      assetId: ref.assetId,
     });
     if (!r.ok) {
       await provider.deleteProject(newId);

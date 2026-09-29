@@ -266,12 +266,13 @@ export async function removeScene(id: string): Promise<void> {
 // ---------- 编排台「从舞台库导入」的候选检索 ----------
 
 /**
- * 后端口径（`platform/search_router.py:140`）：空白查询返回空、按 name 子串匹配、上限 8 条。
+ * 后端口径（`platform/search_router.py:140`/`:157`）：空白查询返回空、按 name 子串匹配、上限 8 条。
  * 桌面没有"别人的公开池"，候选换成**本地池里我可见的那一份**（自有 + 已公开）；
  * 空白与上限两条口径逐字保留——候选集不同是有意的，返回形状与截断长度不该再不同。
  *
  * 这一格只有在导入本身也本地化之后才成立：只把 fetcher 换掉会得到"搜得到、点下去必败"，
- * 宪章 S13-2b 记的就是这个顺序问题。
+ * 宪章 S13-2b 记的就是这个顺序问题。S13-2c 的道具侧同一形状：
+ * `project_asset_refs` 建表 + 读路径 + `addItemRef` 改线在这一批一起落了，检索才不再是空转。
  */
 const IMPORT_LIMIT = 8;
 
@@ -279,5 +280,12 @@ export async function searchImportScenes(q: string): Promise<SelectableItem[]> {
   if (!q.trim()) return [];
   if (!assetPoolDeps.isLocal()) return searchApi.scenes(q);
   const rows = await readScenes({ authorId: assetPoolDeps.author(), search: q });
+  return rows.slice(0, IMPORT_LIMIT).map((r) => ({ id: r.id, name: r.name }));
+}
+
+export async function searchImportItems(q: string): Promise<SelectableItem[]> {
+  if (!q.trim()) return [];
+  if (!assetPoolDeps.isLocal()) return searchApi.items(q);
+  const rows = await readItems({ authorId: assetPoolDeps.author(), search: q });
   return rows.slice(0, IMPORT_LIMIT).map((r) => ({ id: r.id, name: r.name }));
 }

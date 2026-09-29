@@ -243,7 +243,7 @@
 
 - [ ] `PlayerPage.tsx`（1370 行）→ IR 渲染器分层：播放状态机（纯逻辑入 `packages/core` 或 editor-core L2 同级）、指令执行器、舞台视图、系统菜单/存档面板；渲染文件全部 ≤400 行
 - [ ] `useProjectEditor.ts`（1164 → **1089 行**，v0.8 M3 进行中）→ 域拆分。判据已从「按四域名词预切」改为两条真判据：**依赖方向**（不读图内容者归视图域）与**纯度**（纯计算先外提，可单测且零行为风险）。已交付 `useCanvasView` 与 `editorProjection`（后者补上投影层此前零单测的空洞）；余 persistence 与 node-inspector 两域（宪章 1b G1 偏差记录的欠账，Phase 2 时承诺未兑现）
-- [x] 道具与场景资产域本地化（v0.8：契约 + schema v3 + 分派口 + 双支单测）：`asset_items` / `asset_scenes` / `project_asset_refs` 未进 SQLite schema，桌面侧栏这两页离线只能报「读取失败」（Phase 6 已把错误态显式化，不再伪装成空态）
+- [x] 道具与场景资产域本地化（v0.8：契约 + schema v3 + 分派口 + 双支单测）：`asset_items` / `asset_scenes` 随 v3 进本地库，桌面侧栏这两页不再离线报「读取失败」（Phase 6 已把错误态显式化，不再伪装成空态）。**当时同一批没做的 `project_asset_refs` 直到 S13-2c（schema v5，2026-09-29）才补齐**——那一条欠账的形状不是"页面报错"而是"写进去读不回来"，比报错更难发现
 - [x] 四态原语：`packages/ui` 新增 `QueryStatePanel` + `pickQuerySlot`（穷尽 switch，缺一态即编译不过），状态词表与判定分离，宿主 `resolveQueryState` 复用同一词表；已迁移角色页与剧本清单页两个既有消费者，其余页面按 Phase 8 逐屏巡检迁移
 - [~] 本地工程元数据补齐 —— **原文前提的一半已不成立，按实测改判**：原文写「SQLite `projects` 表只有 id/title/is_public/axs_source/author_id/时间戳，缺 `description`/`cover_image`/`theme_tags`/`mechanism`/`genre`/`is_meta` 等列」。这六列**已随 v0.8 schema v3 进入本地库**（`sqlite/backend.ts` 的 `COLUMN_PATCHES` 带「缺列才 ALTER」的幂等迁移），`projectMetaToResponse` 已逐字段透传而非填空值，契约套件断言 `themeTags` 写→读往返。故「一律显示暂无描述」不再成立。
       **写入面未闭环，且 2026-09-24 复核时查出一处真实缺陷（三支实现口径不一致）**：
@@ -466,7 +466,17 @@
   **补记（同日）——那处「仍欠」查出来不是一个遗漏，而是一条真实的两端分叉**：`packages/core/src/compiler.ts` 的场景解析把 `sceneRef` 的兜底整段丢了（写成 `s.location ?? null`），而后端 `narrative/compiler.py:333-345` 是 `location = location or asset.location`。后果：**从舞台库导入的舞台在网页试玩有背景、在桌面试玩是空白**——同一份数据、两个编译器、两种结果。金样本抓不到它，因为三个样本工程的场景都不带 `scene_ref_id`，那条分支从未被任何 fixture 走过。
   已改：TS 侧按 Python 的 `or` 语义用 `||`（空串也算没值，本地库里"没填"恰恰常是空串），`bundleToCompilerInput` 补上 `location/atmosphere/sceneRef` 投影并由 `loadStoryOffline` 预取资产池（复刻后端的一次查表，不是新抽象）；新增三条专项单测覆盖此前无覆盖的优先级，见过它红（把 `||` 换回 `??`，「空串算没值」立刻报 `expected '' to be '方舟·地下'`）。
   教训写在这里而不只写在测试注释里：**金样本证明"当前两边一致"，证明不了"每条分支两边都走"**；分支要有专门用例，否则 fixture 没覆盖 = 行为没实现。
-- [ ] S13-2c 编排台道具引用本地化：本地**没有 `project_asset_refs` 表**，且 bundle 读回恒为 `asset_refs: []`（`shared/storage/index.ts:92,212`）。只补写不补读会让加进去的道具在下次刷新时凭空消失，所以建表、读路径与 `addItemRef/removeItemRef` 改线必须同批落地。道具检索（`/search/items`）同属这一刀。
+- [x] S13-2c 编排台道具引用本地化 —— 已交付 2026-09-29，建表 / 读路径 / 写入改线 / 检索四件同批（立项理由成立：本地没有 `project_asset_refs` 表，bundle 投影把 `asset_refs` 恒写成 `[]`，"加入道具"在桌面上写进去、下次刷新凭空消失）。落地顺序照 2a/2b 的形状走：
+  1. `StoredAssetRef` + `AssetRefInput` + `ProjectBundle.assetRefs` 进 L4 契约，`addAssetRef`/`removeAssetRef` 两个方法三实现齐（Memory / SQLite / HTTP）；
+  2. SQLite schema v5 建表（带索引与孤儿行清理，与 `backend.ts:80-85` 的既有形状一致）。**没有加 `UNIQUE(project_id, asset_type, asset_id)`**：后端 `add_asset_ref` 是一次裸 INSERT，同一件道具加两次真的留两条，本地不替它做"更聪明"的去重；
+  3. 读路径 `loadProject` 与写入 `addAssetRef/removeAssetRef` 同批接通，`useProjectOutliner` 的 `addItemRef/removeItemRef` 从 `projectApi` 改到 provider——和 2a 的第 2 条同一个教训：**契约早就有两端实现，缺的常常只是一处调用方没接上**；
+  4. 道具检索 `searchImportItems`（`assetPoolSaves.ts`）与 `searchImportScenes` 同形：空白查询返回空、上限 8 条逐字保留后端口径（`platform/search_router.py:157`），桌面候选集换成本地池里"我的 ∪ 已公开"那一份；`OutlinerPanel` 的 `fetcher` 因此不再打 `/search/items`；
+  5. 契约用例三条见过它们红，各对应一个真实缺陷形状：删掉 SQLite 的 `assetRefs` 读取 → 3 条同时红（就是立项写的那条静默降级）；`removeAssetRef` 改成恒成功 → 2 条红（重复删与跨工程删）；`saveNarrative` 里顺手清引用 → 红（叙事图覆写与引用是两个域）。检索侧另有 4 次变异：漏掉平台分派、去掉 8 条截断、`toBundle` 不回读 `asset_refs`、404 演成删除成功，各自只让对应用例失败；
+  6. 旧库升级：`sqlite.test.ts` 那条 v0.7 形状库的用例扩到 `project_asset_refs`——两次 `init()` 后表存在、且旧工程上能写能读回引用。
+  **顺带把两端真正对齐（改的是后端，行为收紧、不会更松）**：`remove_asset_ref` 此前只按 `ref_id` 删、把路径里的 `project_id` 整个丢掉，`add_asset_ref` 不校验工程是否存在。实测（把两处改回旧形状）前者让跨工程删除返回 204、后者顶出 `project_asset_refs_project_id_fkey` 的 FK 500。现按 `(project_id, id)` 删、工程不存在 404，与本地契约逐字一致；`backend/tests/test_project_api.py` 新增一条端点级用例把五点口径钉住（不去重 / 跨工程删不动 / 重复删 404 / 无主工程 404）。
+  **一处已知边界（不在这一刀里扩张）**：`.axsp` 容器不装道具本体，导入时把引用原样带过去——同机导入即刻解析，跨机导入留成悬空引用，编排台按 `道具 <id前缀>` 显示、可手动移除。静默丢掉才是问题（导出者明明挂了三件道具），故选择"带着悬空"并由 `unpackAxsp` 的 `normalizeBundle` 在唯一一处补 `assetRefs: []`（早于本批的容器根本没有这个键）。详见 ADR-026。
+  **G1 清偿（这一批自己越的线，按门禁处方拆）**：四个文件被新增的契约方法推过 400（`types.ts` 435 / `sqliteProject.ts` 440 / `memory.ts` 415 / `httpStorageProvider.ts` 422）。分轴沿用仓库既有形状、不改行为：契约的记录形态回到 `records.ts`（它本来就是「查表型」字段表的家，`types.ts` 仍 `export *` 再导出，消费方 import 路径不变）；SQLite 与 Memory 各出 `sqliteProjectLinks.ts` / `memoryLinks.ts`，HTTP 侧出 `httpAssetRefs.ts` / `httpCharacters.ts`（与 `httpProjectScenes` / `httpStories` 同一先例）。结果八道门禁全绿。
+  **拆出来的一个真实缺口**：外提 `listCharacters` 之后做一次变异——整段删掉「公开」分支，web 的 118 条测试全绿。角色的「我的 ∪ 公开」合并在 HTTP 支从来没有用例盯着（契约套件只跑 Memory / SQLite 两支）。已补 `storage.test.ts` 角色域两条（合并去重、只取公开时不打 `/characters/user`），见过它们红：删公开分支红 2 条，去掉 `merged.has` 去重护栏红 1 条。**教训：一次纯搬运的重构也能暴露覆盖空洞——搬的时候给被搬的那段补腿，比事后追问「这块为什么没测」便宜得多。**
 - [ ] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底

@@ -1,8 +1,8 @@
 /**
- * v0.8 起新增的记录形态：全局资产池（道具 / 场景）与运行时状态（存档 / 成就）。
+ * 存储态记录形态：全局资产池（道具 / 场景）、运行时状态（存档 / 成就）与工程域字段表。
  *
  * 从 types.ts 拆出的原因：契约本体（StorageProvider）要一眼读完，
- * 而四个新域的字段表属于「查表型」内容；同文件时契约被推到 400 行开外。
+ * 而这些字段表属于「查表型」内容；同文件时契约被推到 400 行开外（G1 棘轮）。
  * 仍由 types.ts 再导出，消费方 import 路径不变。
  */
 
@@ -126,4 +126,156 @@ export interface StoredAchievement {
 export interface UnlockedAchievement {
   readonly key: string;
   readonly unlockedAt: string;
+}
+
+// ------------------------------------------------------------
+// 工程域记录形态（自 types.ts 同轴外提，仍由契约文件再导出）
+// ------------------------------------------------------------
+
+// ------------------------------------------------------------
+// 记录形态（存储态；与传输态 DTO、使用态 Draft 三者解耦）
+// ------------------------------------------------------------
+
+export interface ProjectMeta {
+  readonly id: string;
+  readonly title: string;
+  readonly updatedAt: string;
+  readonly isPublic: boolean;
+  /**
+   * 云端本有的工程元数据，v0.8 起本地表同批补齐（宪章 Phase 7）。
+   * 一律必填：缺失≠空串/空数组，五义在契约一处定死。
+   */
+  readonly description: string;
+  readonly coverImage: string | null;
+  readonly themeTags: readonly string[];
+  readonly mechanism: string | null;
+  readonly genre: string | null;
+  readonly isMeta: boolean;
+  /**
+   * 世界观与规则正文：云端本有列，且 `world_setting` 会进编译器、
+   * 在玩家页设定面板显示——缺席它，桌面态那一栏就是永久空白。
+   */
+  readonly worldSetting: string | null;
+  readonly rules: string | null;
+}
+
+export interface StoredNode {
+  readonly id: string;
+  readonly stageId: string | null;
+  readonly editorData: Record<string, unknown>; // 含 position
+  readonly narrativeData: Record<string, unknown>; // 含 script: Instruction[]（JSON 列）
+  readonly sortOrder: number;
+}
+
+export interface StoredEdge {
+  readonly id: string;
+  readonly source: string;
+  readonly target: string;
+  readonly label: string | null;
+}
+
+export interface StoredRole {
+  readonly id: string;
+  readonly characterRefId: string;
+}
+
+/**
+ * 工程内的资产引用（目前只有道具）。它只记"引用了什么"，不复制资产数据——
+ * 与后端 `project_asset_refs` 同构：删资产不会把引用一起带走，所以读侧要能容忍悬空。
+ */
+export interface StoredAssetRef {
+  readonly id: string;
+  readonly projectId: string;
+  readonly assetType: "item";
+  readonly assetId: string;
+}
+
+/** 新增引用的入参：id 由实现分配并回传，调用方不得自己猜 */
+export interface AssetRefInput {
+  readonly assetType: "item";
+  readonly assetId: string;
+}
+
+export interface ProjectBundle {
+  readonly meta: ProjectMeta;
+  readonly axsSource: string | null;
+  readonly nodes: readonly StoredNode[];
+  readonly edges: readonly StoredEdge[];
+  readonly scenes: readonly StoredScene[];
+  readonly roles: readonly StoredRole[];
+  readonly assetRefs: readonly StoredAssetRef[];
+}
+
+/** 一次原子叙事保存（nodes/edges/axs_source 同批提交，对应后端 sync 语义） */
+export interface NarrativePayload {
+  readonly axsSource: string | null;
+  readonly nodes: readonly StoredNode[];
+  readonly edges: readonly StoredEdge[];
+}
+
+export interface StoredCharacter {
+  readonly id: string;
+  readonly name: string;
+  readonly characterData: Record<string, unknown>; // 六层模型 JSON（ADR-001）
+  readonly imagePath: string | null;
+  /** 显式字段而非可选：缺失≠false，五义在此一处定死 */
+  readonly isPublic: boolean;
+  readonly authorId: string | null;
+}
+
+/**
+ * 全局资产池三兄弟（角色 / 道具 / 场景）的共同形状：
+ * filterByVisibility 只依赖这四个字段，故一处约束而非三处复制。
+ */
+export interface VisibleRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly isPublic: boolean;
+  readonly authorId: string | null;
+}
+
+/**
+ * 可见范围。语义 = 「我的（给 authorId 时）∪ 公开（includePublic 时）」，
+ * 两者都不给 = 全部公开（协作服务的默认对外视角）。
+ * 角色 / 道具 / 场景共用此一处定义：同一语义不得有两套词汇。
+ */
+export interface VisibilityScope {
+  readonly authorId?: string | null;
+  readonly includePublic?: boolean;
+  readonly search?: string;
+}
+
+/**
+ * 工程尚无元数据时的取值，一处定义。
+ * 六个空值若在多处各写一遍，「本地新建」与「导入」两条路径就会漂移。
+ */
+export const emptyProjectMetadata = (): Omit<
+  ProjectMeta,
+  "id" | "title" | "updatedAt" | "isPublic"
+> => ({
+  description: "",
+  coverImage: null,
+  themeTags: [],
+  mechanism: null,
+  genre: null,
+  isMeta: false,
+  worldSetting: null,
+  rules: null,
+});
+
+export interface CreateProjectInput {  readonly title: string;
+  readonly isPublic?: boolean;
+}
+
+export interface ProjectMetaPatch {
+  readonly title?: string;
+  readonly axsSource?: string | null;
+  readonly description?: string;
+  readonly coverImage?: string | null;
+  readonly themeTags?: readonly string[];
+  readonly mechanism?: string | null;
+  readonly genre?: string | null;
+  readonly isMeta?: boolean;
+  readonly worldSetting?: string | null;
+  readonly rules?: string | null;
 }

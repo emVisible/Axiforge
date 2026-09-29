@@ -162,6 +162,27 @@ export const SCHEMA_MIGRATIONS: readonly string[] = [
   CREATE INDEX IF NOT EXISTS idx_ach_project ON achievements(project_id);
   CREATE INDEX IF NOT EXISTS idx_stories_character ON character_stories(character_id);
   `,
+  /**
+   * schema v5（宪章 Phase 13 S13-2c）：工程内的道具引用。
+   *
+   * 为什么建表必须和读路径同一批落地：bundle 投影此前把 `asset_refs` 恒写成 []，
+   * 于是"加入道具"在桌面上写进去、下次刷新凭空消失——那是静默降级，不是缺功能。
+   *
+   * **没有 UNIQUE(project_id, asset_type, asset_id)**：后端 `add_asset_ref` 是一次裸 INSERT，
+   * 同一件道具加两次真的留两条。本地跟着后端，不替它做"更聪明"的去重。
+   */
+  `
+  CREATE TABLE IF NOT EXISTS project_asset_refs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    asset_type TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    locked_version TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_asset_refs_project ON project_asset_refs(project_id);
+  DELETE FROM project_asset_refs WHERE project_id NOT IN (SELECT id FROM projects);
+  `,
 ];
 
 /**

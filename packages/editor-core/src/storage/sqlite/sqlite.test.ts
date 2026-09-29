@@ -77,7 +77,10 @@ describe("SqliteStorageProvider 初始化", () => {
     const tables = await backend.select<{ name: string }>(
       `SELECT name FROM sqlite_master WHERE type = 'table'`,
     );
-    for (const t of ["asset_items", "asset_scenes", "save_slots", "achievements", "player_achievements"]) {
+    for (const t of [
+      "asset_items", "asset_scenes", "save_slots", "achievements", "player_achievements",
+      "project_asset_refs",
+    ]) {
       expect(tables.some((r) => r.name === t)).toBe(true);
     }
 
@@ -90,6 +93,16 @@ describe("SqliteStorageProvider 初始化", () => {
     expect(item.ok).toBe(true);
     const save = await p.writeSave("legacy-1", "tok-legacy", { state: { ok: true } });
     expect(save.ok).toBe(true);
+
+    // 道具引用是这一版新增的域，且它的读路径和建表必须同批——
+    // 只建表不读会让旧库升级后「加得进、看不见」，跟没迁移一样。
+    const ref = await p.addAssetRef("legacy-1", { assetType: "item", assetId: "legacy-item" });
+    expect(ref.ok).toBe(true);
+    if (ref.ok) {
+      const bundle = await p.loadProject("legacy-1");
+      expect(bundle.ok).toBe(true);
+      if (bundle.ok) expect(bundle.data.assetRefs.map((r) => r.id)).toEqual([ref.data.id]);
+    }
   });
 });
 

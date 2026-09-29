@@ -16,8 +16,7 @@ import {
 import { cn } from "@/shared/components/ui";
 import CharacterSearchSelect from "@/features/character/components/CharacterSearchSelect";
 import { EntitySearchSelect } from "@/shared/components/ui";
-import { searchApi } from "@/shared/api/search";
-import { searchImportScenes } from "@/shared/storage/assetPoolSaves";
+import { searchImportItems, searchImportScenes } from "@/shared/storage/assetPoolSaves";
 import { getImageUrl } from "@/shared/lib/imageUrl";
 import type { ProjectResponse, ProjectRoleResponse, ProjectSceneResponse } from "@/shared/types/project";
 import type { ProjectMetaPatch } from "@axiforge/editor-core";
@@ -431,7 +430,7 @@ export default function OutlinerPanel({
           )}
           <div className="mt-1.5 [&_input]:text-3xs">
             <EntitySearchSelect
-              fetcher={searchApi.items}
+              fetcher={searchImportItems}
               onSelect={(item) => void onAddItem(item.id)}
               placeholder="搜索道具…"
             />

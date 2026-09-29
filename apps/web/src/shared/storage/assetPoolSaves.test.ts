@@ -7,6 +7,7 @@ import {
   readItems,
   readScenes,
   removeItem,
+  searchImportItems,
   searchImportScenes,
   updateItem,
 } from "./assetPoolSaves";
@@ -14,8 +15,11 @@ import {
 const listRemote = vi.fn().mockResolvedValue([]);
 const deleteRemote = vi.fn().mockResolvedValue(undefined);
 const remoteScenes = vi.hoisted(() => vi.fn());
+const remoteItems = vi.hoisted(() => vi.fn());
 
-vi.mock("@/shared/api/search", () => ({ searchApi: { scenes: remoteScenes } }));
+vi.mock("@/shared/api/search", () => ({
+  searchApi: { scenes: remoteScenes, items: remoteItems },
+}));
 
 vi.mock("@/shared/api/editor", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/shared/api/editor")>();
@@ -37,6 +41,7 @@ beforeEach(() => {
   listRemote.mockClear();
   deleteRemote.mockClear();
   remoteScenes.mockClear();
+  remoteItems.mockClear();
 });
 
 describe("道具本地支", () => {
@@ -118,6 +123,45 @@ describe("舞台库导入候选检索", () => {
     assetPoolDeps.isLocal = () => false;
     await searchImportScenes("钥");
     expect(remoteScenes).toHaveBeenCalledWith("钥");
+  });
+});
+
+describe("道具检索（S13-2c：本地池 = 引用写入的池，两端口径一致）", () => {
+  it("桌面支按名匹配、零请求；空白查询返回空；上限 8 条与后端一致", async () => {
+    await createItem({ name: "铜钥匙" }, OWNER);
+    await createItem({ name: "油灯" }, OWNER);
+    expect(await searchImportItems("")).toEqual([]);
+    expect(await searchImportItems("   ")).toEqual([]);
+    expect(remoteItems).not.toHaveBeenCalled();
+
+    const hits = await searchImportItems("钥匙");
+    expect(hits.map((h) => h.name)).toEqual(["铜钥匙"]);
+    expect(remoteItems).not.toHaveBeenCalled();
+
+    for (let i = 0; i < 11; i += 1) await createItem({ name: `物${String(i)}` }, OWNER);
+    expect((await searchImportItems("物")).length).toBe(8);
+  });
+
+  it("搜到的 id 直接加得进工程——检索与引用写的是同一个池子", async () => {
+    const item = await createItem({ name: "铜钥匙" }, OWNER);
+    const hits = await searchImportItems("钥匙");
+    expect(hits.map((h) => h.id)).toEqual([item.id]);
+
+    const created = await provider.createProject({ title: "编排台" });
+    if (!created.ok) throw new Error("create failed");
+    const added = await provider.addAssetRef(created.data.id, {
+      assetType: "item",
+      assetId: hits[0]!.id,
+    });
+    expect(added.ok).toBe(true);
+    const bundle = await provider.loadProject(created.data.id);
+    expect(bundle.ok && bundle.data.assetRefs.map((r) => r.assetId)).toEqual([item.id]);
+  });
+
+  it("非桌面环境仍打 /search/items", async () => {
+    assetPoolDeps.isLocal = () => false;
+    await searchImportItems("钥");
+    expect(remoteItems).toHaveBeenCalledWith("钥");
   });
 });
 

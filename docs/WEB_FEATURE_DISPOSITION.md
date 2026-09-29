@@ -23,7 +23,7 @@
 | 云端模块 | 消费者 | 桌面现状 | 类 |
 |---|---|---|---|
 | `stories`（角色传记） | 5 个页面/组件 | **S13-1 已本地化 2026-09-26**：进 L4 契约 + SQLite schema v4 `character_stories`，`useStories` 改走 `storySaves` 分派口 | **A** |
-| `search` | OutlinerPanel、GlobalSearch | **舞台侧已本地化（S13-2b 2026-09-26）**：`searchImportScenes` 桌面走本地池、导入通路两端字段口径已对齐。道具侧仍 `searchApi.items`——阻塞在本地没有 `project_asset_refs` 表（S13-2c）。`GlobalSearch` 是云语义（搜别人的作品），按 B 处理 | **C→部分已修** |
+| `search` | OutlinerPanel、GlobalSearch | **舞台侧已本地化（S13-2b 2026-09-26）**：`searchImportScenes` 桌面走本地池、导入通路两端字段口径已对齐。**道具侧已本地化（S13-2c 2026-09-29）**：`project_asset_refs` 随 schema v5 建表、读写与 `searchImportItems` 同批接通，`OutlinerPanel` 不再打 `/search/items`。`GlobalSearch` 是云语义（搜别人的作品），按 B 处理 | **C→已修** |
 | `llm` | LlmStatusBadge | 桌面每次开编辑器发一次必败 `/llm/health`，且把"没问到"渲染成"已降级" | **C→已修** |
 | `editor`（道具/场景/工程） | 19 处 | 主链路已分派；本轮修好 `ItemDetailPage`、`useProjectDirectory`、`useProjectOutliner` 三处绕开 `readItem()` 的直连 | **C→已修** |
 | `creator`（创作数据面板） | 6 处 | `/studio/dashboard` 直达路由仍起查询；判据已下沉到 hook 的 `enabled` | **C→已修** |
@@ -52,6 +52,8 @@
    本地 `project_scenes` 只有 `(id,project_id,title,sort_order)`，`location/atmosphere/scene_ref_id` 无处存也读不回，
    而道具引用的 `project_asset_refs` 表压根不存在（bundle 读回恒为 `asset_refs: []`）。
    顺序必须是：**补列/建表 → 打通读路径 → 改写入调用 → 最后才换 fetcher**。已按此拆成宪章 S13-2b / S13-2c。
+   S13-2c 于 2026-09-29 按同序收口，并顺带把两端真正对齐：后端 `remove_asset_ref` 此前只按 `ref_id` 删、丢掉路径里的 `project_id`，
+   `add_asset_ref` 不校验工程是否存在（实测顶出 FK 500）；本地契约要求跨工程删不动、无主工程 404，故改的是服务端。
    顺带一处反直觉的收获：编排台的角色加入/移出**根本不用写本地实现**——L4 契约里 `addRole/removeRole`
    两端早就齐了，缺的只是调用方绕开了 provider。本地化有时只是改一行调用。
 

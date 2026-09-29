@@ -1,12 +1,15 @@
 /**
- * 工程域（projects / nodes / edges / scenes / roles）的 SQLite 落地。
+ * 工程正文域（projects / nodes / edges）的 SQLite 落地。
  *
  * 从 SqliteStorageProvider 外提的原因：该 Provider 受 G1 行数预算约束，
  * 而工程域是它最大的一块（引导默认舞台、原子覆写叙事图、角色挂载）。
  * 语义未变——外提的是文件边界，不是行为。
+ * 挂在正文上的三种引用（舞台 / 角色 / 道具）另见 `sqliteProjectLinks.ts`；
+ * 工程束仍在这里的 `loadProject` 一处装配，两段读路径不各自成形。
  */
 
 import type {
+  AssetRefInput,
   CreateProjectInput,
   NarrativePayload,
   ProjectBundle,
@@ -16,11 +19,11 @@ import type {
   StorageResult,
   StoredEdge,
   StoredNode,
-  StoredScene,
 } from "../types";
 import { emptyProjectMetadata, err, ok } from "../types";
 import type { SqlBackend, SqlStmt } from "./backend";
 import { asBool, nowIso, parseJson, uuid } from "./rows";
+import { SqliteProjectLinkStore } from "./sqliteProjectLinks";
 
 interface ProjectRow {
   id: string;
@@ -62,10 +65,15 @@ const PROJECT_COLS = `id, title, updated_at, is_public, description, cover_image
   theme_tags, mechanism, genre, is_meta, world_setting, rules`;
 
 export class SqliteProjectStore {
+  /** 挂在工程正文上的三种引用；同一个 backend，在 `loadProject` 处合并成一份工程束 */
+  private readonly links: SqliteProjectLinkStore;
+
   constructor(
     protected readonly backend: SqlBackend,
     private readonly authorId: string | null,
-  ) {}
+  ) {
+    this.links = new SqliteProjectLinkStore(backend);
+  }
 
   async listProjects(): Promise<StorageResult<ProjectMeta[]>> {
     try {
@@ -173,37 +181,16 @@ export class SqliteProjectStore {
         id: e.id, source: e.source_node_id, target: e.target_node_id, label: e.label,
       }));
 
-      const sceneRows = await this.backend.select<{
-        id: string; title: string; description: string | null; location: string | null;
-        atmosphere: string | null; scene_ref_id: string | null; source: string | null;
-        sort_order: number;
-      }>(
-        `SELECT id, title, description, location, atmosphere, scene_ref_id, source, sort_order
-         FROM project_scenes WHERE project_id = ? ORDER BY sort_order, id`,
-        [id],
-      );
-      const scenes = sceneRows.map((s) => ({
-        id: s.id,
-        title: s.title,
-        description: s.description ?? "",
-        location: s.location,
-        atmosphere: s.atmosphere,
-        sceneRefId: s.scene_ref_id,
-        source: (s.source ?? "inline") as StoredScene["source"],
-        sortOrder: Number(s.sort_order) || 0,
-      }));
-      const roleRows = await this.backend.select<{ id: string; character_ref_id: string }>(
-        `SELECT id, character_ref_id FROM project_roles WHERE project_id = ?`,
-        [id],
-      );
+      // 舞台 / 角色 / 道具引用三段由挂接域负责，这里只做装配（分域理由见 sqliteProjectLinks.ts）
+      const links = await this.links.loadLinks(id);
+      if (!links.ok) return links;
 
       return ok({
         meta: meta.data,
         axsSource: row.axs_source,
         nodes,
         edges,
-        scenes,
-        roles: roleRows.map((r) => ({ id: r.id, characterRefId: r.character_ref_id })),
+        ...links.data,
       });
     } catch (cause) {
       return err({ code: "io", detail: "loadProject 查询失败", cause });
@@ -288,96 +275,38 @@ export class SqliteProjectStore {
     }
   }
 
-  async addProjectScene(
+  // ---------- 挂接域分派：实现体在 sqliteProjectLinks.ts，本类只做契约转调 ----------
+
+  addProjectScene(
     id: string,
     scene: ProjectSceneInput,
   ): Promise<StorageResult<{ id: string }>> {
-    try {
-      const exists = await this.backend.select<{ id: string }>(
-        `SELECT id FROM projects WHERE id = ?`, [id],
-      );
-      if (!exists.length) return err({ code: "not_found", entity: "project", id });
-      const sceneId = uuid();
-      await this.backend.execute(
-        `INSERT INTO project_scenes
-         (id, project_id, title, sort_order, description, location, atmosphere, scene_ref_id, source)
-         VALUES (?, ?, ?,
-           (SELECT COUNT(*) FROM project_scenes WHERE project_id = ?), ?, ?, ?, ?, ?)`,
-        [
-          sceneId, id, scene.title, id,
-          scene.description ?? "", scene.location ?? null, scene.atmosphere ?? null,
-          scene.sceneRefId ?? null, scene.source ?? "inline",
-        ],
-      );
-      return ok({ id: sceneId });
-    } catch (cause) {
-      return err({ code: "io", detail: "addProjectScene 失败", cause });
-    }
+    return this.links.addProjectScene(id, scene);
   }
 
-  async removeProjectScene(
-    id: string,
-    sceneId: string,
-  ): Promise<StorageResult<void>> {
-    try {
-      // 本地 project_nodes.stage_id 没有 FK 约束，PG 的 ON DELETE SET NULL
-      // 必须在删行之前显式兑现，否则删一次舞台就把节点挂到不存在的 stage_id 上。
-      await this.backend.execute(
-        `UPDATE project_nodes SET stage_id = NULL WHERE project_id = ? AND stage_id = ?`,
-        [id, sceneId],
-      );
-      const removed = await this.backend.execute(
-        `DELETE FROM project_scenes WHERE id = ? AND project_id = ?`,
-        [sceneId, id],
-      );
-      if (!removed.rowsAffected) {
-        return err({ code: "not_found", entity: "scene", id: sceneId });
-      }
-      return ok(undefined);
-    } catch (cause) {
-      return err({ code: "io", detail: "removeProjectScene 失败", cause });
-    }
+  removeProjectScene(id: string, sceneId: string): Promise<StorageResult<void>> {
+    return this.links.removeProjectScene(id, sceneId);
   }
 
-  async addRole(
+  addRole(
     id: string,
     role: { characterRefId: string },
   ): Promise<StorageResult<void>> {
-    try {
-      const projectExists = await this.backend.select(
-        `SELECT id FROM projects WHERE id = ?`, [id],
-      );
-      if (!projectExists.length) return err({ code: "not_found", entity: "project", id });
-      const dup = await this.backend.select(
-        `SELECT id FROM project_roles WHERE project_id = ? AND character_ref_id = ?`,
-        [id, role.characterRefId],
-      );
-      if (dup.length) {
-        return err({ code: "io", detail: `duplicate role characterRefId=${role.characterRefId}` });
-      }
-      await this.backend.execute(
-        `INSERT INTO project_roles (id, project_id, character_ref_id) VALUES (?, ?, ?)`,
-        [uuid(), id, role.characterRefId],
-      );
-      return ok(undefined);
-    } catch (cause) {
-      return err({ code: "io", detail: "addRole 失败", cause });
-    }
+    return this.links.addRole(id, role);
   }
 
-  async removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
-    try {
-      const projectExists = await this.backend.select(
-        `SELECT id FROM projects WHERE id = ?`, [id],
-      );
-      if (!projectExists.length) return err({ code: "not_found", entity: "project", id });
-      await this.backend.execute(
-        `DELETE FROM project_roles WHERE project_id = ? AND id = ?`,
-        [id, roleId],
-      );
-      return ok(undefined);
-    } catch (cause) {
-      return err({ code: "io", detail: "removeRole 失败", cause });
-    }
+  removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
+    return this.links.removeRole(id, roleId);
+  }
+
+  addAssetRef(
+    id: string,
+    ref: AssetRefInput,
+  ): Promise<StorageResult<{ id: string }>> {
+    return this.links.addAssetRef(id, ref);
+  }
+
+  removeAssetRef(id: string, refId: string): Promise<StorageResult<void>> {
+    return this.links.removeAssetRef(id, refId);
   }
 }

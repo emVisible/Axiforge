@@ -1,5 +1,7 @@
 """Project editor API integration tests."""
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -158,8 +160,8 @@ async def test_saving_a_project_narrative_reaches_the_review_queue(client: Async
     from app.domains.moderation.background import drain_pending
 
     await drain_pending()  # 判定在后台：保存返回 ≠ 案件已落地
-    # order=new 是必须的：dev 库现在有 1200+ 条待处置，默认按风险排时
-    # 刚建的这条会在某一页之外——那时"这一页没有它"会被读成"判定没落库"。
+    # order=new 是必须的：队列默认按风险排序，本套件每跑一次就往 axiforge_test 里
+    # 添一批案件，刚建的这条会排到某一页之外——那时「这一页没有它」会被读成「判定没落库」。
     # （读分页却当成全表，正是 D12 修掉的那类缺陷，这次打在我自己的测试上。）
     queue = await client.get("/api/v1/admin/moderation/queue",
                              params={"limit": 200, "order": "new"}, headers=admin)
@@ -168,3 +170,56 @@ async def test_saving_a_project_narrative_reaches_the_review_queue(client: Async
     assert len(cases) == 1, "一次保存该留一条案件（ADR-028 的旁路留痕）"
     assert cases[0]["subject_type"] == "project"
     assert "spam_promotion" in cases[0]["clause_ids"]
+
+
+@pytest.mark.asyncio
+async def test_asset_ref_endpoints_hold_the_local_contract(client: AsyncClient):
+    """S13-2c：桌面 SQLite 支的 add/remove 逐字照着这两个端点写，服务端就得守住同一口径——
+    不去重（加两次留两条）、删除按 (工程, 引用) 认、工程不存在报 404 而不是让 FK 冒 500。"""
+
+    async def new_project(title: str) -> str:
+        created = await client.post(
+            "/api/v1/editor/projects/",
+            json={"title": title, "author_id": "pytest", "is_public": False},
+        )
+        assert created.status_code == 201
+        return created.json()["id"]
+
+    mine = await new_project("道具引用两端对照")
+    other = await new_project("另一份工程")
+    item_id = str(uuid.uuid4())  # 引用不校验道具本体是否存在，两端都不校验
+
+    first = await client.post(
+        f"/api/v1/editor/projects/{mine}/assets",
+        json={"asset_type": "item", "asset_id": item_id},
+    )
+    second = await client.post(
+        f"/api/v1/editor/projects/{mine}/assets",
+        json={"asset_type": "item", "asset_id": item_id},
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] != second.json()["id"], "同一件道具加两次该留两条"
+
+    detail = await client.get(f"/api/v1/editor/projects/{mine}")
+    refs = {r["id"] for r in detail.json()["asset_refs"] if r["asset_id"] == item_id}
+    assert refs == {first.json()["id"], second.json()["id"]}
+
+    # 借自己工程的路径删别人的引用：删不动才算归属成立
+    cross = await client.delete(
+        f"/api/v1/editor/projects/{other}/assets/{first.json()['id']}"
+    )
+    assert cross.status_code == 404
+    after_cross = await client.get(f"/api/v1/editor/projects/{mine}")
+    assert len(after_cross.json()["asset_refs"]) == 2, "跨工程删失败，两条都该还在"
+
+    gone = await client.delete(f"/api/v1/editor/projects/{mine}/assets/{first.json()['id']}")
+    assert gone.status_code == 204
+    again = await client.delete(f"/api/v1/editor/projects/{mine}/assets/{first.json()['id']}")
+    assert again.status_code == 404, "重复删除该可见地失败，不是幂等成功"
+
+    orphan = await client.post(
+        f"/api/v1/editor/projects/{uuid.uuid4()}/assets",
+        json={"asset_type": "item", "asset_id": item_id},
+    )
+    assert orphan.status_code == 404, "工程不存在该 404，而不是顶出 FK 500"

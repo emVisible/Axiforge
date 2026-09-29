@@ -324,7 +324,7 @@
 
 **目标**：让产品「像成品，不像工程」。本轮是纯设计轮，产出可对比的视觉证据。
 
-- [~] G2 覆盖率（`packages/core` 与 `packages/editor-core` 行+分支 ≥90%）—— **core 两轴已达标；editor-core 行达标、分支未达**
+- [x] G2 覆盖率（`packages/core` 与 `packages/editor-core` 行+分支 ≥90%）—— 两包两轴都过，且**这次真的挂进门禁了**
   2026-09-29 实测（`pnpm coverage`）：
   - `packages/core` **98.62% 行 / 90.07% 分支**（立项时 83.47 / 72.02）。补的三批用例分别针对
     引擎分支行为（wait / 未知 op / 起始拍回退 / 成就播报 / 存档退化）、编译器那些「金样本恰好不走」的
@@ -336,9 +336,18 @@
     排除口径补齐后数字才是生产代码的真实值（也才第一次真正对上 thresholds 里那条 90%）。
   - **新事实：门禁根本没在管这件事。** `vitest.config.ts` 里写着 `thresholds: { lines: 90, branches: 90 }`,
     而 `pnpm gates` 跑的是不带 `--coverage` 的 `test:unit`——所以 editor-core 那条分支阈值一直在**静默不达标**
-    （`pnpm coverage` 会明确报 `Coverage for branches (86.24%) does not meet global threshold (90%)`,
-    只是没人跑它）。余下缺口集中在 SQLite 的错误路径：`assetPool.ts` 26/49、`runtimeLocal.ts` 16/45、
-    `axsp.ts` 22/112 未覆盖分支。下一刀就按这三处补，并把 `pnpm coverage` 排进 CI 固定税（M4）。
+    同一天补齐并锁死：`pnpm coverage` 已插进 `pnpm gates`（排在 `test:unit` 之后），
+    `packages/core` 也补了 `thresholds: {lines:90, branches:90}`（原来只有 editor-core 写着阈值，
+    而 gates 跑的是不带 `--coverage` 的 `test:unit`，所以那条阈值一直是纸面的）。
+    **见过它红**：临时塞进一个 5 分支未覆盖的函数，core 立刻掉到 89.85% 并报
+    `Coverage for branches (89.85%) does not meet global threshold (90%)`；删掉后回到 90.07%。
+    余下缺口补的是 SQLite 本地库的失败与缺值形状：`runtimeLocal.ts` 现在 100%/100%，
+    `assetPool.ts` 98.13%/85.71%（只剩场景 UPDATE 那一段），`axsp.ts` 80.35% 分支仍是余量。
+    新增 10 条用例钉住：底层抛错时 17 个方法一律返回 io 而不穿越异常；JSON 列被写坏时
+    `corrupted` 点名是哪一列，且清单读取不许把坏行悄悄少给一条；从未写过的槽位 / 不存在的成就 /
+    挂在不存在工程上的成就定义都是 `not_found` 而不是假成功；最小行读回来的五种空值
+    （空串、null、未公开、空数组、空对象）逐字段核对。
+    余量只有 0.07~0.26 个点：**新增未覆盖分支会立刻红，这是有意的棘轮**——补测试，不要降阈值。
   本轮每条新判据都配了一次「让它先红」的变异：把代码改回缺陷形状，只有对应用例失败、其余全绿才算数
   （其中三次注入本身语法失败，重做后才有结论——失败的变异不算证据）。
 
@@ -531,7 +540,7 @@
 > S13-2 的三个子刀（2a/2b/2c）至此全部落地。
 >
 > 实测验收状态（不是声明，都是刚跑出来的数）：
-> - `pnpm gates` 八道全绿；单测 core 80 / axs 37 / editor-core 141 / web 124（另有 1 条显式跳过：需后端在线的示范作导出工具）/ admin 39 —— 合计 421 passed + 1 skipped
+> - `pnpm gates` 九道全绿（`pnpm coverage` 已并入）；单测 core 80 / axs 37 / editor-core 151 / web 124（另有 1 条显式跳过：需后端在线的示范作导出工具）/ admin 39 —— 合计 431 passed + 1 skipped
 > - `uv run pytest -q` 后端 165 passed；`pnpm e2e` **33 passed**（E1–E16，独立库 `axiforge_e2e`，自包含起服务后自动收）
 > - `packages/core` 覆盖率 92.79% 语句 / 79.71% 分支——G2 要求「行+分支 ≥90%」，**语句轴过、分支轴未过**，按 [~] 如实挂着
 > - 本轮每条新判据都配了一次「让它先红」的变异：把代码改回缺陷形状，只有对应用例失败、其余全绿才算数（其中三次注入本身语法失败，重做后才有结论——失败的变异不算证据）

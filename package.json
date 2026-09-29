@@ -28,7 +28,7 @@
     "check:purity": "node scripts/check-package-purity.mjs",
     "check:circular": "dpdm --no-warning --no-tree --exit-code circular:1 \"packages/core/src/index.ts\" \"packages/axs/src/index.ts\" \"packages/editor-core/src/index.ts\" \"packages/ui/src/index.ts\"",
     "check:desktop": "pnpm --filter @axiforge/desktop check",
-    "gates": "pnpm typecheck && pnpm test:unit && pnpm lint && pnpm check:purity && pnpm check:circular && pnpm check:size && pnpm check:contrast && pnpm check:ui-source"
+    "gates": "pnpm typecheck && pnpm test:unit && pnpm coverage && pnpm lint && pnpm check:purity && pnpm check:circular && pnpm check:size && pnpm check:contrast && pnpm check:ui-source"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

@@ -618,6 +618,21 @@
 
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 
+> S13-3 预备（2026-09-29 量好的可执行清单，只等你一句放行；数字由命令产生）：
+> - **云端专属页面共 955 行 / 8 个文件**：`DiscoverPage` 96、`AuthorPage` 236、
+>   `DiscoverProjectDetailPage` 136、`DiscoverCharacterDetailPage` 116、`DiscoverItemDetailPage` 101、
+>   `DiscoverSceneDetailPage` 104、`DiscoverTopicPage` 101、`DiscoverCommentSection` 65。
+>   每个页面的"其他引用者"都是 1（只有 `App.tsx` 的路由表），评论区是 5（挂在五个详情页上）——
+>   也就是说摘除顺序是"评论区 → 五个详情页 → AuthorPage → DiscoverPage → 路由表"，一步一提交。
+> - **账户与创作者面板**：`ProfilePage` 211 行（桌面态已在 E36 换成 `CloudFeatureNotice`，
+>   剩下的云端分支可以整段搬走）、`CreatorDashboardPage` 188 行（自带闸门，入口已不可达）。
+> - **云端实现侧（S13-7）**：`httpDomains` 394 + `httpStorageProvider` 356 + `httpStories` 99 +
+>   `httpCharacters` 77 + `httpProjectScenes` 62 + `httpAssetRefs` 42 ＝ **1030 行**，
+>   引用者只有 `storage/index.ts` 与两个测试（本轮 `check:dispatch` 已把它们排除在"必须有本地分支"之外）。
+> - **摘每块时要一起走的判据**（避免留残口）：路由表项 + `AppHeader`/导航里的入口 +
+>   对应的 `use*` hook + 该页在 E14/E15 路由清单里的条目 + `KNOWN_DEBT_ROUTES` 反向棘轮；
+>   评论区与详情页只能 URL 直达（E35 之后桌面已无指向 `/discover` 的链接）。
+
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
   - **S13-4a 已交付 2026-09-27**（提示词单一真相源 + 桌面本机模型通路 + 配置 UI）：
     1. 提示词从 `backend/llm/prompts.py` 迁到 `packages/axs/prompts/prose-to-axs.json`，两端读同一份。迁移是机械 dump 而非手抄——手抄会错在看不见的地方（末两句原本紧接、没有换行）。两端各锁一个 sha256 摘要，把"只输出"改成"请只输出"两侧同时红，见过它红。

@@ -409,3 +409,33 @@ async def test_compiled_story_carries_item_refs(client: AsyncClient):
         "id": item_id, "name": "铜钥匙", "category": "关键道具",
         "imagePath": "/uploads/key.png",  # IR 出 JSON 走 camelCase 别名，与 TS 侧同一形状
     }
+
+
+@pytest.mark.asyncio
+async def test_codex_scope_dedups_repeated_role(client: AsyncClient):
+    """同一角色挂两次时 codexScope 只给一条——与 TS 编译器逐字一致（金样本第四份钉住的分支）。"""
+    proj = await client.post(
+        "/api/v1/editor/projects/",
+        json={"title": "重复选角", "description": "", "author_id": "pytest", "is_public": True},
+    )
+    proj.raise_for_status()
+    proj_id = proj.json()["id"]
+
+    char = await client.post(
+        "/api/v1/characters/",
+        json={"name": "同一个人", "author_id": "pytest",
+              "character_data": {"anchor": {"name": "同一个人"}}},
+    )
+    char.raise_for_status()
+    char_id = char.json()["id"]
+
+    for importance in (5, 1):
+        added = await client.post(
+            f"/api/v1/editor/projects/{proj_id}/roles",
+            json={"character_ref_id": char_id, "importance": importance},
+        )
+        assert added.status_code in (200, 201), added.text
+
+    resp = await client.get(f"/api/v1/play/story/{proj_id}")
+    resp.raise_for_status()
+    assert resp.json()["codexScope"] == [char_id]

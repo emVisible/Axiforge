@@ -198,6 +198,9 @@ async def main() -> None:
         db.add_all([
             ProjectRole(id=_uid(60), project_id=FIXED, character_ref_id=char_public.id, importance=5),
             ProjectRole(id=_uid(61), project_id=FIXED, character_ref_id=char_private.id, importance=2),
+            # 同一个角色挂两次：本地契约与 TS 编译器会去重，Python 早前不去重——
+            # 这条引用就是为了让两端在这个分支上必须给出同一个 codexScope。
+            ProjectRole(id=_uid(62), project_id=FIXED, character_ref_id=char_public.id, importance=1),
         ])
 
         db.add_all([

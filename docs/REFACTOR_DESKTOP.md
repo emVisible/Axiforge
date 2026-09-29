@@ -653,6 +653,28 @@
   复现：`createdb axiforge_golden` → `alembic upgrade head` → `seed_branch_parity.py` → `dump_golden.py <id>`；
   **scratch 库已删**，开发库 `axiforge` 全程零接触（实测 `pg_database` 只剩原有四个 axiforge* 库）。
 
+  **这份样本一装上去就抓出一处真的两端不一致**（不是形状差异，是产物差异）：
+  同一角色挂两条选角时，Python 的 `codexScope` 给重复项、TS 给去重项。
+  判据是金样本那条用例直接红（`expected … to deeply equal …`，差集就是那一条重复 id）。
+  取向按 ADR-029 决策 5 定：**TS 是真相源**，且重复项对"查哪些角色的跨作品记忆"没有语义，
+  于是把 Python 侧收紧到去重（保持首次出现顺序，`compiler.py`），
+  并新增 `backend/tests/test_story_compiler.py::test_codex_scope_dedups_repeated_role` 钉住它
+  （把去重退回原形状 → 该用例红，实测 1 failed）。
+- [x] 附带：桌面投影的**端到端**对照用例（`apps/web/src/shared/storage/compilerInput.test.ts`）。
+  金样本对照的是"同一份输入 → 两端输出一致"，而本轮两条真缺陷都出在**投影**（bundle → 输入）这一层，
+  那条链路此前只在单测里按字段测过、没有和服务端产物对起来过。
+  新用例走完整链路：本地存储形态 → `bundleToCompilerInput` → `compileStory` → 必须等于 `expected.json`。
+  **比较编译产物而不是比较输入对象**是有意的：`scenes[].nodes`、`sceneRefId`、`isPublic` 这些
+  编译器不读的形状差异会淹没有意义的差异，而产物层相等才是用户看得见的一致。
+  牙（还原后 4 passed）：把舞台资产在投影里丢掉（S13-2b 之前的形状）→ 红 2 条；
+  把道具丢掉（S13-2c 之前 `items: []` 的形状）→ 红 2 条。这两次正是历史上真实存在过的两个缺陷。
+  **两处漂移在册而不是当场修**，写成显式断言、改好就会红：
+  ① 桌面 `playMeta` 恒 `{}` → 术语表在桌面试玩里不出现（就是 #58 的那半条，需产品定档）；
+  ② 边级 `condition` 在本地存储没有列、投影给不出，而编译器的"多出口自动成选择"会用它
+  （`compiler.ts:191`）。不补的理由：Flow 编辑器把门禁写在**节点**的 `trigger_condition` 上
+  （`useProjectEditor.ts:545`，随 narrativeData 落本地、两端一致），边级条件只有 API/旧数据才写；
+  为 UI 走不到的路径加 schema v6 + 契约方法 + 三实现属于给假设需求造工程。
+
 - [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。
   `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
   为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、

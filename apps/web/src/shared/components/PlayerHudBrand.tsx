@@ -9,11 +9,13 @@ interface PlayerHudBrandProps {
 export default function PlayerHudBrand({ subtitle }: PlayerHudBrandProps) {
   return (
     <div className="flex min-w-0 items-center gap-4">
-      /*
-       * 这里不能再用 Link 包一层：AppBrand 自己就是一个指向发现页的锚链接，套起来就是「锚里套锚」，
-       * React 会打 "In HTML, a cannot be a descendant of a" 并留下 hydration 隐患。
-       * 停掉冒泡仍然需要（播放器整屏 onClick=推进剧情，点品牌不该顺带翻一拍），所以换成 span 承担。
-       */
+      {/*
+        这里不能再用 Link 包一层：AppBrand 自己就是一个指向发现页的锚链接，套起来就是「锚里套锚」，
+        React 会打 "In HTML, a cannot be a descendant of a" 并留下 hydration 隐患。
+        停掉冒泡仍然需要（播放器整屏 onClick=推进剧情，点品牌不该顺带翻一拍），所以换成 span 承担。
+        写法上记一笔：JSX 子位置的注释必须裹在花括号里；裸写块注释会被当成文本节点，
+        整段原样渲染到界面上（我自己踩过，判据见 desktop-http.spec.ts 的「界面上不该出现源码注释」）。
+      */}
       <span
         className="shrink-0 opacity-80 transition-opacity hover:opacity-100"
         onClick={(e) => e.stopPropagation()}

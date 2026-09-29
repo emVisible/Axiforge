@@ -348,6 +348,8 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
     // 播出来的必须是我刚写进那一拍的字：这条一跳同时验收「写入 → 编译 → 播出」整链
     await expect(page.getByText("离线路上的第一句")).toBeVisible({ timeout: 8000 });
+    // 界面上不该出现源码注释：JSX 子位置裸写块注释会被当成文本节点渲染出来（我踩过，判据钉在这里）
+    await expect(page.getByText(/\/\*|\*\//)).toHaveCount(0);
     // 判据从「只筛数据通路那一类」升级成「整条桌面链路上零 console 错误」：播放器那条 <a><a> 修好之后才敢这么收
     expect(errs, `桌面链路上有 console 错误：${errs.join(" | ")}`).toEqual([]);
     await page.goBack({ waitUntil: "load" });

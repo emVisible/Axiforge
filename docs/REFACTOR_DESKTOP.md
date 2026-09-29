@@ -650,7 +650,13 @@
   这一步做完才允许浏览器 run mode 降级为纯测试宿主
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"
-- [ ] S13-8 修订战略文档：新 ADR 记录本决策与代价并链接 ADR-024/016/027；`docs/ROADMAP_FINAL.md` 的楔子3 标注为随 web 退场而搁置；恢复锚点见 [WEB_SUNSET_RESTORE](./WEB_SUNSET_RESTORE.md)，逐功能去留见 [WEB_FEATURE_DISPOSITION](./WEB_FEATURE_DISPOSITION.md)
+- [x] S13-8 修订战略文档 —— 已交付 2026-09-29：新增 [ADR-029](./ADR/029-desktop-only-build-target.md)
+  （桌面是唯一构建与发布目标、web 与第二套数据通路退场、代价与未决逐条实测；链接 ADR-024/008/016/027/026）；
+  `docs/ADR/README.md` 索引补上 **ADR-028 与 029 两行**（028 此前根本不在索引里，文件存在却查不到，
+  顺手按同一格式补上）；`docs/ROADMAP_FINAL.md` 的楔子3 就地标注为随分发面退场而搁置，
+  并如实写明楔子2 只部分不受影响（跨作品 Codex 在桌面是「如实说出来地缺席」）；
+  恢复锚点 [WEB_SUNSET_RESTORE](./WEB_SUNSET_RESTORE.md)（历史标签 `web-archive-20260926`）与
+  逐功能去留 [WEB_FEATURE_DISPOSITION](./WEB_FEATURE_DISPOSITION.md) 两份文档此前已存在，本条只做链接。
 
 > **收尾快照（2026-09-29，tag `desktop-wip-20260929`）**
 >
@@ -732,6 +738,25 @@
 >
 > 手动验收（机器给不出的那部分，仍在你手上）：把 `Axiforge.app` 双击打开，看首屏能否新建剧本、
 > 试玩一台没有后端的机器上的示范作、以及角色页「设定导出」是否真落出一个 `.md`。
+
+> **收尾快照 4（2026-09-29 本回合最后两刀，tag `desktop-wip-20260929e`）**
+>
+> 两刀都是"查漏补缺"而不是新功能：
+> 1. `f4b4840` 加 E18 钉住「云端专属工具条在桌面不给入口」，同时**按证据作废普查里一条不成立的前提**
+>    （模板 tab 早在 `{!localOnly && (<>…</>)}` 整块里，桌面进不到那条 effect）。
+>    作废过程本身就是这条用例的价值来源：我先写了断言、再用 `{true && (` 打穿外层闸门，
+>    看到桌面那一半红（`Received: 1`）才知道原断言是空转。**页面改动整体撤回**，不留死条件。
+> 2. 本颗文档刀：新增 [ADR-029](./ADR/029-desktop-only-build-target.md)（S13-8 关闭）、
+>    `docs/ADR/README.md` 补回**此前完全不在索引里的 ADR-028** 与新增的 029、
+>    `docs/ROADMAP_FINAL.md` 楔子3 就地标注搁置并如实写明楔子2 只部分不受影响。
+>
+> 实测（本回合最后一次全链复跑，都是命令产生的数）：
+> `pnpm gates` GATES_EXIT=0 / 单测 455 passed + 1 skipped；`pnpm e2e` E2E_EXIT=0 / **36 passed (45.9s)**；
+> `cd backend && uv run pytest -q` PYTEST_EXIT=0 / **165 passed**；`pnpm check:desktop` EXIT=0（本地 1.0s 预热）。
+>
+> 一条改判（原 #25「让 web 也改调 TS 内核」）：在桌面唯一化之后，这条的正确归宿不是"web 换内核"，
+> 而是**Python 编译器随 web 一起退场**（ADR-029 决策 4/5）。给要被删的那一侧新建调用路径是净负收益，
+> 而双端分叉的风险已由金样本 + 分支用例 + `sceneRef` 那类专项回归守着。
 
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 

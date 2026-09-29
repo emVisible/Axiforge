@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { cn, inputCompact, labelSm } from "@/shared/components/ui";
 
 import {
@@ -21,6 +23,7 @@ export default function ConditionEditor({
   onChange,
   roles,
 }: ConditionEditorProps) {
+  const groupId = useId();
   const add = () =>
     onChange([
       ...conditions,
@@ -38,9 +41,9 @@ export default function ConditionEditor({
   const remove = (i: number) => onChange(conditions.filter((_, j) => j !== i));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="group" aria-labelledby={groupId}>
       <div className="flex items-center justify-between">
-        <label className={labelSm}>触发条件</label>
+        <label id={groupId} className={labelSm}>触发条件</label>
         <button
           type="button"
           onClick={add}

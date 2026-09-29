@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { cn, inputCompact, labelSm } from "@/shared/components/ui";
 
 import {
@@ -20,6 +22,7 @@ export default function EffectEditor({
   onChange,
   roles,
 }: EffectEditorProps) {
+  const groupId = useId();
   const add = () =>
     onChange([...effects, { type: "memory", key: "", value: "" }]);
   const update = (i: number, d: Partial<EffectItem>) => {
@@ -34,9 +37,9 @@ export default function EffectEditor({
   const remove = (i: number) => onChange(effects.filter((_, j) => j !== i));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="group" aria-labelledby={groupId}>
       <div className="flex items-center justify-between">
-        <label className={labelSm}>完成效果</label>
+        <label id={groupId} className={labelSm}>完成效果</label>
         <button
           type="button"
           onClick={add}

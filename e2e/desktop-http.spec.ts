@@ -283,6 +283,17 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page.getByPlaceholder("叙述性文字...")).toHaveValue("离线路上的第一句", { timeout: 8000 });
 
     /*
+     * #65 的另两处分派：条件/效果面板顶上的「触发条件」「完成效果」原本是裸 <label>——
+     * 它下面是一整列行（每行各有 Select 与 Input），根本没有"那一个控件"可以指，
+     * 所以正确的修法不是 htmlFor，而是把这一块命名成一组（role=group + aria-labelledby 指着标题）。
+     * 判据取浏览器的计算结果：getByRole("group", name) 只在分组语义真的成立时才拿得到。
+     */
+    await page.getByRole("button", { name: "条件", exact: true }).click();
+    await expect(page.getByRole("group", { name: "触发条件" })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("button", { name: "效果", exact: true }).click();
+    await expect(page.getByRole("group", { name: "完成效果" })).toBeVisible({ timeout: 8000 });
+
+    /*
      * E25：把角色加进工程（S13-2a 那条 `addRole` 腿，本地实现早就齐了、缺的是点击层证据）。
      * 全程走客户端路由不刷新文档——内存库随重载归零；角色也在同一文档里现造，
      * 于是这条一并把「建角色 → 挂进工程 → 计数抬头 → 换页回读」串起来。

@@ -173,6 +173,33 @@ export async function unlockAchievement(
 }
 
 /**
+ * 读侧与写侧必须同一裁决，否则「本地没有账本表」这件事只有一半成立：
+ * `syncCodex` 早就改成如实 skipped 了，而 `PlayerPage` 仍在直接 `playerApi.getCodex`
+ * （那一轮分派收口漏掉的第二条腿）——桌面每次开播都发一条打不到的请求，
+ * 失败被 `catch` 成空账本，于是跨作品记忆在桌面上永远是空的，而且没人知道。
+ */
+export async function readCodex(
+  token: string,
+  scope?: string[],
+): Promise<{
+  ledger: CodexLedger;
+  via: "skipped-offline" | "remote" | "failed";
+  detail?: string;
+}> {
+  if (playerSavesDeps.isLocal()) return { ledger: {}, via: "skipped-offline" };
+  try {
+    const res = await playerApi.getCodex(token, scope);
+    return { ledger: res.ledger ?? {}, via: "remote" };
+  } catch (e) {
+    return {
+      ledger: {},
+      via: "failed",
+      detail: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+/**
  * 跨作品 Codex 账本没有本地表（宪章 Phase 7 未纳入，登记为后续项）。
  * 桌面离线时如实返回 skipped，不再像原先那样发一次注定失败的请求然后 `.catch(()=>{})` 当作无事发生。
  */

@@ -1,5 +1,5 @@
 {
-  "apps/web/src/features/player/pages/PlayerPage.tsx": 1393,
+  "apps/web/src/features/player/pages/PlayerPage.tsx": 1331,
   "apps/web/src/features/studio/hooks/useProjectEditor.ts": 1081,
   "apps/web/src/features/character/pages/CharacterDetailPage.tsx": 735,
   "apps/web/src/features/studio/cut/TimelineShell.tsx": 713,

@@ -31,6 +31,7 @@ import {
   clearSave as clearSaveSlot,
   getSave as readActiveSave,
   listSaves as readSaveSlots,
+  readCodex,
   syncCodex,
   unlockAchievement,
   writeSave as writeSaveSlot,
@@ -75,6 +76,7 @@ import GalleryPanel from "../components/GalleryPanel";
 import CodexPanel, { TermTipPopover } from "../components/CodexPanel";
 import RouteReplayPanel from "../components/RouteReplayPanel";
 import TimelinePanel from "../components/TimelinePanel";
+import PlayerStatePanel from "../components/PlayerStatePanel";
 import { playerTheme, playerScreenClass } from "@/shared/lib/playerTheme";
 import PlayerHudBrand from "@/shared/components/PlayerHudBrand";
 import UserAccountMenu from "@/shared/components/UserAccountMenu";
@@ -103,18 +105,6 @@ type Overlay =
   | "codex"
   | "route"
   | "timeline";
-
-function formatVal(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  if (typeof v === "object") {
-    try {
-      return JSON.stringify(v);
-    } catch {
-      return String(v);
-    }
-  }
-  return String(v);
-}
 
 /** 从视图构造存档摘要（列表页/续玩提示用） */
 function buildSummary(v: StoryView | null): string {
@@ -336,17 +326,24 @@ export default function PlayerPage() {
   );
 
   const codexSyncRef = useRef<string>("{}");
+  /** 非 null 就是一条要说出来的降级，不是错误弹窗——播错不如播得明白 */
+  const [codexNotice, setCodexNotice] = useState<string | null>(null);
 
   // ---------- 加载并启动 ----------
+  // 走分派口而不是直接 playerApi：桌面没有跨作品账本表，读不到是**设计如此**，
+  // 但这件事必须被说出来——原先的 .catch(() => ({})) 把「没读到」压成「没有记忆」。
   const fetchCodex = useCallback(
     async (scope?: string[]) => {
-      try {
-        const res = await playerApi.getCodex(playerToken, scope);
-        codexSyncRef.current = JSON.stringify(res.ledger ?? {});
-        return res.ledger ?? {};
-      } catch {
-        return {} as CodexLedger;
+      const r = await readCodex(playerToken, scope);
+      codexSyncRef.current = JSON.stringify(r.ledger);
+      if (r.via === "skipped-offline") {
+        setCodexNotice("桌面版尚未把跨作品记忆本地化，本次试玩不带上其它作品的记忆（开播时的记忆不受影响）。");
+      } else if (r.via === "failed") {
+        setCodexNotice(`跨作品记忆没读到（${r.detail ?? "未知原因"}），本次试玩不带上它。`);
+      } else {
+        setCodexNotice(null);
       }
+      return r.ledger;
     },
     [playerToken],
   );
@@ -760,6 +757,10 @@ export default function PlayerPage() {
   const flagEntries = Object.entries(rtState?.vars.flags ?? {});
   const charEntries = Object.entries(rtState?.vars.characters ?? {});
   const stateCount = memEntries.length + flagEntries.length;
+  const charNames = useMemo(
+    () => Object.fromEntries(Object.entries(charById).map(([id, c]) => [id, c.name])),
+    [charById],
+  );
 
   const line = view?.waiting === "say" ? view.line : undefined;
   const isNarration = !!line && !line.speaker;
@@ -1110,77 +1111,14 @@ export default function PlayerPage() {
 
       {/* 状态面板 */}
       {showStatePanel && (
-        <div
-          className="absolute inset-0 z-50 flex animate-fade-in flex-col bg-black/95 backdrop-blur-sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between border-b border-white/5 p-6">
-            <h2 className="flex items-center gap-2 text-sm tracking-wider text-white/50">
-              <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-              会话状态
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowStatePanel(false)}
-              className="text-sm text-white/20 hover:text-white/50"
-            >
-              关闭
-            </button>
-          </div>
-          <div className="flex-1 space-y-8 overflow-y-auto p-8">
-            <section>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">
-                记忆 ({memEntries.length})
-              </h3>
-              {memEntries.length === 0 ? (
-                <p className="text-sm text-white/65">暂无记忆</p>
-              ) : (
-                <div className="space-y-2">
-                  {memEntries.map(([k, v]) => (
-                    <div key={k} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                      <span className="text-xs text-white/40">{k}</span>
-                      <p className="text-sm text-white/60">{formatVal(v)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">
-                标志 ({flagEntries.length})
-              </h3>
-              {flagEntries.length === 0 ? (
-                <p className="text-sm text-white/65">暂无标志</p>
-              ) : (
-                <div className="space-y-2">
-                  {flagEntries.map(([k, v]) => (
-                    <div key={k} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                      <span className="text-xs text-white/40">{k}</span>
-                      <p className="text-sm text-white/60">{formatVal(v)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">
-                角色状态 ({charEntries.length})
-              </h3>
-              {charEntries.length === 0 ? (
-                <p className="text-sm text-white/65">暂无角色状态</p>
-              ) : (
-                <div className="space-y-2">
-                  {charEntries.map(([id, fields]) => (
-                    <div key={id} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                      <p className="text-sm text-white/70">{charById[id]?.name || id}</p>
-                      <p className="text-xs text-white/35">{formatVal(fields)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
+        <PlayerStatePanel
+          memory={memEntries}
+          flags={flagEntries}
+          characters={charEntries}
+          charNames={charNames}
+          notice={codexNotice}
+          onClose={() => setShowStatePanel(false)}
+        />
       )}
 
       {/* 回顾 */}

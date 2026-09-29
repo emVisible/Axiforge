@@ -19,6 +19,12 @@ const DESKTOP_MARKER_INIT = () => {
   (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
 };
 
+/**
+ * 断言的是「进入这个路由、装载这条数据通路」时零云端请求。
+ * **不覆盖点击之后的行为**——例如 /studio/characters/new 上的「AI 建档建议」按钮，
+ * 它调 `aiApi.suggestCharacter`（CreateCharacterPage.tsx:83）在这条判据之外。
+ * 这条边界写在这里而不是留成隐含预期：路由级棘轮证明的是装载路径，不是整页无云调用。
+ */
 const CLEAN_ROUTES = [
   "/discover",
   "/studio/projects",
@@ -28,6 +34,7 @@ const CLEAN_ROUTES = [
   "/studio/dashboard",
   "/profile",
   "/docs",
+  "/studio/characters/new",
 ];
 
 /**

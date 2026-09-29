@@ -1,10 +1,21 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryStorageProvider, type StorageProvider } from "@axiforge/editor-core";
-import { playerSavesDeps, writeSave, listSaves, getSave, clearSave, unlockAchievement, syncCodex } from "./playerSaves";
+import {
+  clearSave,
+  getSave,
+  listSaves,
+  playerSavesDeps,
+  readCodex,
+  syncCodex,
+  unlockAchievement,
+  writeSave,
+} from "./playerSaves";
 
 const putSave = vi.fn();
 const clearSaveRemote = vi.fn();
+const getCodex = vi.fn();
+const putCodex = vi.fn();
 
 vi.mock("@/shared/api/player", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/shared/api/player")>();
@@ -14,6 +25,8 @@ vi.mock("@/shared/api/player", async (importOriginal) => {
       ...mod.playerApi,
       putSave: (p: string, b: unknown) => putSave(p, b),
       clearSave: (p: string, t: string, s?: number) => clearSaveRemote(p, t, s),
+      getCodex: (t: string, ids?: string[]) => getCodex(t, ids),
+      putCodex: (b: unknown) => putCodex(b),
     },
   };
 });
@@ -33,6 +46,8 @@ beforeEach(async () => {
   playerSavesDeps.provider = async () => provider;
   putSave.mockReset();
   clearSaveRemote.mockReset();
+  getCodex.mockReset();
+  putCodex.mockReset();
 });
 
 describe("playerSaves 本地支", () => {
@@ -109,9 +124,34 @@ describe("playerSaves 本地支", () => {
     const r = await syncCodex(projectId, TOKEN, { entries: [] } as never);
     expect(r).toEqual({ ok: true, via: "skipped-offline" });
   });
+
+  // 读侧与写侧同一条裁决：本地没有跨作品账本表，就如实说 skipped，
+  // 不许发一条注定打不到的请求再 catch 成「这个玩家没有记忆」。
+  it("readCodex 桌面支零请求，并把降级说成一个可区分的 via", async () => {
+    const r = await readCodex(TOKEN, ["c1"]);
+    expect(r).toEqual({ ledger: {}, via: "skipped-offline" });
+    expect(getCodex).not.toHaveBeenCalled();
+  });
 });
 
 describe("playerSaves 远端支", () => {
+  it("readCodex 远端支打 GET /play/codex 并带回账本", async () => {
+    playerSavesDeps.isLocal = () => false;
+    getCodex.mockResolvedValue({ ledger: { c1: { met: true } } });
+    const r = await readCodex(TOKEN, ["c1"]);
+    expect(getCodex).toHaveBeenCalledWith(TOKEN, ["c1"]);
+    expect(r).toEqual({ ledger: { c1: { met: true } }, via: "remote" });
+  });
+
+  it("读失败与「没有账本」是两种状态：via=failed 带原因，不静默成空", async () => {
+    playerSavesDeps.isLocal = () => false;
+    getCodex.mockRejectedValue(new Error("502"));
+    const r = await readCodex(TOKEN);
+    expect(r.via).toBe("failed");
+    expect(r.ledger).toEqual({});
+    expect(r.detail).toContain("502");
+  });
+
   it("非桌面环境仍打既有 REST，不经本地 Provider", async () => {
     playerSavesDeps.isLocal = () => false;
     const r = await writeSave(projectId, TOKEN, {

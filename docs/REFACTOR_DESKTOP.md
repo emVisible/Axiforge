@@ -527,7 +527,37 @@
   **一处已知边界（不在这一刀里扩张）**：`.axsp` 容器不装道具本体，导入时把引用原样带过去——同机导入即刻解析，跨机导入留成悬空引用，编排台按 `道具 <id前缀>` 显示、可手动移除。静默丢掉才是问题（导出者明明挂了三件道具），故选择"带着悬空"并由 `unpackAxsp` 的 `normalizeBundle` 在唯一一处补 `assetRefs: []`（早于本批的容器根本没有这个键）。详见 ADR-026。
   **G1 清偿（这一批自己越的线，按门禁处方拆）**：四个文件被新增的契约方法推过 400（`types.ts` 435 / `sqliteProject.ts` 440 / `memory.ts` 415 / `httpStorageProvider.ts` 422）。分轴沿用仓库既有形状、不改行为：契约的记录形态回到 `records.ts`（它本来就是「查表型」字段表的家，`types.ts` 仍 `export *` 再导出，消费方 import 路径不变）；SQLite 与 Memory 各出 `sqliteProjectLinks.ts` / `memoryLinks.ts`，HTTP 侧出 `httpAssetRefs.ts` / `httpCharacters.ts`（与 `httpProjectScenes` / `httpStories` 同一先例）。结果八道门禁全绿。
   **拆出来的一个真实缺口**：外提 `listCharacters` 之后做一次变异——整段删掉「公开」分支，web 的 118 条测试全绿。角色的「我的 ∪ 公开」合并在 HTTP 支从来没有用例盯着（契约套件只跑 Memory / SQLite 两支）。已补 `storage.test.ts` 角色域两条（合并去重、只取公开时不打 `/characters/user`），见过它们红：删公开分支红 2 条，去掉 `merged.has` 去重护栏红 1 条。**教训：一次纯搬运的重构也能暴露覆盖空洞——搬的时候给被搬的那段补腿，比事后追问「这块为什么没测」便宜得多。**
-- [ ] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
+- [~] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
+  —— 2026-09-29 逐条取证后的**实测结论**（有一条的前提本身是错的，另有一处藏在假绿后面的真缺陷）：
+  1. **`PlayerPage` 的跨作品 Codex 读侧**：`fetchCodex` 一直直接 `playerApi.getCodex`，没走分派口
+     （同文件的 `recordView`/`getStory`/写侧 `syncCodex` 都走）。桌面每次开播发一条打不到的请求，
+     `catch` 成空账本——**跨作品记忆在桌面上永远为空且无人知晓**。E15 之所以绿，只是因为
+     `loadStoryOffline` 先抛了、根本没走到这一行。已补 `readCodex` 进 `playerSaves`（与 `syncCodex` 同一裁决：
+     本地如实 `skipped-offline`、远端失败给 `via: "failed"` 带原因），并在记忆面板把这条降级**说出来**。
+     3 条新用例 + 2 次变异见过红（桌面支不再短路、读失败伪装成读成功）。
+  2. **`ai` 的立项前提是错的**：`CreateCharacterPage` 不在「有数据才挂载」那一类——`/studio/characters/new`
+     裸访问就挂载（页内 `draft`/`ready` 由挂载副作用置真）。所以它**可以**进 E14  CLEAN_ROUTES，
+     已加进去并实测通过（装载路径零 `/api/v1`）。仍然没测的是点击之后的 `aiApi.suggestCharacter`
+     （`CreateCharacterPage.tsx:83`，直连 `aiApi` 无守卫）——这条属 S13-4b「AI 建档建议本地化」，
+     边界写进 `desktop-http.spec.ts` 的注释里，不留成隐含预期。
+  3. **`PromptExport` 与 `usePlayer` 是零消费者的孤儿**：全仓 grep 只有各自的定义与 barrel 再导出
+     （`features/character/components/index.tsx:5`、`shared/hooks/index.ts:4`），
+     `playerApi.startSession/draw/complete/getMemories/getFlags/getCharacterStates` 除 `usePlayer.ts` 内
+     没有任何调用点。它们不是「待本地化」，是「该摘除」——已挪进 S13-3 的清单（摘除=组件 + api 段 + 后端路由一起走）。
+  4. **`nexus`**（`OutlinerPanel.tsx:99` 的 `sendToNexus` → `POST /api/v1/nexus/notes`）桌面可达但**双重数据门**
+     （要真工程 + 「项目」手风琴默认收起），路由级判据结构上碰不到它；`SaveSlotPanel` 本身零网络（纯展示，
+     存档读写早已走 `playerSaves` 分派口）。两者的共同前提是「浏览器里得有一个能成功读取的本地库」——
+     这正是 S13-5「注入内存本地库」还没做的部分：那个 host 建起来之后，这两处才谈得上被 e2e 断言。
+  剩下的未完成项：`nexus` 与 `aiApi.suggestCharacter` 两条真实云调用需要处置（判死或本地化），
+  孤儿模块两件待随 S13-3 摘除，E14/E15 的可测面需要 S13-5 的本地库 host 才能扩到点击路径。
+  **G1 清偿（本批第 1 条自己越的线）**：`readCodex` + 降级提示把 `PlayerPage` 顶到 1406 行 > 棘轮 1393。
+  按门禁处方把「会话状态」面板整块外提成 `components/PlayerStatePanel.tsx`（纯展示，只吃已算好的三张表），
+  1393 → **1331** 并锁进基线。**两处刻意的不统一**：角色状态那一栏的 DOM 形状与记忆/标志不同构
+  （名是 `p text-sm/70`、值是 `p text-xs/35`），逐类原样保留而不是抽一个共用行组件——外提的验收是零行为漂移，
+  顺手"规整"样式就等于把重构变成改视觉。
+  同一次搬运让 `lint:colors` 的低透明度文字棘轮从 47 降到 **45**（三段重复的 `text-white/30` 表头合成一处），
+  新文件按仓库既有口径在 `ui-dim-text-baseline.json` 登记 3 处（`BacklogPanel` 2、`TimelinePanel` 2 同一先例）；
+  **没有**为了让新文件从 0 开始而把 HUD 的 `text-white/20` 关闭键改亮——那是替用户改视觉，不是清偿债。
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
   - **S13-4a 已交付 2026-09-27**（提示词单一真相源 + 桌面本机模型通路 + 配置 UI）：
@@ -557,10 +587,10 @@
 > （G2：core 两轴达标 98.62/90.07，editor-core 行达标、分支 86.24 未达）。
 > S13-2 的三个子刀（2a/2b/2c）至此全部落地。
 >
-> 实测验收状态（不是声明，都是刚跑出来的数）：
-> - `pnpm gates` 九道全绿（`pnpm coverage` 已并入）；单测 core 80 / axs 37 / editor-core 151 / web 128（另有 1 条显式跳过：需后端在线的示范作导出工具）/ admin 39 —— 合计 435 passed + 1 skipped
-> - `uv run pytest -q` 后端 165 passed；`pnpm e2e` **33 passed**（E1–E16，独立库 `axiforge_e2e`，自包含起服务后自动收）
-> - `packages/core` 覆盖率 92.79% 语句 / 79.71% 分支——G2 要求「行+分支 ≥90%」，**语句轴过、分支轴未过**，按 [~] 如实挂着
+> 实测验收状态（不是声明，都是刚跑出来的数；2026-09-29 随 S13-2d 重测一遍，覆盖上一版数字）：
+> - `pnpm gates` 九道全绿（`pnpm coverage` 已并入）；单测 core 80 / axs 37 / editor-core 151 / web 131（另有 1 条显式跳过：需后端在线的示范作导出工具）/ admin 39 —— 合计 **438 passed + 1 skipped**
+> - `uv run pytest -q` 后端 165 passed；`pnpm e2e` **34 passed**（E1–E16，独立库 `axiforge_e2e`，自包含起服务后自动收；比上一版的 33 多一条，就是本批加进 CLEAN_ROUTES 的 `/studio/characters/new`）
+> - 覆盖率：`packages/core` **98.62% 语句 / 90.07% 分支**（由 `9513c74` 过线），`packages/editor-core` **96.82 / 90.26**（由 `5bf4344` 过线）—— G2 的「行+分支 ≥90%」两包两轴**均达标**（上一版此处记的是 core 分支 79.71 未过）
 > - 本轮每条新判据都配了一次「让它先红」的变异：把代码改回缺陷形状，只有对应用例失败、其余全绿才算数（其中三次注入本身语法失败，重做后才有结论——失败的变异不算证据）
 >
 > 未做完的（保持未勾，不降级成「已完成」）：

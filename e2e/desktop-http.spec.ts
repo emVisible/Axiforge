@@ -301,6 +301,19 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
      */
     await page.getByRole("button", { name: "条件", exact: true }).click();
     await expect(page.getByRole("group", { name: "触发条件" })).toBeVisible({ timeout: 8000 });
+    /*
+     * 条件段里那台「模拟变量 → 出边预演」的预演器：两处原本都是裸 <label>。
+     * 它下面不是"一个控件"而是一整列行，所以修法分两种——
+     * 整块用 role=group 指到「模拟变量」这个标题，行内的三个控件各自带 aria-label（带序号，
+     * 因为它们在 map 出来的行里，useId 不能进循环）；而「出边预演」本来就是小标题，
+     * 于是改成 <h3>，不再假冒字段标签。
+     */
+    await page.getByRole("button", { name: "+ 添加变量" }).click();
+    await expect(page.getByRole("group", { name: "模拟变量" })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("combobox", { name: "模拟变量作用域 1", exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("textbox", { name: "模拟变量键 1", exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("textbox", { name: "模拟变量值 1", exact: true })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("heading", { name: /出边预演/ })).toBeVisible({ timeout: 8000 });
     await page.getByRole("button", { name: "效果", exact: true }).click();
     await expect(page.getByRole("group", { name: "完成效果" })).toBeVisible({ timeout: 8000 });
 

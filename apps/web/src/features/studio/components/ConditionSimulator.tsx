@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { evaluateCondition } from "@axiforge/core";
 import type { Condition, RuntimeVariables } from "@axiforge/core";
 import { cn, labelSm } from "@/shared/components/ui";
@@ -54,6 +54,7 @@ const SCOPE_LABEL: Record<FakeVar["scope"], string> = {
  */
 export default function ConditionSimulator({ targets }: { targets: SimTarget[] }) {
   const [vars, setVars] = useState<FakeVar[]>([]);
+  const varsGroupId = useId();
 
   const runtimeVars = buildVars(vars);
   const results = targets.map((t) => ({
@@ -66,9 +67,9 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
     setVars(vars.map((v, j) => (j === i ? { ...v, ...patch } : v)));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" role="group" aria-labelledby={varsGroupId}>
       <div>
-        <label className={cn(labelSm, "block")}>模拟变量</label>
+        <label id={varsGroupId} className={cn(labelSm, "block")}>模拟变量</label>
         <p className="mt-1 text-2xs leading-relaxed text-ink-muted">
           填入假设的记忆/关系值，预览从本节点将走向哪条分支。角色用
           <code className="mx-1 rounded bg-canvas px-1">角色id.字段</code>
@@ -79,6 +80,7 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
       {vars.map((v, i) => (
         <div key={i} className="flex items-center gap-1.5">
           <select
+            aria-label={`模拟变量作用域 ${i + 1}`}
             className="rounded-md border border-border bg-surface px-1.5 py-1 text-2xs"
             value={v.scope}
             onChange={(e) => setVar(i, { scope: e.target.value as FakeVar["scope"] })}
@@ -90,12 +92,14 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
             ))}
           </select>
           <input
+            aria-label={`模拟变量键 ${i + 1}`}
             className="w-24 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs"
             placeholder="键"
             value={v.key}
             onChange={(e) => setVar(i, { key: e.target.value })}
           />
           <input
+            aria-label={`模拟变量值 ${i + 1}`}
             className="w-20 rounded-md border border-border bg-surface px-2 py-1 text-xs"
             placeholder="值"
             value={v.value}
@@ -123,7 +127,7 @@ export default function ConditionSimulator({ targets }: { targets: SimTarget[] }
       </button>
 
       <div className="pt-2">
-        <label className={cn(labelSm, "block")}>出边预演（{results.length}）</label>
+        <h3 className={cn(labelSm, "block")}>出边预演（{results.length}）</h3>
         {results.length === 0 ? (
           <p className="mt-1 text-xs text-ink-muted">本节点没有出边</p>
         ) : (

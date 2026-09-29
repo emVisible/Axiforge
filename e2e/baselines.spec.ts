@@ -6,7 +6,6 @@ import {
   createProject,
   E2E_TAG,
   getProject,
-  replaceEdges,
   updateNode,
 } from "./helpers";
 

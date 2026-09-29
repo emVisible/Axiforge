@@ -1,0 +1,21 @@
+{
+  /* 37 条行为基线此前不在任何 tsc 的 include 里（apps/web 的 tsconfig.app.json 只收 src），
+     也就是说规格文件里的类型错误只能等 Playwright 跑起来才暴露。搬出 apps/web 的同时把这道检查补上。
+     playwright.config.ts 不在这里：它读 process.env，而仓库根没有装 @types/node（typescript 也只装在 apps/web）。
+     调用方式因此是 `pnpm --filter @axiforge/web exec tsc -p ../../tsconfig.e2e.json`，见根 package.json 的 typecheck。 */
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["e2e"]
+}

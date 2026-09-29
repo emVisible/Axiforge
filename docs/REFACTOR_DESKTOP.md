@@ -698,6 +698,14 @@
   顺带复核：角色页那两个导出/复制按钮**不在任何 `localOnly` 闸门里**（367/377 两处闸门在 388 的分隔线之前已闭合），
   所以 S13-2f 的立项前提成立。
   这一步做完才允许浏览器 run mode 降级为纯测试宿主
+
+  **基线的新家已落地（2026-09-29，#26 的前半条）**：`apps/web/e2e/` → 仓库根 `e2e/`，
+  `playwright.config.ts` 的 `testDir` 随之改为 `"e2e"`（旧路径只留在 BLUEPRINT 的日期条目里，那是历史轨迹不改）。
+  理由很具体：web 端退场（ADR-029 决策 2）时不能把 37 条行为基线一起删掉——它们现在是桌面唯一的自动化验收面。
+  **顺带补上一道此前不存在的检查**：`tsconfig.e2e.json` 把规格文件纳入 tsc，并接进 `pnpm typecheck`（G1 链第一环）。
+  此前 37 条基线的 TS 从没被类型检查过（`apps/web/tsconfig.app.json` 的 include 只有 `src`），
+  接上后立刻报出 `e2e/baselines.spec.ts` 里一个从未被使用的 `replaceEdges` 导入（oxlint 早就警告过，但没人把它当错误）。
+  牙：往 `desktop-http.spec.ts` 注入一处类型错误 → `pnpm typecheck` 报 4 处并 exit 1；还原 → exit 0。
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"
 - [x] S13-8 修订战略文档 —— 已交付 2026-09-29：新增 [ADR-029](./ADR/029-desktop-only-build-target.md)

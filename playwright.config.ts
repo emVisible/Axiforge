@@ -11,7 +11,8 @@ const E2E_DATABASE_URL =
   "postgresql+asyncpg://young@localhost:5432/axiforge_e2e";
 
 export default defineConfig({
-  testDir: "apps/web/e2e",
+    // 基线不住在 apps/web 里：web 端退场（ADR-029 决策 2）时不能把 37 条行为基线一起删掉
+  testDir: "e2e",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,

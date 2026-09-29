@@ -19,7 +19,7 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "lint": "pnpm --filter @axiforge/web lint && pnpm --filter @axiforge/admin lint:colors",
-    "typecheck": "pnpm -r --filter @axiforge/core --filter @axiforge/axs --filter @axiforge/editor-core typecheck && pnpm --filter @axiforge/web exec tsc -b",
+    "typecheck": "pnpm -r --filter @axiforge/core --filter @axiforge/axs --filter @axiforge/editor-core typecheck && pnpm --filter @axiforge/web exec tsc -b && pnpm --filter @axiforge/web exec tsc -p ../../tsconfig.e2e.json",
     "test:unit": "pnpm --filter @axiforge/core test && pnpm --filter @axiforge/axs test && pnpm --filter @axiforge/editor-core test && pnpm --filter @axiforge/web test && pnpm --filter @axiforge/admin test",
     "coverage": "pnpm --filter @axiforge/core test:coverage && pnpm --filter @axiforge/editor-core test:coverage",
     "check:size": "node scripts/check-file-size.mjs",

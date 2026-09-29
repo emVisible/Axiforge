@@ -772,6 +772,14 @@
   实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（38 passed, 48.5s）。
 
 - [x] 附带：**交付物层三条实测 + 导航出口普查**（2026-09-29，在 `e10cae2` 之后重跑，所以产物含本轮全部生产改动）。
+- [x] E22：**工程元信息写入面在桌面被点了一次**（2026-09-29，挂在 E17 的编辑器停留期间）。
+  编排台「项目」栏的世界观 textarea 是 `onBlur → onProjectPatch → patchProjectMeta → Provider`（S13-2d 那条腿），此前只有契约级证据、界面从没点过。
+  用例按 `Tab` 触发失焦，**判据取真回读而不是 toast**：写完后走 列表 → 再进工程 → 断言这一栏还在（`toHaveValue`）。
+  理由是 toast 会自己消失，也可能被本地 state 演成"看起来保存了"；只有换一次页面再读回来才证明字节进了本地库。
+  **这里我第一次打了无效变异**：把 `const res = await p.updateProjectMeta(...)` 改成"照样调用、但去掉 `!res.ok` 的抛错"，用例照绿——那删的是错误处理不是能力。
+  按「变异必须拿掉能力本身」重做（`void patch` + 伪造 ok）之后，红在 `Expected: 方舟是一座会移动的城 / Received: ""`，这才算证到。
+  实测：gates GATES_EXIT=0、`pnpm e2e` E2E_EXIT=0（38 passed）。
+
 
   1. `pnpm build:desktop` BUILD_EXIT=0，重新产出 `Axiforge.app` 与 `Axiforge_0.1.0_aarch64.dmg`。
 

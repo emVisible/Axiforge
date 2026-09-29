@@ -237,6 +237,22 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page.getByRole("button", { name: "导出 Markdown" })).toBeVisible({ timeout: 8000 });
     await expect(page.getByRole("button", { name: "发送到 Nexus" })).toHaveCount(0);
 
+    /*
+     * E22：工程元信息写入面在桌面被点一次。`onProjectPatch` 走 `patchProjectMeta` → Provider
+     * （S13-2d 那条腿），此前只有契约级证据；界面是 onBlur 落库，所以要按 Tab 而不是点保存。
+     * 判据不取 toast（它会自己消失、也容易被本地 state 演成真的），而是**真回读一趟**：
+     * 列表 → 再进工程 → 这一栏还在，才证明字节落进了本地库。
+     */
+    await page.getByPlaceholder("世界观设定…").fill("方舟是一座会移动的城");
+    await page.getByPlaceholder("世界观设定…").press("Tab");
+    await page.waitForTimeout(400);
+    await page.getByRole("link", { name: "剧本列表" }).click();
+    await expect(page.getByText("桌面可建").first()).toBeVisible({ timeout: 8000 });
+    await page.getByText("桌面可建").first().click();
+    await expect(page).toHaveURL(/\/studio\/projects\/[^/]+$/, { timeout: 8000 });
+    await page.getByRole("button", { name: "项目", exact: true }).click();
+    await expect(page.getByPlaceholder("世界观设定…")).toHaveValue("方舟是一座会移动的城", { timeout: 8000 });
+
     await page.getByRole("link", { name: "试玩" }).first().click();
     await page.waitForTimeout(1500);
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });

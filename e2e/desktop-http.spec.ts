@@ -282,6 +282,27 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await page.getByText(/01\s*开始/).first().click();
     await expect(page.getByPlaceholder("叙述性文字...")).toHaveValue("离线路上的第一句", { timeout: 8000 });
 
+    /*
+     * E25：把角色加进工程（S13-2a 那条 `addRole` 腿，本地实现早就齐了、缺的是点击层证据）。
+     * 全程走客户端路由不刷新文档——内存库随重载归零；角色也在同一文档里现造，
+     * 于是这条一并把「建角色 → 挂进工程 → 计数抬头 → 换页回读」串起来。
+     */
+    await page.getByRole("link", { name: "角色" }).click();
+    await page.getByRole("link", { name: "创建角色" }).first().click();
+    await page.getByRole("button", { name: /英雄/ }).first().click();
+    await page.getByPlaceholder("角色如何称呼").fill("凛");
+    await page.getByRole("button", { name: "保存角色" }).click();
+    await expect(page).toHaveURL(/\/studio\/characters\/mine$/, { timeout: 8000 });
+    await page.getByRole("link", { name: "剧本" }).click();
+    await page.getByText("桌面可建").first().click();
+    await page.getByRole("button", { name: /角色\s*0/ }).first().click();
+    await page.getByPlaceholder("搜索角色（公开 + 我的）...").fill("凛");
+    await page.getByRole("button", { name: /凛/ }).first().click();
+    await expect(page.getByRole("button", { name: /角色\s*1/ })).toBeVisible({ timeout: 8000 });
+    await page.getByRole("link", { name: "剧本列表" }).click();
+    await page.getByText("桌面可建").first().click();
+    await expect(page.getByRole("button", { name: /角色\s*1/ }).first()).toBeVisible({ timeout: 8000 });
+
     await page.getByRole("link", { name: "试玩" }).first().click();
     await expect(page).toHaveURL(/\/play\/[^/]+$/, { timeout: 8000 });
     // 播出来的必须是我刚写进那一拍的字：这条一跳同时验收「写入 → 编译 → 播出」整链

@@ -147,7 +147,7 @@ export default function ProjectCreatePage() {
               </div>
             </div>
             {createProject.isError && (
-              <p role="alert" className="text-sm text-red-500">
+              <p role="alert" className="text-sm text-danger">
                 {createProject.error.message}
               </p>
             )}

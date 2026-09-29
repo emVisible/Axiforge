@@ -782,6 +782,24 @@
 清单状态：S13-1、S13-2a–f、S13-8 为 `[x]`；S13-2d 与 S13-5 为 `[~]`（各留真实未决项）；
 S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一步都需要 ADR-029「未决」里那五条判断。
 
+> **一条实测分母（2026-09-29，#49「写死色板收成语义令牌」的起点，也是一条没有下手的决定）**
+>
+> 扫五个硬色线根（`features/studio`、`features/discover`、`features/character`、`apps/admin/src`、`packages/ui/src`）
+> 里的 `(text|bg|border|ring|…)-<palette>-<0-9>{2,3}` 类名，共 **239 处 / 44 个文件**。
+> 但命中面里最大的几个都不是债：`Badge.tsx` 30、`studio/flow/types.ts` 33、`cut/timelineUtils.ts` 24、
+> `flow/stageColors.ts` 12 —— 它们是**配色的定义处**（变体→色档的映射表），债在消费侧的散装用法
+> （`CharacterEditor` 14、`ModerationPage` 10、`StoryNode` 10、`CharacterDetailPage` 7…）。
+> 所以这一轮**没有**加"按文件计数"的棘轮：那道闸门会把映射层一起记成债，量错东西的门禁比没有门禁更贵
+> （宪章 G1 那次「文档把愿望写成机制」的教训同族）。要做的前提是先定口径——要么给扫描加"只算 JSX className
+> 字符串字面量"的作用域，要么先给映射层一份显式豁免清单，两者都需要一句话来定"什么算定义处"。
+>
+> 本回合只清偿自己新增的部分：三处错误提示原先写成 `text-red-500`，现已收成语义令牌 `text-danger`
+> （`ProjectListPage` 两处、`ProjectCreatePage` 一处）。理由是实测出来的，不是审美：
+> `packages/ui/styles/tokens.css` 里 `--ax-danger` 分主题（浅 #dc2626 / 深 #f87171），
+> 而 `red-500` 在两套主题里是同一个死值 #ef4444——**写死色板绕过的不只是对比度门禁，还有主题切换本身**。
+> 类名有效性在产物层验：`dist/assets/index-*.css` 里有 `.text-danger{color:var(--color-danger)}`。
+> 此前我在 S13-2d/S13-2f 里写过「与本文件既有的 text-red-500 同一色档」，那个判断是错的，按上面这条改掉了。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

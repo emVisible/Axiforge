@@ -312,14 +312,14 @@ export default function ProjectListPage() {
           autoFocus
         />
         {opError && (
-          <p role="alert" className="mt-2 text-sm text-red-500">
+          <p role="alert" className="mt-2 text-sm text-danger">
             {opError}
           </p>
         )}
       </Modal>
 
       {opError && !showCreate && (
-        <p role="alert" className="mb-3 text-sm text-red-500">
+        <p role="alert" className="mb-3 text-sm text-danger">
           {opError}
         </p>
       )}

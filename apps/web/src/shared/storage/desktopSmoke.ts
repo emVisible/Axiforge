@@ -4,10 +4,9 @@
  * 输出可 grep 标记：AXIFORGE-DESKTOP-STORAGE: PASS / FAIL <步骤>
  */
 import { createStorageProvider, exportProjectAsAxsp, getSeedOutcome } from "./index";
-import { bundleToCompilerInput } from "./compilerInput";
 import { assetDisplayUrl, getLocalAssetRoot } from "./assetContext";
 import { localAssetPath, unpackAxsp, type StorageProvider } from "@axiforge/editor-core";
-import { compileStory } from "@axiforge/core";
+import { loadStoryOffline } from "./offlineStory";
 
 /** 真实可解码的 1x1 透明 PNG（68 字节）——素材出图断言的固定样本 */
 const PNG_1X1 =
@@ -137,18 +136,41 @@ export async function smokeDesktopStorage(): Promise<boolean> {
     }
 
     // 离线试玩链路：Provider 数据 → 本地编译 → 引擎可启动（不触网）
-    const chars = await p.listCharacters();
-    const pkg = compileStory(
-      bundleToCompilerInput(load3.data, chars.ok ? chars.data : []),
-    );
+    // 走 loadStoryOffline 而不是在这里手搓一遍投影：投影层只允许有一处权威，
+    // 冒烟自己拼 compileStory(bundleToCompilerInput(...)) 会测不到真实入口的取数语义
+    // （壳内实测：那条手搓路径用无作用域的 listCharacters，私有角色一条都取不到）。
+    const char = await p.saveCharacter({
+      id: "", name: "冒烟角色", characterData: {}, imagePath: null,
+      isPublic: false, authorId: "desktop-smoke",
+    });
+    if (!char.ok) {
+      await writeResultFile(`FAIL smoke-character: ${JSON.stringify(char.error)}`);
+      return false;
+    }
+    await p.addRole(id, { characterRefId: char.data.id });
+    const item = await p.saveItem({
+      id: "", name: "冒烟钥匙", description: "", category: "关键道具", rarity: "普通",
+      mechanismTags: [], effects: [], imagePath: null,
+      isPublic: false, authorId: "desktop-smoke", updatedAt: "",
+    });
+    if (item.ok) {
+      await p.addAssetRef(id, { assetType: "item", assetId: item.data.id });
+    }
+    // 本体已删的悬空引用：编译期该如实缺席，不该占一个空位
+    await p.addAssetRef(id, { assetType: "item", assetId: "item-ghost" });
+
+    const pkg = await loadStoryOffline(id, p);
     const playable =
       pkg.beats.length === 1 &&
       Boolean(pkg.startBeatId) &&
-      (pkg.beats[0]!.script[0] as { text?: string })?.text === "冒烟拍";
-    mark(playable, "offline-play-compile");
+      (pkg.beats[0]!.script[0] as { text?: string })?.text === "冒烟拍" &&
+      pkg.characters.map((c) => c.name).join() === "冒烟角色" &&
+      pkg.items?.length === 1;
+    mark(playable, `offline-play-compile chars=${pkg.characters.length} items=${pkg.items?.length}`);
     if (!playable) {
       await writeResultFile(
-        `FAIL offline-play-compile: beats=${pkg.beats.length} start=${pkg.startBeatId}`,
+        `FAIL offline-play-compile: beats=${pkg.beats.length} start=${pkg.startBeatId}`
+        + ` chars=${pkg.characters.length} items=${pkg.items?.length}`,
       );
       return false;
     }

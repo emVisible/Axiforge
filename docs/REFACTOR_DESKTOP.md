@@ -155,7 +155,12 @@
 - [x] SQLite 实现：`SqliteStorageProvider`（SqlBackend 抽象——生产 tauri-plugin-sql / 测试 sql.js 真引擎）+ schema v1（沿用 PG 关系模型，narrative_data JSON 文本列）+ 事务原子覆写 + **契约套件全绿**（85 测试，分支 93.4%）
 - [x] TauriSqlBackend + Provider 工厂：`?`→`$n` 占位符翻译（sqlx 语法）+ 串行队列；**原子性下沉**——sqlx 池化下 BEGIN/COMMIT 跨连接失效（壳内冒烟实证），新增 Rust 命令 `sql_transaction`（单连接 + FK 级联）承载事务，回滚在真壳内实证 ✓
 - [x] 壳内冒烟（DEV 自动运行，结果落盘 `~/Documents/Axiforge/storage-smoke.txt`）：create→bootstrap→覆写→回滚→**离线试玩编译**→角色去重→清理 全链路 PASS（8 步）
+  2026-09-29 改动：冒烟不再自己拼 `compileStory(bundleToCompilerInput(...))`，改调 `loadStoryOffline`——投影层只允许有一处权威，手搓那份测不到真实入口的取数语义（正是它把下面那条缺陷藏住的）。断言加到「私有角色解析得到 + 道具清单非空 + 悬空引用不占位」。
 - [x] 断网试玩链路：PlayerPage 桌面分支 `loadStoryOffline`（Provider 数据 → `compileStory` 本地编译，零触网）；存档/Codex/recordView 离线优雅降级（既有 catch 路径）
+  **这一条勾得太早，2026-09-29 实测两处静默降级并已修**（「通路接通」不等于「渲染正确」）：
+  ① 它用**无作用域的 `listCharacters()`** 取角色，而本地可见性语义是「我的 ∪ 公开」，私有角色在桌面上被裁成零条——**桌面试玩里所有说话人退化成 id、立绘与表情差分全空**（把实现改回旧形状，用例立刻报 `expected [] to deeply equal [ '凛' ]`）。后端从来不看可见性：`_build_characters` 走 `Character.id.in_(role_ids)`。现按引用取（角色/舞台/道具三个池同一规则），与后端逐字同义。
+  ② `bundleToCompilerInput` 恒写 `items: []`：S13-2c 让编排台在桌面挂上道具之后，道具在试玩里仍然一个都不出现，而同一份数据经后端编译却有。引擎侧 `packages/core/compiler.ts:308` 早就实现了「本体缺失即跳过」，缺的只是投影层有人把这一格填上。
+  金样本抓不到②：三份示范作的 `items` 全是 0（实测读 `__golden__*/input.json`），那条分支两侧都没走过——同 S13-2b 那条教训。现按同一规则三处各钉一条用例：TS 引擎（`compiler.test.ts` 三条）、投影+取数（`offlineStory.test.ts` 四条）、Python（`test_story_compiler.py::test_compiled_story_carries_item_refs`，含悬空引用与不去重）。9 次变异分别让对应那一条红（旧形状 listCharacters / items 恒空 / 不传舞台池 / io 演成缺席 / 悬空占位 / 引擎两处 / Python 一处）。
 - [x] `.axsp` UI 集成：编辑器工具栏「导出」（dialog+fs / 浏览器下载）+ 工程列表「导入 .axsp」（导入 = 现有契约组合，新 id + 角色引用重建）；E2E E8 数据等价验收 ✓
 - [x] 顺手修复两个真实缺陷：① apiClient 异常丢失 HTTP status（404→not_found 映射从未生效）② 后端 sync_narrative 跨工程 id 碰撞 500（.axsp 导入必踩；payload id 被其他工程占用时重映射新 id，边引用随动）
 - [x] useProjectEditor 核心链路切换 Provider：装载（loadProject→bundleToResponse）/ 刷新 / saveWriter / **saveAll（逐节点 API 舞蹈 → 单次原子 saveNarrative，临时 id 客户端重映射，舞台模式保留域外节点）** / patchProjectMeta / axs 投影

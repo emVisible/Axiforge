@@ -15,6 +15,12 @@ import type { CompilerProjectInput } from "@axiforge/core";
  * 传进来是为了复刻后端 `_build_scenes` 的一次查表：舞台自身的值优先、资产池的值兜底，
  * 背景图只可能来自资产池。缺了它，桌面导入的舞台在试玩里就是没有背景的空白，
  * 而同一条数据在网页端（后端编译）是有的——两端就此分叉。
+ *
+ * `itemAssets` 是同一条教训的第二处：后端 `_build_items`（`narrative/compiler.py:356`）
+ * 把 `project_asset_refs` 里的 item 引用查表成 `ItemRef`，S13-2c 之前这里恒写 `items: []`，
+ * 于是编排台挂上的道具在桌面试玩里一个都不出现，而引擎（`packages/core/compiler.ts:308`）
+ * 早就在等这一格——它甚至已经实现了「引用悬空就跳过」，与 Python 的 `if not item: continue` 逐字同义。
+ * 金样本抓不到这件事：三份示范作的 `items` 全是 0，那条分支两侧都没被走过。
  */
 export function bundleToCompilerInput(
   b: ProjectBundle,
@@ -30,8 +36,15 @@ export function bundleToCompilerInput(
     atmosphere?: string | null;
     imagePath?: string | null;
   }[] = [],
+  itemAssets: {
+    id: string;
+    name: string;
+    category?: string | null;
+    imagePath?: string | null;
+  }[] = [],
 ): CompilerProjectInput {
   const assetById = new Map(sceneAssets.map((a) => [a.id, a]));
+  const itemById = new Map(itemAssets.map((a) => [a.id, a]));
   return {
     id: b.meta.id,
     title: b.meta.title,
@@ -68,6 +81,17 @@ export function bundleToCompilerInput(
       characterData: c.characterData,
       imagePath: c.imagePath ?? null,
     })),
-    items: [],
+    items: b.assetRefs
+      .filter((r) => r.assetType === "item")
+      .map((r) => {
+        const asset = itemById.get(r.assetId);
+        return {
+          id: r.id,
+          assetId: r.assetId,
+          asset: asset
+            ? { id: asset.id, name: asset.name, category: asset.category ?? null, imagePath: asset.imagePath ?? null }
+            : null,
+        };
+      }),
   };
 }

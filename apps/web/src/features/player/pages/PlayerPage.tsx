@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
-import { loadStoryOffline } from "@/shared/storage";
+import { loadStoryOffline } from "@/shared/storage/offlineStory";
 import { useParams, Link } from "react-router";
 import {
   Anchor,

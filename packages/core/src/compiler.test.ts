@@ -93,3 +93,43 @@ describe("场景引用解析（对齐 Python _build_scenes）", () => {
     expect(sceneOf({ id: "s2", title: "无引用" }).backgroundImage).toBeNull();
   });
 });
+
+/**
+ * 道具引用编译（对齐 Python `_build_items`）。同上一条的立项理由：
+ * 三份金样本的 `items` 全是 0，这条分支两侧都没被走过，于是桌面投影层
+ * 恒写 `items: []`（S13-2c 之前的形状）没有被任何门禁抓住——编排台挂的道具
+ * 在桌面试玩里一个都不出现。引擎其实早就实现了「悬空即跳过」，缺的是有人按这条规则测它。
+ */
+describe("道具引用编译（对齐 Python _build_items）", () => {
+  const baseInput = () =>
+    JSON.parse(
+      readFileSync(join(GOLDEN_DIR, cases[0]!, "input.json"), "utf-8"),
+    ) as CompilerProjectInput;
+
+  const itemsOf = (
+    items: CompilerProjectInput["items"],
+  ) => compileStory({ ...baseInput(), items }).items;
+
+  it("引用+本体 → ItemRef 逐字段映射，顺序就是引用的顺序（不去重）", () => {
+    expect(
+      itemsOf([
+        { id: "r1", assetId: "i1", asset: { id: "i1", name: "铜钥匙", category: "关键道具", imagePath: "assets/k.png" } },
+        { id: "r2", assetId: "i1", asset: { id: "i1", name: "铜钥匙", category: "关键道具", imagePath: null } },
+      ]),
+    ).toEqual([
+      { id: "i1", name: "铜钥匙", category: "关键道具", imagePath: "assets/k.png" },
+      { id: "i1", name: "铜钥匙", category: "关键道具", imagePath: null },
+    ]);
+  });
+
+  it("本体已删（asset=null）如实缺席，不占一个空位；空清单就是空清单", () => {
+    expect(itemsOf([{ id: "r1", assetId: "gone", asset: null }])).toEqual([]);
+    expect(itemsOf([])).toEqual([]);
+  });
+
+  it("缺 category 给 null 而不是 undefined——IR 要与 Python 的字段集合逐字一致", () => {
+    expect(itemsOf([{ id: "r1", assetId: "i9", asset: { id: "i9", name: "油灯" } }])).toEqual([
+      { id: "i9", name: "油灯", category: null, imagePath: null },
+    ]);
+  });
+});

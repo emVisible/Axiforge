@@ -1,5 +1,7 @@
 """Story Compiler / IR 端点集成测试（ADR-008）"""
 
+from uuid import uuid4
+
 from httpx import AsyncClient
 import pytest
 
@@ -361,3 +363,49 @@ async def test_fork_and_templates(client: AsyncClient):
         json={"author_id": "u2"},
     )
     assert denied.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_compiled_story_carries_item_refs(client: AsyncClient):
+    """道具引用进运行时清单。
+
+    TS 侧的投影层在 S13-2c 之前恒写 `items: []`，于是编排台挂上的道具在桌面试玩里
+    一个都不出现，而同一份数据经后端编译却有——两端分叉。这条用例把 Python 的
+    规则写死，TS 的三条断言（`packages/core/src/compiler.test.ts`）照着同一规则摆：
+    逐字段映射、按引用顺序、不去重、本体已删即缺席。
+    """
+    item = await client.post(
+        "/api/v1/editor/assets/items",
+        json={
+            "name": "铜钥匙", "description": "开地窖", "category": "关键道具",
+            "image_path": "/uploads/key.png", "author_id": "pytest",
+        },
+    )
+    assert item.status_code == 201
+    item_id = item.json()["id"]
+
+    proj = await client.post(
+        "/api/v1/editor/projects/",
+        json={"title": "道具编译", "author_id": "pytest", "is_public": True},
+    )
+    assert proj.status_code == 201
+    pid = proj.json()["id"]
+
+    for _ in range(2):
+        added = await client.post(
+            f"/api/v1/editor/projects/{pid}/assets",
+            json={"asset_type": "item", "asset_id": item_id},
+        )
+        assert added.status_code == 201
+    ghost = await client.post(
+        f"/api/v1/editor/projects/{pid}/assets",
+        json={"asset_type": "item", "asset_id": str(uuid4())},
+    )
+    assert ghost.status_code == 201
+
+    pkg = (await client.get(f"/api/v1/play/story/{pid}")).json()
+    assert [i["name"] for i in pkg["items"]] == ["铜钥匙", "铜钥匙"], "不去重，且不给悬空引用占位"
+    assert pkg["items"][0] == {
+        "id": item_id, "name": "铜钥匙", "category": "关键道具",
+        "imagePath": "/uploads/key.png",  # IR 出 JSON 走 camelCase 别名，与 TS 侧同一形状
+    }

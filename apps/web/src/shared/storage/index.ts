@@ -5,7 +5,6 @@
  * - 浏览器：HTTP（既有 FastAPI 后端）
  * 云同步/协作服务后期以装饰器形态叠加，不改变本工厂签名。
  */
-import { compileStory, type StoryPackage } from "@axiforge/core";
 import { collectAssetRefs, packAxsp, remapCharacterIds, unpackAxsp } from "@axiforge/editor-core";
 import type { ProjectBundle, StoredCharacter } from "@axiforge/editor-core";
 import { SqliteStorageProvider, type ProjectMeta, type StorageResult, type StorageProvider } from "@axiforge/editor-core";
@@ -26,7 +25,6 @@ import type {
 } from "@/shared/types/project";
 
 const NOW = () => new Date().toISOString();
-import { bundleToCompilerInput } from "./compilerInput";
 
 /** 存储态工程束 → 传输态 ProjectResponse（编辑器消费形态，字段对齐后端响应） */
 export function bundleToResponse(b: ProjectBundle): ProjectResponse {
@@ -113,23 +111,6 @@ export function bundleToResponse(b: ProjectBundle): ProjectResponse {
 }
 
 
-/** 离线编译：Provider 数据 → 本地 StoryPackage（不触网） */
-export async function loadStoryOffline(projectId: string): Promise<StoryPackage> {
-  const p = await createStorageProvider();
-  const bundle = await p.loadProject(projectId);
-  if (!bundle.ok) {
-    throw new Error(bundle.error.code === "not_found" ? "404" : bundle.error.detail);
-  }
-  const chars = await p.listCharacters();
-  const scenes = await p.listScenes();
-  return compileStory(
-    bundleToCompilerInput(
-      bundle.data,
-      chars.ok ? chars.data : [],
-      scenes.ok ? scenes.data : [],
-    ),
-  );
-}
 
 /** 桌面空库首启播种：整进程一次，并发取 Provider 也只灌一遍；结果可观测 */
 let seedOnce: Promise<SeedOutcome> | null = null;

@@ -558,6 +558,7 @@
   同一次搬运让 `lint:colors` 的低透明度文字棘轮从 47 降到 **45**（三段重复的 `text-white/30` 表头合成一处），
   新文件按仓库既有口径在 `ui-dim-text-baseline.json` 登记 3 处（`BacklogPanel` 2、`TimelinePanel` 2 同一先例）；
   **没有**为了让新文件从 0 开始而把 HUD 的 `text-white/20` 关闭键改亮——那是替用户改视觉，不是清偿债。
+
 - [x] S13-2e 工程域**写侧**本地化（桌面首屏的主流程）—— 已交付 2026-09-29。
   起因是一次「同族缺陷普查」：本项目已经第三次撞上同一形状（读路径本地化、写路径忘了），
   所以扫了全部 `@/shared/api` 直连点里桌面可达的那些。**结果是产品最上面那一环是断的**：
@@ -585,20 +586,30 @@
   **一次教训**：新文件先跑 vitest 全绿、`pnpm gates` 的 `tsc` 才报 8 处 TS2540
   （`ProjectMetaPatch` 字段是 readonly）——vitest 走 esbuild 只剥类型不做类型检查，
   新增 TS 文件的顺序应是先 typecheck 再跑测试。
-- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。
-  `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
-  为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、
-  骗不过 Rust 连接，所以「点击之后的行为」在 e2e 里结构上不可断言——S13-2d 那份审计就卡在这。
-  E17 一条走完「新建剧本 → 落到工程页 → 后退列表看得见 → 删除 → 回到空态」并断言全程零 `/api/v1`
-  （后退而非第二次 `goto`：内存库随页面重载归零，`goto` 会把它变成假阴性）。
-  两次红证明它有牙：`create` 退回直连 `projectApi` → 红在「列表里看得见」；摘掉 `?storage=memory` 分支 → 红在首屏空态。
-  **测试宿主没有进生产物**（实测，不是声明）：`pnpm --filter @axiforge/web build` 后
-  `dist/assets/*.js`（10:38 刚构建）里 `get("storage")` 与 `"memory"` 各 **0 命中**，
-  而同一批文件里 `"还没有剧本"` 1 命中——对照组证明 grep 面有效，`import.meta.env.DEV` 静态替换后整段被 DCE。
-  仍欠：`nexus` 的 `sendToInbox`、`aiApi.suggestCharacter` 两条真实云调用的处置（判死或本地化）；
-  角色的设定导出/复制两个按钮在桌面是点了没反应（`CharacterById` 路由可达、且不在任何 `localOnly` 闸门内）；
-  工程模板 tab 仍是 `projectApi.listTemplates` + `catch(() => [])`；
-  以及把 34→35 条 e2e 的**主目标**从浏览器 run mode 挪到壳内冒烟。
+- [x] S13-2f 角色设定的导出/复制本地化 —— 已交付 2026-09-29。同一普查里的第二处：
+  `CharacterDetailPage` 的两个按钮都以 `characterApi.export` 开头，而**正文本来就在本地渲染**
+  （`renderCharacterPrompt(character.character_data)`），只有传记与关系取自服务端那一次 POST。
+  桌面上这一句 await 抛错 → 一个 `catch { console.error }`、一个 `catch {}` → 连本地已有的正文也导不出去，
+  表现为「点了没反应」。
+  新增 `shared/storage/characterExport.ts`：`composeCharacterMarkdown`（纯函数）+ `buildCharacterExport`（分派）。
+  三个判断：
+  1. **本地支复用已经分派好的 `storySaves.readStories/readStory`**，不在这里再造一条本地读法；
+  2. **远端支保持原来那一次 POST**——如果无差别走 `storySaves`，web 会从 1 次请求变成 N+1 次，
+     这是"顺手统一"最容易踩的隐性退化，专门写了一条用例盯住（`readStories` 在远端支必须零调用）；
+  3. **桌面不含「## 关系」段**：关系域在桌面上本就不存在（S13-3 判死清单），
+     一台机器上没有的功能不该在导出产物里留一个空标题；`compose` 同时滤掉畸形关系条目，
+     不再写出 `undefined: undefined`（旧代码把服务端结果当 `any` 直拼，这是既有缺陷）。
+  落盘改走既有的 `saveBinaryFile`（桌面 dialog+fs / 浏览器 blob），不再手写 `<a download>`——
+  原实现在壳里能不能下载**从未验证过**，换用与 `.axsp` 导出同一个助手可以把这层不确定性交掉。
+  该助手多了一个 `mime` 形参（原先浏览器分支写死 `application/zip`，导 .md 时 MIME 是错的）。
+  失败不再静默：两个动作共用一条 `exportError` 线，渲染在按钮行下方（用既有语义令牌 `text-danger`，
+  不是新增色值）。
+  验收：`characterExport.test.ts` 7 条；3 次变异见过红（分派反过来红 4 条、畸形条目不再过滤红 1 条、
+  空段落也写标题红 3 条）。**一次流程错误**：第一次变异脚本把 vitest 的目标写成了源文件而不是测试文件，
+  三次"没有输出"被我自己当成"没红"——重做之后才有结论；另外那次 M2 的改写只是加了个类型断言，
+  过滤器还在，属于无效变异（判据：改完之后坏行为真的会发生吗）。
+  顺带 `-41` 行：`CharacterDetailPage` 里两处逐字重复的段落拼装被收成一处。
+
 - [ ] S13-3 云本质功能判死并摘除：`comments`、`report`、`identity`、`user` 档案与多用户鉴权、`tags`、`discover` 发布与发现、`relations` 关系图、`versions` 角色版本历史、跨设备同步。摘除 = UI 入口 + api 模块 + 后端路由三段一起走，不留"点进去报网络错误"的残口
 
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
@@ -614,8 +625,20 @@
 - [x] 附带修掉：道具/场景**资产详情页**绕过分派口（S13-2 期间漏的半条腿）
   —— 已交付 2026-09-27。`SceneAssetDetailPage` 的 get/update/delete 与 `ItemDetailPage` 的 update/delete 仍直连 `sceneAssetApi`/`itemApi`，而**清单页早已本地化**——于是桌面能看见、能点开、改完点保存却写进一个够不到的后端。两处顺带修掉同一个假「已保存」：`setItem({ ...item, ...form })` 是乐观合并，界面立刻显示新值而写入根本没成，现改为采用回读的那一份。判据补进 E15（`/studio/scenes/no-such-scene`）。
   教训：**本地化是按"读路径"完成的，不是按"页面"完成的**——一个页面里 get/list/create/update/delete 五支各自选路，只改读的那支就等于把半条腿焊进了主干。
-- [~] S13-5 验收基线搬家：**内存本地库宿主已交付（见上方 S13-2e 之后的 E17 详记，同一批）**；
-  余下的是「CI 改为以桌面构建为主目标」与壳内冒烟成为主判据。
+- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。
+  `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
+  为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、
+  骗不过 Rust 连接，所以「点击之后的行为」在 e2e 里结构上不可断言——S13-2d 那份审计就卡在这。
+  E17 一条走完「新建剧本 → 落到工程页 → 后退列表看得见 → 删除 → 回到空态」并断言全程零 `/api/v1`
+  （后退而非第二次 `goto`：内存库随页面重载归零，`goto` 会把它变成假阴性）。
+  两次红证明它有牙：`create` 退回直连 `projectApi` → 红在「列表里看得见」；摘掉 `?storage=memory` 分支 → 红在首屏空态。
+  **测试宿主没有进生产物**（实测，不是声明）：`pnpm --filter @axiforge/web build` 后
+  `dist/assets/*.js`（10:38 刚构建）里 `get("storage")` 与 `"memory"` 各 **0 命中**，
+  而同一批文件里 `"还没有剧本"` 1 命中——对照组证明 grep 面有效，`import.meta.env.DEV` 静态替换后整段被 DCE。
+  仍欠：`nexus` 的 `sendToInbox`、`aiApi.suggestCharacter` 两条真实云调用的处置（判死或本地化）；
+  角色的设定导出/复制两个按钮在桌面是点了没反应（`CharacterById` 路由可达、且不在任何 `localOnly` 闸门内）；
+  工程模板 tab 仍是 `projectApi.listTemplates` + `catch(() => [])`；
+  以及把 34→35 条 e2e 的**主目标**从浏览器 run mode 挪到壳内冒烟。
   这一步做完才允许浏览器 run mode 降级为纯测试宿主
 - [ ] S13-6 后端退场：`backend/` + Postgres + Alembic + `docker-compose.yml`。删前必核三处依赖：随包 `.axsp` 播种链路、`seed_showcase` 的三份示范作、`docs/user` 与 README 里所有指向服务端的段落的**桌面分支不受影响**（播种在壳内，示范作是构建产物）
 - [ ] S13-7 分支消解：删 `httpStorageProvider`、`httpDomains`、各适配层的云端字段映射与 `isTauriEnvironment()` 的另一半。做完「一个功能只有一条数据通路」才算成立——不再需要问"桌面这条接了没有"
@@ -683,6 +706,24 @@
 > （`971b9c8` 的理由成立：没有 Rust 工具链的人就连门禁都跑不动），而 `.github/workflows/ci.yml` 里没有任何 desktop job。
 > 可选处置是加一个 `macos-latest` 的 `cargo check`（Linux 需要 webkit2gtk 等系统依赖，且 `targets: "all"` 在 Linux 上会去碰 deb/AppImage 链路），
 > 但本会话无法观察远端 CI（`gh` 未登录、私有库匿名 API 返回 404），**未跑过一次的 CI 配置不该被声称有效**，所以没写进 `.github/`，等一句「加」。
+
+> **收尾快照 3（2026-09-29 S13-2f，tag `desktop-wip-20260929d`）**
+>
+> 普查的最后一刀：角色设定导出/复制本地化（`characterExport.ts` 新增，页面两处逐字重复的拼装收成一处，
+> `CharacterDetailPage` 棘轮 735→702）。
+> 实测：`pnpm gates` GATES_EXIT=0，单测 core 80 / axs 37 / editor-core 151 / web 148（+1 跳过）/ admin 39
+> = **455 passed + 1 skipped**；`pnpm e2e` E2E_EXIT=0，**35 passed (45.6s)**；
+> `backend` `uv run pytest -q` **165 passed**（本批未改后端）。
+> 变异证据：`characterExport.test.ts` 3 次（红 4/1/3 条）。
+> 两次自身错误已入档在 S13-2f 条目里：变异脚本跑错了目标文件（三次"无输出"当时看着像"没红"），
+> 以及一次改了类型断言却没改行为的无效变异。
+>
+> **本轮做完之后仍然没做完的**（保持未勾）：S13-3 判死与摘除、S13-4b 壳内 `OLLAMA_ORIGINS` 与小模型护栏、
+> S13-5 的"CI 以桌面构建为主目标"（桌面壳在 CI 上仍是零信号，见上面第四条待决策事实）、
+> S13-6/S13-7/S13-8、#49 语义令牌收编、#51 自动结案语义、#55 第二批对照标注、#57 dev 库清理、#58 术语表三档决策。
+>
+> 手动验收（机器给不出的那部分，仍在你手上）：把 `Axiforge.app` 双击打开，看首屏能否新建剧本、
+> 试玩一台没有后端的机器上的示范作、以及角色页「设定导出」是否真落出一个 `.md`。
 
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 

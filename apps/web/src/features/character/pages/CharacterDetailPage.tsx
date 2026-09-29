@@ -43,8 +43,8 @@ import StoryList from "@/features/character/components/StoryList";
 import CreateStoryDialog from "@/features/character/components/CreateStoryDialog";
 import VersionPanel from "@/features/character/components/VersionPanel";
 import { versionApi } from "@/shared/api/versions";
-import { characterApi } from "@/shared/api/characters";
-import { renderCharacterPrompt } from "@/shared/lib/promptRenderer";
+import { buildCharacterExport } from "@/shared/storage/characterExport";
+import { saveBinaryFile } from "@/shared/storage";
 import { routes } from "@/shared/lib/routes";
 import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 
@@ -152,6 +152,8 @@ export default function CharacterDetailPage() {
   );
   const [copiedId, setCopiedId] = useState(false);
   const [exporting, setExporting] = useState(false);
+  /** 导出/复制的失败原因（这两个动作共用一条错误线，不再 console.error 掉） */
+  const [exportError, setExportError] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -165,40 +167,17 @@ export default function CharacterDetailPage() {
   const handleExportMarkdown = async () => {
     if (!character) return;
     setExporting(true);
+    setExportError(null);
     try {
-      const data = await characterApi.export(character.id, {
-        format: "markdown",
-        include_stories: true,
-        include_relations: true,
-      });
-
-      let md = renderCharacterPrompt(
-        character.character_data as CharacterData,
-        "markdown",
+      const md = await buildCharacterExport(character);
+      await saveBinaryFile(
+        `${character.name || "character"}.md`,
+        new TextEncoder().encode(md),
+        "text/markdown",
       );
-
-      if ((data as any).stories?.length) {
-        md += "\n\n## 传记\n\n";
-        (data as any).stories.forEach((s: any) => {
-          md += `### ${s.title}\n\n${s.content}\n\n`;
-        });
-      }
-      if ((data as any).relations?.length) {
-        md += "\n## 关系\n\n";
-        (data as any).relations.forEach((r: any) => {
-          md += `- ${r.relation_name}: ${r.target_name}\n`;
-        });
-      }
-
-      const blob = new Blob([md], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.download = `${character.name || "character"}.md`;
-      a.href = url;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("导出失败", e);
+      // 原先只有 console.error：桌面上这两个按钮点了毫无反应，用户无从判断是没数据还是没接通
+      setExportError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -412,28 +391,9 @@ export default function CharacterDetailPage() {
               onClick={async () => {
                 if (!character) return;
                 setCopying(true);
+                setExportError(null);
                 try {
-                  const data = await characterApi.export(character.id, {
-                    format: "markdown",
-                    include_stories: true,
-                    include_relations: true,
-                  });
-                  let md = renderCharacterPrompt(
-                    character.character_data as CharacterData,
-                    "markdown",
-                  );
-                  if ((data as any).stories?.length) {
-                    md += "\n\n## 传记\n\n";
-                    (data as any).stories.forEach((s: any) => {
-                      md += `### ${s.title}\n\n${s.content}\n\n`;
-                    });
-                  }
-                  if ((data as any).relations?.length) {
-                    md += "\n## 关系\n\n";
-                    (data as any).relations.forEach((r: any) => {
-                      md += `- ${r.relation_name}: ${r.target_name}\n`;
-                    });
-                  }
+                  const md = await buildCharacterExport(character);
                   try {
                     await navigator.clipboard.writeText(md);
                   } catch {
@@ -446,7 +406,9 @@ export default function CharacterDetailPage() {
                   }
                   setCopiedText(true);
                   setTimeout(() => setCopiedText(false), 2000);
-                } catch {
+                } catch (e) {
+                  // 原先是空的 catch {}：复制失败时连一句「没复制上」都不说
+                  setExportError(e instanceof Error ? e.message : String(e));
                 } finally {
                   setCopying(false);
                 }
@@ -476,6 +438,11 @@ export default function CharacterDetailPage() {
               )}
             </button>
           </div>
+          {exportError && (
+            <p role="alert" className="text-xs text-danger">
+              {exportError}
+            </p>
+          )}
         </div>
 
         <div className="flex items-start gap-8">

@@ -328,6 +328,7 @@ export async function importProjectFromAxsp(
 export async function saveBinaryFile(
   defaultName: string,
   bytes: Uint8Array,
+  mime = "application/zip",
 ): Promise<boolean> {
   if (isTauriEnvironment()) {
     const { save } = await import("@tauri-apps/plugin-dialog");
@@ -339,7 +340,7 @@ export async function saveBinaryFile(
   }
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
-  const blob = new Blob([copy as unknown as BlobPart], { type: "application/zip" });
+  const blob = new Blob([copy as unknown as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

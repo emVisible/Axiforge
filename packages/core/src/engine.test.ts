@@ -474,3 +474,40 @@ describe("engine — 成就门槛与播报", () => {
     expect(gated?.disabled).toBe(false);
   });
 });
+
+/**
+ * `choose` 的两条退化路（此前未覆盖）：不在选项暂停点上点、点了不存在的序号。
+ * 两者都退化为「继续」而不是抛错——渲染器在异步点击里完全可能带着过期状态进来。
+ */
+describe("engine — choose 的退化路", () => {
+  const pkg = (): StoryPackage => {
+    const src = explicitBranchPackage();
+    return src;
+  };
+
+  it("停在 say 时点选项 = 等同继续，不抛错也不越界", () => {
+    const p = pkg();
+    const atSay = start(p);
+    const r = choose(p, atSay.state, 0);
+    expect(r.state.cursor).toBe(atSay.state.cursor + 1);
+  });
+
+  it("序号越界与「当前拍不存在」都退化为继续，不抛错", () => {
+    // 专造一个「只有一个选项、且没有出边」的拍，好让退化后的行为可判：
+    // 越过选项 → 脚本走完 → 没有出边 → ended
+    const oneOption: StoryPackage = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: "a",
+      characters: [], scenes: [],
+      beats: [{ id: "a", script: [{ op: "choice", options: [{ label: "唯" }] }] }],
+      transitions: [],
+    } as unknown as StoryPackage;
+    const atChoice = start(oneOption);
+    expect(atChoice.view.waiting).toBe("choice");
+    const oob = choose(oneOption, atChoice.state, 99);
+    expect(oob.state.cursor).toBe(atChoice.state.cursor + 1);
+    expect(oob.view.waiting).toBe("end");
+
+    const gone = choose(oneOption, { ...atChoice.state, currentBeatId: "已被删掉的拍" }, 0);
+    expect(gone.state.cursor).toBe(atChoice.state.cursor + 1);
+  });
+});

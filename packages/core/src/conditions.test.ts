@@ -297,3 +297,71 @@ describe("cloneVariables", () => {
     expect(vars.characters.c1.mood).toBe("x");
   });
 });
+
+/**
+ * 「读不到」的语义此前一条用例都没盖（conditions.ts 分支 88.23%）。
+ * 它不是细节而是判据：条件里没写 key、key 形状不对、引用的角色/关系/账本条目不存在时，
+ * Python 与 TS 都只把 `ne` 算真、其余算假——写反一处，桌面与云端的分支就会分岔。
+ */
+describe("evaluateCondition — 缺席只喂 ne", () => {
+  const vars: RuntimeVariables = {
+    memory: {}, flags: {},
+    characters: { c1: { mood: "晴" } },
+    relationships: { c1: { c2: { trust: 3 } } },
+  };
+
+  it("memory / flag 缺 key 或键不存在：eq 假、ne 真", () => {
+    expect(evaluateCondition({ type: "memory", operator: "eq", value: 1 }, vars)).toBe(false);
+    expect(evaluateCondition({ type: "memory", operator: "ne", value: 1 }, vars)).toBe(true);
+    expect(evaluateCondition({ type: "flag", key: "nope", operator: "eq", value: true }, vars)).toBe(false);
+    expect(evaluateCondition({ type: "flag", key: "nope", operator: "ne", value: true }, vars)).toBe(true);
+  });
+
+  it("character_state 与 relationship 的 key 形状不对：同样只喂 ne", () => {
+    expect(evaluateCondition({ type: "character_state", key: "没有点号", operator: "ne" }, vars)).toBe(true);
+    expect(evaluateCondition({ type: "character_state", key: "c1.mood", operator: "eq", value: "晴" }, vars)).toBe(true);
+    expect(evaluateCondition({ type: "relationship", key: "c1.c2", operator: "ne" }, vars)).toBe(true);
+    expect(evaluateCondition({ type: "relationship", key: "c1.c2.trust", operator: "lt", value: 5 }, vars)).toBe(true);
+    expect(evaluateCondition({ type: "relationship", key: "c1.c9.trust", operator: "ne" }, vars)).toBe(true);
+    expect(evaluateCondition({ type: "relationship", key: "c1.c9.trust", operator: "eq", value: 1 }, vars)).toBe(false);
+  });
+
+  it("codex 键要写成 characterRefId.memoryKey；账本里没有时只喂 ne", () => {
+    const ledger = { c1: { met: true } };
+    expect(evaluateCondition({ type: "codex", key: "c1.met", operator: "eq", value: true }, vars, new Set(), ledger)).toBe(true);
+    expect(evaluateCondition({ type: "codex", key: "缺点号", operator: "ne" }, vars, new Set(), ledger)).toBe(true);
+    expect(evaluateCondition({ type: "codex", key: "缺点号", operator: "eq", value: true }, vars, new Set(), ledger)).toBe(false);
+    expect(evaluateCondition({ type: "codex", key: "c1.absent", operator: "ne" }, vars, new Set(), ledger)).toBe(true);
+    expect(evaluateCondition({ type: "codex", key: "c9.met", operator: "eq", value: true }, vars, new Set(), ledger)).toBe(false);
+  });
+
+  it("achievement 认已解锁集合；node_completed 没给 value 一律假；未知类型假", () => {
+    expect(evaluateCondition({ type: "achievement", key: "first" }, vars, new Set(), {}, new Set(["first"]))).toBe(true);
+    expect(evaluateCondition({ type: "achievement", key: "" }, vars, new Set(), {}, new Set(["first"]))).toBe(false);
+    expect(evaluateCondition({ type: "node_completed", value: "b1" }, vars, new Set(["b1"]))).toBe(true);
+    expect(evaluateCondition({ type: "node_completed" }, vars, new Set(["b1"]))).toBe(false);
+    expect(evaluateCondition({ type: "relationship" } as never, vars)).toBe(false);
+  });
+
+  it("条件组只认 all / any / none；写了别的类型算假而不是当作通过", () => {
+    const atom = { type: "flag", key: "k", operator: "eq", value: true } as const;
+    const withFlag: RuntimeVariables = { ...vars, flags: { k: true } };
+    expect(evaluateCondition({ type: "all", conditions: [atom] }, withFlag)).toBe(true);
+    expect(evaluateCondition({ type: "any", conditions: [atom] }, withFlag)).toBe(true);
+    expect(evaluateCondition({ type: "none", conditions: [atom] }, vars)).toBe(true);
+    // 组与成员都在第一个参数里：写错位置的调用不算通过（这条判据本身也要能被证伪）
+    // 带着 conditions 但 type 不在 all/any/none 里的对象**不算组**（isGroup 两个条件都要成立），
+    // 于是它落到原子求值的 default 分支——组里那条 `default:` 结构上不可达，
+    // 不去假装有覆盖，只把「未知类型一律假」这条真能走到的路钉住。
+    expect(evaluateCondition({ type: "全部", conditions: [atom] } as never, withFlag)).toBe(false);
+  });
+
+  it("cloneVariables 把 relationships 的两层桶也复制成新对象（纯函数不得共享引用）", () => {
+    const withRel: RuntimeVariables = { ...vars, relationships: { c1: { c2: { trust: 3 } } } };
+    const copy = cloneVariables(withRel);
+    copy.relationships!.c1.c2.trust = 99;
+    expect(withRel.relationships!.c1.c2.trust).toBe(3);
+    copy.characters.c1.mood = "雨";
+    expect(withRel.characters.c1.mood).toBe("晴");
+  });
+});

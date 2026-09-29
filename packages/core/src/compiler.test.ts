@@ -133,3 +133,146 @@ describe("道具引用编译（对齐 Python _build_items）", () => {
     ]);
   });
 });
+
+/**
+ * 编译器余下那些「金样本恰好不走」的分支（此前 compiler.ts 84.59% 语句 / 65.85% 分支）。
+ * 三份示范作都是 script 数组写法、自动分支、无 glossary、无嵌套节点——于是旁白、
+ * 手动选项、术语表、旧数据回退这些分支两侧各自演化而无人报警。
+ * 判据来源是 Python 侧同名逻辑（_build_script / _build_glossary / 主循环的嵌套回退）。
+ */
+describe("编译器 — 叙事字段与分支回退", () => {
+  const node = (
+    id: string,
+    narrativeData: Record<string, unknown>,
+    sortOrder = 0,
+    stageId: string | null = "s1",
+  ) => ({ id, stageId, editorData: {}, narrativeData, sortOrder });
+
+  const input = (over: Partial<CompilerProjectInput> = {}): CompilerProjectInput => ({
+    id: "p1",
+    title: "分支",
+    worldSetting: null,
+    playMeta: {},
+    nodes: [],
+    edges: [],
+    scenes: [{ id: "s1", title: "场景" }],
+    roles: [{ characterRefId: "c1" }],
+    characters: [{ id: "c1", name: "凛", characterData: {}, imagePath: null }],
+    items: [],
+    ...over,
+  });
+
+  const scriptOf = (narrativeData: Record<string, unknown>, over: Partial<CompilerProjectInput> = {}) =>
+    compileStory(input({ nodes: [node("n1", narrativeData)], ...over })).beats[0]!.script;
+
+  it("只有 narration → 一句旁白（speaker 与 characterId 都是 null，而不是省略键）", () => {
+    expect(scriptOf({ narration: "雨停了。" })).toEqual([
+      { op: "say", characterId: null, speaker: null, text: "雨停了。", voice: null, rich: null },
+    ]);
+  });
+
+  it("dialogue + speaker：名字在演员表里就解析成 id，不在就保留名字而 id 为 null", () => {
+    const known = scriptOf({ dialogue: "我来了。", speaker: "凛" });
+    expect(known[0]).toMatchObject({ op: "say", text: "我来了。", speaker: "凛", characterId: "c1" });
+    const unknown = scriptOf({ dialogue: "陌生人。", speaker: "没人认识我" });
+    expect(unknown[0]).toMatchObject({ text: "陌生人。", speaker: "没人认识我", characterId: null });
+  });
+
+  it("手动 choices 优先于「出边≥2 自动生成」；空标签补「继续」；只有一条出边时不生成选项", () => {
+    const manual = scriptOf({
+      dialogue: "选吧",
+      choices: [{ label: "", target_node_id: "n9" }, { condition: { type: "flag", key: "k" } }],
+    });
+    expect(manual[manual.length - 1]).toEqual({
+      op: "choice",
+      options: [
+        { label: "继续", to: "n9", condition: null },
+        { label: "继续", to: null, condition: { type: "flag", key: "k" } },
+      ],
+    });
+
+    const two = compileStory(input({
+      nodes: [node("n1", { dialogue: "两条路" }), node("n2", { dialogue: "A" }, 1), node("n3", { dialogue: "B" }, 2)],
+      edges: [
+        { sourceNodeId: "n1", targetNodeId: "n2", label: "左" },
+        { sourceNodeId: "n1", targetNodeId: "n3", label: null },
+      ],
+    })).beats.find((b) => b.id === "n1")!.script;
+    expect(two[two.length - 1]).toEqual({
+      op: "choice",
+      options: [
+        { label: "左", to: "n2", condition: null },
+        { label: "继续", to: "n3", condition: null },
+      ],
+    });
+
+    const one = compileStory(input({
+      nodes: [node("n1", { dialogue: "只有一条" }), node("n2", { dialogue: "唯一" }, 1)],
+      edges: [{ sourceNodeId: "n1", targetNodeId: "n2", label: "继续" }],
+    })).beats.find((b) => b.id === "n1")!.script;
+    expect(one.some((i) => i.op === "choice")).toBe(false);
+  });
+
+  it("显式 actors 原样取（数字也转字符串）；没写 actors 时从脚本归纳", () => {
+    const pkg = compileStory(input({ nodes: [node("n1", { actors: ["c1", 7], dialogue: "在" })] }));
+    expect(pkg.beats[0]!.actors).toEqual(["c1", "7"]);
+    const inferred = compileStory(input({
+      nodes: [node("n1", { script: [{ op: "show", characterId: "c1" }, { op: "say", text: "在" }] })],
+    }));
+    expect(inferred.beats[0]!.actors).toEqual(["c1"]);
+  });
+
+  it("表情差分：空对象给 null 而不是 {}；值为空的差分被丢掉", () => {
+    const withSprites = compileStory(input({
+      nodes: [node("n1", { dialogue: "在" })],
+      characters: [{ id: "c1", name: "凛", characterData: { sprites: { smile: "a.png", sad: "" } }, imagePath: null }],
+    }));
+    expect(withSprites.characters[0]!.expressions).toEqual({ smile: "a.png" });
+    const bare = compileStory(input({
+      nodes: [node("n1", { dialogue: "在" })],
+      characters: [{ id: "c1", name: "凛", characterData: { sprites: {} }, imagePath: null }],
+    }));
+    expect(bare.characters[0]!.expressions).toBeNull();
+  });
+
+  it("同一个角色被引用两次只进一次；引用了不存在的角色则整条不出现", () => {
+    const pkg = compileStory(input({
+      nodes: [node("n1", { dialogue: "在" })],
+      roles: [{ characterRefId: "c1" }, { characterRefId: "c1" }, { characterRefId: "ghost" }],
+    }));
+    expect(pkg.characters.map((c) => c.id)).toEqual(["c1"]);
+  });
+
+  it("术语表只收 term 非空的项、trim 两端空白、缺 id 用下标补；playMeta 不是对象也不炸", () => {
+    const pkg = compileStory(input({
+      nodes: [node("n1", { dialogue: "在" })],
+      playMeta: {
+        glossary: [
+          { term: " 方舟 ", definition: " 移动都市 " },
+          { definition: "没有术语，整条丢掉" },
+          "不是对象",
+          { id: "x1", term: "锚点" },
+        ],
+      } as CompilerProjectInput["playMeta"],
+    }));
+    expect(pkg.glossary).toEqual([
+      { id: "g0", term: "方舟", definition: "移动都市" },
+      { id: "x1", term: "锚点", definition: "" },
+    ]);
+    expect(compileStory(input({ playMeta: null })).glossary).toEqual([]);
+  });
+
+  it("顶层没有节点时回退到 scene.nodes（旧数据形状）", () => {
+    const pkg = compileStory(input({
+      nodes: [],
+      scenes: [
+        {
+          id: "s1", title: "旧场景",
+          nodes: [node("old1", { dialogue: "旧写法", speaker: "凛" }, 3, null)],
+        },
+      ] as unknown as CompilerProjectInput["scenes"],
+    }));
+    expect(pkg.beats.map((b) => b.id)).toContain("old1");
+    expect(pkg.beats.find((b) => b.id === "old1")!.sceneId).toBe("s1");
+  });
+});

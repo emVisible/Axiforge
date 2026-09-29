@@ -15,16 +15,34 @@ const dir = join(process.cwd(), "apps/web/src/shared/storage");
 const DISPATCH_FILES = /^(.*Saves\.ts|assetPool.*\.ts|achievementDefs\.ts)$/;
 const targets = readdirSync(dir).filter((n) => DISPATCH_FILES.test(n) && !n.endsWith(".test.ts"));
 
-const offenders = [];
-let total = 0;
+const bodies = [];
 for (const name of targets) {
   const src = readFileSync(join(dir, name), "utf8");
   for (const m of src.matchAll(/export async function (\w+)/g)) {
-    total++;
     const rest = src.slice(m.index + m[0].length);
     const next = rest.search(/\nexport (async )?function/);
-    const body = rest.slice(0, next === -1 ? rest.length : next);
-    if (!/isLocal\(\)|isTauriEnvironment\(\)/.test(body)) offenders.push(`${name} :: ${m[1]}`);
+    bodies.push({ file: name, fn: m[1], body: rest.slice(0, next === -1 ? rest.length : next) });
+  }
+}
+// 同一批分派口里的导出名：本地分支可以经兄弟函数间接分派（如 searchImportItems → readItems）
+const dispatchNames = new Set(bodies.map((b) => b.fn));
+
+const offenders = [];
+let total = 0;
+for (const { file, fn, body } of bodies) {
+  total++;
+  const i = body.search(/isLocal\(\)|isTauriEnvironment\(\)/);
+  if (i < 0) {
+    offenders.push(`${file} :: ${fn} —— 没有本地分支`);
+    continue;
+  }
+  // 只看"本地那一支"：从分派判定到 else 之前（找不到就取后文）
+  const seg = body.slice(i);
+  const direct = /await\s+(?:\w*[Dd]eps\.provider\(\)|p\.|provider\(\))/.test(seg);
+  const indirect = [...dispatchNames].some((n) => new RegExp(`await\\s+${n}\\(`).test(seg));
+  const registeredSkip = seg.includes("skipped-offline"); // 跨作品 Codex 那条是登记过的显式跳过，不是静默桩
+  if (!direct && !indirect && !registeredSkip) {
+    offenders.push(`${file} :: ${fn} —— 本地分支既不调 provider、也不经兄弟分派、也没有显式 skipped 标记`);
   }
 }
 

@@ -1523,6 +1523,21 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 修好后串行复跑：gates 退出码 0（十一道）/ `pnpm e2e:desktop` 连续两次各 **31 passed** /
 > `pnpm e2e` **44 passed**（约 1.0m）/ renderer 重建 0。桌面基线从 30 到 31，浏览器从 43 到 44。
 
+> **`check:dispatch` 从"提到本地"收紧成"本地那一支真干活"（2026-09-29）**
+>
+> 原来的判据只看函数体里出现过 `isLocal()`——一个"本地分支直接 return 一个 ok 对象"的桩也能过。
+> 收紧成三档合法，缺一即失败：**①** 本地那一支 `await` 了 provider（`p.xxx()` / `Deps.provider()`）；
+> **②** 或经同一批分派口里的兄弟函数间接分派；**③** 或返回**登记过的** `skipped-offline` 显式跳过
+> （跨作品 Codex 那条就是③：没有本地表，如实标 skipped，而不是发一条注定失败的请求再 `.catch(()=>{})`）。
+>
+> 复扫时②与③各捞到真实用例：`searchImportItems` / `searchImportScenes` 走 `readItems` / `readScenes`（②），
+> `readCodex` / `syncCodex` 走③——**这四处不是缺陷**，我逐条读了函数体才定性；
+> 若不核对就加"必须有 provider 调用"这一条，门禁会把它们误杀（过宽的 fail-closed 比没门禁更贵）。
+> 30 个导出函数在新规则下仍全绿；插一个"本地分支返回 `{ok:true}` 不调 provider"的桩，门禁退出码 1
+> 并点名那个函数；删桩后回到退出码 0。
+>
+> 复跑：gates 0（十一道）/ e2e:desktop 31 passed / e2e 44 passed / renderer 重建 0。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

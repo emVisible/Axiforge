@@ -25,12 +25,13 @@
     "coverage": "pnpm --filter @axiforge/core test:coverage && pnpm --filter @axiforge/editor-core test:coverage",
     "check:size": "node scripts/check-file-size.mjs",
     "check:labels": "node scripts/check-label-association.mjs",
+    "check:dispatch": "node scripts/check-dispatch-local.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
     "check:ui-source": "node scripts/check-ui-source.mjs",
     "check:purity": "node scripts/check-package-purity.mjs",
     "check:circular": "dpdm --no-warning --no-tree --exit-code circular:1 \"packages/core/src/index.ts\" \"packages/axs/src/index.ts\" \"packages/editor-core/src/index.ts\" \"packages/ui/src/index.ts\"",
     "check:desktop": "pnpm --filter @axiforge/desktop check",
-    "gates": "pnpm typecheck && pnpm test:unit && pnpm coverage && pnpm lint && pnpm check:purity && pnpm check:circular && pnpm check:size && pnpm check:labels && pnpm check:contrast && pnpm check:ui-source"
+    "gates": "pnpm typecheck && pnpm test:unit && pnpm coverage && pnpm lint && pnpm check:purity && pnpm check:circular && pnpm check:size && pnpm check:labels && pnpm check:dispatch && pnpm check:contrast && pnpm check:ui-source"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

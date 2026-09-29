@@ -1538,6 +1538,22 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 >
 > 复跑：gates 0（十一道）/ e2e:desktop 31 passed / e2e 44 passed / renderer 重建 0。
 
+> **`check:labels` 的第二档从"挂了 id 就算"收紧成"确有 aria-labelledby 指到它"（2026-09-29）**
+>
+> 原判据 `/\bid=\{?["\w]/` 只问"这行有没有 id"，不问"有没有人引用它"——
+> 给裸 `<label>` 随手加一个 `id="x"` 就能把门禁哄过去，而读屏仍然念不出分组名。
+> 现在第二档要求同文件里存在指到该 id 的 `aria-labelledby`，三种写法都认：`="x"` / `={x}` / ``={`x-${i}`} ``。
+>
+> 第一次收紧跑出了 **3 处假阳性**（`ConditionSimulator` 模拟变量、`ConditionEditor` 触发条件、
+> `EffectEditor` 完成效果）——它们用的是 `aria-labelledby={groupId}`（花括号无引号），
+> 而我的正则把引号写成了必需，于是把合法代码判成违规。判据崩在合法输入上比没判据更贵，
+> 所以先把三处的真实写法 grep 出来核对，再改正则；改完 144 个文件、4 处 id 档全绿、基线仍 1 条。
+>
+> 双向证据（临时探针 `apps/web/src/__labelgate-probe.tsx`，测完已删）：
+> 注入①无 htmlFor/无 id/不包控件的裸标签 与 ②挂 id 无人引用的假分组 → 退出码 1，两条都点名且各自给出原因；
+> 把同一份探针换成合法形状（htmlFor+input、`role=group`+`aria-labelledby={groupId}`、字面量 id 三种）→ 退出码 0。
+> 也就是这条判据能区分好坏，不是"新文件一律红"。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

@@ -3,7 +3,8 @@
  * 表单标签的编程关联门禁（G1 棘轮的同族）。
  * 判据形状三档：
  *   1) `<label htmlFor=…>`——字段标签；
- *   2) `<label id=…>` 配合祖先的 `aria-labelledby`——一整列行的命名分组；
+ *   2) `<label id=…>` 且同文件确有 `aria-labelledby` 指到它——一整列行的命名分组；
+ *      只挂 id 不接引用不算（那只是把门禁哄过去的假分组，读屏依旧念不出）。
  *   3) `<label>` 到 `</label>` 之间就包着控件——包裹型，天然合法。
  * 三档都不满足的就是"看着像标签、读屏却念不出字段名"，必须留在基线里具名豁免，
  * 新增一处即失败。基线为什么允许非空：#65 还剩两处（分支选项被 #68 堵住、分支标签需要选中出边）。
@@ -26,8 +27,15 @@ const files = [];
 })(srcRoot);
 
 const found = [];
+const reasons = new Map();
 for (const file of files) {
-  const lines = readFileSync(file, "utf8").split("\n");
+  const src = readFileSync(file, "utf8");
+  const lines = src.split("\n");
+  // 命名分组档要有真引用才算数：光给 <label> 挂个 id 而没人 aria-labelledby 它，读屏照样念不出来
+  // 三种写法都得认：aria-labelledby="x" / ={x} / ={`x`}
+  const ariaRefs = [...src.matchAll(/aria-labelledby\s*=\s*(?:\{\s*["'`]([^"'`\n]*)["'`]\s*\}|\{\s*([^}\n]+?)\s*\}|["'`]([^"'`\n]*)["'`])/g)]
+    .map((m) => m[1] ?? m[2] ?? m[3])
+    .map((s) => s.replace(/[`"'\s]/g, ""));
   for (let i = 0; i < lines.length; i++) {
     const head = lines[i];
     if (!head.includes("<label")) continue;
@@ -40,11 +48,19 @@ for (const file of files) {
       if (lines[j].includes("</label>")) break;
     }
     if (open.includes("htmlFor")) continue;
-    if (/\bid=\{?["\w]/.test(open)) continue;
+    const idMatch = open.match(/\bid=\{([^}]*)\}|\bid="([^"]*)"/);
+    const idValue = idMatch ? (idMatch[1] ?? idMatch[2]).replace(/[`"'\s]/g, "") : "";
+    if (idValue && ariaRefs.some((ref) => ref.includes(idValue))) continue;
     if (CONTROL.test(body)) continue;
     const m = body.match(/<label[^>]*>([\s\S]*?)<\/label>/);
     const text = (m ? m[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "").slice(0, 24);
-    found.push(`${relative(root, file)} :: ${text}`);
+    const key = `${relative(root, file)} :: ${text}`;
+    if (!reasons.has(key))
+      reasons.set(
+        key,
+        idValue ? `挂了 id 却同文件无人 aria-labelledby（假分组）` : "既无 htmlFor、也不是命名分组、也没包控件",
+      );
+    found.push(key);
   }
 }
 
@@ -70,7 +86,7 @@ if (stale.length) {
   console.log("  提示：基线里有 " + stale.length + " 条已经不存在（修完就该把它删掉，别留给后人当挡箭牌）");
 }
 if (extra.length) {
-  for (const e of extra) console.log("  ✗ 新增未具名的裸 <label>：" + e);
+  for (const e of extra) console.log(`  ✗ 新增未具名的裸 <label>：${e} —— ${reasons.get(e) ?? ""}`);
   console.log("[labels] FAIL —— 补 htmlFor、或改命名分组/包裹型，或（仅在确有理由时）--update 具名登记");
   process.exit(1);
 }

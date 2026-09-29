@@ -109,3 +109,6 @@ docker-data/
 *.bak
 *.tmp
 *.temp
+
+# e2e 套件互斥锁（scripts/e2e-lock.mjs）
+.e2e-lock

@@ -475,6 +475,25 @@ test.describe("E17 桌面态点击路径写进本地库", () => {
     await expect(page.getByText("离线路上的第一句")).toBeVisible({ timeout: 8000 });
     await page.getByRole("button", { name: "从头开始" }).click();
 
+    /*
+     * E33：手动存档槽位（slot 1）的写入 / 回读 / 删除在桌面走本地分派口。
+     * E28 只覆盖了自动存档那一格；手动槽位走同一批函数但 slot≠0，删除是另一条腿。
+     * 屏障不由我定时长：manualSave 等 writeSave 返回 ok 才关面板，重开面板会再走一次
+     * listSaves——所以「回读」量的是存储而不是本页 state；删除后面板自己 refreshSaveSlots。
+     * 定位器踩过一次：按 class 限定卡片（div.relative.overflow-hidden）会捞到外层容器，
+     * 结果点在 HUD 的「创作者」按钮上等稳定性等到超时——改用槽位自己的可访问名。
+     */
+    await page.getByRole("button", { name: "菜单" }).click();
+    await page.getByRole("button", { name: "存档" }).click();
+    await page.getByRole("button", { name: /存档 1/ }).first().click();
+    await page.getByRole("button", { name: "菜单" }).click();
+    await page.getByRole("button", { name: "读档" }).click();
+    const slot1 = page.getByRole("button", { name: /存档 1/ }).first();
+    await expect(slot1).toContainText("离线路上的第一句", { timeout: 8000 });
+    await page.getByRole("button", { name: "删除存档" }).click();
+    await expect(slot1).toContainText("— 空槽 —", { timeout: 8000 });
+    await page.getByRole("button", { name: "关闭" }).click();
+
     // 判据从「只筛数据通路那一类」升级成「整条桌面链路上零 console 错误」：播放器那条 <a><a> 修好之后才敢这么收
     expect(errs, `桌面链路上有 console 错误：${errs.join(" | ")}`).toEqual([]);
     await page.goBack({ waitUntil: "load" });

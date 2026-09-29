@@ -1371,6 +1371,19 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 一条自我修正：我第一遍统计用的是 Python 扫描，得出"38 个函数"——那是 `*Saves.ts` 与 `assetPool*.ts`
 > 两个 glob 让 `assetPoolSaves.ts` 被数了两遍。以 node 脚本的 26 为准，注释与文档都已按实测改。
 
+> **#65 最后两处的可达性实测（2026-09-29 收尾，交接用）**
+>
+> - `NodeInspectorPanel:336`「分支标签」：**只有 `selectedEdge` 非 null 才渲染**。
+>   实测挂载点四处：`CutStudioView.tsx:621` 与 `CutWorkspace.tsx:158` 把 `selectedEdge` **硬写成 null**
+>   （剪辑台这条路永远打不开连线面板），真正能出连线面板的只有 `FlowWorkspace.tsx:69` 与
+>   `FlowStudioView.tsx:166` 这条流程工作台路径。所以它的判据必须先去流程页选中一条边；
+>   修法也不是命名分组——那一块下面是 chip 行 + 一个自由文本 `input`，该给 input 补 `htmlFor`。
+>   我在收尾轮没启动它：需要新搭一条"进流程工作台 + 点中一条边"的路径，
+>   半条 flaky 判据留在基线里比不做更坏。
+> - `ScriptEditor`「分支选项」：被 **#68** 堵住（`choice` 指令在 AXS 写侧没有归宿，那一行根本不出现）。
+>
+> 这两处之外，`check:labels` 的基线就只剩这两条豁免；两条都做完后应当把它删空，让门禁归零。
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
 ---

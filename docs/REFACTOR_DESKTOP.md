@@ -632,6 +632,14 @@
 > - **摘每块时要一起走的判据**（避免留残口）：路由表项 + `AppHeader`/导航里的入口 +
 >   对应的 `use*` hook + 该页在 E14/E15 路由清单里的条目 + `KNOWN_DEBT_ROUTES` 反向棘轮；
 >   评论区与详情页只能 URL 直达（E35 之后桌面已无指向 `/discover` 的链接）。
+> - **hooks 侧的交叉核对（2026-09-29 复扫，数字由命令产生）**：`apps/web/src` 里 18 个 `.ts` 消费者碰到云端 api，
+>   未闸门的 5 个经逐一追消费者后定性为——2 个是误报（`useProjectEditor.ts:5`、`writer/lib/projection.ts:18`
+>   都只 `import type { NarrativeSyncRequest }`，不发请求）；3 个真实但**桌面已无路可达**：
+>   `useCommentThread` 只被 `DiscoverCommentSection` 用、`useTags` 只被 `DiscoverCharactersTab` 用、
+>   `identityLink` 只被 `DiscoverProjectsTab` 用，而这三块都挂在 `/discover` 系页面上，
+>   E35 之后桌面没有任何导航路径通向它们（只能 URL 直达）。
+>   ⇒ 桌面态"点了只会失败"的云端入口到这里已经收干净：视图层 `.tsx` 未闸门数 0，hooks 层剩的都是 URL-only 页面，
+>   归 S13-3 一起摘，不需要另开闸门。
 
 - [ ] S13-4 AI 通路本地化：模型接入落到 TS provider 直连 Ollama / 兼容 API（即 v1.0「演绎内核」M3 的第三支），Python 的 provider 链与 `/editor/ai/*` 随之退场；桌面离线仍由 TS 规则引擎兜底
   - **S13-4a 已交付 2026-09-27**（提示词单一真相源 + 桌面本机模型通路 + 配置 UI）：

@@ -185,7 +185,7 @@ class ProjectNode(Base):
     #
     # Condition 结构:
     #   { "type": "memory"|"flag"|"character_state"|"node_completed",
-    #     "key": str, "operator": "eq"|"ne"|"gt"|"lt"|"contains", "value": any }
+    #     "key": str, "operator": "eq"|"ne"|"gt"|"lt"|"gte"|"lte"|"contains", "value": any }
     #
     # Effect 结构:
     #   { "type": "memory"|"flag"|"character_state",

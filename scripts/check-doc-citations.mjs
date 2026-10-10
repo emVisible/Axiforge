@@ -93,6 +93,51 @@ function lineCount(relPath) {
 const SKIP_DIR =
   /(^|[/\\])(node_modules|Clearance)([/\\]|$)|[/\\](dist|build|target)[/\\]|[/\\]\.venv[/\\]/;
 const SRC_EXT = /\.(ts|tsx|py|json|mjs|rs|bash|sh|yml|yaml|md)$/;
+
+/**
+ * 「仓外未纳管」档（2026-10-10 加，由干净 clone 对照逼出来的）。
+ *
+ * 起因：`pnpm gates` 在这台机器上 0，在同一条 commit 的干净 clone 上 **FAIL**——
+ * ADR-028 与 REFACTOR_DESKTOP 引的 `engines.py`／`gateway.py`／`store.py` 住在隔壁那个
+ * **未纳管的 `Clearance/`** 里。本机磁盘上有它 ⇒ 落进 `skippedHit`；clone 上没有 ⇒ 同样的
+ * 引用落进 `missing`。**一个事实两种读法，就是"这台机器的读数"本身**。
+ *
+ * 所以这一档必须在**碰磁盘之前**判完：清单是手写的（doc, ref）对，身份**不含行号**
+ * （同一天两次踩过的坑：拿行号当身份 ⇒ 写一次文档就假红一次），也**不从磁盘反推**
+ * （反推就等于把判据重新绑回本机目录形状）。
+ *
+ * 三件事各自有腿：①清单里的对必须真被行使过，否则棘轮等于没关（`stale` 那条 FAIL）；
+ * ②判定面为空（`已判定 0`）不算通过；③本函数自带合成对照——一条必须判出、
+ * 两条必须不判出，不依赖真实清单非空。
+ *
+ * **残余限度（2026-10-10 由配对对照量出来，别把它当成已消除）**：这一档只覆盖**登记过**的
+ * 引用。没登记的那一类"只有在本机隔壁未纳管目录里才存在"的引用，仍然随磁盘形状在两台上
+ * 给出不同读法（本机 `skippedHit`、clone `missing`）。所以"该拦"这条腿**在开发机上结构性
+ * 点不亮**——实测摘掉清单里一对，本机仍 exit 0（它掉进 skippedHit 而不是 missing），
+ * 只有干净 clone 才点亮它。⇒ 取这条腿的数必须在 clone 上取；本机跑出来的绿只说明
+ * "这台机器上没有新的悬空引用"。要彻底消除得改 `SKIP_DIR` 那一档的口径（从"磁盘上有"
+ * 改成"形状上属于仓外"），而那会把裸文件名的引用一并暴露在两种读法下——是口径决策，
+ * 已登记待决，不在这里顺手改。
+ */
+const EXTERNAL_PATH = join(root, "scripts/doc-citation-external.json");
+const externalPairs = new Set(
+  existsSync(EXTERNAL_PATH)
+    ? (JSON.parse(readFileSync(EXTERNAL_PATH, "utf8")).pairs ?? [])
+    : [],
+);
+
+/** 纯谓词：一对（文档, 引用）是否在「仓外未纳管」清单里。不读磁盘、不看目录是否存在。 */
+function externalPairHit(pairs, docRel, ref) {
+  return pairs.has(`${docRel}|${ref}`);
+}
+
+// 合成对照（真实清单为空也照跑）：摘掉这一腿，整档会退化成"清单写什么算什么"。
+const extControls = [
+  { want: true, desc: "在册的对必须判出", got: externalPairHit(new Set(["a.md|x.py"]), "a.md", "x.py") },
+  { want: false, desc: "同一个 ref 换文档不许判出", got: externalPairHit(new Set(["a.md|x.py"]), "b.md", "x.py") },
+  { want: false, desc: "不在册的对不许判出", got: externalPairHit(new Set(["a.md|x.py"]), "a.md", "y.py") },
+];
+const extControlFails = extControls.filter((c) => c.got !== c.want);
 const tracked = [];
 const everyFile = [];
 function collect(p, intoSkipped) {
@@ -133,7 +178,7 @@ function suffixHits(rel) {
   return tracked.filter((f) => f === rel || f.endsWith("/" + rel));
 }
 
-function resolveRef(rawPath) {
+function resolveRef(rawPath, docRel) {
   if (rawPath.includes("...")) return { kind: "ellipsis" };
   const direct = join(root, rawPath);
   if (existsSync(direct) && statSync(direct).isFile()) return { kind: "ok", rel: rawPath };
@@ -142,6 +187,9 @@ function resolveRef(rawPath) {
     : (byBase.get(rawPath) ?? []).filter((f) => !SKIP_DIR.test(f));
   if (hits.length === 1) return { kind: "ok", rel: hits[0] };
   if (hits.length === 0) {
+    // 先查手写清单，再碰磁盘：顺序反过来，同一句引用在本机算 skippedHit、在干净 clone 算
+    // missing，门禁就从"判一个事实"退化成"判这台机器上有没有那个隔壁目录"。
+    if (externalPairHit(externalPairs, docRel, rawPath)) return { kind: "external" };
     // 「只在被跳目录里找到」——2026-10-01 复审改，原实现是**按 basename 匹配 `everyFile`**，
     // 那等于把"文件不存在"这一档整档关掉：仓库里任何地方（含 node_modules、Clearance/）
     // 有个同名文件，一条**根本不存在的路径**就被判成 skippedHit 而放行。
@@ -175,20 +223,27 @@ function citationKey(file, target, lineText) {
   return `${relative(root, file)} → ${target} #${fingerprint}`;
 }
 
-const tally = { ok: 0, ambiguous: 0, ellipsis: 0, skippedHit: 0, missing: 0, outOfRange: 0 };
+const tally = { ok: 0, ambiguous: 0, ellipsis: 0, skippedHit: 0, external: 0, missing: 0, outOfRange: 0 };
+const matchedExternal = new Set();
 for (const file of files) {
   const src = readFileSync(file, "utf8");
   const docLines = src.split("\n");
+  const docRel = relative(root, file).split("\\").join("/");
   for (let i = 0; i < docLines.length; i++) {
     for (const m of docLines[i].matchAll(CITATION_RE)) {
       const [, rawPath, rawNumbers] = m;
-      const r = resolveRef(rawPath);
+      const r = resolveRef(rawPath, docRel);
       if (r.kind === "ellipsis") {
         tally.ellipsis += 1;
         continue;
       }
       if (r.kind === "ambiguous") {
         tally.ambiguous += 1;
+        continue;
+      }
+      if (r.kind === "external") {
+        tally.external += 1;
+        matchedExternal.add(`${docRel}|${rawPath}`);
         continue;
       }
       if (r.kind === "skippedHit") {
@@ -243,4 +298,36 @@ if (process.argv.includes("--update")) {
   process.exitCode = 1;
 } else {
   console.log(`[doc-citations] OK —— 扫描 ${files.length} 个文档，${shape}（基线 ${allow.size} 条在册）`);
+}
+
+/**
+ * 「仓外未纳管」这一档必须自己说话，而且要单独打印：它不在 shape 那行里，而它恰恰是
+ * 本机读数与干净 clone 读数的分界处（同一个事实，两种读法就是"这台机器的读数"本身）。
+ *
+ * 三条腿各自独立、全部打印，不折成布尔：
+ * ①合成对照不成立 ⇒ UNRELIABLE（判据自己坏了，不能拿它去判别人）；
+ * ②判定面为空 ⇒ UNRELIABLE（引用面被搬走或全被判成跳过，绿灯不携带信息）；
+ * ③清单里的对今天一次都没出现 ⇒ FAIL（清偿了就删，留着就是把豁免敞在那里）。
+ */
+console.log(
+  `[doc-citations] 仓外未纳管 ${tally.external} 次（清单 ${externalPairs.size} 对，被行使 ${matchedExternal.size} 对）`,
+);
+const staleExt = [...externalPairs].filter((k) => !matchedExternal.has(k));
+if (extControlFails.length) {
+  console.log(
+    `[doc-citations] UNRELIABLE —— 仓外档自测 ${extControlFails.length} 条不符（应当一条判出、两条不判出）`,
+  );
+  for (const c of extControlFails) console.log(`  - ${c.desc}：期望 ${c.want}，实得 ${c.got}`);
+  process.exitCode = 1;
+} else if (files.length === 0 || tally.ok === 0) {
+  console.log(
+    `[doc-citations] UNRELIABLE —— 判定面为空（文档 ${files.length} 个、已判定 ${tally.ok}），这一档今天没在判任何东西`,
+  );
+  process.exitCode = 1;
+} else if (staleExt.length) {
+  console.log(
+    `[doc-citations] FAIL —— 仓外清单有 ${staleExt.length} 对今天不再出现：清偿了就删掉，留着等于把豁免敞着`,
+  );
+  for (const k of staleExt) console.log(`  - 过期豁免：${k}`);
+  process.exitCode = 1;
 }

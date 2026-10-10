@@ -1,0 +1,9 @@
+{
+  "_note": "文档里指向「仓外未纳管目录」的引用（住在本机隔壁的 Clearance/ 一类，任何一台别的机器上都没有）。身份＝文档相对路径|引用原文，不含行号。清偿（改成指向仓内真文件，或随 backend 退场删掉那段）之后必须删掉对应条目——门禁会在它一次都没出现时 FAIL。",
+  "pairs": [
+    "docs/ADR/028-moderation-decision-layer-in-admin.md|engines.py",
+    "docs/ADR/028-moderation-decision-layer-in-admin.md|gateway.py",
+    "docs/ADR/028-moderation-decision-layer-in-admin.md|store.py",
+    "docs/REFACTOR_DESKTOP.md|gateway.py"
+  ]
+}

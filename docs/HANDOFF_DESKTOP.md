@@ -5267,3 +5267,33 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
 - **测量代替推测（05:06）**：两笔提交里 31 个 TS 文件的相对 import，在 **HEAD 的树**中 **0 条解不到**（载入层没问题；对照组＝同一解析器在工作树里 42 条全解到，故读数可信）。但其中 **23 条 import 指向「已跟踪却仍未提交修改」的 12 个文件**（`packages/axs/src/parse.ts`／`print.ts`、`packages/core/src/conditions.ts`／`ir.ts`、`packages/editor-core/src/projection/axs.ts`、`apps/web/src/shared/storage/{index,tauriSqlBackend,tauriAssetStore}.ts`、`creatorId.ts`、`playerToken.ts` 等）⇒ **干净 clone 上那些新判据测的是尚未进树的行为，`test:unit` 预期为红**。对照群（全仓 65 个已跟踪测试文件）命中 23 个文件／63 条 import，证明这套匹配真能命中、不是恒 0 的假绿。
 - **剩余 1 项是误报，且我不动它**：`backend/tests/test_condition_family_support.py ⇐ packages/core/src/familySupport.test.ts:20` —— 那一行是**注释**（「Python 那一侧的断言在…」），该文件真正 `readFileSync` 的是已进树的 `families.json`（同文件 43 行），断言读的是 JSON 里的 `python` 列（66 行）。所以这一条不是「干净 clone 跑不起来」。修它要改判据口径（数据面改吃剥注释后的源码，与形状匹配同一口径），**会动其它计数，故留下一轮**，与 #177 同批。
 - **因此"把绿灯变成仓库事实"还没完成，且它需要的不是更多 add**：那 **99 个已跟踪修改文件**才是行为本体。把它们一次性提交会造出一个巨型提交、也把 #177 那个自我复制的文档一起卷进去 ⇒ 正确顺序是「先还 #177 的文档合并 ⇒ 再按域分批提交修改 ⇒ 每批之后真跑一次 clone 对照」。这一步等你点头，我不替你把九十九份压成一笔。
+
+## 11. 分域进树（2026-10-10 05:20–05:55，第一百一十三批；**当前恢复点，取代 §10**）
+
+你授权「分域提交那 99 份」。执行时的口径先纠正一次：**99 是 `^ M` 的读数，漏了 17 个删除项**，
+真实的未提交跟踪改动是 **116**（99 改 ＋ 17 删）。按域切成八笔，另加三笔补齐自洽：
+
+| 域 | 文件数 | 内容 |
+|---|---|---|
+| 后端 | 2 | `narrative/models.py`、`runtime/service.py`（**两份禁区文件按长期约束永不进**：`backend/uv.lock`、`llm/providers/__init__.py`） |
+| 语法与内核 | 28 | `packages/axs`／`core`／`editor-core`：运算符 fail-closed、空说话人按旁白印、指令取值 warning、双端向量清单、诊断出参 |
+| 本地存储与分派 | 11 | 二次导入的 id 重映射、导入回滚、素材摘要 fail-closed、身份键单一权威 |
+| 界面层 | 20 | 剪贴板唯一通路与失败可见、24 处标签编程关联、投影说明三个时刻 |
+| 门禁与验收 | 10 | `e2e/desktop-http.spec.ts`（E43–E65）与 scripts 判据 |
+| 命令面与配置 | 7 | dev.bash／vite／两套 playwright／两份 package.json／CI（CI 仍无桌面 job，未声称远端有效） |
+| 文档归档**移动** | 34 | 17 删除 ＋ 17 `docs/archive/` 新增**在同一笔里**⇒ git 记为 rename，历史不断；分两笔中间那笔就是真的丢文件 |
+| 活文档 | 19 | ADR-016／027／029、用户文档、README、HANDOFF |
+
+**「跑得起来≠跑得得过」由干净 clone 亲口判了**（`git worktree` 到 `/tmp/clonecheck`，`node_modules` 符号链接复用，不碰你的库、不跑 e2e）：
+
+1. clone 的 `pnpm typecheck` 起初**一个错**：`vite.config.ts:5` 要 `scripts/ports.d.mts`。这份**隐式伴随声明**没进树——`check:tracked` 的编译面只跟着显式 `from "…"` 走，而 `.d.mts` 不是任何人的 import 落点，**这一面结构性看不见它**。补进树（一笔）。
+2. clone 的 `pnpm gates` 起初断在 `check:citations`：ADR-028 与 REFACTOR_DESKTOP 引的 `engines.py`／`gateway.py`／`store.py` 住在本机隔壁那个**未纳管的 `Clearance/`** 里。本机磁盘上有 ⇒ 落 `skippedHit`；clone 没有 ⇒ 落 `missing` ⇒ **同一句引用两种读法**。加「仓外未纳管」档：手写 `(文档, 引用)` 清单、**在碰磁盘之前**判、身份不含行号、清单过期即 FAIL。
+3. 修完：clone 上 `已判定 382`／`不存在 0`／`仓外 4 次`，与本机**逐字相同**；unit 全绿（143／96／192／325＋1skip／39）。
+
+**本轮我自己的三处量具缺陷（都是被对照抓的，不是被结果抓的）**：
+- 绝对路径比相对路径集合 ⇒ **恒 0 假绿**（差点写成"新测试不依赖未提交改动"）；对照组（全仓测试文件命中 23 个）把它救回来。
+- 用 `git diff --cached --name-only` 核对重命名 ⇒ **必然误报**：rename 只打印目的路径。核对要用 `--name-status -M` 的两端。
+- 「该拦」这条腿**在开发机上点不亮**：摘掉清单里一对，本机仍 exit 0（掉进 `skippedHit` 而非 `missing`）。⇒ 这一腿的数只能在 clone 上取，本机绿只证明"这台机器没有新增悬空引用"。已写进脚本头当残余限度，**没假装消除**。
+
+**剩余未跟踪 12 项**（都不在你授权的范围内，逐名）：`Clearance/`（禁区，里面有 `.env`）、`backend/tests/` 三个（他人在飞）、`docs/README.md`、`scripts/check-chain-tracked.mjs`／`check-apibase-literals.mjs`／`cloud-callmap.mjs`／`desktop-cloud-judgements.json`（四道**链外**普查与它自己的台账）、`scripts/ports.d.mts` 已进、`testdata/axs-draft/unknown-speaker.json`。
+**状态**：本地领先十二笔，`origin/desktop` 与 tag 仍是 `1b9ca06`——**未 push、未打 tag**。

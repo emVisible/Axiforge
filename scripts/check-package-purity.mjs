@@ -33,6 +33,34 @@ const BANNED = [
 /** 行内豁免：`// purity-allow: <理由>`（必须写理由，防止整文件关掉） */
 const ALLOW_MARK = "// purity-allow:";
 
+/**
+ * 剥掉一行之内的注释，只留代码部分供匹配。
+ * 为什么要剥：这条门禁管的是**运行时依赖**，而 `const x = 1; // 见 document.ts` 这种行尾注释
+ * 会让 /\bdocument\./ 判成 DOM 依赖——脚本头原先把这条写成「已知不覆盖，宁可误报」。
+ * 误报的代价不是"多打一行"，而是逼人用 `purity-allow` 把代码侧一起放宽（豁免一旦写出就长在那）。
+ * 处理：跳过 ' " ` 三种字符串（含转义）；正则字面量里的斜杠序列带反斜杠转义，不会被当成注释起点。
+ * 仍不覆盖：跨行的块注释（本行起、后文才结束）——那种形状在本内核包里不存在，
+ * 真要出现应换 tokenizer/AST，而不是继续加文本特例。
+ */
+function codePart(line) {
+  let inStr = null;
+  for (let k = 0; k < line.length; k++) {
+    const c = line[k];
+    if (inStr) {
+      if (c === "\\") k += 1;
+      else if (c === inStr) inStr = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      inStr = c;
+      continue;
+    }
+    if (c === "/" && line[k + 1] === "/") return line.slice(0, k);
+    if (c === "/" && line[k + 1] === "*") return line.slice(0, k);
+  }
+  return line;
+}
+
 function* tsFiles(dir) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
@@ -54,9 +82,15 @@ for (const pkg of PURE_PACKAGES) {
     const lines = readFileSync(file, "utf8").split("\n");
     lines.forEach((line, i) => {
       if (line.includes(ALLOW_MARK)) return;
+      const t = line.trim();
+      // 纯注释行不参与扫描：这条门禁管的是运行时依赖，而注释里提到文件名/概念是正常表达。
+      // 实测会被喂一口——一句「从 document.ts 外提」被 /\bdocument\./ 判成 DOM 依赖。
+      if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
+      // 行尾注释同样先剥掉（旧版这里自报"宁可误报"，见 codePart 的注释）：代码侧仍是全文匹配，没放宽。
+      const code = codePart(line);
       for (const { re, why } of BANNED) {
-        if (re.test(line)) {
-          violations.push(`${relative(ROOT, file)}:${i + 1}  ${why}\n      ${line.trim()}`);
+        if (re.test(code)) {
+          violations.push(`${relative(ROOT, file)}:${i + 1}  ${why}\n      ${code.trim()}`);
         }
       }
     });

@@ -1,6 +1,4 @@
 {
-  "allowed": [
-    "apps/web/src/features/studio/components/ScriptEditor.tsx :: 分支选项"
-  ],
-  "note": "具名豁免；新增未列出的裸标签即失败"
+  "allowed": [],
+  "note": "当前无豁免；新增不满足合法形状的裸标签必须修复"
 }

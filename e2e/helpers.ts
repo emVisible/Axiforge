@@ -1,11 +1,13 @@
 import type { APIRequestContext } from "@playwright/test";
+import ports from "../scripts/ports.json";
 
 /**
  * E2E API 夹具工厂——数据全部经后端 API 造出，测试只负责 UI 行为断言。
  * 所有工程标题带 [e2e] 前缀，便于识别与清理。
  */
 
-const API = "http://localhost:8000/api/v1";
+/** 端口真相源是 `scripts/ports.json`（与两套 Playwright 配置同源），这里不再硬写 */
+export const API = `http://localhost:${ports.api}/api/v1`;
 export const E2E_TAG = "[e2e]";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

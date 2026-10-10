@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   addNode,
   addRole,
+  API,
   createCharacter,
   createProject,
   E2E_TAG,
@@ -175,7 +176,7 @@ test("E4 角色：Outliner 添加角色 → 剧本引用 → characterId 物化"
     ["axiforge.creatorId", creatorId],
   );
   const charName = `${E2E_TAG}凛${Date.now().toString(36).slice(-4)}`;
-  const charRes = await request.post("http://localhost:8000/api/v1/characters/", {
+  const charRes = await request.post(`${API}/characters/`, {
     data: {
       character_data: { anchor: { name: charName } },
       is_public: false,
@@ -403,7 +404,7 @@ test("E9 角色轨：双角色分轨渲染、折叠往返、片段选择", async
     ["axiforge.creatorId", creatorId],
   );
   const mkChar = async (name: string) => {
-    const res = await request.post("http://localhost:8000/api/v1/characters/", {
+    const res = await request.post(`${API}/characters/`, {
       data: { character_data: { anchor: { name } }, is_public: false, author_id: creatorId },
     });
     return res.json();
@@ -464,7 +465,7 @@ test("E10 精灵拖入：角色面板缩略图可见、拖入生成 show 指令"
   );
 
   // 创建带 sprites 的角色
-  const res = await request.post("http://localhost:8000/api/v1/characters/", {
+  const res = await request.post(`${API}/characters/`, {
     data: {
       character_data: {
         anchor: { name: `${E2E_TAG}拖入精灵` },
@@ -634,7 +635,7 @@ test("E12 .axsp v2：导出带角色，导入新建角色并重映射 characterI
   expect(newCharId).not.toBe(character.id);
 
   const importedChar = await request.get(
-    `http://localhost:8000/api/v1/characters/${newCharId}`,
+    `${API}/characters/${newCharId}`,
   );
   expect(importedChar.ok()).toBeTruthy();
   const body = await importedChar.json();
@@ -642,7 +643,7 @@ test("E12 .axsp v2：导出带角色，导入新建角色并重映射 characterI
 
   // 导入是「新建」而非覆盖：导出端角色仍在原位
   const original = await request.get(
-    `http://localhost:8000/api/v1/characters/${character.id}`,
+    `${API}/characters/${character.id}`,
   );
   expect(original.ok()).toBeTruthy();
 });

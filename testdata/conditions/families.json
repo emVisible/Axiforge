@@ -1,0 +1,330 @@
+{
+  "_note": [
+    "条件**族支持清单**：哪些条件类型两端各自会求值。",
+    "",
+    "2026-10-01 复审量出来的：TS `packages/core/src/conditions.ts` 求值 **7 族**，",
+    "而 Python `PlayerService` 只求值 **4 族**，`relationship` / `achievement` / `codex`",
+    "落到函数末尾的 `return False` —— 也就是**静默为假**。",
+    "后果：一条被 `[if: relationship …]` 门控的分支，在桌面/浏览器（TS 引擎）会打开，",
+    "经后端播放时**永远打不开**，而两边都报成功、零诊断。",
+    "",
+    "**为什么不把后三族补进 Python**：那个后端正在退场（ADR-029 桌面唯一化、S13-6 删 `backend/`），",
+    "每族还带一个 `probe`（条件 + 需要预置的变量），**必须逐族不同**：",
+    "第一版探针给所有族都套了同一个 key，于是 `memory` 去查 `vars.memory[\"A.B.trust\"]`、",
+    "查不到落进 `ne` 兜底返回 false，判据红在 `memory` 上——**探针错得像真缺陷**。",
+    "把探针放进向量，就是为了让\"这一族怎么被点亮\"成为规格的一部分，而不是每个消费者各自猜。",
+    "给将死的后端加功能等于**扩大删除面**。TS 是对的一侧。",
+    "",
+    "**这份清单是库存 + 绊线，不是「谁该支持」的规格**：",
+    "  - TS 侧断言「这些族确实被求值」⇒ 防止 TS 悄悄丢掉某一族；",
+    "  - Python 侧断言「这些族当前返回 False」⇒ 有人真去实现它时，这条会红，",
+    "    逼他同时更新本清单与 ADR/S13-6，而不是让分叉悄悄消失。",
+    "换句话说：**分叉要变成一次显式决定，而不是一个安静的洞**。",
+    "",
+    "**2026-10-01 第三批：键语法 + 写读往返（锁现状，不定口径）。**",
+    "`character_state` / `codex` 是「切第一个点、**其余整体**当键」⇒ 键可以带点；",
+    "`relationship` 是「按点切、取第 3 段、**第 4 段起静默丢弃**」⇒ 键不能带点。",
+    "实测确认：两族的**写侧与读侧规则一致**（写 A.B.affection.mood 落进 affection，长键读也只取第 3 段），",
+    "所以**不存在「写 A 读 B」的错配**——多写的第 4 段在两侧被同样地丢弃。",
+    "真正剩下的是**跨族不一致**：同一个「带点的字段名」在 character_state/codex 里可用、在 relationship 里不可用，",
+    "而且**零诊断**。要不要统一、往哪边统一属于**口径**，不由复审单方面决定 ⇒ 已登记为待定项；",
+    "本批只把**现状**钉成向量，让那个决定有基线、也让日后任何改动立刻被看见。",
+    "教训记两条：(1) 我一度用 grep 过滤掉 conditions.ts 去查「谁写这些桶」，结论「生产代码从不写 ⇒ 两族恒为假」是**错的**——",
+    "写入就在被我自己滤掉的那个文件里（今天第二次被自己的过滤器藏住答案）。",
+    "(2) 我第一版把这条说成「作者打错字会静默开错分支」，也**过头了**：读写同规则 ⇒ 无错配。",
+    "两次都是先下结论再补测量；顺序应该是先量读写两侧、再定性。"
+  ],
+  "families": [
+    {
+      "type": "memory",
+      "ts": "evaluated",
+      "python": "evaluated",
+      "probe": {
+        "vars": {
+          "memory": {
+            "A.B.trust": 7
+          }
+        },
+        "cond": {
+          "type": "memory",
+          "key": "A.B.trust",
+          "operator": "gte",
+          "value": 1
+        }
+      }
+    },
+    {
+      "type": "flag",
+      "ts": "evaluated",
+      "python": "evaluated",
+      "probe": {
+        "vars": {
+          "flags": {
+            "A.B.trust": true
+          }
+        },
+        "cond": {
+          "type": "flag",
+          "key": "A.B.trust",
+          "operator": "eq",
+          "value": true
+        }
+      }
+    },
+    {
+      "type": "character_state",
+      "ts": "evaluated",
+      "python": "evaluated",
+      "probe": {
+        "vars": {
+          "characters": {
+            "A": {
+              "trust": 7
+            }
+          }
+        },
+        "cond": {
+          "type": "character_state",
+          "key": "A.trust",
+          "operator": "gte",
+          "value": 1
+        }
+      }
+    },
+    {
+      "type": "node_completed",
+      "ts": "evaluated",
+      "python": "evaluated",
+      "probe": {
+        "completed": [
+          "n1"
+        ],
+        "cond": {
+          "type": "node_completed",
+          "value": "n1"
+        }
+      }
+    },
+    {
+      "type": "relationship",
+      "ts": "evaluated",
+      "python": "false",
+      "probe": {
+        "vars": {
+          "relationships": {
+            "A": {
+              "B": {
+                "trust": 7
+              }
+            }
+          }
+        },
+        "cond": {
+          "type": "relationship",
+          "key": "A.B.trust",
+          "operator": "gte",
+          "value": 1
+        }
+      }
+    },
+    {
+      "type": "achievement",
+      "ts": "evaluated",
+      "python": "false",
+      "probe": {
+        "unlocked": [
+          "ach_1"
+        ],
+        "cond": {
+          "type": "achievement",
+          "key": "ach_1"
+        }
+      }
+    },
+    {
+      "type": "codex",
+      "ts": "evaluated",
+      "python": "false",
+      "probe": {
+        "codex": {
+          "A": {
+            "met_once": true
+          }
+        },
+        "cond": {
+          "type": "codex",
+          "key": "A.met_once",
+          "operator": "eq",
+          "value": true
+        }
+      }
+    }
+  ],
+  "groupTypes": {
+    "ts": [
+      "all",
+      "any",
+      "none"
+    ],
+    "python": [
+      "all",
+      "any",
+      "none"
+    ],
+    "_note": "组类型两端一致（曾怀疑 TS 用 not、Python 用 none，实测两边都是 none）"
+  },
+  "keyGrammar": [
+    {
+      "type": "memory",
+      "rule": "flat: 键就是键，不分段",
+      "segments": "flat"
+    },
+    {
+      "type": "flag",
+      "rule": "flat: 键就是键，不分段",
+      "segments": "flat"
+    },
+    {
+      "type": "character_state",
+      "rule": "切**第一个**点：前段是 characterId，**其余整体**是字段名 ⇒ 字段名可以带点",
+      "segments": "first-dot-rest"
+    },
+    {
+      "type": "relationship",
+      "rule": "按点切，取第 1/2/3 段，**第 4 段起被静默丢弃** ⇒ 字段名不能带点",
+      "segments": "third-segment-only"
+    },
+    {
+      "type": "codex",
+      "rule": "切**第一个**点：前段是 characterRefId，**其余整体**是记忆键 ⇒ 记忆键可以带点",
+      "segments": "first-dot-rest"
+    },
+    {
+      "type": "node_completed",
+      "rule": "不看 key，看 value 是不是走过的节点 id",
+      "segments": "flat"
+    }
+  ],
+  "roundTrip": [
+    {
+      "id": "memory：写读同键",
+      "effect": {
+        "type": "memory",
+        "key": "trust.A",
+        "value": 3
+      },
+      "read": {
+        "type": "memory",
+        "key": "trust.A",
+        "operator": "gte",
+        "value": 3
+      },
+      "want": true
+    },
+    {
+      "id": "character_state：字段名带点 ⇒ 读写都按整段字段名",
+      "effect": {
+        "type": "character_state",
+        "key": "A.affection.mood",
+        "value": 7
+      },
+      "read": {
+        "type": "character_state",
+        "key": "A.affection.mood",
+        "operator": "gte",
+        "value": 7
+      },
+      "want": true
+    },
+    {
+      "id": "character_state：只读短名读不到带点的字段（不误命中）",
+      "effect": {
+        "type": "character_state",
+        "key": "A.affection.mood",
+        "value": 7
+      },
+      "read": {
+        "type": "character_state",
+        "key": "A.affection",
+        "operator": "gte",
+        "value": 7
+      },
+      "want": false
+    },
+    {
+      "id": "relationship：只取第 3 段，第 4 段被丢弃 ⇒ 短名读得到",
+      "effect": {
+        "type": "relationship",
+        "key": "A.B.affection.mood",
+        "value": 7
+      },
+      "read": {
+        "type": "relationship",
+        "key": "A.B.affection",
+        "operator": "gte",
+        "value": 7
+      },
+      "want": true
+    },
+    {
+      "id": "relationship：长键读也只取第 3 段（与写侧同规则，不错配）",
+      "effect": {
+        "type": "relationship",
+        "key": "A.B.affection.mood",
+        "value": 7
+      },
+      "read": {
+        "type": "relationship",
+        "key": "A.B.affection.mood",
+        "operator": "gte",
+        "value": 7
+      },
+      "want": true
+    },
+    {
+      "id": "relationship：不足 3 段的键写侧不写、读侧 ne 兜底",
+      "effect": {
+        "type": "relationship",
+        "key": "A.B",
+        "value": 7
+      },
+      "read": {
+        "type": "relationship",
+        "key": "A.B",
+        "operator": "ne",
+        "value": 7
+      },
+      "want": true
+    },
+    {
+      "id": "codex：记忆键带点 ⇒ 按整段记忆键读写",
+      "effect": {
+        "type": "codex_write",
+        "key": "r1.arc.backstory",
+        "value": "x"
+      },
+      "read": {
+        "type": "codex",
+        "key": "r1.arc.backstory",
+        "operator": "ne",
+        "value": "y"
+      },
+      "want": true
+    },
+    {
+      "id": "codex：只读前一段读不到整段记忆键",
+      "effect": {
+        "type": "codex_write",
+        "key": "r1.arc.backstory",
+        "value": "x"
+      },
+      "read": {
+        "type": "codex",
+        "key": "r1.arc",
+        "operator": "ne",
+        "value": "y"
+      },
+      "want": true
+    }
+  ]
+}

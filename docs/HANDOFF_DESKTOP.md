@@ -5297,3 +5297,8 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
 
 **剩余未跟踪 12 项**（都不在你授权的范围内，逐名）：`Clearance/`（禁区，里面有 `.env`）、`backend/tests/` 三个（他人在飞）、`docs/README.md`、`scripts/check-chain-tracked.mjs`／`check-apibase-literals.mjs`／`cloud-callmap.mjs`／`desktop-cloud-judgements.json`（四道**链外**普查与它自己的台账）、`scripts/ports.d.mts` 已进、`testdata/axs-draft/unknown-speaker.json`。
 **状态**：本地领先十二笔，`origin/desktop` 与 tag 仍是 `1b9ca06`——**未 push、未打 tag**。
+
+**批注 2026-10-10 06:12（push 之后取数，取代上一段末句"未 push"）**：`git push origin desktop` 走**快进**（`1b9ca06..f317dbf`，无 `--force`、无 `--follow-tags`）⇒ **十三笔已进远端**，`origin/desktop == f317dbf`。
+**tag 没推**（你只授权了 push）：本地与远端的 `desktop-handoff-20260929` 都仍 peel 到 `1b9ca06`。
+推送前预检实测：待推 **161** 个文件；**路径层禁区 0 命中**（无 `.env`、无 `Clearance/`、无 `backend/uv.lock`、无 `providers/__init__.py`）；内容层密钥模式命中 **0**——那 12 行 grep 输出全是 `import.meta.env.DEV`／`process.env.AXIFORGE_*` 这类**读取**，以及文档散文里**提到** `.env` 这个文件名（不是值）。
+本行所在这一笔是第十四笔（写完即推，推后 `origin/desktop == HEAD`）。

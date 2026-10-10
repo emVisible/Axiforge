@@ -2,7 +2,8 @@
 
 > **文档性质**：v2 阶段唯一执行基准，接替 `ROADMAP_FINAL.md`（v1.1–v1.7 已完成部分保留为历史）。
 > **最后更新**：2026-07-07
-> **决策记录**：破坏性变更逐条落 ADR —— [ADR-016 AXS 叙事语言](./ADR/016-axs-narrative-language.md)、[ADR-017 节点独立与舞台化](./ADR/017-node-independence-and-stage.md)、[ADR-018 内容治理状态机](./ADR/018-content-governance.md)。
+> **状态（2026-09-30）**：历史执行计划，v2/v3/v4 已完成且桌面产品边界已由 [ADR-029](../ADR/029-desktop-only-build-target.md) 重定。不要从本文恢复平台、社群或多应用待办；当前执行基准为 [`REFACTOR_DESKTOP.md`](../REFACTOR_DESKTOP.md)。
+> **决策记录**：破坏性变更逐条落 ADR —— [ADR-016 AXS 叙事语言](../ADR/016-axs-narrative-language.md)、[ADR-017 节点独立与舞台化](../ADR/017-node-independence-and-stage.md)、[ADR-018 内容治理状态机](../ADR/018-content-governance.md)。
 
 ---
 

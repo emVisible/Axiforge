@@ -41,7 +41,7 @@ M 与 G/U 相对独立，可并行；S 依赖 G 的术语/入口决策，故排�
 
 ## 阶段 M：管理后台重设计
 
-现状（见 [apps/admin/src](../apps/admin/src)）：7 个页面几乎不用 `@axiforge/ui`（仅用了 `Button`），无分页、无统一加载/错误态、`confirm()` 做二次确认、Audit 的 `detail` JSON 不展示、Login 不校验 token。
+现状（见 [apps/admin/src](../../apps/admin/src)）：7 个页面几乎不用 `@axiforge/ui`（仅用了 `Button`），无分页、无统一加载/错误态、`confirm()` 做二次确认、Audit 的 `detail` JSON 不展示、Login 不校验 token。
 
 - [x] 在 `packages/ui` 新增缺失基元：`DataTable`（列定义+排序+分页）、`Pagination`、`StatCard`/`MetricCard`、`ConfirmDialog`、`Toast`。
 - [x] Admin 全部页面迁移到 `PageHeader`/`Card`/`Badge`/`EmptyState`/`ErrorDisplay`/`LoadingSpinner`/`Modal`/`SegmentedControl`。

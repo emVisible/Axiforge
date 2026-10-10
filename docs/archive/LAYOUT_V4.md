@@ -174,6 +174,6 @@ K1 快捷键浮层
 ## 相关文档
 
 - [LAYOUT_V3](./LAYOUT_V3.md) — 主题 + Panel Shell（已完成）
-- [ADR-023](./ADR/023-theme-and-workstation-shell.md)
+- [ADR-023](../ADR/023-theme-and-workstation-shell.md)
 - [REFACTOR_CUT_STUDIO](./REFACTOR_CUT_STUDIO.md) — 剪辑台功能清单
 - [ROADMAP_FINAL](./ROADMAP_FINAL.md) — 楔子1 演出即所得

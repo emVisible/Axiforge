@@ -43,4 +43,4 @@
 
 ## 相关 ADR
 
-- [ADR-023](./ADR/023-theme-and-workstation-shell.md)
+- [ADR-023](../ADR/023-theme-and-workstation-shell.md)

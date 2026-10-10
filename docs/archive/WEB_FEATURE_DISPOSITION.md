@@ -2,7 +2,7 @@
 
 > 2026-09-26 · 服务于「去掉 web、只保留桌面端」。这份文件回答一个问题：
 > **每一条云端能力，桌面上现在是「已本地化」「按缺席处理」还是「仍然直连 HTTP、删掉后端就坏」。**
-> 恢复锚点见 [WEB_SUNSET_RESTORE](./WEB_SUNSET_RESTORE.md)。
+> 恢复锚点见 [WEB_SUNSET_RESTORE](../WEB_SUNSET_RESTORE.md)。
 
 ## 方法与它的限度（先说清，免得把噪声当结论）
 
@@ -64,7 +64,7 @@
 ## 已定案（2026-09-26）：只要桌面端
 
 人类决议「我只要桌面端的」。本文件上面那张表因此从"待决清单"变成**执行依据**，逐行处置已写入宪章
-[REFACTOR_DESKTOP](./REFACTOR_DESKTOP.md) 的 Phase 13（S13-1…S13-8），此处只保留结论口径：
+[REFACTOR_DESKTOP](../REFACTOR_DESKTOP.md) 的 Phase 13（S13-1…S13-8），此处只保留结论口径：
 
 - **C 类里属于创作主数据的 → 本地化**，不给"隐藏入口"这条退路：`stories`（传记正文）、资产池检索/导入（`search` 在编排台那一处）、AI 建档建议。
 - **B 类里属于多人语义的 → 判死并摘除**，UI 入口、api 模块、后端路由三段一起走：`comments`、`report`、`identity`、`user` 档案与鉴权、`tags`、`discover` 发布与发现、`relations`、`versions`、跨设备同步。留半截就是留"点进去报网络错误"的残口。

@@ -4,6 +4,8 @@
 > **最后更新**：2026-07-09  
 > **北极星**：以 Axiforge 为统一平台核心；首波 Canopy 社群闭环，并行 RN 成就与 Nexus 数据总线。
 
+> **状态（2026-09-30）**：历史规划，已被桌面唯一产品决策 [ADR-029](../ADR/029-desktop-only-build-target.md) 取代。社群、发现、跨作品生态、Nexus 等波次不得视为当前 Axiforge 产品待办；现行范围见 [`REFACTOR_DESKTOP.md`](../REFACTOR_DESKTOP.md)。
+
 ---
 
 ## Grove → Axiforge 模块映射
@@ -111,4 +113,4 @@
 - [NEXUS_VNEXT.md](./NEXUS_VNEXT.md) — Nexus Electron 版本路线
 - [REFACTOR_V4.md](./REFACTOR_V4.md) — v4 平台化（已完成）
 - [ROADMAP_FINAL.md](./ROADMAP_FINAL.md) — 楔子与桥梁长期路线
-- [ADR-022](./ADR/022-cut-studio-three-track-projection.md) — 剪辑三轨
+- [ADR-022](../ADR/022-cut-studio-three-track-projection.md) — 剪辑三轨

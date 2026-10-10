@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "vercel-build": "pnpm build",
-    "lint": "oxlint && pnpm lint:colors",
+    "lint": "oxlint --deny-warnings && pnpm lint:colors",
     "lint:colors": "node ../../scripts/check-ui-tokens.mjs",
     "preview": "vite preview",
     "test": "vitest run",

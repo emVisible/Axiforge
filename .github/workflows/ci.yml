@@ -65,8 +65,8 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build web
-        run: pnpm build
+      - name: Build renderer and internal Admin
+        run: pnpm build:web && pnpm build:admin
 
       - uses: astral-sh/setup-uv@v5
 

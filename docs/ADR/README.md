@@ -21,7 +21,9 @@
 | [ADR-028](./028-moderation-decision-layer-in-admin.md) | 审核判断层收进中台（Clearance 融合与 `ModerationProvider` 落地） | 已采纳 |
 | [ADR-029](./029-desktop-only-build-target.md) | 桌面是唯一构建与发布目标，web 端与第二套数据通路退场 | 已采纳 |
 
-## 待落文档（最终建议已定于 [`../ROADMAP_FINAL.md`](../ROADMAP_FINAL.md) §7，逐个正式落 ADR）
+## 历史议题清单（来自已归档路线图，不代表当前待办）
+
+下表保留早期路线图的议题与当时建议，仅供追溯。它不是当前 ADR backlog；当前产品决策和未决项以 [ADR-029](./029-desktop-only-build-target.md) 及桌面重构计划为准。历史来源见[归档的 ROADMAP_FINAL §7](../archive/ROADMAP_FINAL.md)。
 
 | ID | 议题 | 最终建议 | 落地版本 |
 |----|------|----------|----------|

@@ -2,7 +2,7 @@
 
 **状态**：已采纳  
 **日期**：2026-07-08  
-**关联**：[LAYOUT_V2.md](../LAYOUT_V2.md)
+**关联**：[归档：LAYOUT_V2.md](../archive/LAYOUT_V2.md)
 
 ## 背景
 

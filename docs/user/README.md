@@ -9,7 +9,7 @@
 
 ## 关于 AXS
 
-AXS（Axiforge eXperience Script）是 Axiforge 的叙事文本语言。在剧本模式中，**AXS 源文本是真相源**：保存时会解析为桥段（Beat）、分支与演出指令，并同步到剪辑台与 Flow 结构图。
+AXS（Axiforge eXperience Script）是 Axiforge 唯一的叙事文本语言。剧本、剪辑与结构模式是同一作品的协同编辑视图：AXS 保存后解析并同步到剪辑台与 Flow 结构图；在其他视图中的编辑也会同步回文本。各视图共享同一份作品状态，不存在“文本永远覆盖其他视图”的全局优先级。
 
 ## 获取帮助
 

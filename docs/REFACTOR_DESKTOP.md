@@ -7,6 +7,35 @@
 
 ---
 
+## 0 · 产品边界（2026-09-30）
+
+### 产品定义
+
+**Axiforge 是一款桌面互动叙事创作器：作者用 AXS 编写剧本，在剪辑视图中编排演出，在结构视图中检查分支，并在应用内即时预览。**
+
+核心用户任务只有一条：创建或打开本地工程 → 编写/编排叙事 → 检查结构与预览 → 保存或导出 `.axsp`。
+
+### 核心对象与权威
+
+- **AXS 是唯一叙事文本语法**：解析与打印的语法权威只有 `packages/axs`，不得再造方言或第二解析器。
+- **AXS 分支引用使用 Beat 标题**：工程内的目标节点 ID 在导出/打印时映射为目标标题；不能输出内部 ID，也不能静默丢失显式目标。
+- **Draft/IR 是编辑期语义模型**：剪辑、剧本、结构是同一 Draft 的三个协同视图，不是三份独立数据；AXS 是可读、可编辑、可交换的文本投影，不再声明为唯一持久化真相源。
+- **桌面工程是产品边界**：Tauri + 本地 SQLite/素材目录 + `.axsp`；`apps/web` 是桌面 renderer 与测试宿主，不作为独立用户产品发布。
+- **Player 的范围是创作验证**：用于即时预览与检查作品，不以扩建成独立运行平台为本阶段目标。
+
+### 本阶段非目标
+
+- 社区平台：发现、发布、评论、关注、账号、跨设备同步与多人协作。
+- 独立笔记产品、运营中台，以及需要与创作主流程并列呈现的子应用。
+- 让云服务、AI 服务或外部账号成为创建、编辑、保存、导出工程的前置条件。
+- 为了“功能完整”继续增加关系网、成就、跨作品记忆等运行时系统；除非它们直接改善上述核心任务，否则冻结。
+
+Admin、Nexus、后端及浏览器态测试设施暂时保留为内部工具/迁移设施，不属于桌面产品默认入口。**本边界不授权提前删除它们**：仍按 S13 的“先替代、后删除”与验收基线搬迁顺序执行。
+
+### 产品验收
+
+一位创作者在不启动 API、PostgreSQL、Admin 或 Nexus 的情况下，能够从桌面应用新建/打开工程，在三种视图中编辑同一叙事内容、即时预览、保存并导出 `.axsp`；再次导入后内容与引用保持可用。各阶段只接受能推进这条任务、或保护它的工作。
+
 ## 第一部 · 重构宪章
 
 ### 一、质量观：九维验收矩阵
@@ -77,6 +106,20 @@
 ## 第二部 · 阶段计划
 
 > 排期原则：质量优先于速度——宁可阶段内多一轮安全网，不带病进入下一阶段。各阶段验收项以 checkbox 推进，完成后在此留痕。
+
+### Phase 0 · 产品收敛与默认入口
+
+**目标**：让项目文档、日常启动和发行构建都把 Axiforge 桌面创作器作为默认产品；内部服务仍可显式启动，暂不删除。
+
+- [x] 冻结本文件「产品边界」：AXS 唯一语法权威、Draft/IR 唯一编辑期语义模型、三视图协作、`.axsp` 本地工程交付。
+- [x] `pnpm dev` 默认启动 Tauri 桌面应用；Web renderer 由 Tauri 配置自行启动。
+- [x] `pnpm build` 默认构建 macOS `.app`；`.dmg` 安装盘用显式发行命令；renderer 与 Admin 构建保留显式命令，CI 明确调用它们。
+- [x] `./dev.bash` 默认只开桌面 session；`./dev.bash all` 保留旧的多服务调试入口。
+- [x] README 的快速开始与产品结构改为桌面优先，标出内部工具的显式启动方式。
+- [x] 收敛首屏与导航：桌面根路径落到本地剧本列表（E14 回归测试）；创作导航保留剧本/道具/场景/角色，云功能依 S13-3 逐项显式缺席或摘除。
+- [x] 统一战略文档与用户文档的产品口径；旧平台路线标记为冻结/历史，不再作为当前待办导入。
+
+**验收**：`pnpm dev` 不启动 API/Admin/Nexus；`pnpm build` 产出 `.app`；`.dmg` 可单独请求；保留命令能显式构建 renderer/启动旧测试栈；无云服务时桌面创作主链路可运行。
 
 ### Phase 1 · 内核抽壳（当前阶段）
 
@@ -159,7 +202,7 @@
 - [x] 断网试玩链路：PlayerPage 桌面分支 `loadStoryOffline`（Provider 数据 → `compileStory` 本地编译，零触网）；存档/Codex/recordView 离线优雅降级（既有 catch 路径）
   **这一条勾得太早，2026-09-29 实测两处静默降级并已修**（「通路接通」不等于「渲染正确」）：
   ① 它用**无作用域的 `listCharacters()`** 取角色，而本地可见性语义是「我的 ∪ 公开」，私有角色在桌面上被裁成零条——**桌面试玩里所有说话人退化成 id、立绘与表情差分全空**（把实现改回旧形状，用例立刻报 `expected [] to deeply equal [ '凛' ]`）。后端从来不看可见性：`_build_characters` 走 `Character.id.in_(role_ids)`。现按引用取（角色/舞台/道具三个池同一规则），与后端逐字同义。
-  ② `bundleToCompilerInput` 恒写 `items: []`：S13-2c 让编排台在桌面挂上道具之后，道具在试玩里仍然一个都不出现，而同一份数据经后端编译却有。引擎侧 `packages/core/compiler.ts:308` 早就实现了「本体缺失即跳过」，缺的只是投影层有人把这一格填上。
+  ② `bundleToCompilerInput` 恒写 `items: []`：S13-2c 让编排台在桌面挂上道具之后，道具在试玩里仍然一个都不出现，而同一份数据经后端编译却有。引擎侧 `packages/core/src/compiler.ts:308` 早就实现了「本体缺失即跳过」，缺的只是投影层有人把这一格填上。
   金样本抓不到②：三份示范作的 `items` 全是 0（实测读 `__golden__*/input.json`），那条分支两侧都没走过——同 S13-2b 那条教训。现按同一规则三处各钉一条用例：TS 引擎（`compiler.test.ts` 三条）、投影+取数（`offlineStory.test.ts` 四条）、Python（`test_story_compiler.py::test_compiled_story_carries_item_refs`，含悬空引用与不去重）。9 次变异分别让对应那一条红（旧形状 listCharacters / items 恒空 / 不传舞台池 / io 演成缺席 / 悬空占位 / 引擎两处 / Python 一处）。
 - [x] `.axsp` UI 集成：编辑器工具栏「导出」（dialog+fs / 浏览器下载）+ 工程列表「导入 .axsp」（导入 = 现有契约组合，新 id + 角色引用重建）；E2E E8 数据等价验收 ✓
 - [x] 顺手修复两个真实缺陷：① apiClient 异常丢失 HTTP status（404→not_found 映射从未生效）② 后端 sync_narrative 跨工程 id 碰撞 500（.axsp 导入必踩；payload id 被其他工程占用时重映射新 id，边引用随动）
@@ -437,7 +480,7 @@
 
 **目标**：不写一行代码，做出一段 ≥30 秒、有镜头语言与配乐的方舟风格演出，且**在打包桌面端可看、可导出、可交给别人**。
 
-- [ ] 演出节奏曲线与关键帧（AXIFORGE_V2 波次 0 推迟项落地）
+- [ ] 演出节奏曲线与关键帧（旧 AXIFORGE_V2 波次 0 后置项，见 [归档路线](./archive/AXIFORGE_V2.md)）
 - [ ] 音频轨：环境音 / ducking / crossfade / 音画同步；素材入口从「仅图片」扩到音频
 - [ ] 示范作①②③补真实立绘、背景、BGM（当前 `seed_showcase.py` 零素材引用——北极星「演出上限证明」此前无载体）
 - [ ] 验收：新用户 30 分钟内从模板改出一段含立绘与 BGM 的三场景短篇；示范作 `.axsp` 在另一台机器导入后演出完整
@@ -528,6 +571,11 @@
   **G1 清偿（这一批自己越的线，按门禁处方拆）**：四个文件被新增的契约方法推过 400（`types.ts` 435 / `sqliteProject.ts` 440 / `memory.ts` 415 / `httpStorageProvider.ts` 422）。分轴沿用仓库既有形状、不改行为：契约的记录形态回到 `records.ts`（它本来就是「查表型」字段表的家，`types.ts` 仍 `export *` 再导出，消费方 import 路径不变）；SQLite 与 Memory 各出 `sqliteProjectLinks.ts` / `memoryLinks.ts`，HTTP 侧出 `httpAssetRefs.ts` / `httpCharacters.ts`（与 `httpProjectScenes` / `httpStories` 同一先例）。结果八道门禁全绿。
   **拆出来的一个真实缺口**：外提 `listCharacters` 之后做一次变异——整段删掉「公开」分支，web 的 118 条测试全绿。角色的「我的 ∪ 公开」合并在 HTTP 支从来没有用例盯着（契约套件只跑 Memory / SQLite 两支）。已补 `storage.test.ts` 角色域两条（合并去重、只取公开时不打 `/characters/user`），见过它们红：删公开分支红 2 条，去掉 `merged.has` 去重护栏红 1 条。**教训：一次纯搬运的重构也能暴露覆盖空洞——搬的时候给被搬的那段补腿，比事后追问「这块为什么没测」便宜得多。**
 - [~] S13-2d 清掉 `nexus`/`ai`/`PromptExport`/`SaveSlotPanel`/`usePlayer` 五处「有数据才挂载、E14/E15 结构上测不到」的待核项
+  > 2026-09-30 逐项对账：`usePlayer` ✓ E28（自动存档换页回读）、`SaveSlotPanel` ✓ E33（槽位写-读-删）、
+  > 建档建议 ✓ E19、`nexus` 工具条 ✓ E18/E20 的桌面侧，**但浏览器那一半「按钮应该在」一直没人断**——
+  > 本轮补上 **E40**（两半各一条，按 E35/E36/E37 的写法）。牙验过：把 `NexusSendAction` 改成浏览器态也返回 null，
+  > 红在 E40 的 `toBeVisible()`，而**旧覆盖的 47 条全绿**——这正是缺口本身。`PromptExport` 仍未接线（＝#60，等定档），
+  > 所以这一条保持 `[~]` 而不是勾掉。
   —— 2026-09-29 逐条取证后的**实测结论**（有一条的前提本身是错的，另有一处藏在假绿后面的真缺陷）：
   1. **`PlayerPage` 的跨作品 Codex 读侧**：`fetchCodex` 一直直接 `playerApi.getCodex`，没走分派口
      （同文件的 `recordView`/`getStory`/写侧 `syncCodex` 都走）。桌面每次开播发一条打不到的请求，
@@ -724,6 +772,7 @@
   实测：`pnpm gates` GATES_EXIT=0（web 178→181 passed）、`pnpm e2e` E2E_EXIT=0（37 passed，浏览器态渲染无变化）、`tsc -b` 先于 vitest 跑且零报错。
   **顺带一条判据陷阱**：`scripts/desktop-http-inventory.mjs` 需要 5174 上活着的服务；没有服务时它对每条路由都返回 `httpCalls: []` + 一条 `ERR_CONNECTION_REFUSED`，
   看着像「全部干净」其实是「一条都没加载」。空结果不等于不存在——读它的输出前先看 `pageErrors`。
+  **（2026-09-30 第十四次续做：这句"读之前自己看一眼"已经升级成脚本自己的判据——没挂载出界面的路由会让脚本退出码 1 并点名，见本节末的补记。）**
 - [x] 附带：桌面**点击层判据此前结构上写不出来**的根因——已修 2026-09-29（全量普查的第 7 条，也是这轮最值钱的一条）。
   这轮把抽样普查换成**全量**：`grep -rlE "\b[A-Za-z]+Api\." apps/web/src` 得到 44 个文件，再用一张自建 import 图（`@/` 解析到 src）
   把每个文件反推到路由页面，逐个读外层闸门。结论分四类：已分派（`CharacterSearchSelect`、`useProjectDirectory` 都有 `isTauriEnvironment()` 腿，
@@ -738,7 +787,7 @@
      `TauriAssetStore.create()` 里的 `documentDir()` 抛 **未捕获** `TypeError: __TAURI_INTERNALS__.invoke is not a function`，剪辑台永远停在「加载中...」。
      **E17 此前只敢断 URL、不敢断页面，根因就是这个。** 后果二（真壳里）：每次重建都重开一条 SQLite 连接与资产根，与同一文件自己那句
      「重建 SQLite 连接没有意义」相反。改法就是两处换成 `getStorageProvider()`。
-  2. `main.tsx` 的壳内冒烟用的判据是 `"__TAURI_INTERNALS__" in window`——**那恰好是 e2e 注入的标记**（`DESKTOP_MARKER_INIT` 塞的是空对象）。
+  2. `main.tsx` 的壳内冒烟用的判据是 `"__TAURI_INTERNALS__" in window`——**那恰好是 e2e 注入的标记**（`DESKTOP_MARKER_INIT` 塞的是空对象）。**2026-10-01 第三十批追注**：这句判据后来抽成 `shared/storage/shellSmokeGate.ts` 的 `shouldRunDesktopSmoke()`，入口仍引它，并由 6 条单测钉住它与 `isTauriEnvironment()` 的语义差。
      于是测试宿主里会去跑壳内冒烟，实测两条 console error + 未捕获异常。改成要求 `invoke` 真是函数：冒烟是壳内诊断，不该在测试宿主里跑。
 
   判据 **E20**（挂在 E17 那条流程里，因为内存库随重载归零、建好的工程只在同一文档内活着）：先展开「项目」栏，
@@ -866,6 +915,26 @@
      注：这证明的是路径进了二进制的资源索引，不等于壳内首启真能播种——那一条仍归 #16 的人工壳内验收。
 
   3. 生产产物里 `storage=memory` 字面量 **0 次**（DEV 测试宿主被 `import.meta.env.DEV` 静态剥掉）。这条以前只是文档里的纸面推断，现在是实测。
+     **（更正 2026-10-01）取证的那一层是错的，结论留下、证据换掉**：当时是在 `Contents/MacOS/axiforge-desktop` 上跑 `strings`——
+     而 Tauri 把 renderer 资源**压缩内嵌**，JS 内容在二进制里根本读不到：同一次复核里，`选项目标未找到`、`跳转目标未找到`、`未知指令`
+     三条**一直在用**的解析器文案也都是 0 命中，它们在 `apps/web/dist/assets/*.js` 里却各自存在。
+     也就是说那次"0 次"对该类内容**恒为 0**，它证明不了任何事。
+     现在的证据换成能承载它的那一层：`apps/web/dist/assets/` 里含 `storage=memory` 的文件数 **= 0**（grep 实测，dist 是 09:15:21 刚构建的），
+     加上源码侧守卫 `apps/web/src/shared/storage/index.ts:143,144`（`import.meta.env.DEV &&` 在生产被静态替换为 false；
+     **行号也顺手校正过一次**：原文写的是 `storage/index.ts:139,143`，其中 139 落在那段注释里，143/144 才是守卫与那条 `get("storage") === "memory"` 的真位置——
+     而 144 行正是我今天拿去产物层搜的那个形状）。
+     留在二进制里可读的只有**资源名**（`seeds/manifest.json`、三个 `.axsp` 各 1 命中）——那部分仍然有效，别混用两种承载层。
+
+     **补记（2026-10-01 04:00）：上面第 922 行那次"换对承载层"的取证，判据形状仍然是错的——今天第三次重量它。**
+     问题不在层，在**搜的字面量**：`storage=memory` 这个串在源码里根本不存在（源码是 `new URLSearchParams(window.location.search).get("storage") === "memory"`），
+     minify 也造不出它——所以**任何构建、任何承载层上它都恒为 0**，那次"文件数 = 0"跟它替换掉的那次 `strings` 一样证明不了任何事。
+     这次按代码真能长成什么样去搜：`get(`storage`)` / `get("storage")` / 以及 `storage` 与 `memory` 相隔 12 字符内的邻近形状，三种写法在 `apps/web/dist/assets/*.js` 里**全部 0 命中**；
+     **并配正对照**——同一次 grep 在同一个 chunk（`ui-*.js`，也就是存储代码实际被打包进去的那个文件）里能找到 `axiforge.db` 1 次。
+     对照组是这条测量成立的关键：没有它，"0 命中"又一次只是"搜了个不存在的东西"。
+     **还有一道形状对照**：产物里能直接看到 react-router 留下的 `URLSearchParams(a.search)` 与 `.getAll(\`index\`)`——
+     证明构建确实**原样保留** `X.get("字面量")` 这种形状，所以"搜不到我们的 `get("storage")`"不是被压缩变形的结果，而是那段代码真不在。
+     **结论不变**（DEV 测试宿主确实没进产物），但证据从"两次恒为 0"换成"一次带对照组的 0"。源码侧守卫那条引用照旧有效。
+     收成一句方法：**验"某串没进产物"之前，先问这个串在原代码里长什么样**——文档里的措辞（`?storage=memory` 是 URL 形态）不是可搜索的字面量。
 
   **导航出口这一轴是新做的**（此前只普查过数据通路）：桌面可达界面里指向云本质页面的出口共 4 处——
 
@@ -916,7 +985,7 @@
   （`useProjectEditor.ts:545`，随 narrativeData 落本地、两端一致），边级条件只有 API/旧数据才写；
   为 UI 走不到的路径加 schema v6 + 契约方法 + 三实现属于给假设需求造工程。
 
-- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。 **2026-09-29 实测推进**：新增 `playwright.desktop.config.ts` + `pnpm e2e:desktop`（只起 vite，不起 uvicorn，`testIgnore: /baselines/`）。无后端下 25 条桌面族用例全绿；不加 ignore 时 38 条会红 12 条，且 12 条**全部**来自 `baselines.spec.ts`——这就是「基线搬家」可执行的那一半，S13-6 的前置从口号变成一条命令。
+- [~] S13-5 验收基线搬家：**内存本地库宿主已建起来**，E17 是它的第一条产出。 **2026-09-29 实测推进**：新增 `playwright.desktop.config.ts` + `pnpm e2e:desktop`（只起 vite，不起 uvicorn，`testIgnore: /baselines/`）。无后端下 25 条桌面族用例全绿；不加 ignore 时 38 条会红 12 条，且 12 条**全部**来自 `baselines.spec.ts`——这就是「基线搬家」可执行的那一半，S13-6 的前置从口号变成一条命令。 **2026-09-30 复量（同日第十二→十九次）**：`--list` 口径下浏览器态 **50 tests / 3 files**（`baselines` **13** + `desktop-http` 33 + `llm-endpoint` 4），桌面态 `pnpm e2e:desktop` **37 tests / 2 files** 零后端全绿，且已在 **Node 20.20.2**（CI 同档）实测两套配置可加载。上面那句「38 条红 12 条」是当时数字，保留不改写。**于是 S13-6 的前置不再是"要不要搬"——桌面那一半已经搬完**，待决的是这 13 条的归属（分母已量：只涉及 8 个端点形状，本地是一次 `saveNarrative` 原子覆写 ⇒ 搬离线不需新能力，代价是不再覆盖后端 REST 契约；见本节末第十九次补记与 `WEB_SUNSET_RESTORE` 的第 1 问）。
   `createStorageProvider()` 增加 `?storage=memory` 分支（**仅 DEV 生效**）。
   为什么必须有它：E14/E15 注入的 `__TAURI_INTERNALS__` 只骗得过 `isTauriEnvironment()` 的判定、
   骗不过 Rust 连接，所以「点击之后的行为」在 e2e 里结构上不可断言——S13-2d 那份审计就卡在这。
@@ -978,10 +1047,10 @@
 - [x] S13-8 修订战略文档 —— 已交付 2026-09-29：新增 [ADR-029](./ADR/029-desktop-only-build-target.md)
   （桌面是唯一构建与发布目标、web 与第二套数据通路退场、代价与未决逐条实测；链接 ADR-024/008/016/027/026）；
   `docs/ADR/README.md` 索引补上 **ADR-028 与 029 两行**（028 此前根本不在索引里，文件存在却查不到，
-  顺手按同一格式补上）；`docs/ROADMAP_FINAL.md` 的楔子3 就地标注为随分发面退场而搁置，
+  顺手按同一格式补上）；归档 `docs/archive/ROADMAP_FINAL.md` 的楔子3 就地标注为随分发面退场而搁置，
   并如实写明楔子2 只部分不受影响（跨作品 Codex 在桌面是「如实说出来地缺席」）；
   恢复锚点 [WEB_SUNSET_RESTORE](./WEB_SUNSET_RESTORE.md)（历史标签 `web-archive-20260926`）与
-  逐功能去留 [WEB_FEATURE_DISPOSITION](./WEB_FEATURE_DISPOSITION.md) 两份文档此前已存在，本条只做链接。
+  逐功能去留 [WEB_FEATURE_DISPOSITION](./archive/WEB_FEATURE_DISPOSITION.md) 两份文档此前已存在，本条只做链接。
 
 > **收尾快照（2026-09-29，tag `desktop-wip-20260929`）**
 >
@@ -1359,6 +1428,8 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > #65 剩下的两处里，「分支选项」被这条堵住（没有 choice 行就没有那个组）；
 > `NodeInspectorPanel:336` 的「分支标签」在连线检查器里，需要选中一条出边才能显形，与本条无关，可单独推进。
 
+> **更正（2026-09-30）**：上述“choice 在 AXS 中没有行语法”的诊断不准确。`packages/axs` 已支持 `> 选项 -> Beat`；真实缺陷是打印器把内部目标 ID 原样写进 AXS，且空标签 `>` 被 parser 当成旁白。现已修复目标 ID→Beat 标题映射与空选项解析。新增 E38 验证 choice 可见、选项文本/跳转控件有可访问名称；标签豁免基线已归零。
+
 > **新门禁 `check:labels`：把 #65 的成果钉成棘轮（2026-09-29）**
 >
 > 十三个点的标签关联工作不该靠人记住。`scripts/check-label-association.mjs` 扫 `apps/web/src/**/*.tsx`
@@ -1595,9 +1666,1240 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 > 收束判断：**剩下的没有一条是缺技术信息的**——普查三轴（数据通路 / 入口在场 / 导航出口）都已穷尽，
 > 缺的是 ADR-029 那几条判断与一次真机时段。所以这条线在这里停车，不再自开新切片。
 
+> **choice 的同名消歧：落地 #68 时漏掉的一半（2026-09-30）**
+>
+> #68 把分支写进 AXS 文本后，choice 目标在文本层用 **Beat 标题**。标题不唯一时这条引用就不可寻址：
+> 解析侧 `assignBeatIds` 给同名 Beat 的 id 是 `开场` / `开场-2` / `开场-3`，而打印侧无条件输出裸标题，
+> 于是**指向第二个「开场」的分支回读后静默落到第一个**。这比原缺陷更坏——原来是选项丢失，现在是改指他处，
+> 而且不报错、不产生诊断。
+>
+> 修法把契约收成一条：**beat 模型里 `options[].to` 存 beat id，标题映射只发生在打印那一刻**。
+> ①`print.ts` 的 `idToTitle` → `idToBeatRef`：目标标题在同名序列里排第二及以后时，输出与解析侧同一序号规则的
+> `标题-2`；②`projection/axs.ts` 的 legacy 投影撤掉「提前换成标题」那步（它会让 `to` 变成标题、
+> 绕过消歧并丢掉节点 id），`titleByNodeId` 整条 plumbing 一并删。
+> 判据先红后绿：axs roundtrip 新增两条（红时的 Received 是 `> 向东 -> 开场`）+ editor-core 投影一条；
+> 顺手把「裸同名标题按出现顺序指向第一个」也钉成断言（这是我一开始想报诊断的那条——查了 `assignBeatIds`
+> 之后承认它是既有规则的另一半而不是缺陷，所以改成钉规则，不写会误报的门禁）。
+> 用户文档同轮补了这条规则（`docs/user/writing/axs-syntax.md` 的「选项与跳转」）。
+> **仍欠**：把 AXS 文本 apply 回草稿时同名 Beat 会塌到同一个节点（`document.ts` 的 `titleToId` 第一个同名赢），
+> 登记为 #69，判据形状写在单里。
+>
+> 同轮清了交接文档 §5 的四项技术问题（文件尾空行 / `ports.mjs` 缺类型面导致 `build:admin` 红 /
+> 两条既存 lint warning / `.dmg` 打包），并把 web 的 lint 翻成 `--deny-warnings` 当地板。
+> `.dmg` 这次跑通且 `hdiutil verify` 校验和 VALID，但**上次失败的根因未复现、仍未归因**，
+> 所以这条只算「当前能出可用 DMG」，不算交付验收。
+> 复跑：`pnpm gates` 退出码 0（十一道；单测 497 passed + 1 skipped，axs 41 / editor-core 155）/
+> `pnpm e2e:desktop` **33 passed** / `pnpm build:admin` 0 / `pnpm --filter @axiforge/web build` 0。
+> 按 §7 的硬限制，本轮**未提交、未推送、未改 tag**；在飞的改动仍留在工作区。
+
+> **#69 清偿：同名 Beat 在 apply 回草稿时塌成一个节点（2026-09-30 同日续做）**
+>
+> 现场：`axs.import` 解析出的 beat id 是 slug（`开场` / `开场-2`），而 id 解析链是
+> 「UUID 形式的 beat.id → 按标题复用既有节点 → idGen()」。草稿里已有一个标题「开场」的节点时，
+> **两个同名 beat 都命中同一个既有 id**，`nodes.set(resolved, …)` 让后一个覆盖前一个——
+> 两个桥段塌成一个节点，且没有任何报错。这与 #68 是同一条根因的两半：#68 修的是**写出去**的文本，
+> 这条是**读回来**的图。
+>
+> 判据先行：`document.test.ts` 新增「同名 Beat 不塌成同一个节点：第二个同名必须拿新 id」，
+> 改代码前红在 `expected 1 to be 2`（节点图上只剩一个「开场」）。
+> 修法把契约收成一条：**一次导入里一个节点 id 只许被消费一次**——第一个同名仍复用既有节点身份
+> （上一条用例钉的「Writer 重复保存不换 id」语义不变），第二个起走 `idGen()`。
+>
+> 顺带按门禁给的处置还了一笔债：改完 `document.ts` 436 > 棘轮 432，`check:size` 的红写的就是
+> 「按域外提成协作模块，不要在文件内继续堆」。于是 `axs.import` 整段（含 `gridPosition` 与
+> `beatToNarrative`）外提成新模块 `axsImport.ts`（107 行），`document.ts` 降到 **363 行**，
+> baseline 里那一行随之删除（回到默认 400 硬线）、`ScriptEditor` 一并收到 512。
+> 外提时刻意**不反向依赖 L2 文档模型**，避免 `check:circular` 亮。
+>
+> 还抓到一条门禁自身的缺陷：`check:purity` 按文本扫 `/\bdocument\./`，被我注释里那句
+> 「从 `document.ts` 外提」喂了一口——**负向文本守卫会被自己解释缺陷的注释喂饱**（同类第二次）。
+> 处置不是给注释加 `purity-allow`（那是把守卫关掉），而是让**纯注释行不参与扫描**：这条门禁管运行时依赖，
+> 注释里的文件名不是依赖。三条腿实测：代码行 `export const b = document.title;` → 退出码 1 并点名该行；
+> 同样内容写进 JSDoc（`//`、`*`、`/*` 开头）→ 退出码 0；删探针 → 40 文件 0 违规。
+> 行尾注释仍会计数，这条局限写在脚本里（宁可误报也不放宽代码侧）。
+>
+> 复跑：`pnpm gates` 退出码 0（十一道；editor-core 154 → **156 passed**，lint 0 warning，
+> 纯净度 40 文件 0 违规，循环依赖 0）/ `pnpm e2e:desktop` **33 passed**（1.4m）。
+> 本轮仍未提交、未推送、未改 tag；`packages/editor-core/src/axsImport.ts` 是新文件，提交时要显式 add。
+
+> **Phase 0 改语义的连带核对：CI 引用、`build` 的祈使句、以及一条我记错了的前提（2026-09-30 第三次续做）**
+>
+> 这一串不做就没人做：Phase 0 把根 `pnpm build` 的含义从「构建 web」改成「打桌面 `.app`」，
+> 语义一改，所有按旧含义写的调用点都变成静默陷阱。逐类核了一遍：
+>
+> **① CI 的命令引用（可静态核对的部分）。** `.github/workflows/ci.yml` 本轮已被改成
+> `pnpm build:web && pnpm build:admin`（因为裸 `pnpm build` 现在会去跑 Tauri 打包）。
+> 用命令把 yml 里出现的每个 `pnpm <脚本>` 对 `package.json.scripts` 比一遍：`build:admin` / `build:web` / `e2e` / `gates`
+> 全部可解析（`install`/`exec` 是 pnpm 内建，不是脚本）。**远端跑没跑通仍不可观测**，这里只证「引用不错」。
+>
+> **② 一处文档祈使句失效并已修。** `docs/design/v0.9-baseline/README.md` 的复现步骤写着
+> `rm -rf apps/web/dist && pnpm build`——照今天这份含义执行会去跑一次 cargo 打包而且产不出 `apps/web/dist`。
+> 已改成 `pnpm build:web`，并在原地留一条带日期的更正说明「当年写的是 `pnpm build`」，不把历史改写成没发生过。
+> 其余 `pnpm build` 出现处逐条判定过：`README.md` 的两行、本文件 116/122 是新语义，正确；`docs/archive/**` 是归档记录，不动。
+>
+> **③ 我的一条在册前提是错的。** 我此前（也写进了 BLUEPRINT v1.6 那条）核实为「仓库从来没有 web 部署管线——无 Dockerfile/vercel/netlify」。
+> 实测：根目录 `vercel.json` 是 **tracked 的，自 v0.1（`956497b`）就在**，声明 `@vercel/python` 入口 `backend/src/main.py`
+> 与 `@vercel/static-build`（`apps/web/dist`）。而 `backend/src/main.py` **不存在**（真实入口 `backend/app/main.py`，
+> `backend/main.py` 是兼容 shim）⇒ 那份配置按今天的仓库状态**构建不起来**。
+> 所以：结论「去掉 web 不是下线一个在跑的服务」仍然成立，但依据要换成这条实测；
+> 「是否曾真的连接过 Vercel 项目」属远端集成，本会话不可观测，不下判断。
+> README 原来把这份配置当可用部署路径写（「部署前设置 `DATABASE_URL`」），已改成上述实测口径，
+> 并把「Legacy Web / API」那句里的 Vercel 从可用调试手段中摘掉；`vercel.json` 的处置（删 / 修入口 / 留作文物）归入 S13 待决清单，不自己拍。
+> BLUEPRINT 那条历史记录按「更正单列一刀」的做法补了带日子的批注，不改写原文。
+>
+> 顺带一条判据教训（已进记忆）：**「从来没有 X」这类缺失断言必须按具体文件名逐个 `ls`/`git ls-files` 过一遍**，
+> 我那次是从「没有 Dockerfile」外推出的结论，`vercel.json` 恰好不在我列举的那三个里。
+>
+> 复跑：`pnpm gates` 0（十一道）/ `pnpm e2e:desktop` 33 / `pnpm e2e` 46 / `pnpm typecheck` 0 /
+> > web 与 admin 构建各 0（web 构建的 `INEFFECTIVE_DYNAMIC_IMPORT` 计数 0）。本轮同样未提交、未推送。
+
+> **两处「差点就做」的判断，理由记下来（2026-09-30 第四次续做）**
+>
+> **① 端口表的三处 JS 侧散写，本轮不合。** 实测还剩这些地方硬写着 `5174`/`8000`：
+> `playwright.config.ts`（baseURL、webServer 的 url 与 `--port`，共 4 处）、`playwright.desktop.config.ts`（2 处）、
+> `scripts/desktop-http-inventory.mjs`（BASE，1 处）；`backend/app/config.py` 的 CORS 是第六处（Python，随 S13-6 退场）。
+> 看着就该并进 `scripts/ports.mjs`，**但那条 import 在 CI 上会炸**：CI 的 `setup-node` 钉的是 **Node 20**（本地是 26），
+> 而 Playwright 的 `.ts` 配置是被转成 CJS 加载的——`import … from "./scripts/ports.mjs"` 会落到 `require()` ESM，
+> Node 22.12 之前直接 `ERR_REQUIRE_ESM`。也就是说这份改动会在**我看不见的地方**变红、在本地全绿。
+> 真要合，得把真相源下沉成 `ports.json`（CJS/ESM 都能读），`ports.mjs` 只做派生视图；
+> 这属于 S13-7「消双通路」那一刀的配套，不是现在顺手能签收的事。别用「本地跑过了」替远端背书。
+> > **更正（同日第十三次续做，实测后写）**：这一段的**结论对，归因错**。把 `import "./scripts/ports.mjs"` 真加进
+> > `playwright.desktop.config.ts` 后，在本机三个 Node 上逐一跑 `--list`：**20.20.2 红**（`ReferenceError: exports is not defined in ES module scope`）、
+> > **22.14 红**（`ReferenceError: exports is not defined`）、**26.7 红**（`SyntaxError: Cannot use 'import.meta' outside a module`），退出码都是 1。
+> > 报的法子随版本不同，但**没有"本地绿、CI 红"这一回事——三个版本都红**。所以当时那条"CI 钉 Node 20 才危险"的顾虑
+> > 是被高估了；真正的机制更简单：Playwright 的 `.ts` 配置走 CJS 转译，掺进 ESM 依赖就混不合格式而炸。
+> > 之所以仍然值得记下来：**"看不见的远端"不是不去测的理由**——本地就装着 20/22/26 三个版本，一次 `PATH=… node … --list` 就能把猜测变成数。
+> > 那一轮把它写成"机制风险"而没有去测，本质是把**没跑的对照组**当成了结论。真相源已按这里给的解法在同日下沉成 `scripts/ports.json`（见第十二次补记）。
+>
+> **② `.dmg` 上次失败的两条猜测都被证伪。** (a)「残留的 `rw.9752.*.dmg` 挡住了下一次建卷」——不成立：
+> 本次成功的那一轮，那个 42 MB 中间件**全程在场**。(b)「Finder AppleScript 被 TCC 拒了」——也站不住：
+> `osascript -e 'tell application "Finder" to get name of startup disk'` 现在答得上来。
+> 脚本 `set -e` 下真正会死在这两处（`hdiutil detach` 重试、Finder 定制窗口），但**没有一条被复现过**，
+> 所以 §5 里这条继续按「未归因」挂着，别写成结论。
+>
+> **③ 同名消歧的对称面补了一刀判据。** 显式跳转行 `-> 标题-2` 与选项行共用 `titleToId`，
+> 今天只给选项行加过用例，跳转行没有。补 `roundtrip.test.ts` 一条（axs 41 → **42**）：断言它解析到第二个桥段、
+> 无诊断、且打印时不回退成裸标题。这条一上来是绿的，所以按规矩验了牙——
+> 把解析侧的 slug 回退那行拿掉后 **2 条同时红**（选项那条 + 跳转那条，报 `选项目标未找到: 开场-2`），
+> > 还原后回到 42 passed；「裸同名指向第一个」那条在变异下仍绿，说明它钉的是另一条规则而不是运气。
+
+> **同一个缺陷在主通路上的第二份实现（2026-09-30 第五次续做）**
+>
+> 查 Writer 保存到底走哪条路时抓到的：`useProjectEditor.saveWriter` 用的**不是**草稿事务 `axs.import`，
+> 而是 `axsToSyncPayload → parseAxsToPlan`（`packages/editor-core/src/projection/axs.ts:170`）——
+> 也就是说「AXS 文本 → 节点图」在这份代码里有**两套实现**。我在 #69 修的是其中一套。
+>
+> 另一套犯的是同一个错，而且后果更难看：`existingByTitle.get(beat.title)` 没有一次性消费守卫，
+> 而它把结果 **push 进数组**（`axs.import` 那边是 `Map.set`，表现是一个节点被覆盖；这里直接发出
+> **两个 id 相同的节点**，存储侧后写盖掉前写），顺带让邻接边两端解析成同一个 id → **自环边**。
+> 判据 `parseAxsToPlan > 同名 Beat 不许共用同一个既有节点 id`：改前红在
+> `expected ['existing-1','existing-1'] to deeply equal ['existing-1','gen-1']`（实测，不是推测）。
+>
+> 既然两套实现各自犯过一次错，就再加一条**配对判据**把它们钉在一起：
+> `两条「AXS 文本 → 节点图」的通路守同一条 id 契约` 同时跑 `axs.import` 与 `parseAxsToPlan`，
+> 断言两边都给两个不同 id、第一个仍复用 `keep-1`。牙重验过一次——把 `axsImport.ts` 的守卫去掉后
+> **两条同时红**（这次是外提之后重验，外提前验过的不算数，因为代码已经搬过家）。
+>
+> **登记一笔债（别当成已完成）**：两套实现只是被同一条判据钉住，**没有合并**。
+> 要合成一套（`axsImportDraft` 复用 `parseAxsToPlan`）得先核对两者的 `beatToNarrative` /
+> `beatToNarrativeData` 是否逐字段等价——现在不一致，字段差异会直接改 Writer 的保存载荷，属主创路径，
+> 归进 S13-7「一个功能只有一条数据通路」那一刀一起做，不顺手合。
+>
+> 复跑（同一代码状态，串行）：`pnpm gates` 0 / `pnpm e2e:desktop` **33 passed** / `pnpm e2e` **46 passed**。
+> 仍按 §7 未提交、未推送。
+>
+> （上一颗的数字补记：单测 500 → **502 passed + 1 skipped**，editor-core 156 → 158。）
+
+> **E39：给 Writer 主通路补上界面级判据——以及它第一版的假绿（2026-09-30 第六次续做）**
+>
+> 两处修复此前只有单元层证据。补一条点击层判据 `E39`：建工程 → 剧本轨写 AXS → 「保存剧本」 → **换页再进** →
+> 断言重新投影出的文本里 `# 开场` 出现两次、两句话都在。CodeMirror 的可访问名是
+> `textbox "AXS 剧本编辑器"`（`AxsCodeEditor` 用 `EditorView.contentAttributes` 挂的），
+> 模式切换是 `SegmentedControl` 渲染的 `<button role="tab">`——**按 ARIA 角色定位是 `tab`，不是 `button`**，
+> 第一版写成 `getByRole("button", { name: "剧本" })` 在重进那一步直接超时。
+>
+> **第一版的假绿更值得记**：改成 SPA 重进后它绿了，但我拿变异去验牙——把 `parseAxsToPlan` 的一次性消费守卫拿掉，
+> **它照样 34 passed**。原因不是门禁失效，是**我的用例前提没够到缺陷那条分支**：
+> 新建工程里没有任何叫「开场」的节点，`existingByTitle` 两次都取不到，两边直接走 `idGen()`，天然不塌陷。
+> 塌陷发生在「工程里已有同名节点」的时候。改成两轮保存（第一轮存一个「开场」，第二轮改稿再加一个同名桥段）后，
+> 同一处变异立刻红在该红的行：`Expected: 2 / Received: 1`——界面上真的少掉一个桥段。
+> 还原后桌面 34 passed、浏览器 47 passed、`pnpm gates` 0。
+>
+> 另记一条通路事实：`?storage=memory` 的「换页再进」必须走 SPA 路由；整页 `page.goto` 会把模块态清掉，
+> 回读到的是空白编辑器（第一次写这条用例就是这么踩到的）。既有 E24/E29/E33 用的都是 `link "剧本列表"` 那套。
+
+> **E40：把「缺席」判据的另一半补上（2026-09-30 第七次续做，S13-2d 的 nexus 那条）**
+>
+> 交接文档 §3 与 S13-2d 都写着同一句：桌面侧「按钮不该在」由 E18/E20 断过，**浏览器侧「按钮应该在」一直没断言**。
+> 这条缺口的后果不是"少一条测试"，而是**任何把 `NexusSendAction` 整块删掉的改法都不会被抓住**——
+> 桌面那一半断的是 `toHaveCount(0)`，"组件不存在"与"组件被正确挡住"在它眼里是同一个状态。
+> 补法沿用 E35/E36/E37 的两半写法（同一条用例里先跑浏览器态、清零 hits、再跑桌面态）。
+>
+> 牙不是假设：把闸门改成 `isLocalOnlyDeployment() || true`（浏览器态也返回 null）后，
+> **E40 红在自己的 `toBeVisible()`，而其余 47 条全绿**——那 47 条里就包括只看缺席的那半。
+> 还原后：`pnpm e2e` **48 passed**、`pnpm e2e:desktop` **35 passed**、`pnpm gates` 0。
+> S13-2d 因此仍保持 `[~]`：五处待核里只剩 `PromptExport` 未接线（＝#60，等定档），
+> 勾掉它需要的是那个决定，不是再写一条测试。
+
+> **缺席断言的配对排查：12 条查完，补上 E41，也当场推翻了我自己一个结论（2026-09-30 第八次续做）**
+>
+> 顺着 E40 那一类做法把 `e2e/desktop-http.spec.ts` 里的 **12 条缺席断言**（`toHaveCount(0)`）逐条对了一遍，
+> 规则是「每一条都得有另一态『它应该在』的配对判据」，否则"被闸门挡住"与"被删了"在测试眼里同形。
+> 对完的结果：**工具条(E15)、我的主页(E37)、账户动作(E36)、Discover 链接(E35)、Nexus(E20+E40)** 都已有两半；
+> 剩下的 `toHaveCount(0)` 不属于这一类——「离线路台」那条是**删除动作的回读**，`/\*` 那条是**渲染文本里不许出现注释符号**，
+> 两者断的不是闸门。这一类因此在本文件内闭合。
+>
+> 顺手补了一条 **E41**：`LlmStatusBadge` 在浏览器态是只读徽标、**没有**配置按钮；桌面态那个按钮由 E16 覆盖。
+> 但这里必须记一次我自己的错：**我最初的判断是"这条界面此前一条 e2e 都没有"，是错的**——
+> 我只 grep 了 `desktop-http.spec.ts` 一个文件，而桌面侧四条判据住在 `e2e/llm-endpoint.spec.ts` 的 E16 里。
+> 是变异把它推翻的：把 `LlmStatusBadge` 的桌面分支打穿（`if (false && desktop)`）之后，
+> **E16 四条 + E41 一起红**。所以 E41 的真实价值不是"补空白"，而是补上**没被覆盖的另一半**（浏览器态不该有配置入口）。
+> 教训入档：**断言"某处没被测"之前，grep 的对象是整个 `e2e/` 目录，不是单个 spec 文件**——
+> 这条和"覆盖面按样本输入里的字段算而非测试条数"是同族，但更靠前：先要数对**测试文件**的集合。
+>
+> 还有一条没做完的：闸门点本身有 **14 个文件**（`grep -l isLocalOnlyDeployment() apps/web/src/**/*.tsx`），
+> 两半都有人看着的目前只有其中约 8 个；剩下那几个（`StudioNavContent`、`VersionPanel`、
+> `CreatorDashboardPage`、`DiscoverPage`、`UserContext` 等）要么由 E14/E15/E21 从数据面覆盖、要么根本没有桌面入口，
+> **我没有逐个核过，不写成结论**。这一列清点记在 §6 的待核里，属于 S13-7 那一带的活。
+>
+> 复跑：`pnpm e2e:desktop` **36 passed** / `pnpm e2e` **49 passed**；`LlmStatusBadge` 变异残留计数 0。
+
+> **闸门点 14 处全部定性完毕，补 E42；也记一次我自己重复犯的变异错位（2026-09-30 第九次续做）**
+>
+> 上一轮写下的「未逐个核过」这条现在核完了。`apps/web/src` 里 14 个用 `isLocalOnlyDeployment()` 的 `.tsx`，
+> 按两半覆盖分档：
+> **两半都有人看**——`ProjectListPage`(E15)、`ProfilePage`(E36)、`UserAccountMenu`(E37)、`DiscoverBrowseLink`(E35)、
+> `NexusSendAction`(E20+E40)、`LlmStatusBadge`(E16+E41)、`StudioNavContent`+`CreatorDashboardPage`(本轮 E42)；
+> **数据面覆盖**——`UserContext`(E14/E15 零请求)、`VersionPanel`(查询 `enabled`，E21)、`CharacterDetailPage`(E21 传记 tab)；
+> **无桌面入口，结构性不可达**——`DiscoverPage`（`/discover` 在册路由本身给缺席说明，E13/E14 看着落点）、
+> `CreateCharacterPage`(E19 的显式缺席 toast)、`AppHeader`(「发现」链接与 `GlobalSearch` 由 E14/E15 的零请求 +
+> E35 的组件级闸门覆盖入口本身)。清点方式：把闸门打穿成两态同名，看是哪几条红。
+>
+> **E42** 就是这次清点的产物：侧栏「概览」项浏览器态必须在、桌面态必须不在（正控用同栏的「剧本」），
+> 且 URL 直达 `/studio/dashboard` 在桌面只渲染 `PageHeader 创作概览` + 「创作数据面板需要协作服务」，
+> **不许**出现「加载数据中…」（那一句是浏览器态取数分支，桌面走到它就是在等一个不存在的后端）。
+>
+> **一次无效变异，值得单独记**：我先把 `StudioNavContent` 的 `if (rail)` 那一支改成两态都隐藏，
+> **37 条全绿**——不是判据失效，是**页面渲染的是非 rail 那一支**，我改了个不在热路径上的分支。
+> 换成改实际渲染的 `{!localOnly && (` 之后，立刻红在 E42 浏览器那一行的 `getByRole('link', {name:'概览', exact})`，
+> 而其余 36 条（含 E42 的桌面半）保持绿。这正是本文件早已写过的一条纪律（「变异要挑对当前渲染的分支」）——
+> 我自己隔了几轮又踩一次。**判别式：变异后一条都没红，先怀疑变异落点，再怀疑判据**；
+> 组件带 `rail` / 条件 JSX / 多返回分支这类结构时，先确认哪一支在渲染（红没红就是证据）。
+>
+> 复跑（全部在还原之后）：`pnpm gates` 0 / `pnpm e2e:desktop` **37 passed** / `pnpm e2e` **50 passed** /
+> `git diff --check` 干净、`StudioNavContent.tsx` 与 HEAD 无差异、变异残留计数 0。
+
+> **用户文档与行为对账：抓出一条"承诺了不存在的能力"（2026-09-30 第十次续做）**
+>
+> `docs/user/desktop/desktop-and-axsp.md` 的「桌面版目前没有的功能」里写着
+> 「把道具挂进某一拍（道具引用还没有本地存储）…仍需要后端」。两句都不成立：
+> ①**道具引用早就本地化了**（S13-2c 的 `project_asset_refs`，且 **E27** 在桌面点击层跑通"造道具 → 挂进工程 → 移除 → 换页回读"）；
+> ②**「挂进某一拍」这个能力两端都没有**——本地表的列只有 `project_id / asset_type / asset_id / locked_version / …`（无拍、无节点字段），
+> 云端 `httpAddAssetRef` 发的也只有 `asset_type` + `asset_id`；剧本指令集合里也没有 item 类 op。
+> 所以这是**文档凭空承诺了一个不存在的能力**，并把已完成的那半说成缺失。
+> 改法：把这条从"桌面缺失"清单里删掉，在「已知限制」里按实测重写——引用只到工程级、拍级绑定"尚未实现（要同时动数据模型、投影与试玩）"，
+> 并顺手补齐清单里漏掉的三项缺席（Nexus 收件箱、「我的主页」与账户设置页的动作、AI 建档建议）。
+> 这一类的判别式和门禁一样：文档说的"缺"必须能对上"某一端曾经有"，否则它就是**未实现**，不是**被裁掉**——
+> 把未实现写成被裁掉，会让下一轮去找一条根本不存在的路径来"恢复"。
+>
+> 同轮把 §4「当前工作区状态」补成实测清单（那份文档原本只列到上一批改动，我这几轮的改动没进去），
+> 用户文档改动不涉及门禁输入（六道 `check-*.mjs` 都不读 `.md`），故沿用上轮实测：gates 0 / 桌面 37 / 浏览器 50。
+
+> **决策层与契约对账：两处 ADR 都没记下今天扩了的那条寻址契约（2026-09-30 第十一次续做）**
+>
+> 上几轮把用户文档、路线图逐条对着代码量了一遍；这轮把同一把尺子放到**第三层——决策层**。
+> 判据是机械的：`grep -c "消歧\|同名\|序号\|标题唯一" docs/ADR/*.md` 里，今天两次修复（#68 打印侧丢指向、
+> #69 导入侧 id 复用串号）所依据的那套规则，在 **ADR-016 与 ADR-027 里命中 0 次**。
+> ADR-016 关于目标只有一句「`->` 显式跳转按标题解析为 edge」——这句话在标题不唯一时**没有判定权**，
+> 而"没有判定权"正是那两个 bug 的根：文本层根本写不出"指第二个开场"，于是打印即换靶。
+>
+> 这一类的缺陷形态值得单独立一条判别式：**契约只活在实现层**。代码、测试、用户文档三方都按序号规则走了，
+> 决策层却没有一条记录，等于把"这是契约"降级成"这是当前实现顺带的行为"。
+> 下一轮想"简化" `print.ts` 的人看不出 `标题-N` 不是巧合而是与 `assignBeatIds` 咬合的必要条件，
+> 把 `idToBeatRef` 改回裸标题不会撞上任何门禁——直到第三次静默换靶。用户文档写了怎么用、路线图记了做什么，
+> 都不等于有人记着**为什么不许改回去**。
+>
+> 落笔内容（三方各就各位，没有新增第二真相源）：
+> - **ADR-016** 新增「补记 2026-09-30」一节，把已生效的契约写成 6 条：①模型层存 id、文本层存可寻址引用、
+>   映射只发生在打印那一刻；②id 由标题按出现顺序生成（第一拍裸 slug，其后 `标题-N`）；
+>   ③解析次序（唯一命中→该拍；多命中→**确定性取第一拍**；无命中→退回 slug 查 id，序号别名在此生效）；
+>   ④打印侧共用同一个序号规则；⑤不变量 `parse(print(g))` 靶心不变，同名是唯一定破坏者，失败模式一律静默；
+>   ⑥消费侧 id 复用受"未被本轮用过"约束（`usedNodeIds`）。末了显式记一条**未清偿**：裸同名标题恒指第一拍
+>   虽然可预测，但作者写错时没有任何提示，lint 诊断为欠账。
+> - ADR-016 的「语法要点」补一条bullet指向该节，「质量要求」补一条：round-trip 必须覆盖同名的两种寻址形态且**双向各测一次**。
+> - **ADR-027** 的方言对照表后加一条补记交叉引用——表格本身按决策时实态保留，不改写历史。
+>
+> 引用行号逐条 sed 复看过，不是凭记忆写的：`parse.ts:383-391`＝`assignBeatIds`、`:393-401`＝`titleToId`、
+> `print.ts:70`（choice）与 `:222`（jump）都走 `idToBeatRef`、`usedNodeIds` 在 `axsImport.ts:81` 与
+> `projection/axs.ts:183` 各一处、E39 在 `desktop-http.spec.ts:785`。
+>
+> **同一条尺子量到第三处：内核规约把两套实现画成了一行归宿。**
+> `docs/KERNEL_DESIGN.md` §2.4 的迁移表写着 `axsToSyncPayload` → 「L3：`axsImport(source, roles)`」，
+> 读起来像"这一条已经归一"。实态是两套并存：`axs.import` 走 `axsImport.ts:56` 的 `importAxsDraft`
+> （`document.ts:355` 调用，操作 Draft 的既有节点集合），Writer 保存走 `projection.ts:96,102` 的
+> `axsToSyncPayload` → `projection/axs.ts:170` 的 `parseAxsToPlan`（产出同步载荷，含边与 sort_order）。
+> 这正是本文档末尾那句规矩要管的场景——「实现与本规约冲突时：要么改实现，要么回写本文并说明理由，不允许沉默漂移」，
+> 所以按表内既有惯例补了一条 `> 状态（2026-09-30）`，写明两套各自在做什么、为什么不自作主张合并（语义不是逐字相同，
+> 硬合会把两种语义拧成第三种），并把临时保险的判据指名到 `document.test.ts:385` 那条配对测试。
+> **归并本身仍属 S13-7，等定档**——这一轮补的是记录，不是实现。
+>
+> 落笔时自己犯了一次引用错：先把配对判据写成在 `projection.test.ts`。那个文件里确实有一条同名 Beat 的断言（`:198`），
+> 但它只测 `parseAxsToPlan` 单侧；跑两套实现的那条在 `document.test.ts:385`。**"文件里有这个词"不等于"这条判据在那个文件"**，
+> 已改正。补记类文档最容易错的就是这一层——行号存在但指错了对象，比行号不存在更难被发现。
+>
+> 同一轮里还有两处初稿把"当前实现顺带的性质"写成了绝对保证，被代码本身驳回：
+> ①「id 永远不被写进剧本正文」——`print.ts:155-156` 在 id 查不到 beat 时**原样返回 id**，悬空引用会进正文；
+> ②「失败模式一律静默」——只有**换靶**是静默的，**丢靶**会由 `parse.ts:417` / `:436` 报 warning。
+> 两条都改成"常规情形 + 例外 + 例外可见与否"的写法。这一类的教训不是"少写"，而是**下笔前把那句断言的反例搜一遍**：
+> `if (!beat) return id` 这种兜底行就在被引用的函数里，读三行就能否掉一个全称句。
+>
+> 本轮只动 `.md`：六道 `check-*.mjs` 均不读 Markdown，故 `pnpm gates` **未重跑**（没有门禁输入变化）。
+> 两半 e2e 各实跑一次以刷新 HANDOFF §5 的计数——`pnpm e2e:desktop` **37 passed**（1.6m）、
+> `pnpm e2e` **50 passed**（1.1m，退出码单独取到 0）。第一次那条桌面跑用的是 `${PIPESTATUS[0]}`，
+> 在 zsh 下取不到值（zsh 是 `$pipestatus[1]`），所以补跑浏览器那一半时才把退出码拿到——
+> 「只看汇总行就当退出码 0」这条自己也犯过一次，记在这里。
+>
+> **同一把尺子量到第四处：退场前置那张体量表里的基线数字过期了。**
+> `docs/WEB_SUNSET_RESTORE.md` 的「验收基线」一行还写着「3 个 spec、38 条用例」，那是搬家前的数字。
+> 今天用 `--list` 量：浏览器态 **50 tests in 3 files**（`baselines` 13 + `desktop-http` 33 + `llm-endpoint` 4），
+> 桌面态 **37 tests in 2 files**（`testIgnore: /baselines/`，零后端）。
+> 意义不是数字变大，而是**第 1 问被换了**：原文问"要不要把桌面那半搬走"，实测桌面那半**早搬完了**，
+> 删后端真正打掉的只剩 `baselines.spec.ts` 的 **13 条**——所以待决的是"这 13 条归谁"，不是"要不要保留后端当测试宿主"。
+> **一份会被拿去支撑破坏性决定的检查单，数字过期本身就是风险**，所以按当前实态改在原表旁边，不另起文档。
+> 顺带记一条 ID 漂移：上一轮补里写的「E29 场景池写侧判据」今天在 `e2e/` 里 **grep 不到**，
+> 但那条写腿本身还在（`desktop-http.spec.ts:532-539`「建一条场景 → 换页再进 → 还在」，挂在 E17 链内）。
+> 结论是**编号被并进了 E17 一族**，覆盖没丢。**引用测试编号前先 grep 证明它存在**——编号会被重组，标题与文件行号才是要引用的东西。
+
+> **端口真相源下沉成 `scripts/ports.json`：把上一轮写下的"为什么没合"变成做完的一刀（2026-09-30 第十二次续做）**
+>
+> 上一轮留了一条判断：端口表在 `playwright.config.ts` 等 7 处硬写，看着就该并进 `scripts/ports.mjs`，
+> 但那条 import 在 CI 上会炸——CI 钉 Node 20，Playwright 的 `.ts` 配置按 **CJS** 加载，`import "./ports.mjs"` 变成 `require()` ESM，
+> Node 22.12 之前直接 `ERR_REQUIRE_ESM`，本地绿、远端红而远端不可观测。**同一条判断里已经写着解法**：真相源下沉成 JSON，`.mjs` 只做派生视图。
+> 这一轮就是去执行那句被记下来的解法，而不是重新发明它。
+>
+> 做法与实测：
+> - 新建 `scripts/ports.json`（四个数字，**未纳管，提交要显式 add**）；`ports.mjs` 改成 `readFileSync(new URL("./ports.json", import.meta.url))` 后派生
+>   `origins` / `corsOrigins`。改动前后三个导出的值**逐字比对过**（`{api:8000,web:5174,admin:5175,nexus:5274}`、六条 CORS 来源不变）——
+>   先证"没改行为"，再谈"改了结构"。
+> - 消费侧 13 处改读真相源：`playwright.config.ts` 4（baseURL、`--port`、两个 `webServer.url`）、`playwright.desktop.config.ts` 2、
+>   `e2e/helpers.ts` 1（`API` 顺手改成导出，`baselines.spec.ts` 那 5 处硬写的角色端点因此有唯一来源）、`e2e/baselines.spec.ts` 5、
+>   `scripts/desktop-http-inventory.mjs` 1。收完再扫：**工具与 e2e 层 `5174`/`localhost:8000` 字面量 0 处**。
+> - 两套 Playwright 配置都 `--list` 过（50 / 37，退出码 0），证明 JSON 在 Playwright 的转译路径下真能被加载——**这才是上一轮不敢动的那一环**。
+> - 判据是双向的，不是"改完没红"：①把 `ports.json` 的 web 改成 5999 → `pnpm e2e:desktop` **37 passed**，
+>   说明 vite dev server 与两套配置确实跟着这一份数字走（若任一消费点还硬写着 5174，探针就连不上而整批红）；
+>   ②再把 `playwright.desktop.config.ts` 的 `webServer.url` 单独钉回 5174 → **1 failed**，报 `ERR_CONNECTION_REFUSED at http://localhost:5999/studio/projects`。
+>   **一致→绿、偏离→红且点名端口**，这条重构才算有牙。两轮之后都还原了。
+>
+> 没做的部分与理由（写清，免得下一轮以为已全收）：`apps/{admin,nexus}/src/**` 4 处与 `apps/web/src/shared/storage/exportSeeds.test.ts` 1 处是
+> `import.meta.env.VITE_*` / `process.env` 的**兜底默认值**（真要并得走 vite `define` 或注入环境变量，是另一刀）；
+> `apps/nexus/electron/main.cjs`、`apps/nexus/scripts/dev.mjs` 2 处**本机起不了 Electron，改了无法验证**，不动；
+> `tauri.conf.json` 的 `devUrl` 由 Tauri CLI 读，并进来需要一步生成流程；`scripts/kill-dev-ports.sh` 是"清掉相邻端口段"的工具，端口族本就比表里四个宽；
+> `backend/app/config.py` 的 6 处 CORS 随 S13-6 后端退场消失。**"一个语义一处权威"要连剩余分母一起报，只报收掉的那 13 处等于没说清还剩多少。**
+>
+> 复跑（全部在还原之后）：`pnpm gates` 退出码 **0**（core 82 / axs 42 / editor-core 158 / web 181+1skipped / admin 39）/ `pnpm typecheck` 0 /
+> `pnpm e2e:desktop` **37 passed**（1.7m，退出码 0）/ `pnpm e2e` **50 passed**（1.1m，退出码 0）。
+> 一条过程记录：`e2e/helpers.ts` 的第一版我写成了自引用的废表达式（`API` 引用了还没声明的 `API_BASE_FROM_PORT`），
+> 同轮内看回 diff 自己否掉重写——**typecheck 是在改正之后才跑的**，不是靠它抓到的。
+> 本轮仍未提交、未推送、未改 tag（§7）。
+
+> **给上一轮那条"机制风险"补上对照组（2026-09-30 第十三次续做）**
+>
+> 第十二次那一刀的理由是抄自更早一轮的判断：「`.mjs` 不能进 Playwright 的 `.ts` 配置，因为 CI 钉 Node 20、本地是 26，会 `ERR_REQUIRE_ESM`，本地绿远端红」。
+> 这一轮发现**本机 `~/.nvm/versions/node` 里就装着 20.20.2 与 22.14**——那条说法从来不需要靠推断，跑一下就有数。于是把两头都跑了一遍：
+> - **正向**（当前交付形状：两份配置读 `scripts/ports.json`）：`PATH=…/v20.20.2/bin node …/playwright/cli.js test --list` → 浏览器态 **50 tests in 3 files**、桌面态 **37 tests in 2 files**，退出码 **0**；Node 26.7 与 22.14 同样绿。
+>   ⇒ CI 用的那一档（`ci.yml` 两个 job 都钉 `node-version: 20`）实测可用，**不再是纸面推断**。
+> - **反向**（临时把 `import { origins } from "./scripts/ports.mjs"` 加进 `playwright.desktop.config.ts`）：
+>   **20.20.2 → 退出码 1，`ReferenceError: exports is not defined in ES module scope`**；
+>   **22.14 → 1，`ReferenceError: exports is not defined`**；**26.7 → 1，`SyntaxError: Cannot use 'import.meta' outside a module`**。
+>   ⇒ 三个版本全红。所以"本地绿、CI 红"这个前提**根本不成立**——那条被引用的顾虑把结论蒙对了，但把机制说错了，而且说成了一种**不需要本地验证**的失败。
+>
+> 结论怎么写才算准：炸的**位置**随版本不同（有时炸在配置的 `exports`，有时炸在 `.mjs` 的 `import.meta`），所以不能报某一个错误码当"标准错法"；
+> 稳的说法是「Playwright 的 `.ts` 配置走 CJS 转译，掺进 ESM 依赖就会混合格式炸，且本地就能证伪」。
+> 顺手把这条纪律收成一般式的：**看到"看不见的那一端"先查本机装了几个运行时版本**——`ls ~/.nvm/versions/node` 只花一秒，
+> 而这次它把一条持续了两轮的猜测直接变成了数。三份注释（两份配置 + `ports.mjs` 头）都已按实测改写，删掉了 `ERR_REQUIRE_ESM` 那个错归因。
+> 探针在测完后还原（`playwright.desktop.config.ts` 现只 import `ports.json`），本轮无产品行为变化。
+> 末轮复跑（注释改写之后）：`pnpm gates` 0、`pnpm e2e:desktop` **37 passed**（退出码 0）、`pnpm e2e` **50 passed**（退出码 0）、`git diff --check` 干净；
+> Node 20.20.2 下两份配置 `--list` 各 50 / 37、退出码 0。
+
+> **把一条写在文档里的判据陷阱变成脚本自己的牙（2026-09-30 第十四次续做）**
+>
+> `scripts/desktop-http-inventory.mjs` 是运行时普查：注入桌面探针后逐条路由走一遍，数它发过几个 `/api/v1`。
+> 它的失效形状本文件早就记过（`:773`）：**服务没起来时每条路由都返回 `httpCalls: []`，输出读起来就是"桌面态零云端调用，很干净"**，
+> 而当时给的处置是"读它的输出前先看 `pageErrors`"——那是把校验留给人，而这条链上没人会去看。
+> 本轮把它做成机械判据：每条路由 goto 之后读 `#root` 的 `childElementCount`（`main.tsx:7` 的挂载点（2026-10-01 第三十批给入口冒烟判据加了 import，行号从 6 搬到 7）），
+> 汇总行从"只报计数"改成 `ROUTES_MOUNTED=<n>/<总>`；**只要有一条没挂载，就报 `DESKTOP_MODE_HTTP_UNIQUE=UNRELIABLE` 并点名是哪几条、附上 BASE，退出码 1**，
+> 计数只在 8/8 都真跑起来时才作为结论输出。
+>
+> 三条腿都跑了，还顺手把"旧形状确实会假绿"测出来而不是宣称：
+> ① **该放**：5174 上有活服务 → `ROUTES_MOUNTED=8/8`、`DESKTOP_MODE_HTTP_UNIQUE=0`、退出码 **0**（顺带再证一次这 8 条路由在桌面态零 `/api/v1`）。
+> ② **该拦**：把真相源指到一个没人监听端口（临时 `ports.json` 的 web=5999）→ `ROUTES_MOUNTED=0/8`、`…=UNRELIABLE`、退出码 **1**。
+> ③ **旧形状的反事实**：用一个临时副本 `scripts/__probe_old_inventory.mjs` 复刻加固前的逻辑对同一台死服务跑一遍——
+>   它打印 `…HTTP_UNIQUE=0` 且**退出码 0**，两条 `ERR_CONNECTION_REFUSED` 只躺在 `pageErrors` 里没人管。探针已删（末轮取数前删净，不留脚手架）。
+> 还原后重跑 ①：8/8、0、退出码 0；`pnpm gates` 退出码 0（345 文件 0 越线，lint 0 warning）。
+>
+> **一条自己差点发出去的假 finding**：看见 `scripts/check-ui-tokens.mjs`（186 行、含硬编码色硬线与字号棘轮）在 `package.json` 里
+> **没有 `check:ui-tokens` 这一档**，就几乎写成"这道门禁没人跑"。追调用链才看清：根 `lint` → `@axiforge/web` 的 `lint`
+> （`oxlint --deny-warnings && pnpm lint:colors`）与 `@axiforge/admin` 的 `lint:colors`，两处都指向 `node ../../scripts/check-ui-tokens.mjs`，
+> 而 `lint` 在 `gates` 链里 ⇒ **它一直在跑，只是没有别名**。撤销该结论。
+> 收成一条纪律：**声称"某段代码/某个门禁没人执行"之前，要把调用链追到末端**（`grep -rn <脚本名>` 之后还要看 package.json 的脚本图），
+> 这跟"共用的单作者主张要验 import 与调用点而非 docstring"是同一件事的另一面——只是这次对象是脚本而不是函数。
+
+> **把 `check:dispatch` 那条在册漏检关掉：正向分支的证据必须落在它自己的块里（2026-09-30 第十五次续做）**
+>
+> 脚本头一直写着一条**已知不覆盖**：证据取自"分派判定之后到函数末尾"，于是
+> 「本地那一支 `return []`／`return {ok:true}` 空桩 + 块外真调 provider」这种混合形状照样过。
+> 这正好是本项目最贵的那类失效——桌面拿到空列表，界面读起来像"真的没有存档"，而没有任何一处报错。
+>
+> 收紧形状按**分支形态分档**处理，不是一刀切窄：
+> - `if (isLocal()) { … }`（正向块）与 `if (isLocal()) return …;`（正向单句）：证据窗口收成**那个块/那条语句本身**。
+>   语料实测分布 `positive-block=4`、其余 `after-guard=26`（30 个导出 async 函数，全绿）。
+> - `if (!isLocal()) return cloud();` 反向守卫与 `const local = isLocal()` flag 形状**保持"判定之后到函数末尾"**：
+>   这两族的本地本体就是守卫之后的整段，硬做块级配对反而会把合法路径切掉（这是"过宽 fail-closed 会崩合法输入"的反面教材，先量再收）。
+> - 配对是文本级的，带一个跳过字符串与行注释的粗 tokenizer；不认正则字面量与嵌套模板串 `${}` ——**这条限度写在脚本头**，
+>   真碰到那种形状应换 AST，而不是悄悄放宽规则。
+>
+> 牙是**新旧对照**跑的，不是只跑新的：
+> 把 `playerSaves.ts::listSaves` 临时改成"本地 `return []`，provider 调用挪到块外"，
+> 用 `git show HEAD:scripts/check-dispatch-local.mjs` 取出加固前的旧脚本对同一份改动跑 → **`OK`，退出码 0**（漏检是真的，不是假想）；
+> 新脚本同输入 → **`FAIL`，退出码 1**，点名 `playerSaves.ts :: listSaves —— 本地那一支（positive-block）既不调 provider…`。
+> 还原后 `git diff --stat` 该文件为空，新脚本再跑 30/30 绿，`pnpm gates` 退出码 0。
+>
+> **本轮最值钱的一条方法论**：新加的那行「本地分支形状分布」计数，第一次跑就报了 `after-guard=30`——
+> 而我刚在源码里看见 `playerSaves.ts:70,85` 明明是正向块。**没有那行输出，这个分类 bug 会安静地跟着绿灯活下来**：
+> 括号配对函数写成了"先判后减"，`conditionEnd` 永远配不上第一个 `)`，正向块全被降级成 after-guard，收紧等于没生效。
+> 收成一般式：**给判据加一行"它把样本分成了几档、各档多少"的分类计数**，它既服务读者也当场暴露错分——
+> 与既有那条"筛选须让零值档可见（total 与 hit 分开报）"同族，但这一例是它在自己工具上的应用。
+
+> **`check:purity` 的"宁可误报"改成"只少报注释"：四类探针一次跑齐（2026-09-30 第十六次续做）**
+>
+> 脚本头自报的另一条漏检：`const x = 1; // document.foo` 这种**行尾注释**会被 `/\bdocument\./` 判成 DOM 依赖，
+> 上一轮的处置是"宁可误报也不放宽代码侧"。误报的真实代价不是多打一行，而是**逼人写 `purity-allow` 把代码侧一起放宽**
+> ——豁免一旦落地就长在那，这才是这条门禁真正的腐蚀路径。
+> 改法是加一个 `codePart(line)`：跳过 `' " \`` 三种字符串（含转义），把行尾的 `//` 或 `/*` 之后剥掉再匹配；
+> 纯注释行的豁免原样保留。**代码侧一个字没放宽**：匹配的还是剥完之后剩下的代码。
+>
+> 探针一次摆四个形状，四类结果同一轮取齐（临时文件 `packages/axs/src/__probePurity.ts`，用完即删）：
+> - ①**该放行**：`export const P1 = 1; // document.title` → 新版不报（旧版报在第 2 行）。
+> - ②③**该拦行**：`document.title`、`window.innerWidth; // react` → 新版照报（第 3、4 行）。
+> - ④**最容易踩的一行**：`/a:\/\/b/.source + document.cookie` → 新版照报（第 5 行）。
+>   这一条是给"剥注释"本身设的反例：**naive 地把 `//` 当注释起点，会先撞上正则字面量里转义的 `\/\/`，
+>   于是把后面的真违规一起吞掉**——"减少误报"就这样悄悄变成"漏报"。转义处理让它落不进这个坑。
+>
+> 新旧对照（与上一轮同一手法）：同一份探针语料，`git show HEAD:` 取出的旧脚本报 **4 处**（含那条误报），
+> 新脚本报 **3 处**（误报消失、真违规一条不少）。删探针后：`check:purity` 40 文件 0 违规、`pnpm gates` 退出码 0。
+> 新限度写回脚本头：**跨行块注释仍不处理**（本内核包里不存在那种形状；真出现应换 tokenizer/AST，而不是继续加文本特例）。
+> README 的 `check:purity` 那行没动——它描述的是"断言零 React/DOM/网络/平台依赖"，本轮改的是匹配精度，不是它断言的对象（核对过再决定不改，不是默认不改）。
+
+> **§6 台账的机械复核：闸门文件还是 14 个，被引用的 E 编号里只剩一个是幽灵（2026-09-30 第十八次续做）**
+>
+> 台账是 2026-09-30 早些时候立的，之后代码与用例又动了四批，所以按既有那条纪律（已勾的条目也要重量一次）
+> 把 §6 第 5 条整张表用命令重对了一遍：
+> - **成员**：`isLocalOnlyDeployment()` 命中的 `.tsx` 仍是 **14 个**，与台账逐个对得上，没有新增闸门、也没有谁被摘掉。
+> - **编号**：把台账引用的 14 个 E 号做一次"定义处计数"（`grep -rho '"E<号>' e2e/*.spec.ts`）——
+>   E15/E16/E18/E19/E21/E35/E36/E37/E38/E39/E40/E41/E42 各 ≥1 ✓，**只有 `E20` = 0**。
+> - **那条断言本身没丢**：`发送到 Nexus` 的桌面缺席腿仍在（`desktop-http.spec.ts:333`，挂在 E17 流程里），
+>   两半配对覆盖由 E40 提供（`:885` 浏览器态可见 / `:901` 桌面态为 0）。也就是说**掉的是编号，不是覆盖**——
+>   与今天早些时候那例 `E29` 同形：用例会重排、会并进别的流程，而台账里引用编号的人不会收到任何通知。
+> - **处置**：把 spec 里两处"E20"字样的注释改成"挂在 E17 流程内、无独立编号，两半见 E40，别按旧编号 grep"，
+>   并改写 HANDOFF §6 的那一格。历史补记（`:575,793,800,1813,1828` 里的 E20）**不改写**——那是决策时的实态，按 ADR/补记惯例保留。
+>   改完重跑桌面那一半：**37 passed**（注释级改动，用例集合没变）。
+>
+> 收成一条可复用的机械核对：**引用测试编号的台账，要定期跑一遍"编号定义处计数"**——
+> 一行 for 循环就能把幽灵编号捞出来；台账引用**用例名或文件行号**比引用编号更耐久。
+
+> **`check:labels` 第一档的漏洞：提了 `htmlFor` 就算过（2026-09-30 第十七次续做）**
+>
+> 三档判据里第一档原来是一句 `if (open.includes("htmlFor")) continue;`——**只要标签上写了 htmlFor 就放行**，
+> 于是 `htmlFor={typoVariable}`（目标 id 根本不存在）照样绿。而浏览器在显式关联悬空时**不会退回包裹式关联**，
+> 读屏与点标签聚焦一起失效：这正是本门禁本要拦的那类"看着像标签却念不出字段名"。
+>
+> 先量再收（这条纪律今天第三次救场）：临时统计脚本扫三个界面层，**`htmlFor` 共 12 处（表达式 11 + 字面量 1），
+> 按"同文件是否有同名 id 接住"逐一对完 → MISS=0**。也就是说这条收紧今天上线是**零误报**的，
+> 不需要基线、不需要豁免（`--update` 那档也就不会被顺手拿来当挡箭牌）。
+> 实现取"归一化比较"：把 `{x}` / `"x"` / `{'x'}` / `` {`x`} `` 都剥成同一个记号再比，
+> 所以模板串与两种引号写法都不会被误判；跨文件（父组件 `useId()` 经 prop 传下来）仍会被判悬空，**这条限度写在脚本头**，
+> 真出现按提示改成全仓扫，而不是把档位放宽。
+>
+> 探针一次摆两个形状（临时 `packages/ui/src/components/__ProbeLabel.tsx`，用完即删）：
+> - `htmlFor={probeGhostId}`（本文件无此 id）→ 新脚本 **FAIL / 退出码 1**，点名"htmlFor 指向「probeGhostId」，但本文件里没有任何 id 接住它"；
+>   同一份输入下 `git show HEAD:` 的旧脚本 **OK / 退出码 0** ⇒ 漏洞是真的存在过，不是我假想的。
+> - `htmlFor={probeRealId}` + `id={probeRealId}` → **不报**（证明这条不是"见未知标识符就红"）。
+> 删探针后：`check:labels` 205 文件 0 处、`pnpm gates` 退出码 **0**（本轮只动门禁脚本，不碰产品代码，故 e2e 两半沿 14:06 那次实测 37 / 50 未重跑）。
+>
+> 连着三轮的同一条矿脉：**门禁脚本注释里自报的"已知不覆盖"是最便宜的重构靶子**——
+> 它已经被写代码的人承认、已经付过一次代价、而且解法常常就写在那句话里（`check:dispatch` 的块级配对、`check:purity` 的剥注释、这一条的"目标必须被接住"）。
+> 剩余仍在脚本头登记的自报限度有三条：`labels` 不校验祖先链、`labels` 的悬空检查以本文件为界（跨文件 id 会误判）、
+> `dispatch` 对反向守卫与 flag 两档仍取宽窗口 + 文本级配对不认正则字面量、`purity` 的跨行块注释（上一轮新写）。
+> 每一条都写明了"真出现该换 AST / 改全仓扫"，而不是留成沉默的例外。
+> **（2026-10-01 第二十一次续做）其中第三条已关闭**：`labels` 的悬空检查从"本文件"升到"全仓"，见本节末那一块。上面这段按当时实态保留。
+
+> **清偿 ADR-016 最后一条在册欠账，并顺带按棘轮的处置把 `edges` 外提（2026-10-01 第二十次续做）**
+>
+> 补记末尾写着：裸同名标题「恒指第一拍」可预测但不显眼，作者写错第二拍时**没有任何东西挡一下**，欠一条 lint 诊断。
+> 这一刀把它付清：**语义一字未改**（tie-break 仍取第一拍），只是把它说出来——
+> 文案「同名 Beat「开场」有 2 处，这里指向第 1 个；要指向第 2 个请写「开场-2」」把解法直接送到作者眼前。
+> 上没上线先看分母（第七十一条那条纪律）：三份随包 `.axsp` **各有 2 个同名 Beat 标题**，正是这条规则存在的场景，
+> 但**裸引用同名的处数为 0** ⇒ 既有作品不会突然亮黄灯。出口也不缺：`WriterPanel` 的「N 条提示」、`AxsCodeEditor:132` 的 linter、
+> 剪辑台 `MiniAxsEditor:77` 都已经在消费 `diagnostics`，severity 是 warning 所以不阻塞保存——**不需要新造 UI**。
+>
+> **撞上一处我自己今天写的对立断言**：`roundtrip.test.ts:196` 当时钉的是「裸同名标题**不报诊断**」。
+> 那不是笔误，是当时用来反驳我另一版过度提案的特征化断言。处置是**改断言而不是删断言**：
+> 换成精确断言这一条 warning（含 line/severity/文案全文），对 id 与 edges 的钉原样留着——
+> 决策层（ADR）优先于特征化层，但特征化层不能因此消失，否则"语义没变"这半就没人证了。
+> 新用例三条：choice 与 jump 两个调用点各报一条（**同拍里 jumps 会 continue 掉 choice 分支，所以分两拍造**）、
+> 唯一标题不许报（防它变成天天红的灯）、tie-break 不许变。先跑成 RED（`1 failed | 15 passed`，received 0）再实现。
+>
+> **棘轮这次挡的是 `parse.ts`（600 > 587），按它给的处置走**：目标解析那一族（`parseChoiceLine`/`parseJumpLine`/
+> `assignBeatIds`/`titleToId`/`buildEdges`，103 行）外提成 `packages/axs/src/edges.ts`，
+> `slugifyTitle` 一并搬过去再由 `parse.ts` 转出——这样 `print.ts` 与 `index.ts` 的 import 路径一行不用改，
+> 公开面不变、`check:circular` 仍绿。`parse.ts` 落到 **493 行**，baseline 收到 493（`--update` 后**逐行复核 diff：只有收紧**，
+> 并顺带清掉 `document.ts` 那条已失效的记录）。这一族的头注释直接指向 ADR-016 补记，写明
+> 「序号规则与 `print.ts::idToBeatRef` 是咬合的两半，单独简化一边会静默换靶」——**契约跟着代码搬了家**。
+>
+> 复跑：`pnpm gates` 退出码 **0**（axs 45 / core 82 / editor-core 158 / web 181+1skipped / admin 39；lint 0 warning；
+> `purity` 现扫 41 文件、`size` 346 文件 0 越线）；`pnpm e2e:desktop` **37 passed**、`pnpm e2e` **50 passed**（两半退出码都 0，
+> 因为改的是创作主通路的解析器，必须实测而不是只信单测）。仍按 §7 未提交未推送。
+
+> **`labels` 的悬空检查升到全仓，并把"被放宽的那一档"单独计数（2026-10-01 第二十一次续做）**
+>
+> 上一轮那条限度写在脚本头：悬空以**本文件**为界，父组件 `useId()` 经 prop 传下去的 id 会被误判成悬空。
+> 今天按那句提示做了——但不是简单把范围放大：**DOM 里的 id 是整个文档的**，所以"全仓找不到"才是真悬空；
+> 而"跨文件接住"是合法但**异常形状**（说明有人在传 id），所以单独计数并打印：
+> `[labels] … htmlFor 跨文件接住 <n> 处`。这一轮实测该值 **= 0**，也就是说这次放宽**没有放过任何一处现有代码**，
+> 而它一旦长起来就是提醒，不是让门禁变哑。（与既有那条"筛选须让零值档可见 / 分档判据要打印各档计数"同族：**放宽一条判据时，必须让被放宽的那一档可见**，否则放宽与失效在输出里长得一模一样。）
+>
+> 牙是一次探针跑两半（临时 `packages/ui/src/components/__ProbeX1.tsx` 定义 `id={probeSharedId}`、`__ProbeX2.tsx` 同时挂
+> `htmlFor={probeSharedId}` 与 `htmlFor={probeNowhereId}`）：
+> 同一份输出里 `跨文件接住 1`（**前者放行**）+ 唯一一条 FAIL 点名 `probeNowhereId`「全仓没有任何 id 接住它」+ 退出码 1（**后者仍拦**）。
+> 删探针后：205 文件、裸标签 0、跨文件 0、退出码 0；`pnpm gates` 退出码 0、`check:size` 346 文件 0 越线（探针不在末轮计数里）、`git diff --check` 干净。
+>
+> 三条自报限度到此只剩两条：`labels` 的祖先链（文本级判据的量不到，要真验证得进 DOM 层，E25/E27/E30/E31/E32/E38 那批 exact 可访问名判据就是它的行为侧替身）、
+> `dispatch` 对反向守卫与 flag 两档的宽窗口 + 文本级配对不认正则字面量、`purity` 的跨行块注释。**这三条我都不建议盲动**——
+> 换 AST 的收益是"少一类理论误判"，代价是新增一套要维护的解析路径与新的漏报面。
+> 本轮仍未提交、未推送、未改 tag（§7）。
+
+> **两套 AXS→图实现的"字段映射"原来是一份抄两遍——已归一，并补上主通路缺的那半判据（2026-10-01 第二十二次续做）**
+>
+> 我一直把 S13-7 的归并写成"两套实现的字段等价性没核对，合并会动 Writer 主路径"。这句话今天量完了，结论比预想的更难看也更省事：
+> **`axsImport.ts::beatToNarrative` 与 `projection/axs.ts::beatToNarrativeData` 是逐字符相同的 8 个字段**（连 `is_anchor: key==="intro" || title==="开始"` 都一样），
+> `gridPosition` 那套 4 列 / 220×140 的落位公式也是两份。所谓"两套实现"在**字段这一层根本不是两种语义，是一份逻辑被抄了两遍**——
+> 归一因此不需要产品定档，它就是"一个语义一处权威"该做的活。
+> 做法：唯一权威留在 `projection/axs.ts`（`beatToNarrativeData` + `gridPosition` 都从那儿导出），`axsImport.ts` 删掉两个本地副本改 import；
+> `index.ts` 同时星号导出两侧，所以公开面一字未变；`document.test.ts` 的 `gridPosition` import 跟着换源；
+> `axsImport` 的头注释原写"只依赖 ./types 与 @axiforge/axs"，现在多一条依赖，**注释同步改了**（注释撒谎比代码有 bug 更难查）。
+> 复核：`is_anchor` 规则在全仓的出现次数 **2 → 1**，`check:circular` 仍无环。
+>
+> **归一之后才有牙——而且发现主通路本来就没被钉**。把唯一权威改成 `is_anchor: false` 做变异：
+> - 归一前：只会红 `document.test.ts`（2 条，`axs.import` 那一侧）——Writer 保存走的 `parseAxsToPlan` **从来没断言过 is_anchor**；
+>   也就是说"关键拍判定"回归，主路径一半没人拦。`projection.test.ts` 里那两处 `is_anchor` 是 图→文本 的**输入**，不是这条断言。
+> - 补一条 `关键拍判定在 Writer 主通路上也钉住` 之后：同一处变异红 **3 条、跨两个文件**（156 passed | 3 failed）。
+> 这条判据写完第一次跑就**红了**——它当时用的是 `[intro]`，而代码只认 `[key: intro]`（见新登记的 #79），
+> 于是把我自己照 ADR 占位写法读出来的错语法抓了个正着：**判据先红不一定是判据错，也可能是写判据的人理解错了契约**——这次的差异同时暴露了一处真实的静默忽略。
+>
+> 末轮复跑：editor-core **159 passed**（158 + 新增 1）、`pnpm gates` 退出码 **0**、`pnpm e2e:desktop` **37 passed**（退出码 0，改的是 Writer 保存的映射，光靠单测不算数）、`git diff --check` 干净。
+> S13-7 剩下的部分要澄清：归一是**字段与落位**，两条**入口通路**（草稿事务 `axs.import` 与同步载荷 `parseAxsToPlan`）依旧并存——
+> 后者要合掉才需要动 Writer 保存的载荷形状，那一步仍然等定档。
+
+> **把今天所有改动过一次"产物层"验证，顺手拆掉一条自己以前记错的取证法（2026-10-01 第二十三次续做）**
+>
+> 触发点很朴素：文档里写着「`build` 刻意不进 `gates`，这类形状没有门禁管 → 接手时顺手跑一次构建看一眼」，
+> 而我今天改了渲染层（AXS 解析器 + 内核映射 + 面板消费的 diagnostics）。三个构建各跑一次：
+> `pnpm build:web` **0**（`tsc -b && vite build`，`INEFFECTIVE_DYNAMIC_IMPORT` 0 条，产物时间 09:15:21）、
+> `pnpm build:admin` **0**、`pnpm build:desktop` **0**（出 `axiforge-desktop` 15,941,328 B 与 `bundle/macos/Axiforge.app`）。
+>
+> 然后我在 `.app` 二进制上 `strings` 找今天新增的那句诊断文案，**0 命中**——差点就此写下"改动没进产物"。
+> 按"先跑对照组"的规矩没有下笔：同法去查**一直在用**的三条解析器文案（`选项目标未找到` / `跳转目标未找到` / `未知指令`），
+> **也全是 0**，而它们在 `apps/web/dist/assets/*.js` 里一一存在；二进制里能读到的只有资源名（108 个 `.js`、10 个 `.css` 的文件名）。
+> ⇒ Tauri 把 renderer 资源压缩内嵌，**JS 内容在二进制层根本不可读**，那条 `strings` 检验对内容恒为 0，
+> 于是它既不能证明"没进去"，也**从来不能证明"进去了"**。
+>
+> 被这条拆掉的旧证据是本文件 `:917` 那条「生产产物里 `storage=memory` 字面量 0 次」——结论没错，
+> 但当天的取证用的正是这个读不到内容的层，所以那份"实测"是空的。已在原处带日期更正，证据换到承载得住它的层：
+> `apps/web/dist/assets/` 内含该字面量的文件数 **= 0**（09:15:21 的新构建），加上源码侧 `storage/index.ts:139,143` 的
+> `import.meta.env.DEV &&` 静态替换。**规则收成一句：0 命中先证明这个方法对该类内容不是恒 0，再谈它证明了什么。**
+> 本轮无代码改动，故 gates / e2e 沿 01:12 那次实测（改的只有文档与产物），构建本身的退出码如上。
+
+> 本轮无代码改动，故 gates / e2e 沿 01:12 那次实测（改的只有文档与产物），构建本身的退出码如上。
+
+> **一条 warning 引出两刀：按棘轮的处置切了条件域，顺手挖出 `>=` 被静默编译成 `==`（2026-10-01 第二十四次续做）**
+>
+> 第一刀本意只是清偿 ADR-016 剩下的那类"文本层静默失败"：Beat 标题里认不出的方括号
+> （`# 第二拍 [intro]`——把键名直接塞进括号，正是照本 ADR「`[key: 名称]`」占位写法误读来的）
+> 走完整个 if-chain 没有分支接住，不报错、不生效、`key` 保持 `null`。
+> 判据先行：`parse.test.ts` 新 describe 跑出 **RED**（`Tests 1 failed | 17 passed`，`expected [] to have a length of 1`）才动 `parse.ts`。
+> 分母先量（第七十一条纪律，今天第三次用）：`packages/**` 与 `docs/user/**` 共 **20 处** Beat 标题方括号、
+> **0 处**落进新分支；三份随包 `.axsp` 是结构化 JSON 不含 AXS 标题文本，golden 无括号 ⇒ 既有作品不会突然亮黄灯。
+> 这里我连错两次取数法才拿到可信数字：先对 `.axsp` 里的原始 JSON 做正则（拿到 0 处，实为方法失效），
+> 再 `unzip -p project.json` 结构化走一遍才确认"确实没有"——**0 命中要先怀疑量法，再谈结论**。
+>
+> 加完这条 warning 后 `check:size` 红：`parse.ts` 502 > 棘轮 493。棘轮给的处置是"按域外提成协作模块"，
+> 于是今天第二次走同一条路。切法上有个真约束：本想切 `parseHeadingLine`，但它要用 `parseCondition`，
+> 单独切出去会形成 `parse ↔ heading` 双向依赖（`check:circular` 会亮）；
+> 而**条件与字面量那一族本来就是三处共用的底部依赖**（标题行 `if:`、指令行取值、`print.ts` 的打印半），
+> 所以切它才是那把正确的刀 → 新文件 `packages/axs/src/condition.ts`，parse.ts 收到 **420** 行、棘轮同步收紧（`--update`：2 增 3 删）。
+> 与 `./edges` 那刀的区别写进了注释：条件不是 parse 的对外 API，**不做"转出再导出"**，
+> `./print` / `./index` / 测试各自直接指过去（`index.ts` 公开出口一字未变）；对应测试同批搬到 `condition.test.ts`，断言一条未改。
+>
+> **挖到的那条是今天最值钱的一处**：搬 `OP_MAP` 时看见它只有 `==`/`!=`/`>`/`<` 四键，
+> 而 `COND_OP_RE` 认得 `>=|<=`、`docs/user/writing/axs-syntax.md:149` 白纸黑字承诺过它们。
+> 缺失分支经 `?? "eq"` 兜底 ⇒ 实测（RED 断言的 Received）`parseCondition("memory.score >= 10")` 得 `operator: "eq"`：
+> 作者写的"够 10 就开"被编译成"恰好等于 10 才开"，且打印回写会把原文改成 `== 10`——**静默改故事逻辑，还顺带改作者的字**。
+> 修法是补齐枚举而不是拒绝语法：`ComparisonOperator` 加 `gte|lte`，
+> 求值两处（`core/conditions.ts` 两个 case、`backend/.../runtime/service.py::_compare` 两条 `elif`）、
+> 打印一处（`OP_PRINT`）、词法映射一处（`OP_MAP`）。**Python 那半不是顺手加的**：
+> `_compare` 对未知运算符返回 `False`，只修 TS 就等于把 `>=` 的闸门在 web 端永久锁死——换一种更安静的坏。
+> 今天第二次验证同一条纪律：**补一处语义之前先数它有几套实现**（这一次是 5 处，且分属两种语言）。
+>
+> 判据四条 + 一次实测：`condition.test.ts` 映射两支、打印原样回到 `>=`（含 `&&` 组合支）、
+> `conditions.test.ts` 边界支（夹具 `coins: 10`：`gte 10` 真 / `gt 10` 假 / `gte 11` 假 / `lte 10` 真 / `lt 10` 假 / `lte 9` 假）。
+> Python 侧**没有测试覆盖 `_compare`**（`grep -rln "_compare" backend/tests` 空，这条限度登记在此），
+> 所以改用 `backend/.venv/bin/python` 直调取数：`10 gte 10 → True / 9 gte 10 → False / 11 gte 10 → True / 10 lte 10 → True / 11 lte 10 → False / 10 gt 10 → False`，
+> 与 TS 端逐位一致；`py_compile` 退出码 **0**。
+>
+> 末轮实测（一次取数，非沿用）：`pnpm gates` 退出码 **0**（purity 扫 42 个文件——新文件入面、0 违规；labels/dispatch/contrast/ui-source 全 OK）、
+> 单测 **511 passed + 1 skipped**（core 83 / axs 49 / editor-core 159 / web 181 / admin 39，比上一轮 +5，正是本轮 4 条新判据 + 1 条搬家拆分）、
+> `pnpm e2e:desktop` **37 passed** 退出码 **0**、`pnpm e2e`（含真后端那一半）**50 passed** 退出码 **0**、`pnpm build:web` 退出码 **0**。
+> 用户文档同轮：`axs-syntax.md` 补「键名要写在冒号右边」写法提醒、「认不出的方括号标记」容错条目，并把 `>=`/`<=` 含边界这句话写实（这条今天才第一次真的成立）。
+
+> **补一处不如关掉一类：把 `?? "eq"` 那类兜底换成 fail-closed，并给词法/映射做一条不变量（2026-10-01 第二十五次续做）**
+>
+> 上面那一刀修的是 `>=` 这个**实例**，但成因还留在原地：`OP_MAP[opStr] ?? "eq"`。
+> 只要词法认得某个记号而映射表缺键，它就替作者猜一个语义，而且猜的是最不像出错的那个。
+> 于是把兜底拆掉：缺键 ⇒ 整条条件判为不可解析 ⇒ 由 `[if:` 那条**已有**的 warning 接住；映射表不再补语义。
+> 同形状的判断在 `titleToId`（#77）与括号标记（#79）那两刀里已经是第二次、第三次出现——**"静默兜底"是这一族缺陷的共同底座**。
+>
+> 判据不做成"数一下今天的运算符"那种空载断言，而是**从真相源自己抽表**：
+> 新测试把 `COND_OP_RE.source` 的第一个捕获组 split 出来当记号表，钉两条 `toEqual`
+> （记号表 7 项 + 每项解析出的 operator 7 项）。为此把 `COND_OP_RE` 导出（只在模块内，包出口 `index.ts` 未变）。
+> 成对变异取数（临时探针 `__probe.test.ts`，用完即删、删后复跑）：
+> - 漂移（往 `COND_OP_RE` 加一个 `=~`）× **新守卫** ⇒ 探针**绿**（`parseCondition("flag.a =~ 1")` 返回 `null`），
+>   不变量**红**：`expected [ '==', '!=', '>=', '<=', '>', …(3) ] to deeply equal [ …, …(2) ]`（1 failed | 50 passed）；
+> - 同一漂移 × **旧 `?? "eq"`** ⇒ 探针**红**：`expected { type: 'flag', key: 'a', …(2) } to be null`，
+>   Received 里那句 `"operator": "eq"` 就是 #82 的机制本体（2 failed | 49 passed）。
+> 两相对照说明这条不变量不是"见新形状就红"的过宽守卫：它拦的是**漂移**，而漂移在今天并不存在，所以正常态它是 50 passed 里安静的一条。
+>
+> 一处自己该先做却被门禁补上的检查：新测试写完我只跑了 vitest 就往下走，`pnpm gates` 第一步 typecheck 就红——
+> `condition.test.ts(83,70) error TS2339: Property 'operator' does not exist on type 'Condition'`（`Condition` 是联合类型，
+> 单原子表达式的 `.operator` 要靠 `"operator" in cond` 窄化）。**vitest 只剥类型不查类型**，这条纪律今天是第二次被同一道门禁逮到。
+>
+> 登记限度：那条不变量是**绊线不是自动同步**——真要加运算符，记号表那行 `toEqual` 必须人手改，
+> 而改它只代表"你想清楚了"，仍要自己去动 `OP_MAP`、两处求值、`OP_PRINT` 与用户文档（这正是 #82 那次五处的清单）。
+> 末轮数字（01:38 一次取数）：`pnpm gates` 退出码 **0**、单测 **512 passed + 1 skipped**（core 83 / axs 50 / editor-core 159 / web 181 / admin 39）、
+> `pnpm e2e:desktop` **37 passed** 退出码 **0**、purity 扫 42 文件 0 违规。`pnpm e2e`（浏览器半）沿 01:33 那次 50 passed，本轮只动 `condition.ts` 的不可达分支与测试。
+
+> **把用户文档的示例本身变成机检对象，一刀修掉打印的写回、一刀撤回后登记成待决（2026-10-01 第二十六次续做）**
+>
+> 起因是今天那条最值钱的发现：`>=` 是"文档承诺跑在实现前面"捞出来的。既然靠人眼对账能捞到，
+> 就别再靠人眼——新增 `packages/axs/src/doc-examples.test.ts`，把 `docs/user/writing/axs-syntax.md` 里
+> **12 个 ` ```axs ` 围栏块**全部变成被测对象，判据 26 条：取块数量守卫（防"一块都没抓到"的假绿）、
+> 每块 0 error 级诊断、**`printAxs` 必须是纯函数**、每块 `parse → print → parse` 结构一致。
+>
+> **第一刀无歧义，当场修**：往返差异里混着一种污染——`printAxs` 把内部 scratch 直接盖回调用方对象
+> （旧 `print.ts:249-250`：`beat._edges = edgeMap.get(beat.id)`，而 `printBeatBody` 又去读它）。
+> 后果是 `parse → print → 再序列化` 的通路会把一个私字段带进草稿与 `.axsp`。
+> 改法：`edgeMap.get(beat.id)` 作为参数传给 `printBeatBody`，输入对象一字不碰。
+> 活调用方两处（`projection/axs.ts:142`、`MiniAxsEditor.tsx:22`）都是打印完即弃 `doc`，**所以今天没有可见后果**——
+> 但"打印不许改输入"是契约不是风格。见过它红：把 stamp 装回去 ⇒ 纯度那条红（消息点名「示例 L16 被打印改写了」）、
+> 往返三条一起红（`Tests 4 failed | …`），还原后 76 全绿。
+>
+> **第二刀有权衡，实现过又撤回，登记为待决**：往返判据同时抓到 `printAxs` 会把**指向下一拍的顺序边**物化成
+> `-> 标题` 行——文档示例 `# 开场` + `## 子场景` 之间没有任何 `->`，一次打印就凭空多一行，重新解析后 beat 上多出 `jumps`。
+> 我先按缺陷实现并跑绿（axs 76），随后**既有契约断言 `projection.test.ts`「线性链按拓扑序打印，roles 反解说话人，边打印为 -> 标题」变红**——
+> 这一红把问题从"实现缺陷"改判成"决策层两难"：① 显式化（现状）让"在两拍之间插一拍"不会自动接入链，新插入的那拍可能孤立；
+> ② 隐式化让文本干净且往返幂等，但"移动节点/调整顺序"会静默重连连线。两边都有真实失效模式，**不该由重构轮单方面定档**，
+> 于是撤回 ②，并把它的实测证据留在工单里（红过哪条断言、跑绿过哪些测试）。
+> 判据的处置是不作弊也不收掉：往返比较**只摘掉与待决项相关的那一维 `jumps`**，`edges` 与 beats 其余字段照比，
+> 并在比较函数注释里点名"为什么这里允许不同"、引用工单用**标题而不是编号**（这一轮就撞上编号漂移：注释里写 #85，台账给的是 #84，
+> 而同批 describe 里的 "(#84)" 又另指纯度那件事）。
+>
+> 末轮数字：`pnpm gates` 退出码 **0**（01:51）、单测 **538 passed + 1 skipped**（core 83 / **axs 76** / editor-core 159 / web 181 / admin 39；axs 从 50 涨到 76 就是这 26 条）、
+> `pnpm e2e:desktop` **37 passed**（01:51）、`pnpm e2e` **50 passed**（01:52）、`git diff --check` 干净；
+> 之后两次注释/测试标题的措辞改动只重跑了受影响的包（axs **76 passed**，01:53）。
+> 收成一句：**判据抓到的"不一致"要先分诊——写回输入是缺陷，物化顺序边是决策；前者当场修，后者带证据登记，别把两难当成 bug 顺手改掉。**
+
+> **演出指令的取值集合终于有了牙齿：三族枚举 + 两处数字参数不再静默通过（2026-10-01 第二十七次续做）**
+>
+> 起点仍是那条"文档 ↔ 实现"的机械对照：把用户文档列出的 `@` 指令清单与解析器认识的清单逐项比（结果两边一致，`@item` 文档已明说不提供），
+> 但顺着读 `parseDirectiveLine` 时读出第二类今天一直在修的形状——**吃下任意拼写再用 `as` 把类型圆过去**：
+> `@transition banana` → `kind: (kind ?? "fade") as "fade"`、`@fx disco` → `as "rain"`、`@camera wiggle` → `as "zoom"`，
+> 而真相源 `packages/core/src/ir.ts:136,151,159` 把这三族钉成 `CameraAction` / `TransitionKind` / `FxKind` 三个联合类型；
+> `@wait soon` 与 `@camera zoom big` 更直接：`parseInt`/`parseFloat` 出 `NaN` 原样进 IR。
+> **两端严格程度还不一致**：Python 侧用 pydantic `Literal` 校验同一组值（`backend/app/domains/narrative/ir.py:83,93,99`），
+> 同一份文本一端拒收、另一端静默降级——已在 ADR-027 的方言对照表补记这条差异。
+> 修法沿用今天那一条纪律：**只加提示、不改语义**（值仍照原样带着），warning 文案把可用列表送到眼前
+> （「转场种类「banana」不在可用列表里：fade / dissolve / wipe / cut（这一行照常保留，播放端不会有任何对应效果）」）。
+> **一处例外说清楚**：`@camera zoom big` 的 `scale` 不再写进 IR。理由是 `NaN` 进不了 JSON、且打印侧 `scale != null` 判定会把它当有值
+> （`print.ts:122`）从而把字面量 `NaN` 印回作者文本——那是"坏数据外泄"而不是"语义"，所以这一处不是纯加提示，判据里也写明了它是什么。
+>
+> 分母先量（今天第四次同一条纪律）：`docs/user/**`、`docs/ADR/**`、`seed_showcase.py`、`prompt.ts` 里这四族的实际取值
+> 只有 `fade` / `dissolve` / `rain` / `none` / `zoom` 与裸指令行（表格示例），**0 处落进新分支** ⇒ 零误报上线，不需要基线。
+> 判据 5 条在 `parse.test.ts` 新 describe：三族各一条 + `@wait` 缺参数/非数字两条 + `@camera zoom` 的 scale 那条带"不进 IR 且不印出 NaN"的断言，
+> 外加一条**对照组**（文档表格里给过的 7 种写法一条都不许报）。先跑出 RED：`4 failed | 16 passed`，`expected [] to have a length of 1`。
+>
+> 同轮按棘轮的处置又切一刀：加完这些分支 `parse.ts` 会越过 420 档，于是把**演出指令取值**这一族（11 个 `case`）外提成
+> **`packages/axs/src/instructions.ts`**（170 行，含 `resolveRole`——立绘指令与对白行共用同一个"角色名→id"解析，
+> 留在 `parse.ts` 会让新模块回头依赖它而成环）；`parse.ts` 落到 **330** 行，棘轮同步收紧（`--update`：1 增 3 删）。
+> `ADR-027` 方言对照表里 `parse.ts:234-318` 那一族行号就此失效，已按"历史文本不重写"另起带日期的补记指明新落点。
+>
+> 末轮数字（02:00 一次取数）：`pnpm gates` 退出码 **0**、单测 **543 passed + 1 skipped**（core 83 / **axs 81** / editor-core 159 / web 181 / admin 39）、
+> `pnpm e2e:desktop` **37 passed** 退出码 **0**、`pnpm build:web` 退出码 **0**。
+
+> **一条没上线的 warning：先量分母再决定做不做，这一轮它把想法否掉了（2026-10-01 第二十八次续做）**
+>
+> 顺着"分支没接住就糊过去"这一族往下看，读到对白分隔符：`parseDialogueLine` 的正则只认**半角冒号**，
+> 全角 `：` 的行整行落进旁白兜底 ⇒ `堰纱：你来了。` 变成 narration，说话人丢失、前缀照原样进玩家端文本。
+> 这条规则此前**只存在于 ADR-027 的方言对照表**（第 50 行）和代码里——用户文档一个字没提，判据也没有。
+> 直觉修法是给全角冒号加一条 warning。今天第五条分母纪律把它否了：
+> 扫 `docs/**/*.md` 的 ` ```axs ` 围栏、`.axsp` 里的 `*axs*` 字段、`testdata/**` 向量，
+> 全角冒号在 AXS 源文本里共 **6 处，全部来自用户文档自己的示例**，形态是 `旁白：她转身离开。`——
+> 而"整行文本的旁白"是**合法用法**（`旁白：` 属于正文）。⇒ "见全角冒号就提示"的误杀率是 100%，零误报上线不可得。
+> 于是本轮只做两件不需定档的事：**文档写清规则**（`axs-syntax.md` 的对白段加写法提醒，含"旁白：xxx 是合法整行旁白"这半句），
+> 以及**把现状钉成特征化断言**（`parse.test.ts` 新 describe 两条：全角那支 + 半角对照组），并登记待决（工单标题
+> 「全角冒号对白被静默当旁白」：要做提示必须先定"怎么区分打错的说话人与合法的旁白前缀"，三条候选各自要什么，写在工单里）。
+> 特征化断言也见过它红：把正则临时改成 `[:：]` ⇒ `expected [ 'say' ] to deeply equal [ 'narration' ]`（1 failed | 21 passed），还原后 axs **83 passed**。
+>
+> 顺带记一条取证教训：同一次扫描里三份 `.axsp` 报 `BadZipFile`，差点被当成"随包文件格式坏了"。
+> 对照魔数即可归因：`public/seeds/*.axsp` 是 `504b`（PK，真 ZIP），而报错那三份落在
+> `apps/desktop/src-tauri/target/release/build/.../tauri-codegen-assets/`、魔数是 `1b…`（brotli 压缩的构建期副本）——
+> **是我的 `rglob("*.axsp")` 把构建产物扫进了面，不是产物坏了**。扫描面要先按"跟踪文件 vs 构建目录"分一次。
+>
+> 末轮数字（02:07 一次取数）：`pnpm gates` 退出码 **0**、单测 **545 passed + 1 skipped**（core 83 / **axs 83** / editor-core 159 / web 181 / admin 39）、
+> `pnpm e2e:desktop` **37 passed** 退出码 **0**、lint `Found 0 warnings and 0 errors`。本轮只动测试与文档，产品代码未改。
+
+> **审计 `draft.ts` 时撞见一条在册契约被违反：发射器印出了自己读不回来的行（2026-10-01 第二十九次续做）**
+>
+> 起点是查 `defaultSpeaker` 到底生不生效。结论分两层，都有据：
+> **① 那条分支确实是死支**——`draftFromProse` 只在 `i.op === "say" && !i.speaker` 时补默认名，
+> 而它的唯一生产者 `proseToScriptDraft` 用 `SPEAKER_RE = /^([^\s：:]{1,20})[：:]\s*(.+)$/` 取名字，名字非空才可能成 `say`
+> （认不出的名字走旁白那支），所以这条 map 在这条通路上永不点火。
+> **② 但顺着找到了真缺陷**：Python 那头补默认名的位置在**发射器**（`ai_draft.py:109` `speaker = item.get("speaker") or default_speaker`），
+> TS 的发射器**没有任何等价兜底**，于是实测（临时探针，跑完即删）：
+> `printAxs` 把空说话人的 `say` 印成 `# 测试\n: 你来了。\n`，`parseAxs` 读回来是 `narration`、正文 `: 你来了。`
+> ——**冒号漏进玩家文本、op 从 say 翻成 narration**。而 `instructionOps.ts:33` 就是编排台「+ 台词」按钮造的形状
+> （`{ op: "say", characterId: null, text: "" }`），⇒ 这是活路径，不是理论输入。
+>
+> **这条违反的是在册契约，不是我的偏好**：本文件依据的 ADR-016 质量要求第 2 行早就写着 `parse(print(beats)) ≡ beats`。
+> 修法取"按旁白那一支印出去"，依据是三方一致：`core/src/ir.ts:90` 注释写着 characterId「缺省为旁白」；
+> 运行端本来就不显示空说话人的名字（`engine.ts::resolveSpeaker` 返回 `null`、`BacklogPanel.tsx:39` 的 `entry.speaker &&`）；
+> 文本层没有"无名对白"这个形状。另一条候选（照 Python 补一个"旁白"显示名）会让玩家**多出一个原本没有的名字**，
+> 属于播放可见变化，已作为双端差异登记进 ADR-027 补记（桌面是唯一发布目标，本 ADR 认 TS 这条）。
+> 转义规则顺手归一：`printNarrationLine` 一份，`narration` 与这一支共用（此前是内联表达式，两处各写等于两处各漂）。
+>
+> 判据三条（`parse.test.ts` 新 describe，RED 先跑：`expected '# 测试\n: 你来了。\n' to be '# 测试\n你来了。\n'`，对照组一开始就绿）：
+> 空说话人 → 印成纯文本且回读仍是那行文本、`speaker: ""` 同形、**对照组**有说话人时仍印 `名: 台词` 且回读是 `say`。
+> **改断言而非删断言**的又一例：`projection.test.ts:107` 那条基线原本钉的就是坏输出（注释写着「既有行为，基线钉住」），
+> 按新预期改写并留日期与原因，对选项目标映射 `> 东 -> 东方` 的钉原样保留。
+>
+> 末轮数字（02:17 一次取数）：`pnpm gates` 退出码 **0**、单测 **548 passed + 1 skipped**（core 83 / **axs 86** / editor-core 159 / web 181 / admin 39）、
+> `pnpm e2e:desktop` **37 passed**、`pnpm e2e` **50 passed**、`check:size` 扫 348 文件 0 越线。
+> 收成一句：**审计"这段死代码生不生效"值得做——它这次没直接帮上忙，却把发射器缺兜底这条活路径缺陷带了出来。**
+
+> **共享向量补第五条"认不出的名字退回旁白"，并对两端各验一次牙齿（2026-10-01 第三十次续做）**
+>
+> 先查证那句"两端锁定等价"到底有没有执行者（记忆里的老规矩：声称没人跑之前把调用链追到末端）。结论是**有**：
+> `.github/workflows/ci.yml:88` 在 `working-directory: backend` 下跑 `uv run pytest tests/ -v`，
+> 而 `backend/tests/test_axs_draft_vectors.py` 消费的就是 `testdata/axs-draft/*.json` 同一批向量——
+> 它只断言"发射器 reproduces 手写期望文本"，期望文本的合法性由 TS 侧 canonical 解析器裁决（不拿 Python 自己的正则自证）。
+>
+> 缺的是覆盖面：原有 4 条向量锁住了 `@bg/@bgm`、转场/特效的硬编码时长（500/600）、`\` 转义、尾部选项，
+> 但**"认不出的名字不猜角色"这条双端同裁决只散在单测里**。而这条恰好有个易漂的细节：
+> 两端都是 `f"{name}：{text}"` / `` `${name}：${text}` ``——**固定用全角重新拼接，与输入冒号种类无关**
+> （TS 的注释此前写的是"保留全角冒号原样"，对半角输入不成立；已改成写明"与输入无关"，并把注释移进它所属的 else 分支）。
+> 新向量 `testdata/axs-draft/unknown-speaker.json` 用半角输入、期望全角输出，正是为了让"谁哪天改成保留原样"必须过一次两端。
+>
+> 牙齿各验一侧（成对变异，改完即还原、并 `git diff --stat` 确认两个文件都无残留）：
+> 把两端那处拼接同时改成半角 ⇒ TS 侧 `1 failed | 5 passed`（红在 `unknown-speaker` 那一条）、
+> Python 侧 `test_rules_emitter_reproduces_vector[unknown-speaker]` AssertionError；
+> 还原后 TS 向量 runner 回到 6 passed。
+> 新向量首跑两端就绿（不是我改出来才绿的形状，是既成事实被补上登记），所以它的价值全在"漂移会被抓住"这一侧。
+>
+> 末轮数字：补向量后 `pnpm gates` 退出码 **0**、单测 **549 passed + 1 skipped**（**axs 87**：86 + 新向量那 1 条）、
+> `pnpm -F @axiforge/axs typecheck` 0；Python 侧 `pytest tests/test_axs_draft_vectors.py` **6 passed**（`.venv` 宿主）。
+> 产品代码未改（只动一条注释的位置与措辞 + 新增向量文件）。
+
+> **一个 Beat 的第二个分支组在发射时被整个丢掉：钉成在册断言 + 登记三种修法（2026-10-01 第三十一次续做）**
+>
+> 循着上一轮自己点名的两处之一去查（`print.ts` 的 `reverseRole` 回退与"分支目标不存在"），先撞见更大的一个：
+> `printBeatBody` 用 `beat.script.find((s) => s.op === "choice")` **只取第一个分支组**，
+> 第二个组连同它的选项一起消失，而且 `diagnostics` 是空的。临时探针读数：
+> 输入 `[say, choice[左], narration, choice[右]]` ⇒ 打印 `# 测试\n堰纱: 选吧\n中间一句\n> 左\n`——
+> 回读得到 3 条指令、1 个 choice、0 条诊断。**违反 ADR-016 质量要求第 2 行 `parse(print(beats)) ≡ beats`**。
+>
+> **为什么这算活路径**：`ScriptEditor.tsx:81` 的 `add = (op) => onChange([...script, defaultInstruction(op)])`
+> 没有任何"每拍只许一个分支"的守卫，而「分支」就躺在指令面板里（`instructionOps.ts:21,58`）⇒ 连点两次即成立。
+> 三条候选修法各自都要动一层决策，所以本轮**不擅自选一条**：
+> ① 合并成一组（不丢内容，但"两个先后出现的问题"被改写成"一个 N 选项问题"，叙事语义变）；
+> ② 扩语法支持多组（语义保真，但要动解析器/打印/用户文档/语法冻结面，还得定旧文本怎么读）；
+> ③ 保持现状但发射侧给诊断（不丢语义不改语法，代价是 `printAxs` 目前只有字符串出口、没有 diagnostics 通道，
+>    要加一个可选出参并接进 Writer/编排台的提示列表）。
+> 我的建议是 ③——先把"静默"止住，再谈要不要 ①②；但它属于可感知的接口调整，所以进清单等一句话。
+> 本轮落地的不需定档那半：`roundtrip.test.ts` 末新增一条**特征化断言**（钉的就是"第二个组不出现"），
+> 注释写明它是"这条曾经会丢"的凭据，修法定了之后要**改写而不是删除**它。
+>
+> 又第三次被同一道门禁逮到：新断言用了未 import 的 `Instruction`，vitest 全绿而 `typecheck` 红
+> `TS2304: Cannot find name 'Instruction'`——**vitest 只剥类型不查类型**，这条纪律今天的命中率比我自己写它的次数还高。
+>
+> 末轮数字（02:26 一次取数）：`pnpm gates` 退出码 **0**、单测 **550 passed + 1 skipped**（**axs 88**）、`check:size` 扫 348 文件 0 越线。
+> 产品代码未改（只动测试）。
+
+> **新门禁 `check:citations`：把文档里的 `路径:行号` 变成机检对象，当天就被自己的三次搬家打到 12 条越界（2026-10-01 第三十二次续做）**
+>
+> 动因是今天的直接后果：`parse.ts` 一天里被按域切了三刀（600 → 331 行），而 ADR / REFACTOR / BLUEPRINT 里散落着按旧行号写的坐标。
+> 上一轮我给 ADR-027 写的是"历史文本不重写 + 带日期的补记指新落点"，但那只是**声明**，没有东西挡下以下一次失效——
+> 于是这道门禁把声明变成判据：**文件必须存在、行号必须落在文件长度内**。`docs/**` + 两份根文档共 47 个文档、161 条引用被判定。
+>
+> **判据先被自己的误报教过一次**：首版把文档里合法的简写（`parse.ts` 第 391 行、`projection/axs.ts` 第 192 行）全报成"文件不存在"，
+> 166/200 是误报 ⇒ 那条判据不合格。改成**按 basename 或路径后缀在受追踪源码里找唯一匹配**：唯一才判、多义跳过、
+> 构建目录/依赖目录/`Clearance/` 不参与匹配（否则 `target/` 里的副本会让判据变宽）；
+> 并且**各档计数一律打出来**（已判定 161、越界 3、不存在 0、歧义跳过 37、省略号跳过 1、只落在被跳目录 4）——
+> 判据退化成沉默放行时，只有计数会暴露它。牙齿验过：临时放一个 `docs/__probe_citations.md`，里面一条 `parse.ts` 第 99999 行 与一条不存在的路径，
+> 门禁 **FAIL / 退出码 1** 并点名两行，探针随即删除。
+>
+> 真信号 **12 条越界**，处置分两类：**现状类 9 条改到今天的真实落点**（`assignBeatIds` 原 `parse.ts` 第 383-391 行 → `edges.ts` 第 36 行、
+> `titleToId` → `edges.ts` 第 46 行、两条 warning → `edges.ts:84 / :103`、AXS 分派四支 `:540/:553/:559/:568` → `parse.ts:142/:297/:303/:312`（ADR-027 与 BLUEPRINT 同步）、
+> `axsImport.ts` 第 81-87 行 → 第 57-63 行）；**历史日志类 3 条不改写**（当日记录里的 `ScriptEditor.tsx` 第 572 行、`parse.ts` 第 391/417 行，它们描述的是当时的实态），
+> 冻结进 `scripts/doc-citation-baseline.json` 并注明"清偿后应缩短"——具名基线随修完缩短，否则棘轮等于没关。
+>
+> 接线三处同轮：`package.json` 新增 `check:citations` 并插进 `gates`（链从 11 条变 **12 条**）、`README.md` 的门禁表补一行（含自报限度）、
+> 脚本头写明"已知不覆盖"。末轮：`pnpm gates` 退出码 **0**（含新那一道 OK），单测维持 **550 passed + 1 skipped**。
+> **它第一次红是红在我自己身上**：写完这批文档后门禁报 8 条新增越界，逐条看全是「引用一个坏坐标来做说明」的那几处——判据分不出「这是断言」与「这是举例」。处置不是放宽判据，而是把示例改写成「`parse.ts` 第 391 行」这种非引用形式；**一条新门禁上线后第一批抓到的作者往往是我自己**，这正是它该有的样子。产品代码本轮未改。
+
+> **一条"看起来是缺陷"的线按证据作废：`role.remove` 有内核能力、无界面入口（2026-10-01 第三十三次续做）**
+>
+> 上一轮我给自己留的下一处是 `print.ts::reverseRole`——角色反解失败时会把**内部 id 原样印进作者文本**（`@show char-1`、`char-1: 台词`）。
+> 顺着"什么情况下反解失败"查下去，命中的前提是"角色被解绑后节点仍引用它"，于是去查 `role.remove` 会不会留下悬空引用：
+> 内核确实留（`document.ts` 的该分支只过滤 `draft.roles`，不动 node 的 script）。看起来这就是一条活缺陷。
+>
+> **但没有对照之前不下结论**（本文件今天第三次靠这条纪律避免造活）：全仓 grep 分派点——
+> `role.remove` 只出现在内核（`document.ts` / `types.ts`）与它自己的单测（`document.test.ts`），
+> 而同一事务联合里的 `node.move`、`script.patch` 在 `apps/web/src` 有真实 dispatch 调用点。
+> ⇒ **界面从不解绑角色**，"解绑后 id 泄进文本"这条路径今天不可达；内部 id 出现在文本里只剩一种现实入口：**外部灌进来的数据本身带着未绑定的 id**
+> （`axs.import` 走 `resolveRole` 时名字不在 roles 里，characterId 会保持那个字符串原样——但那本来就是作者文本里写的名字，不是泄漏）。
+> 结论：**不修**，也**不给 `reverseRole` 加兜底**——在没有可达输入的情况下加"未知就报提示"的分支，
+> 正是我今天反复拆的那一类"为不可能的场景做防御"。
+>
+> 值得留册的不是缺陷而是这条不对称：**内核有 `role.remove` 能力，界面没有入口**。
+> 两类后果不同，所以登记为一句待决而不是任务：
+> 若将来给"从工程里移除某角色"补 UI 动作，它必须同时决定**引用该角色的节点怎么办**
+> （清空成无名台词？退回旁白？还是阻止移除并列出仍在引用的节点？）——
+> 参照本文件已有的口径："断掉输入路径的能力要记成能力缺口，不是机制已保留"；
+> 而"删掉角色让台词变成无名"会顺带撞今天上午定下的那条（无说话人的 `say` 发射为旁白，见「第二十九次续做」）。
+> 判据侧不需要新增：可达性已经由"分派点存在与否"这个机械问题决定，写测试去测一条 UI 走不到的分支只会多一条不会红的牙。
+>
+> 本轮无代码改动（只动文档），末轮以 `pnpm check:citations` 与 `pnpm gates` 复核（新写的这段里凡"某文件某行"都写成非引用形式，见「第三十二次续做」末尾那条自抓）。
+>
+> **补一条"试过并否掉"的读数（同日第三十四次）**：`check:citations` 的自报限度"不判内容层"看起来是下一步该收的矿脉，
+> 真去量了：把同行反引号里的标识符拿去目标文件里找，**52 条可判引用里 20 条被标 = 误报率 38%**，
+> 成因不是数据脏而是**配对不可得**——一行里同时引用两个文件时（各带自己的符号），"哪个标识符属于哪个引用"没有机械可依据的邻近关系。
+> 于是这道门禁停在"存在性 + 范围"这一层，读数与成因写进脚本头，**下一会话不必再试第二次**。
+> 这条与今天另外两次"按证据作废"（`_line` 死读、`role.remove` 无界面入口）同属一类：**自主矿脉的收尾产物常常是"此路不通"的凭证，而不是又一次改动。**
+>
+> 同一轮把 `doc-examples.test.ts` 的扫描面从"用户文档那一个文件"扩到 **`docs/**`（排除 `docs/archive`）**：
+> 数下来围栏从 12 个变 **13 个**，多出来的正是 **ADR-016 自己那条语法示例**——语法权威的样例句此前落在机检面之外，
+> 而它恰恰是最该被"0 error 诊断 + 打印不改输入 + 往返一致"三条管住的一段。扩面后判据数 26 → **28**（13 块 × 2 条 + 数量守卫 + 纯度条），
+> 全绿：说明 ADR-016 的示例与今天的实现一致（这也是它该有的状态，但从此**漂移会被抓住**）。
+> 数量守卫同时从"大于 0"抬成"大于 12"：**扫描面被谁悄悄改窄会直接红**，而不是退化成"一块没抓到也算过"的假绿。
+
+> **`.axsp` 导出往返补进判据面：夹具之外，真实随包产物也要被钉住（2026-10-01 第三十五次续做）**
+>
+> **先自我更正（同日 03:21，写完下一段之后发现的）**：我下面写的"这条不变量**没人守**"**说过头了**。
+> `apps/web/src/shared/storage/axspRoundTrip.test.ts`（96 行，标题就是「`.axsp` 往返不漏字段」）在**provider 层**守着更强的版本：
+> 它走 `exportProjectAsAxsp → importProjectFromAxsp`，钉工程元信息（描述/世界观/规则/机制/题材/标签）、舞台与 `sceneRefId`、道具引用一起过去，
+> 而且它自己的注释已经写明"`storage.test.ts` 只断言 nodes/edges/axsSource/roles/title，元信息从来没人要求它过去"——
+> 也就是说这正是我今天一直在做的那类补洞，只是**它早在 S13-2 就做完了**。
+> 我漏看的原因很具体：判定"有没有人守"时只 grep 了符号 `packAxsp`，而那条测试调的是**包装函数**（`exportProjectAsAxsp`），符号不匹配 ⇒ 假阴性。
+> 收成一句：**问"有没有人守这条不变量"要按能力名（round trip / 往返 / 不漏字段）扫测试目录，不能只按底层符号名扫。**
+>
+> 于是下面这批判据的真实价值收窄为：**把"真实随包文件"这个输入类别纳入容器层往返**（既有覆盖 = 合成夹具 + provider 层；
+> 新增 = 三份 shipped bundle 过 `unpack → pack → unpack` 逐字段相等 + 素材清单与包内条目一致 + 数量守卫防空载）。
+> 它仍然便宜且有意义（随包示范作是唯一必然存在、又由后端导出器生成的真实产物，与 seed_showcase 的在册漂移正相邻），
+> 但**不是"补了一个没人守的洞"**——这句修正同时进 HANDOFF §4 与 task 表。
+>
+> 先量再说有没有缺陷：拿三份**真实随包 bundle**（`apps/web/public/seeds/showcase-*.axsp`）跑 `unpack → pack → unpack`，
+> project 序列化后**逐字节一致**、角色数守恒、素材清单 0 → 0（示范作不内嵌素材）⇒ **没有缺陷**。
+> 但这条不变量此前**没人守**：`axsp.test.ts` 的 pack→unpack 等价用的是合成夹具，`seedShape` / `seedPlayable` 钉的是"读进来的形状与可玩性"，
+> 两者中间的交叉——**用户从示范作导入工程、再点导出时会不会丢内容**——只能靠代码与夹具自证。
+>
+> 补 4 条判据（新 describe，含一条"目录里有三份"的数量守卫，防空载）：逐份断言再读回的 `project`、`characters`
+> 与 `manifest.assets` 三方相等，并断言"清单声明的素材必须真在包里"（否则导入端读回是一条 `corrupted`）。
+> **牙验过**：临时让 `packAxsp` 在序列化时改一个字段（给标题加后缀）⇒ 新增 3 条**全红**，还原后 `axsp.test.ts` 18 passed。
+> 同时**如实说一句**：那次变异也被既有的两条合成夹具判据抓到，所以新增部分的价值在**输入类别**（真实产物、含 `normalizeBundle` 归一化后的形态），
+> 不是新代码路径——这跟今天 `check:citations` 那条"内容层档否掉"的判断是同一把尺子：**能说清判据抓什么，才值得留它**。
+>
+> 末轮数字（03:19 一次取数）：`pnpm gates` 退出码 **0**、单测 **556 passed + 1 skipped**（core 83 / axs 90 / **editor-core 163** / web 181 / admin 39）。
+> 只动测试与文档，产品代码一字未改。
+
+> **桌面生产后端那条零判据的接缝：I4 的形状第一次被单测钉住（2026-10-01 第三十六次续做）**
+>
+> **先更正我自己的框架**：起手我以为缺陷是"两端没有共享契约"——**不对**。
+> `sqlite.test.ts` 与 `memory.test.ts` 都跑了 `runStorageContractSuite` / `runStoragePoolContractSuite` / `runStorageAuthoringContractSuite` 三支，
+> 同一套契约确实在两个 Provider 上各验一遍。真正的空档只剩一个，而且更窄也更要命：
+> **契约套件跑的是 sql.js 后端，一次都没有实例化 `TauriSqlBackend`**（后者需要桌面壳，CI 里没有壳，桌面壳又零 CI 信号）。
+> 于是 I4（`saveNarrative` 原子覆写）在**生产路径**上的保障，全部压缩在那个文件里三个形状，而三个形状**没有一条判据**。
+>
+> 那个文件还编码了两个"已实证失效"的决策，这类代码最容易被后来者"顺手简化"：
+> ① 一批语句 = 一次 `invoke("sql_transaction")`，由 Rust 侧单连接池执行——替代形状（把 BEGIN/COMMIT 当 SQL 文本发）已被池化连接打穿；
+> ② `execute` 与 `transactional` 共用一条 Promise 链串行化，保证事务窗口内没有并发写插进来。
+>
+> 补 7 条判据（`tauriSqlBackend.test.ts`，mock 掉 `@tauri-apps/api/core` 与 `@tauri-apps/plugin-sql`）：
+> 一次 invoke 承载整批、**载荷形状逐键钉死**（这是跨语言契约：TS 侧改名不会报错，只会把错误推到壳里。真正静默的那格是 `dbName`——
+> Rust 侧 `create_if_missing(true)`，库名写歪就**另建一个空库并成功提交**，而读路仍走插件那个文件 ⇒ 分裂大脑、零报错；
+> 反倒是 `params` 漏发只会在带占位符的语句上被 sqlx 挡回来，因为 Rust 的 `struct Stmt` 给 `params` 挂了 `#[serde(default)]`）。
+> 顺带查实 `dbName` 这条契约**壳内已有实证**：冒烟的 `saveNarrative-overwrite` 就是"经 `sql_transaction` 写、经插件 `select` 读"读回来的，
+> 两边同文件被真壳验过——单测的作用不是再证一次，而是**让它在没有壳的 CI 里改坏时立刻红**。
+> 占位符**按语句独立重新编号**（`?` → `$1..$n`，批次里每条各自从 $1 起）、缺省 `params` 补空数组、
+> 不发逐条 `execute` 也不发含 BEGIN/COMMIT 的文本、并发两个事务只放一个进 invoke、
+> 一处 `execute` 失败后下一条仍真发出、`select` 同样翻译占位符，外加 `isTauriEnvironment` 两分支（`index.ts` 靠它选后端）。
+>
+> **牙是四次成对变异取的，各红且只红该红的那条**：
+> 退回逐条 `execute` ⇒ **4 红**；去掉 `transactional` 里的占位符翻译 ⇒ **2 红**（两条编号断言）；
+> 绕过队列直接 invoke ⇒ **1 红**（串行那条）；把 `enqueue` "简化"成 `chain.then(task)`（少掉拒绝腿）⇒ **1 红**，
+> 红的方式是**上一次磁盘故障的错误串给下一条无关语句**——队列被污染后故障会伪装成"这条也坏了"。全部还原后 7 passed、`tsc -b` 退出码 0。
+> 第一次变异顺带量到一个此前不知道的事实：逐条走 `this.execute` 会在**同一条链上自锁**（外层任务等内层，内层等外层提交），
+> 所以那个"简化"不只是丢原子性，它连活着跑完都做不到——这条写进实现文件的头注释，免得下次有人再试。
+>
+> **同轮拆掉一处替代码撒谎的注释**：头注释原本写"事务原子性最终由壳内冒烟实证，**若池行为不符预期**则原子性下沉到 Rust 单连接命令"，
+> 而代码是**无条件**走 Rust 命令——假设语气留着，下一个读的人会以为还有一条 BEGIN/COMMIT 的通路可退。
+> 顺带把冒烟那支查实了：`desktopSmoke.ts` 确有 `transaction-rollback`，用重复主键触发真回滚并断言旧状态存活，**这条注释没撒谎**，
+> 但它只在 DEV 壳里由人跑，不是门禁——所以判据必须落在 CI 真会跑的 TS 侧。
+>
+> 又一例「vitest 只剥类型」：新测试首跑 **7 passed**，`tsc -b` 却红（把 `globalThis.window` 断言写成不可比较的类型转换）。今天第三次。**产品代码除注释外一字未改。**
+> 顺手把那条注释里的**安全前提从断言改成实数**：`? → $n` 的重写只扫 SQL 文本，前提是"字面量里不含 `?`"——
+> 一次只读探针（44 个非测试文件）量到**含 `?` 的 SQL 文本块 66 个，把 `?` 写进单引号字面量的 0 个**，读数与口径限度（扫不到动态拼接的 SQL）一起写进实现文件头注释。
+> **没有为此建门禁**：66/0 是"当前为真"的测量，不是需要棘轮的漂移面——按今天的尺子，先量分母再决定要不要留牙。
+>
+> **末轮取数里拿到一次红，先归因再落笔**：`pnpm e2e:desktop` 第一跑 **36 passed / 1 failed**，红在 E17 内部的 E28 那一跳
+> （`.poll(...).toBe(1)`：`goBack` → 重进 → 等「继续游玩」，30s 内全轮返回 0 后超时）；**同一份代码立刻重跑 → 37 passed**（那一跳一次就中）。
+> 归因：读 `PlayerPage` 那个「单槽自动存档（slot 0）」effect，它是 600ms `setTimeout` + 卸载时 `clearTimeout`，
+> 而测试的下一步正是"断言文案可见 → 立刻 goBack"——**写入被自己的卸载清掉，那一屏于是永远不出现**。
+> 这不是新缺陷：它是 task「自动存档的 600ms 防抖窗口」在册那条的**第 2 次观测**（第 1 次的记录里已写明"E28 轮询第一次全红就是撞在这上面"）。
+> **所以本轮登记的是一条限度而不是一条修复**：那格定档前，`e2e:desktop` 不能当全绿信号用——今天两次拿到 36/1 → 37/0 这个形状。
+> 我没动它：三种修法（卸载即落盘 / 缩短或取消防抖 / 保留现状但让测试显式等过 600ms）都改玩家数据语义，那由用户定。
+> 末轮取数：`pnpm test:unit` **563 passed + 1 skipped**（core 83 / axs 90 / editor-core 163 / **web 188**（+7）/ admin 39）、
+> `pnpm e2e:desktop` **37 passed**（03:43，退出码 0；即 36/1 那次之后的两次连续绿，今天四样本里 1 红）、`pnpm e2e` **50 passed**（03:43，退出码 0）、`.e2e-lock` 不存在。
+> `pnpm gates` 的退出码取在**全部文档改写之后**（`check:citations` 要扫本轮新写的这几段），见本块最后一行。明细同步进 `docs/HANDOFF_DESKTOP.md` §4 第十七批与 §5。
+> **末次全链（03:45，取在本文件与 HANDOFF 的本轮段落全部改写完成之后）**：`pnpm gates` 退出码 **0**（13 道）——
+> `[file-size] 348 个文件 0 越线`、`[doc-citations] 已判定 165、越界 3 全在册、不存在 0`、`[publish-target] 残差 4 全在册`、`git diff --check` **0 行**。
+
+> **把上一条里那条「测量」升成代码守的 fail-closed（2026-10-01 第三十七次续做）**
+>
+> 上一条留了一句"66/0 是测量，不是需要棘轮的漂移面，所以不建门禁"。**这话只对了一半**：不该建的是**扫描型门禁**（它扫不到动态拼接的 SQL，
+> 报的是假安全感），该建的是**运行时的 fail-closed**——因为那条前提是 `translatePlaceholders` 唯一的正确性依赖，
+> 而它此刻只活在注释里。下一个作者写一句 `WHERE op = '?'` 得到的不是报错，是**序号错位且执行成功**：`'?'` 里那个 `?` 会被当成占位符吃掉，
+> 后面的真占位符集体前移一位，绑值全错而 SQLite 照收不误。这正是今天全天在拆的那一族（`>=` 被降成 eq、空说话人被打回旁白）的存储版。
+>
+> 落地三行：`translatePlaceholders` 先把单引号字面量扫一遍（正则认 SQLite 的 `''` 转义，所以 `'it''s ?'` 也算字面量内含 `?`），
+> 命中就抛 `占位符重写不安全`，**不发出任何语句**；抛点在选择器内部，所以 `select`/`execute`/`transactional` 三条路都过不去。
+> 补 3 条判据（现共 **10 条**）：字面量含 `?` 的事务**reject 且一次 invoke 都不发**、转义引号那条同样拦、
+> **零误杀对照组**——`VALUES ('inline', 'it''s fine', ?)` 与 `pragma_table_info('projects')` 这类合法字面量必须照常翻译成 `$1`。
+> 成对变异：把守卫退回上一条的形状 ⇒ **恰好 2 红**，且红的方式就是缺陷本身（`promise resolved "{rowsAffected: 1}" instead of rejecting`）；
+> 对照组两种形状下都绿 ⇒ 这条牙只咬坏输入。全链复绿：`gates` **0**、单测 **566 passed + 1 skipped**（web 188 → **191**）。
+>
+> **一条如实的范围声明**：这一刀的判据全在单测层，**e2e 两套都加载不到这个模块**——桌面 e2e 跑在 chromium 里，
+> `isTauriEnvironment()` 因为 `__TAURI_INTERNALS__` 不存在而返回 false，于是走 Memory 那一支；
+> 这条分派条件正是上一条切片刚钉住的第 7 项，所以这个"测不到"现在是**有判据的说法**而不是推测。
+> 真壳内的行为仍只有 DEV 冒烟覆盖（与本轮之前一样），这也是为什么修法选"抛"而不是"记一条 warning"：
+> 抛出去会被 Provider 收成 `io` 错误、在界面上可读，而静默错位要等到用户看见错乱的存档才会暴露。
+
+> **同一族的第三个实例搬到素材层：摘要降级会把两条在册契约同时弄破（2026-10-01 第三十八次续做）**
+>
+> 起点还是那句老问法——**这个生产模块有没有判据？** 答案是**一条都没有**：`tauriAssetStore.ts` 是桌面素材落盘的唯一实现，
+> 契约套件跑的是 Memory 与 sql.js，e2e 两套又加载不到它（`isTauriEnvironment()` 为 false，那条分派条件昨天刚钉成断言）。
+> 读代码时撞上一条**已发布的 ADR 决策本身就是坏的**：`ADR-026` 的「后果」里写着
+> 「⚠️ 摘要依赖 `crypto.subtle`；非安全上下文退化为 FNV 内容键，仅用于去重不承担安全语义（代码内已写明）」——
+> 而两句话都不成立：**①** `contentKey` 在 `assets.ts` 自己的注释里写明「仅供内存实现与测试做同内容去重，桌面/服务端落盘用 sha256」，
+> 桌面拿它当落盘键正是那条注释禁止的用法；**②**「须留痕」在代码里**一点痕迹都没有**，静默换键。
+>
+> 后果落在用户看得见的那句承诺上：用户文档写「素材文件名是它内容的 SHA-256…**工程包在别的电脑上打开时能认得同一个文件**」。
+> 一旦某台机器走了降级支，它的文件名在别的机器上算不出来 ⇒ 同一张图存两份、可携带性失效，**而 `write` 照样返回成功**。
+> 这就是今天全天那一族（`>=` 被降成 eq、空说话人被打回旁白、`?? "eq"` 兜底）在存储层的第三个实例：**静默降级伪装成合法**。
+>
+> 修法：删掉兜底，不给它加痕迹。**缺 `crypto.subtle` 就抛**，`write` 把这次抛收成语义明确的
+> `err(io, 「素材摘要不可用（缺 SHA-256），已拒绝落盘」)`，**一个字节都不落盘**。
+> 判据 7 条（该文件首批）：已知向量钉死 ref 就是 SHA-256（`sha256("abc")` 那 64 位十六进制）、无 subtle 时不降级且 `writeFile` 一次都不发、
+> 同内容第二次写不重复落盘、空字节 io、外部 URL 形态的 ref 不去拼路径、缺文件 not_found、读失败 io。
+> **牙＝三次成对变异**：恢复兜底 ⇒ 1 红；把摘要换成非加密键 ⇒ 2 红（向量条 + ref 形状条）；去掉 `exists` 守卫 ⇒ 1 红（幂等条）。
+> 先红后绿的顺序也照旧：守卫写之前那条降级判据就是红的，红法是 `expected true to be false`——**降级写今天会成功**。
+>
+> **一条改判的分寸**：这撤销了一条已发布的 ADR 决策，所以我没改写它那行历史文本，而是**在 ADR-026 末尾另起带日期的补记**，
+> 把「依据是两条在册契约相撞，不是观感」、实测判据与变异读数都写进去，并**把替代修法留给用户**
+> （若优先级其实是「任何环境都得能存」，就该保留兜底但把降级显性化——代价是 ref 命名契约改变、ADR 与用户文档都要重写那段）。
+> 改动局限在一个函数的一条分支 + 一个 try，回退成本低。用户文档同轮补一句"这种环境会失败并说明原因，而不是给个别的电脑认不出的文件名"。
+> **末轮（03:57）**：`pnpm gates` 退出码 **0**（13 道）、`pnpm test:unit` **573 passed + 1 skipped**（core 83 / axs 90 / editor-core 163 / **web 198**（+7）/ admin 39）、
+> `[file-size]` 扫 **348 个文件 0 越线**（两份新测试文件都在限内）、`[doc-citations]` 已判定 165 / 越界 3 全在册。
+> **中间红过一次，红得有价值**：`gates` 第一跑退出码 **1**，`tsc -b` 报 `Property 'detail' does not exist on type 'StorageError'`——
+> 我在测试里直接读了联合类型的 `detail` 字段，**而 vitest 全绿放行了**（今天第 4 次同一课）。修法是先用 `code === "io"` 收窄再断言，
+> 并把"这里必须先收窄"写在测试注释里；改完 7 条仍全绿、全链 0。
+> **本轮未跑 e2e**，理由与上一轮同：改的是 `TauriAssetStore`，两套 e2e 都加载不到该模块（分派条件有在册断言）。
+
+> **门禁自己被客户抓了一次：`check:citations` 的基线键里带着文档行号，于是"写文档"这件事本身在制造假新增（2026-10-01 第三十九次续做）**
+>
+> 现象：写完两批之后跑 `check:citations`，它报 **3 条新增悬空/越界**并退出码 1。三条**全是在册的历史引用**
+> （ScriptEditor 的第 572 行、parse 的第 391 行、parse 的第 417 行），内容一个字没改——它们只是被我在它们上方插入的那些段落**顶下了十几行**。
+> 根因在身份键：基线项写成「某文档 第 1939 行 越界 → parse 第 417 行」，把**位置当成了身份**。
+> 后果比"烦"严重得多：这道棘轮每写一段文档就假红一次，而假红的标准处置是 `--update`——
+> **那就等于每写一段文档都把漂移重新登记成合法**，棘轮实质上等于没关（既有条目「具名豁免基线要随修完缩短否则棘轮等于没关」的另一面：键不稳的基线会**随写作变长**）。
+>
+> 改法：**身份键去掉文档行号**，只留"哪个文档指向哪个文件哪一行"（形如「某文档 → parse 第 417 行 + 句子指纹」），打印时仍带当前行号好让人去修。
+> 方法收成一句：**棘轮的键必须只用"被改动时不变"的量**——这里不变的是"引用所指的目标行"，会变的是它今天坐第几行。
+>
+> 四条腿各验一次（不是只验"现在绿"）：
+> ① **该放**：`--update` 重取基线 ⇒ 3 条在册、退出码 0；
+> ② **位置稳定**（这次修复的正判据）：在宪章顶部临时插一行，把那三条在册引用顶下一行 ⇒ 仍然 OK；探针行随即删除、文件行数复原；
+> ③ **该拦**：临时探针文档放一条 `parse.ts` 第九万九千九百九十九行 与一条不存在文件 ⇒ **FAIL / 退出码 1** 并逐条点名（带当前行号），删净后 OK；
+> ④ **复述不绕白**（去掉行号后新开的口子）：在宪章末尾临时加一句"同一个坏目标、不同句子"的引用 ⇒ **FAIL 且点名那一句**，删净后 OK。
+>
+> **④ 不是我设想出来的，是它自己浮出来的**：修完 ① 那次跑全链，门禁报 **OK**，但计数从 `已判定 165 / 越界 3` 变成 `172 / 越界 8`。
+> 多出的 5 条正是我**为了解释这道门禁**而在新段落里原样复述的那三个在册目标——键里去掉行号后"同文档 + 同目标"归成一个键，
+> 于是一条白名单白掉了任意多次复述。**教训两条**：
+> (a) **门禁报 OK 但计数变了向也要归因**——退出码 0 不是绿灯的全部，分母变大本身就是要查的东西（它与"全量里一个 F 就足以否掉四项局部绿灯"是同一条纪律的镜像）；
+> (b) **文本扫描型门禁的第一批客户还是你自己**：写解释时把坏坐标按可搜索的形态抄了一遍。处置是**改我自己的句子**
+> （写成"ScriptEditor 的第 572 行"这类非引用形式），**而不是把 5 条复述登记进基线**——后者会把棘轮从 3 条放宽到 8 条，等于用豁免来修误报。
+> 读数：`已判定` 回到 **167**（比 165 多的两条是上一批那两条真引用，其中一条把落点从注释行校正到 143 与 144）、`越界 3` 全在册、退出码 0。
+> 另记一次：删探针时我在文件末尾留下一个空行，被 `git diff --check` 抓到并清掉（**今天第二次**——这道最土的空白检查两次都真挡下了东西）。
+
+> **`.axsp` 导入的回滚契约零判据，顺测量到"同一个包导两次必失败"（2026-10-01 第四十次续做）**
+>
+> 老问法问出来的第四个生产模块：`importProjectFromAxsp` 在工程建好之后有 **7 个失败出口**，每个都调 `rollback` 删掉半建的工程，
+> 函数头写着「让调用方拿到一次干净的失败，而不是留下半套内容」——**这条承诺一条判据都没有**（既有 `axspRoundTrip.test.ts` 走的全是成功路径）。
+> 补 `axspImport.rollback.test.ts` **9 条**：对照组（不注入就成功）+ 7 个出口各注入一次失败并断言工程列表回到空 + **一条如实的残留特征化**。
+> **牙＝两次变异**：整条回滚拆掉 ⇒ **8 红且对照组仍绿**；只漏最后一个出口（道具引用那条，正是"新加一个失败点忘了配回滚"的形状）⇒ **恰好 1 红且点名该出口**。
+> 每次变异后都 `git diff --stat` 复核过被改文件**回到 HEAD 一字未动**——这条今天特别重要，因为我在产品文件里做了两次手术。
+>
+> **测残留时抓到一条更大的**：失败路径能删工程，但**删不掉本次新建的角色**——不是代码漏了，是 **L4 契约里根本没有删除角色的方法**
+> （契约面只有 `saveCharacter` / `listCharacters` / `getCharacter`）。函数头那句"不留半套内容"因此只兑了一半。
+>
+> **顺带把这条线的可达性量成了实数**（探针实测，同一条节点 id 分别写进两个真 SQLite 工程）：`first.ok=true / second.ok=false`，
+> 错误 `io「saveNarrative 事务失败已回滚」`。两条在册事实拼出成因：`project_nodes.id` 是**全局主键**，而导入只重映射**角色 id**、节点 id 随包原样插入。
+> ⇒ **同一个 `.axsp` 导第二次一定失败**，用户看到的是一句看不懂的错，且每重试一次多一组孤儿角色。
+> 这一条**不在本轮修**：三条候选（节点 id 一并重映射／把主键改成复合键／导入前查重给提示）都动包内标识语义或本地库 schema，属产品决策，
+> 已带实测数字登记为待决（推荐第一条，因为它让"包内 id 是包本地的"这条既有语义终于一致——角色已经是这么做的）。
+>
+> **另一条测试宿主事实值得留档**：node 环境没有 `localStorage`，`getCreatorId()` 的兜底分支**每次调用返回新的随机 id**——
+> 桌面壳里 `localStorage` 存在所以不是产品缺陷，但不桩定它，按 `authorId` 过滤的残留断言就会红在宿主上（我第一次跑就是这样）。
+> 桩成常量之后，那条判据量的才是产品语义。**方法**：断言按归属范围读数据时，先问这个范围键在测试宿主里稳不稳。
+
+> **同一条纪律还救了一次假红**：残留条最初用不带范围的 `listCharacters()` 断言"有 1 个残留"，实数 0——
+> 无范围只回**公开**角色，而导入的角色一律不继承公开位 ⇒ 读错范围会把残留伪装成"没有残留"。改成带 `authorId` 读，并同时钉住"公开面确实是 0"。
+
+> **"两条通路守同一条契约"那条配对判据被证明只测了它自己的夹具：同名既有节点复用什么，两边给不同答案（2026-10-01 第四十一次续做）**
+>
+> 起因很朴素：把待决清单里"S13-7 两套 AXS→图 要不要归并"拿去对着**当前代码**核一遍。清单写的是
+> "`beatToNarrative` 与 `beatToNarrativeData` 是否逐字段等价未核对"——**那个符号今天早些时候（第三十八批那次归一）已经不存在了**，
+> 所以这句话今天指不到东西。但归并并没有真的做完：剩下的不是字段映射，而是**两处各自写的策略**。对着函数体 diff 出两条真分歧：
+>
+> 1. **同名既有节点复用哪一个**：通路一（草稿事务 `importAxsDraft`）建标题索引时是**第一个赢**（`if (t && !titleToId.has(t))`），
+>    通路二（Writer 保存 `parseAxsToPlan`）原来是 `new Map(existing.map(...))`——**最后一个赢**。
+>    同一份源文本，"改 A"还是"改 Z"取决于走哪个入口。
+>    **在册那条配对判据抓不到它，因为它的夹具只给了一个同名节点**——配对判据的覆盖面等于它夹具的分母，
+>    所以"两套实现是不是同语义"必须读函数体判，不能读判据的名字判（这正是「登记两套实现=两种语义之前先 diff 函数体」那条的用处）。
+> 2. **什么样的 `beat.id` 算既有节点身份**：`axsImport.ts` 的 `NODE_ID_RE` 与 `projection/axs.ts` 的 `UUID_RE` 是**同一串字面量抄两遍**。
+>    今天不出问题，出问题的是"下次只放宽一边"，而两条通路守的是同一条确定性（I5）。
+>
+> 处置是**归一而不是登记**：策略统一成第一个赢（对齐工单「AXS 应用回草稿时同名 Beat 会塌到同一个节点」已经定过的语义，不是我新下的判断）；
+> 正则收成一条导出的谓词 `isReusableNodeId`，两条通路各自调用——**"两侧不同判"从此在结构上不可能**，这比"钉住两侧一致"更好。
+> 补 2 条判据（editor-core 163 → **165**）：一条断"两条通路对同名既有节点必须复用同一个（第一个赢）"，
+> 一条断"UUID 形态复用其 id、包内序号 `开场-2` 走标题复用"，两条都同时比较两路结果。
+>
+> **归一类重构的判据必须双向，两次变异各打一面**：
+> 把通路二钉回 `new Map(existing.map(...))` ⇒ **恰好 1 红**，点名 `expected 'keep-2' to be 'keep-1'`，
+> 而**旧的配对判据仍然绿**——这就是新夹具存在的理由；
+> 把共享谓词放宽成"任何 id 都可复用" ⇒ **6 红**，新增那条"同判"在名单里。
+> 两次都用备份文件原样还原（`grep` 复验还原点），还原后该文件 36 passed、`tsc --noEmit` 退出码 0。
+>
+> **待决清单因此少了一条的一半**：S13-7 那条"要不要归并"现在只剩"两个入口的外层循环与返回形状要不要合成一个"——
+> 字段映射、落位公式、可复用 id 判定、同名复用策略**四处已经同源**。剩下的那个问题不改语义，收益是少一份循环体，代价是动两条通路的调用签名。
+> 末轮（04:28）：`gates` **0**、单测 **584 passed + 1 skipped**（editor-core **165**）、`e2e:desktop` **37 passed** 退出码 0、`git diff --check` 0 行。
+
+> **把"生产模块零判据"从手工发现升级成第 14 道门禁 `check:seams`（2026-10-01 第四十二次续做）**
+>
+> 这一天里我**手工**撞三次同一个形状：`tauriSqlBackend.ts`（I4 的事务形状）、`tauriAssetStore.ts`（摘要静默降级）、`axspImport.ts`（7 个失败出口的回滚）。
+> 三次都是"读到那个文件才发现没判据"，这不可复制。所以问一句：**有没有一条机械可判的特征，能把这一族一次性圈住？**
+> 选中的特征是 **直接 `import` 了 `@tauri-apps/*`**：这类模块只在桌面壳里被执行，而壳零 CI 信号、契约套件只跑 Memory/sql.js——
+> 换句话说"没有同名测试"在这类文件里等价于"发布产物里有一段没人验过的代码"。分母实测 **6 个**，其中 4 个有判据、2 个具名登记（各写理由）：
+> `desktopSmoke.ts`（冒烟本身是判据的载体，不是判据的对象）、`index.ts`（分派口，桌面那一支的三个组件已各自有判据，剩下"选哪一支"要 mock 六个模块）。
+>
+> **两层判据，第二层是被自己逼出来的**：光要求"存在同名测试文件"会被一个空壳测试骗过；于是再加"该测试必须真的 import 被测模块"。
+> 配套的结构性发现：**基线键不分层就会开后门**——如果键只是文件路径，那么给一个在册模块补个不引用它的空测试，
+> 违规换了档（缺测试 → 测试未引用）而键没变，基线照样吸收。所以键写成 `文件#no-test` / `文件#no-import`，
+> **腿二实测**：给在册的 `index.ts` 放一个不引用它的桩测试 ⇒ FAIL 点名 `index.ts#no-import`（基线不吸收）✓。
+> 三层判据齐（该拦／该放且清干净／`--update` 可缩短），并且**退出码单独取**——我在这条上今天已经吃过一次管道里 `$?` 是 `head` 的亏，
+> 这次直接 `> /dev/null 2>&1; echo $?`：桩在 **1**、删净 **0**。
+>
+> **新门禁的第一批客户还是我自己**：`assetContext.ts` 本来进了基线，我当场补 5 条判据把它摘出来——
+> 那是"立绘显不显示"的最后一跳，出错方式是**图不出现且没有任何错误可查**（桌面拼 asset 协议、浏览器态给空串、越界 ref 一律空串、可直显的原样透传、空引用不抛）。
+> 牙验过：把 `localRoot ? convertFileSrc : undefined` 摘成 `undefined` ⇒ **恰好 1 红**，红在"asset 协议没被调用"那一条；还原后 5 全绿。
+>
+> 接线三处同轮（这是在册纪律）：`package.json` 的 `check:seams` 脚本 + `gates` 链 **13 → 14 道** + `README.md` 门禁表补一行；脚本头写自报限度
+> （只看 `apps/web/src`；第二层不检查"import 之后断言了什么"，那是每刀交付时变异取证的活，不是脚本的活）。
+> 末轮（04:38）：`gates` **0**（14 道）、单测 **589 passed + 1 skipped**（web 207 → **212**）、`git diff --check` 0 行、`[doc-citations] OK`。
+
+> **分派口不再是黑箱：`createStorageProvider` 的三条支路各有一条判据，接缝基线当场从 2 缩到 1（2026-10-01 第四十三次续做）**
+>
+> 上一道门禁留下的两条在册里，`index.ts`（Provider 工厂）那条我写着"要 mock 六个模块，先留册"。真去做之后**结论变了**：
+> mock 面没那么大——`@tauri-apps/*` 三个包一个都不用碰，只替换本地的 `./tauriSqlBackend` / `./tauriAssetStore` / `./httpStorageProvider` /
+> `./desktopSeed` / `./axspImport`，再让 editor-core 两个真 Provider 跑起来就够了。而它守的三条不变量**只有工厂自己知道**：
+> ① **素材根目录必须在播种之前登记**——首启会播种示范作，晚一秒，播种进去的立绘在首屏就解析成空串（用户看到的是"官方示范作没图"，没有任何错误可查）；
+> ② 播种**每进程一次**（`seedOnce` 记忆化），且 `getStorageProvider()` 每次问都要拿到同一个实例；
+> ③ `?storage=memory` 那支**只替代存储、不替代壳能力**：它不得去建 `TauriAssetStore` —— 这条原本只在文档里的边界，从此有机器判据。
+>
+> **三次变异里有两次根本没落进去，都被"先验命中"抓回来**（本会话关于变异取证最直白的一课）：
+> 想打"让 memory 支不再短路"那一刀时，`perl` 模式要求 `&&` 后带空格，而源行是 `&&` 换行 ⇒ 替换没发生而测试照绿；
+> 第二次补验命中，`perl` 又命中了**注释里同名的 `import.meta.env.DEV`**（代码行未变）⇒ 又照绿；
+> 换成只可能命中代码的形状（`import.meta.env.DEV &&`）并**先 `sed` 打印出被改的那一行**再跑，才拿到真正的红
+> （`expected SqliteStorageProvider{…} to be an instance of MemoryStorageProvider`）。
+> **方法**：变异"跑绿"先怀疑没写进去——`grep` 出被改的行，再谈红。三条各红一次（1/1/1），每次以 `cp` 备份原样还原，末了 `git diff --stat index.ts` 为空。
+>
+> 另一个坑单独记：`vi.resetModules()` 之后**顶层静态 import 的类**与工厂自己 import 的已经是两个不同对象，
+> 直接 `toBeInstanceOf(MemoryStorageProvider)` 会假红（我就真红了一次）。判据要么从同一份新模块图里动态取类，要么比构造器名。
+> 末了把测试文件按门禁的命名约定改成 `index.test.ts`（只有同名兄弟文件算覆盖），`check:seams` 当场缩短：`有判据 4 → 5`、`基线在册 2 → 1`，
+> 只剩 `desktopSmoke.ts` 那条带理由的在册项——**棘轮在它上线的第二天就变短了一次**。
+> 末轮（04:46）：`gates` **0**（14 道）、单测 **593 passed + 1 skipped**（web 212 → **216**）、`[desktop-seams] OK 6 个：有判据 5、缺测试 1、基线 1`、`git diff --check` 0 行。
+
+> **最后一个非云、非冒烟的无判据模块：存储态→传输态投影的三处"刻意缺席"钉住了（2026-10-01 第四十四次续做）**
+>
+> `assetRecords.ts` 只有两个纯函数，但它存在的理由写在文件头里：本地 Provider 只给存储态，页面消费 REST 响应形状，
+> **映射散进 hooks 就会长出两套字段口径**；而它的第二重意义更容易被"顺手清理"改掉——**本地拿不到的数要如实缺席，不许编一个值**。
+> 具体那处：道具/舞台卡片的「N 个剧本引用」角标靠 `ref_count === undefined` 隐藏；谁把它"对齐"成 `0`，界面上就出现一个谁都没数过的「0 个剧本引用」。
+> 而道具那一支**连这个键都不该有**，舞台那一支**键要在、值为 `undefined`**——同一个词在两个响应里刻意不对称，这正是最容易被人统一掉的东西。
+>
+> 补 7 条判据，钉的全是"看起来像洁癖、其实是事实来源"的四类：
+> ① 两支响应**键集合不多不少**（口径只有一处的机器表达）；② `ref_count` 的三处不对称（道具无键 / 舞台键在值缺 / `view_count` 恒 0）；
+> ③ **数组是拷贝**（道具的 `effects`/`mechanism_tags`、舞台的 `tags`/`node_templates`）；④ 可空字段原样透传、`authorId` 为空折成空串、`created_at` 如实等于 `updatedAt`。
+> 第 ③ 类特别值得记：**别名缺陷类型系统看不见**——`readonly string[]` 直接赋过去照样通过 `tsc -b`（那次退出码 0），
+> 只有"改响应不许脏写存储记录"这种**行为判据**能挡；这也是为什么第 ② 类要写成 `"ref_count" in r` 而不是只看值。
+>
+> 三次变异**每次都先 `grep` 出被改行再跑**（上一批的教训当场兑现）：去掉 `effects` 的展开 ⇒ 恰好 1 红（别名那条）；
+> 把 `ref_count: undefined` 对齐成 `0` ⇒ 恰好 1 红（舞台缺席条）；给道具也补一个 `ref_count: 0` ⇒ 2 红（键集合条 + 道具缺席条）。
+> 三次都以 `cp` 备份还原，末了 `git diff --stat assetRecords.ts` 为空、7 条仍全绿。
+> 末轮（04:51）：`gates` **0**（14 道）、单测 **600 passed + 1 skipped**（web 216 → **223**）、`git diff --check` 0 行、`[desktop-seams] OK 6 / 5 / 1 / 1`。
+
+> **第 14 道门禁自己那条"故意留的限度"关掉了（2026-10-01 第四十五次续做）**
+>
+> 这一刀的对象不是产品代码，是我上一批自己写的判据。`check-desktop-seams.mjs` 的脚本头当时写着：
+> 「判据 2 只检查有没有 import，不检查 import 之后断言了什么——一个只调用不判断的空壳测试仍然算过」，
+> 并给了理由「机械可判的下限是通路被跑到，断言有没有牙要靠变异取证，不是本脚本的活」。
+> **这句话一半是托词**：相关性确实判不了（见下），但"这个文件里到底有没有断言"从来就是机械可判的；
+> 把它写成"不是我的活"，等于给最容易顺手交出的那种判据——`import` 了、函数调了、一条判断都没写——免了检。
+> 本会话已经撞过两次"生产模块零判据"是靠人正好读到文件才发现的，判据自己留这个口子就是把这个失败形状重新放回去。
+>
+> **先量在册真值再上档**（否则交付即红，是我自己的在册纪律）：扫面内 6 个接缝，5 份在册测试的真断言数 **11 / 9 / 15 / 20 / 28**、
+> 恒真断言 **0** ⇒ 新档今天不误伤任何人，不需要例外条目。计数用两份独立实现各量一遍（临时探针脚本 vs 门禁本体），
+> 结果一致（合计 **83**）才敢当成基线。
+>
+> **补成三层**：第 3 层数 `expect(...)` / `assert(...)`，**先按行剥掉注释**（`// expect(...)` 是判据的自述，不是判据），
+> 再把 `expect(true)` 这类恒真断言从计数里扣掉——扣完为 0 ⇒ 档位 `#no-assert`；文件里只要还留着恒真断言 ⇒ 另记档位 `#trivial-assert`
+> （今天 0 条，所以这一档也不需例外）。分档计数照旧全打印，并新增一项「真断言合计」——
+> 它同时是这条检测器自己的防退化读数：正则哪天恒真，这个数会先动。
+>
+> **四腿取证**（临时探针 `apps/web/src/__probe_seam.ts` + 同名测试，跑完当场删净）：
+> ① 干净树 `OK 退出码 0`；② 只调用不判断 ⇒ `FAIL 1` 点名 `#no-assert`；
+> ③ 一条真断言 + 一条恒真 ⇒ `FAIL 1` 点名 `#trivial-assert`，且「真断言合计」只从 83 变 **84**
+> （这一条顺带证明了恒真那条没被算进证据——**如果它被算进，这里会是 85**）；
+> ④ 断言只写在注释里 ⇒ 回到 `#no-assert`（证明剥注释那一步不是装饰）。
+> ⑤ 删净探针后复跑 `OK 0`，`git status` 回到 **61 ` M` / 17 ` D` / 26 `??`**、`git diff --check` **0 行**。
+>
+> **剩下的限度如实写回脚本头，并附"为什么做不到"的证据**：判得了"有没有断言"，判不了"断言说的是不是这个模块的事"——
+> 一份测试可以 import 本模块、把断言全打在别的东西上仍然算过。要机械判相关性就得把断言表达式与模块的导出符号配对，
+> 而配对要理解作用域；同一天 `check:citations` 试做内容层那次已经量过代价：**52 条可判引用里误报 38%**，成因正是这种没有机械邻近关系的配对。
+> 所以限度改写成两条明确的：相关性不可判（不再假装是"不是我的活"）+ 断言有没有牙仍归每刀交付时的变异取证。
+>
+> 末轮（05:06）：`gates` **0**（14 道，`[desktop-seams] OK 6 个：有判据 5（真断言合计 83）、缺测试 1、无真断言 0、含恒真 0、基线 1`）、
+> 单测 **600 passed + 1 skipped** 未变（这一刀没加测试，只加判据的强度）、`git diff --check` 0 行。
+
+> **门禁的扫描面从"一厢情愿"改成实测：抓到 2 个上一版按定义看不见的无判据壳模块（2026-10-01 第四十六次续做）**
+>
+> 触发点还是脚本头那条自报限度：「只看 `apps/web/src`；`packages/*` 的内核模块不在面内（它们由契约套件与 coverage 门守着）」。
+> 上一批我拿这条当"已知边界"接受了。但**它从来没被测过**——"packages 由契约套件守着"是一句推断，不是读数。
+> 于是做一次全仓普查（临时脚本落在 `/tmp`，不进仓库）：扫 `apps/` + `packages/` + `e2e/` + `scripts/` 共 **416** 个源文件，
+> 同时试两种形状：`@tauri-apps` 引用、以及"像在用 `invoke(...)` 调壳"。
+>
+> 读数（**两种形状都不是白试的**）：
+> ① `@tauri-apps` 在 `packages/*` 命中 **0** ⇒ 扩根今天不减分，但把假设变成了不变量；
+> ② 形状从"引用 Tauri"扩到"引用 Electron 主进程桥"抓到 **2 个真模块**：`apps/nexus/electron/main.cjs`（45 行）与
+>    `apps/nexus/electron/preload.cjs`（5 行，`contextBridge.exposeInMainWorld`，唯一的桥就是 main 里那条 `ipcMain.handle("nexus:get-version")`）；
+> ③ 顺带证伪了自己的宽形状：`invoke(` 这一档还会命中 `e2e/desktop-http.spec.ts` 与门禁脚本自己（**3 命中 2 假阳**），
+>    所以最终采用的不是"提到 invoke 就算"，而是"引用 `electron`/`@tauri-apps` 这两个模块名才算"，且 `scripts/`、`e2e/`、`*.test.*` 结构性排除——
+>    **排除的理由是它们不进发布产物**，不是"看着烦"。
+>
+> 一个容易漏的细节：旧面按 `/\.(ts|tsx)$/` 过滤扩展名，而 `preload.cjs` 是 `.cjs` ⇒ **就算把根扩到 `apps/`，那一版也还是打不开这个文件**。
+> 所以扩根、扩形状、扩扩展名是三件事，只做前两件会得出一份"我扩面了"的假读数。
+>
+> **为什么这两个不顺手补测试**（这是本条最需要留痕的判断）：`apps/nexus` 没有测试设施（vitest 只给 admin 建过）；
+> mock 整套 `app`/`BrowserWindow`/`ipcMain` 之后的判据只验 mock；而最根本的是 **nexus 的处置挂在 `ADR-029` 未决清单第 2 条**
+> （`sendToInbox` / `aiApi.suggestCharacter` 判死还是本地化）——给一支可能判死的 Electron 壳搭测试设施等于替用户做决定。
+> 处理方式是**具名基线登记**（各带理由，且理由里写了可测面到底有多大），棘轮从 1 条在册变 3 条在册。
+> 面变大 + 在册变多**不是放宽**：判据强度没降，而任何新增的壳耦合模块仍必须自带测试。
+>
+> **牙**（扩面的判据必须证明扩到了）：临时放 `packages/ui/src/__probe_shell.ts`（引用 `@tauri-apps/api/core`、无同名测试）
+> ⇒ FAIL 点名 `packages/ui/src/__probe_shell.ts#no-test`、接缝数 **8 → 9**；删净 ⇒ 回到 8、退出码 **0**。
+> 探针当场删除（`ls` 取不到该文件），末了 `[desktop-seams] OK —— 桌面接缝 8 个：有判据 5（真断言合计 83）、缺测试 3、基线在册 3`。
+>
+> **可复用的收获**：给自己写的门禁登记"限度"时，**要分清"测过的限度"和"假设的限度"**——后者往往是免费的扩面对象。
+> 这次如果没有普查，nexus 那两个壳模块会一直处在"门禁说 OK，所以没人记得它们存在"的状态；
+> 而现在它们带着理由在册，并且**给了 `ADR-029` 未决第 2 条一个实测分母：nexus 的壳耦合代码总共 50 行 / 2 个文件、功能只有一个（读版本号）**。
+
+> **入口那条"冒烟该不该跑"的判据：从活在注释里，到被 6 条判据钉住（2026-10-01 第四十七次续做）**
+>
+> 线索来自普查的另一半：上一批把面扩到 `apps/` + `packages/` 后，我怀疑**形状本身还缺一类**——不 import 壳包、直接读全局句柄的代码。
+> 实测确认：`apps/web/src/main.tsx` 的冒烟触发条件读的就是 `window.__TAURI_INTERNALS__`，而旧形状只认 `@tauri-apps` / `electron` 两种 import ⇒ **结构性看不见**。
+> 这句判据是承重的，且原注释把代价写得很清楚：e2e 桌面态注入的正是空对象 `__TAURI_INTERNALS__`，
+> 若按"存在性"判，冒烟会在测试宿主里真调 plugin-fs / plugin-sql，抛 `invoke is not a function` 的未捕获异常（注释记的是"实测两条"），把被测界面自己搞坏。
+> **但这条差异只存在于散文里**——没有任何判据挡着下一个人把它"顺手归一"成 `isTauriEnvironment()`。这正是本项目"注释替代码说话"的老形状，本会话已修过两处（#98、#100）。
+>
+> **做法**：把判据抽成 `apps/web/src/shared/storage/shellSmokeGate.ts`（`shouldRunDesktopSmoke(env, host)`，纯函数、零依赖，
+> **刻意不把冒烟模块静态引进入口**——那会把整个存储栈拉进 `main.tsx` 的加载图，违背原来的懒加载设计），补同名测试 6 条：
+> 真壳+DEV 跑 / **e2e 注入形状不跑** / 生产不跑 / 无全局与 `undefined`、`null` 都不跑且不抛 / `invoke` 存在但不可调用不跑 /
+> **最后一条钉语义差**：同一个注入形状下 `isTauriEnvironment()` 为真而本谓词为假 ⇒ 谁合并两者就红。
+>
+> **牙**：把谓词"简化"成 `internals !== undefined`（就是注释警告过的那个写法）⇒ **3 条红**；`cp` 还原后 `diff -q` 与原文件一致、`tsc -b` 0、6 条复绿。
+>
+> **门禁跟着修两处**：形状补两档（`__TAURI_INTERNALS__`、`contextBridge|ipcRenderer`）；
+> 而第一版**形状匹配吃的是全文**，于是 `main.tsx` 只因为**注释里解释了为什么不用那个全局**就被登记成无判据接缝——
+> **负向文本守卫被自己的解释喂饱**（同会话第二次撞上，第一次是 `check:purity` 的行尾注释）。改成只吃 `codeOnly()` 剥注释后的代码；
+> 残留限度照实写进脚本头：行尾注释与块注释中段行仍算命中，方向是"多判一个待登记"而不是漏判。
+> 顺手登记一条**不处置的观察**：`navigator.clipboard.writeText` 共 **5 处**调用点全在无同名测试的页面 `.tsx` 里；
+> 它在 Tauri WebView 里是否真会静默失败属运行时事实、本机无壳不可判，算进门禁会逼第一版就登记 5 条基线并稀释"壳耦合"这个概念，
+> 所以既没进脚本、也**故意不占 §6 的共享编号**，只在 §4 第三十批留一句可追查的观察。
+>
+> 末轮（05:24）：`gates` **0**（14 道）、`[desktop-seams] OK 9 个：有判据 6（真断言合计 94）、缺测试 3、基线 3`、
+> 单测 **606 passed + 1 skipped**（web 223 → **229**）、`tsc -b` 0、`git diff --check` 0 行、`git status` 62/17/28。
+
+
+
 **非目标**：不为多人协作做本地替身（不实现 CRDT / 同步协议 / 离线评论队列）——那是另一条产品线，随 web 一起退场。**验收**：全仓 `grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 
+> **这行验收的机械复核（2026-10-01 02:38 实测，逐条读数见 `docs/HANDOFF_DESKTOP.md` §6 顶部那条带日期的块）**：
+> 四条里**两条达成**（gates 与三份具名基线全绿；桌面功能无回归有 `e2e:desktop` 37 / `e2e` 50 的读数），
+> **两条未达成且都卡在决策**：`backend/` 仍在（删除面要等 13 条 `baselines` 归属与 `.axsp` 播种权威两条定档才量得出）；
+> "唯一发布目标"在脚本层达成（`build` = `build:desktop`）但发布声明层没达成——残项是**可点名的三项**：
+> CI 里那段 `pnpm build:web && pnpm build:admin`、`vercel.json`（仍追踪，685 B）、`docker-compose.yml`（仍追踪）。
+> 另外「`/api/v1` 只剩测试宿主所需」这条**判据本身不可判**：实数 12 处 = 测试 9 + 注释 1 + 传输基址定义 1（`shared/api/client.ts`，桌面态根本不 dispatch 进那几条 http provider）；
+> 建议的可判措辞写在那条复核块里等定档。本轮无代码改动。
+
 ---
+
+> **task #70 的分母：那 13 条 `baselines` 到底依赖什么（2026-10-01 第十九次续做，只读取数，为决策供弹药）**
+>
+> 定档问句换成"这 13 条归谁"之后，"归离线到底要不要新能力"是决定它的关键，而这一格此前没人量过。逐条量完（`grep` 端点形状 + 本地契约导出名对拷）：
+> - **测试数**：`baselines.spec.ts` 里 13 条 `test()`，标题 E1–E13。
+> - **它们打的端点形状只有 8 个**：`POST /characters/`（4 个使用点）、`GET /characters/{id}`（2 个使用点）、
+>   `POST /editor/projects/`、`GET|PUT /editor/projects/{id}`、`POST …/scenes/{sid}/nodes`、`PUT …/scenes/{sid}/nodes/{nid}`、
+>   `…/projects/{id}/roles`、`…/projects/{id}/edges`。其中除 6 处 `${API}/characters…` 直接写在 spec 里，其余全部经 `e2e/helpers.ts` 的夹具。
+> - **本地替身的形状完全不同**：本地没有"逐节点/逐边/逐角色"的端点，而是**一次原子覆写**
+>   `saveNarrative(id, { nodes, edges, axsSource })`（`packages/editor-core/src/storage/memory.ts` 第 156 行；
+>   契约用例 `storage/contract.ts:42,60,79` 与 `storage/contractAuthoring.ts:103,211,262` **同跑 Memory 与 SQLite 两支**）。
+>   工程级 CRUD 走 `projectSaves.createProject/deleteProject`，资产池走 `assetPoolSaves.*`，传记走 `storySaves.*`——
+>   `*Saves.ts` 里 30 个导出 async 函数**全部有本地分支**（`check:dispatch` 刚实测 5 文件 / 30 函数、形状 `positive-block=4 / after-guard=26`）。
+> - **所以给决策的结论是一句话：搬这 13 条不需要新能力，需要的是把夹具从"逐节点 POST"改写为"一次 saveNarrative"**，
+>   外加桌面态那条已验证的换页写法（SPA 路由而非整页 reload——`?storage=memory` 是模块态，整页重载会清空，E39 踩过）。
+>   代价要同时说清：改写后它们验收的是**本地路径**（这正是它们该做的），但**后端 REST 契约那一层覆盖就没了**——
+>   这正是 #70 两个选项真正的分歧点，不是"要不要留着一堆测试"。
+> - **顺带一处路径漂移**：`docs/KERNEL_DESIGN.md:155`（**2026-10-09 复核：这个行号已经搬家**，那句现在在「状态（2026-08-26）」那段、约 `:167`；
+>   这正是 `check:citations` 的在册限度——它只保证行号落在文件范围内，不保证那一行还是当初那段代码，所以引用**优先写小节名而不是行号**）
+>   写着契约落地在 `packages/editor-core/src/storage.ts`，
+>   今天该文件不存在——实际是 `packages/editor-core/src/storage/` 目录（`contract.ts` / `memory.ts` / `contractAuthoring.ts` 等）。
+>   按同一惯例带日期更正，不改写那句历史判断本身。**引用规约文档里的路径也要 grep 证明它今天还在**——这条今天已经在我自己身上验证过三次（E29、E20、这一处）。
 
 ## 附录 · 阶段收尾检查单（G10 执行件）
 
@@ -1669,3 +2971,826 @@ S13-3、S13-4（含 4b 三条）、S13-6、S13-7 仍为 `[ ]`，它们的下一�
 | 1d 编译器移植量超估 | golden test 对齐停滞 >1 周 | 缩样本到 1 个线性工程先通链路，codex 场景单独成批 |
 | SQLite 行为差异 | 数据读写不一致 bug 出现 | narrative_data 全 JSON 化，放弃关系化索引，性能后置 |
 | 单人产能不足 | 连续两个子波次滑期 >50% | 砍当阶段「锦上添花」验收项，主线（安全网→抽取→门禁）不动 |
+
+---
+
+## 补记（2026-10-01，复审）：把上一整串工作重新过一遍，抓到 6 处「判据在自己够不着的地方」
+
+上一轮结论是「非决策矿脉至此挖空」。这一轮是一次**独立复审**，起手假设是「上一轮留下的东西大体可信」，
+结论是**不成立**：在 107 个改动文件里抓到 6 处缺陷，而它们的共同形状是
+**「判据（或代码）声称守住的契约，恰好落在它自己的识别面之外」**——不是漏写，是够不着。
+
+### 一、产品代码 3 处
+
+1. **`importProjectFromAxsp` 的回滚承诺有两处出口根本没有回滚**（`apps/web/src/shared/storage/axspImport.ts`）
+   函数头写着「每一步失败都回滚已建的工程，让调用方拿到一次干净的失败，而不是留下半套内容」，
+   而 `saveAsset` 与 `saveCharacter` 排在 `createProject` **之前**，`rollback` 那时还没被定义。
+   后果按严重度排：`createProject` 失败时前面建好的角色**全部留在库里**（重试一次多一组孤儿，
+   而调用方只是 `alert` 一句看不懂的错）；`saveCharacter` 失败时半套工程整个留在库里。
+   **修法 = 把 `createProject` 提到最前**：它只需要 title（实测 `remapCharacterIds` 只重映射角色引用、
+   `meta.title` 原样），于是从那一刻起每个失败出口都能删掉工程；而它之前只剩素材字节，
+   素材是内容寻址的、没有引用，落地了也不可见。
+   同轮把 `rollback` 吞掉 `deleteProject` 失败的那一格也补上：原来删不掉仍把原错误递出去，
+   而那句话写着"已回滚"——现在合并成一条说清两件事的 `io`。
+   **仍然回滚不了的一格照旧只登记**：角色（L4 契约没有 `deleteCharacter`），那是待决 ⑬。
+   判据从 7 个出口补到 9 个，并**新增一条把枚举与实现里 `rollback(` 的调用点数对起来的断言**——
+   枚举是手抄的，少配一处时 `it.each` 根本看不见那个出口，测试照样全绿。
+   牙＝三次成对变异：去掉回滚的 `!removed.ok` 分支 ⇒ 1 红；去掉 `saveCharacter` 的 `rollback(...)` ⇒ **3 红**
+   （枚举对账那条与出口那条一起红，这正是加它的理由）；把 `createProject` 挪回原顺序（旧形状）⇒ **5 红**。
+
+2. **`translatePlaceholders` 的守卫认不出的地方，恰好是重写会静默改错的地方**（`tauriSqlBackend.ts`）
+   第一轮形状是「全量替换 `?` + 一条「单引号字面量里含 `?` 就抛」的守卫」，守卫靠**正则猜引号边界**，
+   于是双引号/反引号/方括号标识符、`--` 行注释、块注释里的 `?` 一概看不见。
+   复审把它的两条自我描述都实测否掉了：
+   - **头部原写「错位后的 SQL 照样能执行成功，只是绑错值」——不成立。**
+     用 Python 的 sqlite3 真解析器逐个形状量：守卫看不见的那些形状里，全量替换把 `$n` 塞进引号或注释，
+     SQLite 数到的参数就**少一个**，报 `Incorrect number of bindings supplied`
+     （标识符那几种是 `no such column: op$1`）。也就是旧形状在那里是**响亮地失败**，不是静默串值。
+     守卫真正买到的是**诊断质量**（在翻译处就抛、错误里带原 SQL），不是正确性——
+     而它的实现决定了这笔诊断质量买不到它宣称的覆盖面。
+   - 顺带否掉两条读起来很像真的缺陷：① 「守卫误伤合法 SQL」在穷举语料里**复现不出来**（0 例）；
+     ② 「`''` 转义把相邻字面量错位」那个反例 `'x'', '?'` 本身**是 SQLite 语法错误**，不是合法语句。
+     两条都写进来就会变成假账，所以都删了。
+   **修法 = 不再猜内容**：改成结构上只重写**代码区**（引号、注释里的 `?` 原样留着，
+   真占位符照旧逐语句从 `$1` 编号），守卫看不见的那几种形状因此从"报错"变成"本来就对"。
+   fail-closed 保留，但位置从"猜内容是什么"挪到**可判的形状**：引号或注释没有闭合就抛。
+   分母：全仓 23 段真实 SQL 文本块，新扫描器拒绝 **0** 段；旧形状拒绝 1 段（还是本测试自己的夹具），
+   两者在其余 22 段上输出逐字相同。
+   判据 7 条（其中 4 条是原先看不见的形状），牙：退回旧形状 ⇒ **7 红**，而事务形状那 5 条仍绿。
+
+3. **`index.test.ts` 里两条"根目录被清空"的断言是恒真的**（`apps/web/src/shared/storage/index.test.ts`）
+   `getLocalAssetRoot()` 的初值本来就是 `null`，所以"被清空"与"从来没人设过"读起来一模一样——
+   把 `index.ts` 里那两行 `setLocalAssetRoot(null)` 删掉，两条用例照样全绿。
+   用例名里承诺了"根目录置空"，断言却量不到它。修法是**先塞一个非空脏值再进工厂**。
+   牙：删 memory 支那行 ⇒ 恰好 1 红；删浏览器支那行 ⇒ 恰好 1 红，两次都点名那个脏值。
+
+### 二、门禁 3 处（这一类最值得记：门禁的失败方向是"绿"，而绿的那一半从没被测过）
+
+4. **`check-doc-citations` 的「文件不存在」那一档整档是关着的**（`scripts/check-doc-citations.mjs`）
+   「只在被跳目录里找到」这一档原按 **basename** 匹配 `everyFile`——仓里任何地方有个同名文件，
+   一条**根本不存在的路径**就绿。实测当时就中着 `packages/core/compiler.ts`（真实路径少写了一段 `src/`），
+   以及 `docs/ADR/028` 的 `gateway.py:45`（只躺在 `Clearance/` 与一个 torch 测试util 里）。
+   变量名写着 `inSkipped`，代码实现的却是"按 basename 找"——**注释描述的是意图，代码实现的是别的东西**。
+   另两处同族：`suffixHits` 吃 `everyFile`（含 `node_modules/` 与 `Clearance/` 的副本），
+   候选一多就全变 `ambiguous` 而**静默跳过**，已判定数因此虚低 **28 条**；
+   `SKIP_DIR` 在收集阶段被喂**绝对路径**、在判定阶段被喂**相对路径**，而原式要求目录名前面有一个 `/`，
+   于是**位于仓库根的** `Clearance/` 两种输入下结论相反。同一份判据只能有一种输入形状。
+   三处修完：已判定 **168 → 197**（29 条此前根本没被判的引用回到判据面内），
+   浮出 **1 条真的路径写错**（已改正文）＋ **2 条历史快照的行号**（按"历史文本不重写"入基线，
+   与它们那条 `:572` 的兄弟条目同一处置——原先它们因为同名副本太多被判成 ambiguous 而静默跳过，
+   **不是新引入的漂移**）。牙：临时放一条「不存在的路径 + 仓里有同名文件」⇒ FAIL 点名、退出码 1；删净 ⇒ OK。
+
+5. **`check:seams` 第 2 层被两种最省事的骗法绕过**（`scripts/check-desktop-seams.mjs`）
+   第 2 层的机械判据是「那个测试文件必须**真的 import 被测模块**」，而实现拿**全文**跑
+   `from "…/stem"` 正规——于是 `import type { X } from "./x"`（编译后被擦除，模块运行时根本没被加载）
+   与 `// import { X } from "./x"`（注释掉的）都算"真的 import 了"。两条都正好命中脚本头声称已经关掉的洞。
+   第 3 层同理收了一处：恒真形态只认 `expect(` / `assert(` 两种光秃秃的写法，
+   `assert.ok(true)` 因此算成"真断言"，`trivial-assert` 那一档形同虚设。
+   修法：第 2 层只吃剥掉注释行的代码并排除 `import type` / `export type … from`；恒真形态按 `(?:\.\w+)*` 一并匹配。
+   牙＝四条腿：只有 `import type` ⇒ FAIL `#no-import`；只有注释掉的 import ⇒ FAIL `#no-import`；
+   只有 `assert.ok(true)` ⇒ FAIL `#no-assert`；真 import + 真断言 ⇒ OK；删净 ⇒ 接缝数回到 9、退出码 0。
+   **顺带修掉脚本头里一处已过期的实测数字**（在册真断言数仍写着"5 份 / 11,9,15,20,20"，实际已是 6 份）。
+
+6. **`check:apibase` 的「基址定义」那一档比它的字面表述宽得多**（`scripts/check-apibase-literals.mjs`）
+   判据是 `rel === BASE_FILE && /apiBase/.test(line)`——**同一文件里任何提到 `apiBase` 的行都豁免**，
+   于是 `const legacy = apiBase + "/api/v1/old"` 这种"在 client.ts 里新加一个云端端点"是绿的。
+   收成「那一行本身就是一次对 `apiBase` 的赋值」，今天唯一命中的是 `let apiBase = '/api/v1';`。
+   牙：临时插那一行 ⇒ FAIL 点名、退出码 1；删净 ⇒ OK。
+   同时把三条**已知不覆盖**写进脚本头（字面量子串可被 `` `/api/${V}` ``、`"/api/"+"v1"`、大小写绕过；
+   扫描面只有 `apps/web/src/**` 的 `.ts/.tsx`，`vite.config.ts` 的 `/api` 代理在面外；
+   注释判定行首锚定且本脚本**没有基线机制**），因为这条还**刻意不进 `gates`**，接进链之前要认下这些。
+
+### 三、这一轮的方法（与前几轮不同的地方）
+
+前几轮挖矿脉是"读代码找缺陷"；这一轮是**反过来先问「这条判据声称守的契约，它的实现够得着吗」**。
+六处里五处的第一版修法提交前都被自己的判据或真实解析器**打回过一次**：
+`axspImport` 那条先把 `createProject` 挪前却让旧枚举对不上（红 3 条，是枚举对账那条先抓到的）；
+`translatePlaceholders` 那条先写了一版反例 SQL `'x'', '?'`，被 SQLite 自己判为语法错误；
+`index.test.ts` 那条先补了断言，`cp` 备份还原跑一遍才发现**变异后照样全绿**（恒真）；
+两道门禁的"红"都是靠**临时探针文件**验的，不是靠读代码判断的。
+**一句方法**：给判据加断言之后，"跑绿"不算数，要拿一次**故意写错的变异**换一次红才算数；
+而"变异跑绿"的第一嫌疑永远是变异本身没落进去（今天又中了一次：注释里写了个字面量 `*/` 把块注释提前闭合，esbuild 直接报语法错）。
+
+**未改产品语义的地方要说清**：#2 那刀改的是重写器的行为（原先会抛的一类现在能跑通），不是落盘数据；
+#1 那刀改的是调用顺序（`createProject` 提前），落盘结果逐字相同——两份夹具的
+`axspRoundTrip.test.ts` 18 条与本轮新增的 9 条都绿。**待决清单没有因为这一轮变短**，
+⑬（`deleteCharacter`）与 ADR-026 那条 Windows 安全上下文的读数仍挂着。
+
+### 四、复审续：把同一轮审计里剩下两条发现也收掉（同日，门禁那一节的 3 处 → 5 处）
+
+上一段只修了三道门禁，漏了**同一次审计里已经指出**的另外两道。留着就是"审计做了一半"——
+而"我审计出来的缺陷只修了一半"这件事本身比那两道缺陷更难解释，所以补上。
+
+6. **`check:dispatch` 的显式跳过标记写在注释里就能过**（`scripts/check-dispatch-local.mjs`）
+   `registeredSkip` 原是整个窗口的 `seg.includes("skipped-offline")`——**任何位置**出现那个串就算过，
+   于是 `// 这条以前是 skipped-offline，现在应该本地化` 这样一句注释就买一张通行证。
+   收成只认剥掉注释后的代码（与 `check:purity` / `check:seams` 同一口径，到这里四道门禁终于共用
+   一个"代码 vs 散文"的定义）。分母：在册真用法是 `playerSaves.ts:189,211` 两处
+   `return { …, via: "skipped-offline" }`，都在代码里 ⇒ 零误伤。
+   牙：注释里提一句 ⇒ 由绿转红；真用法仍绿；删净后读数不变（30 个函数、形状 `after-guard=26 / positive-block=4`）。
+   **同一轮否掉一条**：审计里写"收紧后的正向档能被空块骗过"——**实测不成立**。
+   `if (isLocal()) {}`、`if (isLocal()) { return null; }`、块内只有一行 TODO 注释，三种都照红。
+   不成立的读数也记下来，否则下一个人会去"修"一个不存在的洞。
+
+7. **`check:labels` 四种写法全被放过**（`scripts/check-label-association.mjs`）
+   第 1 档与第 2 档各有两条够不着的路，四条都实测过（改前全绿、改后点名、其中一条把旧逻辑装回去验过确实放过）：
+   - **标签自己的 id 接住自己的 `htmlFor`**：第 1 档原先只问"这个 id 有没有出现过"，于是
+     `<label id="ghost" htmlFor="ghost">` 里没有任何控件带这个 id 也算接住了。收紧到
+     **"目标 id 必须挂在可标注元素上"**（`label[for]` 只能指向 labelable，这本就是浏览器的规则）。
+     分母：全仓 11 处 htmlFor 的目标全部落在 `input`/`select`/`textarea` 与 `Input`/`Select`/`Textarea` 上 ⇒ 零误伤。
+   - **id 只写在注释里也算接住**：`idsOf` 吃全文。收成只认剥掉注释后的代码。
+   - **`<label htmlFor>`（写了属性没给取值）被放过**：取到空串、被 `if (target && …)` 短路掉。
+     那不可能是笔误之外的任何意思，现在判违规。
+   - **`aria-labelledby` 用子串比**：`ref.includes(idValue)` 让 `aria-labelledby="group-header-2"`
+     接住一个 `id="g"` 的标签（`"group-header-2".includes("g")` 为真）。
+     aria-labelledby 本来就是**空格分隔的 id 引用列表**，语义单位是记号，现按空白切分后逐个相等比。
+   同时把两条仍有的限度写进脚本头（第 2 档不校验是否真在祖先链上；元素归属靠"从 `id=` 往前找最近的开标签名"，
+   一行两个标签的写法会认错）。
+   读数不变：205 个文件、裸标签 0、跨文件接住 0。
+
+**这一段的方法与上一段不同的地方**：上一段是先怀疑判据、先量分母再改；这一段是**先把审计结论拿探针复现一遍**，
+再决定改不改——结果一条成立（labels 四条）、一条成立但很窄（dispatch 那条）、一条**不成立**（空块）。
+不成立的那条如果照着改，就是在给一道没坏的门禁加复杂度。**审计报告本身也是待验证的材料，不是结论。**
+
+### 五、审 `packages/axs`：一个静默缺陷 + 一个既有缺陷（登记为待决 ⑭）
+
+继续按"先问判据够不够得着"往下走，落到全产品语义的真相源 `packages/axs`。
+起因是复审时注意到但没追的一条：**`assignBeatIds` 的计数器按原始标题记，而 id 是拿 slug 拼的**。
+
+- **实测形状**：`# Hello World` 与 `# hello-world` 是两个**不同标题**却共用同一个 slug
+  ⇒ `seen.get(beat.title)` 对两者都给 0 ⇒ **id 相同**。`parseAxs` **零诊断**。
+  下游 `parseAxsToPlan` 里 `beatIdToNodeId` 是按 `beat.id` 建键的，后一次 `set` 盖掉前一次，
+  于是本该「A 顺序走到 B」的邻接边变成 `gen-2 → gen-2` 的**自环**（`id: "hello-world-hello-world"`）。
+  **节点 id 本身是对的**（`gen-1` / `gen-2`，`usedNodeIds` 守卫有效）——**只有边坏了**。
+  这一格值得单独记，因为它演示了一件事：只看"节点 id 有没有重复"会漏掉这一族，
+  真正受害的是**边**，而边的退化在下游才现形。
+- **与 #69 的关系**：同一族、不同维度。#69 是**同名**塌成一个节点（按标题去重是对的），
+  这一格是**不同标题、相同 slug**。
+- **修法一行**：计数器改按 slug 记。已承认的同名规则逐字不变（两个「开场」仍是 `开场` / `开场-2`），
+  往返 `parse(print(beats)) ≡ beats` 保住（打印侧发原始标题，回读逐条落回本拍）。
+  判据 4 条，牙：退回修改前形状 ⇒ **恰好 3 红**，而"同名族回归护栏"两边都绿（正确，那一格不碰）。
+- **分母取了两次错、都记下来**：① 第一版把 Python docstring 的 `# ===` 下划线当 AXS 标题（645 文件里 18 处"撞车"全是假的），
+  改成只量 `docs/**` 的 axs 围栏 + `testdata/axs-draft/*.json` + 测试内联模板串 = **33 段 / 34 条标题**；
+  ② 三份 `.axsp` 第一版只输出"未解包"，按今天已犯过一次的教训改 `unzip -p` 结构化读，
+  结果三份的 `axsSource` **都是空串**（叙事在 `nodes` 里）⇒ 侧分母 0。
+  **最终 0 处真撞车。**
+- **顺出的既有缺陷（修改前后一样红，不是本轮引入）**：`标题-N` **不是保留命名空间**。
+  `# 开场` / `# 开场` / `# 开场-2` 实测得 `开场` / `开场-2` / `开场-2`（重复 id + 自环 + 零诊断）。
+  不能在实现里顺手修：`titleToId` 的优先级是「原始标题先、id 后」，
+  字面标题占住 `开场-2` 之后那个自动生成的引用会解析到**字面标题那一拍**；
+  关掉它必须改**消歧方案本身**，而那是 ADR-016 的语法冻结面 ⇒ **登记为待决 ⑭**。
+- **一条自己写错的判据**：第四版断言按"作者写 `-> slug` 是想指向第一拍"来写，红了。
+  探针显示往返完全正确，而那个前提是**我编的**（引用按字面标题归属，修改前也这样）。
+  按"改断言不删断言"改写成真正的契约（往返不变式），并把编出来的前提留在注释里当限度。
+  **分母为 0 却没有加 warning**，理由是：唯一能修它的办法要先定消歧方案，
+  而 warning 会把"字面标题占位"这件事在文本层说死——**先定档，再让文本开口**。
+
+### 六、审 `packages/editor-core`：四条自证缺陷已修，其余线索按"复核状态"分层登记
+
+这一层是唯一还没独立审过的。两个只读审计给了 22 条线索；**按前几轮的经验，审计报告本身是待验证材料而不是结论**
+（`check:dispatch` 那次 5 条里 3 条不成立），所以逐条自己跑探针，只把**自证的**当缺陷修。
+
+#### 已修（4 条，每条都拿变异换过红）
+
+1. **`journalUndo` 让"任何 redo 之后的 undo"变成静默空操作**（`journal.ts`）
+   `redo` 把 future 栈顶那条**原样**提升进 past，所以 undo 写 future 时就必须已经写成一条**合法的 past 条目**：
+   `before` 得是"这条事务被应用到哪个状态上"，也就是 `last.before`。原实现写 `before: current`
+   （事务应用**之后**的状态）⇒ 实测 `apply → undo → redo → undo` 的第二次 undo 返回 `rev=1`，
+   与撤销前完全相同，**却报 `ok:true`**，而 UI 会弹「已撤销」。顺带修好了该文件自己声明的
+   `rev = before.rev` 不变量（写 `current` 时 `current.rev === last.rev + 1`，自相矛盾）。
+   既有那条 `record → undo → redo` 判据只断言 redo 之后的 draft 与栈长度，**没有再 undo 一次**，所以一直绿。
+   牙：装回旧形状 ⇒ **恰好 1 红**，红在 `expected 1 to be +0`。
+2. **`collectAssetRefs` 漏掉 `meta.coverImage`**（`axsp.ts`）：那条 ref 被序列化进 `project.json`、
+   导入时又被原样写回，但**字节从来没进过包**（导出侧压根没对它调 `readAsset`）⇒ 收件机封面空白、
+   `ok:true` 走完全程。这与本模块已有的不变量正好是镜像：已声明的素材必须真在包里，而这条是**ref 已声明、字节没跟**。
+   分母：随包三份 `.axsp` 封面都是空，今天没有作品因此坏掉。
+   牙：撤掉那一行 ⇒ **1 红**（**且第一次变异没落进去、跑绿了**——今天第 4 次，改成先 `grep` 确认落点再跑）。
+3. **`removeRole` 对不存在的 role 谎报成功——而本地两端都与后端相反**：
+   实测三端是 `后端 router.py:298 → 404` / `HTTP provider → not_found` / **`Memory → ok:true`** / **`SQLite → ok:true`**。
+   权威是后端（`types.ts` 里 `removeAssetRef` 那行注释已经写明"后端对不存在的 ref 返回 404，所以这里也是 not_found"），
+   同一文件里另外两个 `remove*` 也都报 `not_found`——**只有 `removeRole` 是异类**。
+   吞掉的代价：`CutWorkspace` 会弹「已移除角色」，而它其实什么都没删。
+   两端一起修，并把判据写进**契约套件**（同跑 Memory 与 SQLite(sql.js)），下一个新后端也会被拦住。
+   牙：两端各自装回旧形状 ⇒ 各 **1 红**，点名同一条用例。
+4. **`saveNarrative` 在 Memory 端静默吞掉重复 node id，与 SQLite 语义相反**：
+   `new Map(payload.nodes.map(n => [n.id, n]))` 对重复 id 返回 `ok:true`，读回只剩**最后一个**
+   （实测送 2 个 `id="dup"` ⇒ 读回 1 个、且是后者）；SQLite 因主键而 `io` + 整体回滚（读回仍是 2 个）。
+   同一个契约方法在两个本地后端给出相反语义：**桌面测试宿主悄悄丢节点、真桌面报 io**。
+   选对齐 SQLite（而不是改 schema 容忍重复）：铁律 8 要求显式失败语义，
+   而"后写的顶掉先写的"正是前一批在 AXS 侧刚修掉的同一族。判据只断言 `code === "io"`
+   ——两端 detail 措辞可以不同，**语义必须一致、文本不必**。
+
+#### 已修（1 条，投影层）
+
+5. **画布投影按 13 键白名单重建 `narrative_data`，静默丢字段**（`projection/canvas.ts`）
+   `NarrativeData.choices`（legacy 分支组，`buildScriptFromLegacy` 的唯一输入）、白名单外的任何键
+   （类型带 `[key: string]: unknown`，本就是开放的）、`editor_data` 里除 `position` 外的键，在画布碰过该节点后全部消失。
+   生产链实测：`openWriterAtSelection`（"在 Writer 中打开"）→ `projectAxsFromCanvas` → `setAxsSource(projected)`，
+   **Writer 面板当场拿到丢过字段的文本**，随后保存即落盘。
+   责任归属用对照组钉死：同一个 legacy 节点（两个选项）走 `draftToAxs` 直连时两个选项都在，
+   走 `projectAxsFromCanvas` 时两个都不在、只剩一个光标题——**丢失在画布这一层，不在 `buildScriptFromLegacy`**。
+   改法：**以 base 的持久态为底**，再把已知键按原归一化覆盖上去（逐键归一化语义与改前逐字一致）。
+   刻意**不**整体铺开画布 `data`——生产里 `data = {...narrative, stage_id}`，铺开会漏一个字段；另有一条判据钉住这个取舍。
+   牙：装回"白名单重建" ⇒ **恰好 1 红**，红的内容就是症状本身（`'# 岔路口\n\n# 左路\n\n# 右路\n'` 不含选项）。
+
+#### 复审续（同日第二批）：再自证 3 条、否掉 1 条，线索表已扣掉已处理项
+
+继续按"潜在但一旦触发就丢数据"这个标准往下挑，逐条自己跑探针。
+
+- **已修⑥`remapCharacterIds` 漏两处角色引用，跨机导入后指向不存在的角色**（`axsp.ts`）
+  ① `key` 原先只重映射**第一个**点号分段，而 `relationship` 的键是**三段**的 `charA.charB.field`
+  ——条件侧（`conditions.ts::case "relationship"`）与效果侧（`applyEffects`）都按 `split(".")` 取
+  `[charA, charB, field]`，于是 `charB` 保留**导出方机器上**的角色 id，导入后那条关系挂在一个不存在的角色下、
+  从此读写不到。实测 `char-1.char-2.trust` → `NEW1.char-2.trust`。
+  ② `actors` 是 `compiler.ts::extractActors` 里优先级最高的 `explicit` 覆盖值（作者可写的角色 id 列表），
+  与**已被重映射的 `codexScope` 完全同类**，却没有分支。实测 `["char-1","char-2"]` 原样穿过。
+  对照组就是 `codexScope`（本来就对）——三条读数放在一起才看得出是哪两格漏。
+  改法：`keyOf` 改成**逐分段查表**（`map` 里没有的分段原样保留）。
+  安全性：`flag`/`memory`/`state`/`codex` 的首段是命名空间而不是角色 id，而角色 id 是 UUID 或 slug，
+  不会正好等于那些命名空间——另有一条判据钉住这四族首段原样保留。
+  牙：`keyOf` 装回首段 ⇒ **2 红**（新用例 + 命名空间护栏一起红，这正是把两半放进同一个用例的价值）；
+  去掉 `actors` 分支 ⇒ **1 红**，点名那一条。
+- **已修⑦结构不合的 `.axsp` 包抛 `TypeError` 而不是返回 `corrupted`**（`axsp.ts::unpackAxsp`）
+  `storage/types.ts` 的**第一条**设计裁决是「禁止异常穿越内核边界」，本模块开头也写着
+  「结构不符=corrupted，绝不静默兜底」；而 `readJson` 只保证「能 parse」，
+  于是 `for (… of manifest.data.assets)` 与 `project.data.meta?.id` 两处直接吃到外部 JSON。
+  实测 6 个畸形形状里 **4 个抛异常**：`assets` 缺席 / `= null` / `= 7` / `project.json` 是 `null`。
+  可达性不是理论的：`importProjectFromAxsp` 调 `unpackAxsp` 没有 try，
+  所以别的机器上截断或被改过的包，在导入那条路上是**未捕获的 promise 拒绝**，
+  而调用方（工程列表页）只会 `alert` 一句看不懂的话。
+  顺带修掉一个误导：`assets` 是字符串时 `for…of` **逐字符迭代**，报的是「清单缺素材 a」——字符串的第一个字符。
+  牙：撤掉那三处形状校验（`grep` 确认两处落点都是 0 残留）⇒ **1 红**。
+- **已修⑧越界守卫作废了三族「内核不判断」的引用**（`assets.ts::classifyAssetRef`）
+  `..` 守卫原先在归属判定**之前**无条件生效，而下一行明说 `/uploads/…`、`http(s)://`、`data:`、
+  历史裸路径「WebView 自行解析，内核不做判断」。代价**比「显示坏图」更大**：
+  `httpStorageProvider.readAsset` 要求 `kind === "direct"` 才读，
+  所以一个带双点的后端上传路径（`a..b.png` 在磁盘上完全合法）在浏览器态**既显示成缺图、又读不回字节**。
+  守卫强度不变：本地 ref 里的 `..` 照拦（既有三条判据都钉着它）。
+  顺带量了一句：我们自己生成的 ref 是 `sha256 + 扩展名`、**永远不含 `..`**，
+  所以这道守卫实际只对**外来 ref** 点火——而那正是它此前误伤的那一族。
+  牙：守卫装回无条件 ⇒ **1 红**。
+- **否掉 1 条**：`deleteProject` 不级联（审计称 Memory 留 saves/achievements 而 SQLite `ON DELETE CASCADE` 会删）。
+  实测**两端一致**（造一条存档 → 删工程 → 两端读回都还是 1 条），没有分歧。**审计那条不成立**，
+  大概是只读了 schema 声明而没跑（SQLite 的外键要 `PRAGMA foreign_keys=ON` 才生效）。
+  这是本轮第 3 条被否掉的审计结论——**「reports 是材料」这条纪律，回报率就在这里**。
+
+#### 复审续（同日第三批）：舞台排序号两端不一致 + 一条降级为待决
+
+  `ProjectSceneInput = Omit<StoredScene, "id">` **声明了** `sortOrder`，而：
+  - SQLite 硬编码 `COUNT(*)`，把调用方给的值**整个忽略** ⇒ 这是**生产路径**上的契约违反
+    （`.axsp` 导入 `axspImport.ts:126` 显式传的就是它）；
+  - Memory 原样存调用方的值 ⇒ 不传时留下 `undefined`（读回 `null`）。
+  实测**不传时**（两个 live 调用方 `useProjectOutliner` 的「+ 新舞台」与「从舞台库导入」都走这一支）：
+  Memory `[["甲",null],["乙",null],["丙",null]]` / SQLite `[["甲",0],["乙",1],["丙",2]]`；
+  **传了 10/20 时**：Memory `10/20` / SQLite `0/1`。
+  规则收成一条并写进**契约套件**（同跑两端）：**给了就照给，没给才算下一个**；
+  `null` 与 `undefined` 同义（随包三份 `.axsp` 的 `sortOrder` 全是 `null`——运行时不满足那个可选数字的声明，
+  两者必须都走"算下一个"，否则现有内容行为会变；这也是本条改动零影响的原因）。
+  牙：**同一条契约用例**在 Memory 侧装回旧形状 ⇒ 1 红、在 SQLite 侧装回旧形状 ⇒ 1 红，各点各自那一半。
+  **顺带记一条限度**：Memory **不是生产路径**（只有 DEV 的 `?storage=memory`；桌面走 SQLite、浏览器走 HTTP），
+  所以这半个分叉本身不用户可见——它的危害是**契约套件跑的就是 Memory**，
+  于是一个"测试宿主顺序不同、对桌面又绿"的偏差会长期隐身。
+- **降级为待决（不自行决定）**：`saveCharacter` 不像 `saveItem`/`saveScene` 那样兜底 authorId。
+  实测两端一致（`authorId: null` 的角色在无范围列表与按 author 查里**都是 0 条**，只有 `getCharacter(id)` 拿得到），
+  所以**没有两端分歧**；而唯一活路径 `CreateCharacterPage` 两个调用点都传了 `getCreatorId()`，
+  `axspImport` 也显式传 `authorId: owner` ⇒ **今天不可触发**。
+  确定的那一格在 hook：`data.author_id ?? ''` 把"没给作者"折成 `""`——
+  那是**第三种东西**（既不是 null 也不是真作者），可见性判定两边都不匹配 ⇒ 角色存进去却在所有列表里查不到。
+  这一行改成 `?? getCreatorId()`（零风险，唯一活路径本来就传对了）。
+  核心里那条不对称要动两个后端的构造参数，且"没有作者的角色归谁"本身是个设计问题 ⇒ **登记为待决 ⑮**。
+
+#### 复审续（同日第四批）：一条修、一条降级为"不是缺陷"
+
+- **已修⑩同一工程内成就 `key` 必须唯一，撞了显式失败**（`memoryPools.ts` + `contractPools.ts`）
+  SQLite 的 schema 有 `UNIQUE (project_id, akey)` ⇒ 第二次写 `io`；Memory 只按 id upsert ⇒ 两次都 `ok`、
+  读回**两条同 key**。后果不是"多一行"：成就面板按列表渲染（用户看见重复项），
+  而 `unlockAchievement` 按 **key** 解 ⇒ 另一条永远点不亮，是一条谁都够不着的死行。
+  权威是 SQLite（`backend.ts` 那张表是桌面生产路径真在用的）。
+  同时钉住另一半：**同 id 仍是更新**、不算冲突——否则会把 `updateAchievement`（先取回再合并补丁、
+  key 不变）那一支一起堵死。
+  分母：面板用 `ach_${Date.now().toString(36)}` 生成 key ⇒ 活路径不产生重复（同一毫秒连点才可能），
+  所以这条是**潜在**的，值在把口径钉进契约、让下一个后端不必再猜。
+  牙：Memory 装回旧形状（`grep` 确认落点 0 残留）⇒ **1 红**，点名那一条。
+- **降级为"不是缺陷"（有理由的否掉第 2 条）**：`manifest.characters` 从不与 `characters.json` 对账。
+  量到的关键事实是：**这个字段没有任何消费者**——v2 解包真正读的是 `characters.json`，
+  生产代码里唯一读 `.manifest` 的地方是 `unpackAxspV1` 读 v1 信封。
+  而 `manifest.assets` 之所以要强制"声明的素材必须在包里"，正是因为 `unpackAxsp`
+  **自己**按它决定加载哪些 zip 条目——**清单在那里是承重的**。
+  于是这条不是"漏了一条不变量"，而是「**承重处才强制**」的正确形状：
+  在没人读的字段上加拒绝，只会让书写松散的外部包变得导不进来（而 `.axsp` 的定位就是跨机交换）。
+  **不修，也不登记为缺陷**；写在这里是为了让下一次有人提这条时能直接引用这段判据。
+
+#### 复审续（同日第五批）：列表顺序两端不一致（与 `sortOrder` 同形，第三处）
+
+- **已修⑪`listItems` / `listScenes` 两端顺序不同**（`memoryPools.ts` + `contractPools.ts`）
+  SQLite 两侧都是 `ORDER BY updated_at DESC`，而 Memory 原样给插入序。
+  实测「存 A、存 B、再改 B」读回来：Memory `["A","B改"]` / SQLite `["B改","A"]`。
+  权威是 SQLite（桌面生产路径），而**意图在本仓库里早已定了**：
+  `memory.ts::listProjects` 早就特意写了同样的排序去对齐 SQLite 的 `ORDER BY`，
+  `types.ts` 里也有"两端同一操作产生不同行数，桌面用户会比网页用户少看到重复项却没人解释为什么"那条裁决。
+  所以这不是新产品决定，是**同一意图漏了两处**（与刚修的舞台 `sortOrder` 同形，是第三处）。
+  危害形态：`e2e:desktop` 跑的正是 `?storage=memory` 宿主 ⇒ **凡是断言道具/场景列表顺序的 e2e
+  都在断言一个桌面不会给的顺序**，而两边都绿。
+  牙：`listItems` 装回插入序 ⇒ 1 红；`listScenes` 装回插入序 ⇒ 1 红（SQLite 侧两次都保持绿——它是对的那一侧）。
+- **写这条判据时被自己抓到一次**（"判据本身在断言一个并列"）：
+  第一版直接连存两次再断言 `[B, A]`，结果**两端都给 `[A, B]`**。
+  原因是两个后端的 `saveItem` 都在存的时刻自己盖 `updatedAt = nowIso()`，
+  **调用方给的值根本进不去**；而 `nowIso()` 是毫秒级 ⇒ 连续两次存几乎必然同毫秒 ⇒ `updatedAt` 相同
+  ⇒ 量到的其实是"并列"（Memory 靠 `Array#sort` 稳定退回插入序，SQLite 对并列行序未定义，实测也都是插入序）。
+  **那样子这条用例是绿的，却什么都没证明。** 改法：两次存之间 `await tick()`（3ms）让时间真的过去，
+  并把"为什么必须等"写进注释。**教训与判据无关、只与写法有关**：
+  凡是被实现盖掉的时间戳驱动的顺序，判据里都必须显式让时间前进，否则测的是并列而不是顺序。
+
+#### 复审续（同日第六批）：一条**改契约不改代码**——本轮最该被记住的一条
+
+- **已修⑫（改的是契约措辞，代码一行未动）`saveAsset` 的 ref 含扩展名**
+  审计线索说：ref 的身份是 `(内容, 扩展名)` 而不是纯内容，**违反** `types.ts` 与 `assets.ts` 各写了一份的
+  「同一内容 → 同一 ref」。实测确认：同一份字节换后缀确实给两个 ref（`…<key>.png` / `…<key>.jpg`），
+  而同名同后缀给同一个 ref。
+  **但结论是"那句契约不精确"，不是"实现有缺陷"**：
+  本地那侧 ref 就是**落盘文件名**（`assets/<摘要>.<扩展名>`）——去掉后缀文件就没有类型，
+  `readAsset` / `resolveAssetUrl` 都要靠它选解码路径。所以扩展名**必须在身份里**。
+  真正该做的是把那两句改成精确形状：「**同一内容 + 同一后缀 → 同一 ref**」，
+  并把"为什么含后缀是对的 + 两条用户承诺为何不受影响"写在实现旁（`assets.ts::contentKey` 上方）。
+  **两条用户承诺确实不受影响**（逐条推过，不是推断）：
+  ① 「同一张图重复导入只会存一份」——重复导入意味着同一个文件名、因而同一个后缀；
+     而"字节完全相同但后缀不同"对真实格式几乎不可达（同一张图的 JPEG 与 PNG 字节本就不同）。
+  ② 「工程包在别的电脑上打开时能认得同一个文件」——ref（摘要 + 后缀）随包一起过去，
+     接收方按 ref 解析、**不重算摘要**，所以后缀在不在身份里都不影响认得。
+  **判据钉的是"精确后的不变量"，不是把代码改成符合旧措辞**：
+  同一内容换后缀 ⇒ 两个不同 ref，且**两个 ref 都读得回同一份字节**（只断言前半截的话两种实现都能过）。
+  牙：把 `assetRefFor` 改成"只按字节、不带后缀"（也就是照旧措辞"修"代码）⇒ **4 红**：
+  新契约用例在两端各 1，外加**两条既有测试独立钉住 ref 形态**。
+  **这一条是本轮最值钱的形状**：不精确的源码注释本身就是"将来会被照着改错"的种子，
+  而判据钉住精确形状之后，那次"改错"会被 4 条而不是 1 条拦住。
+
+#### 复审续（同日第七批）：一条修、四条否掉——**这份线索表的尾巴基本是噪声**
+
+- **已修⑬`redo` 丢弃 `ApplyError`，"事务应用失败"与"没有可重做的"不可区分**（`journal.ts` + `document.test.ts`）
+  原失败分支是裸 `{ ok: false }`。按本仓库"空值五义"那套约定改成**可选 `error`**：
+  缺席 = 没有可撤销/重做的内容（**不是失败**，不该被当错误呈现）；在场 = 那条事务真的失败了，带回自己的
+  `ApplyError`。加字段是**加法**（旧调用方 `if (!r.ok)` 照旧工作），不改语义。
+  为什么值得改：本文件 `redo` 上方那句「I5 确定性保证结果一致」指的正是这件事，
+  而**确定性只能靠"失败时为什么失败"才谈得上**——把原因吞掉，这句话就是空的。
+  分母：`redo` 目前**零生产调用方**（全仓只有 `journal.ts` 自己与测试），所以这是导出 API 的修复而非线上缺陷；
+  但它是 `@axiforge/editor-core` 的公开面，而公开面没有判据就等于没有契约。
+  牙：把 `error` 吞回去 ⇒ **1 红**（`expected undefined to be defined`）。
+- **否掉第 4 条（线索陈旧）**：`normalizeBundle` 把类型错误的 `assetRefs` 归一成 `[]`。
+  实测**代码已经精确区分**了：键缺失（旧版本）⇒ `ok` + `[]`；键在但不是数组 ⇒ `corrupted`，
+  消息就是「键缺失才是旧版本；键在而形状错是坏输入」。三种错误类型（对象/数字/字符串）逐个试过，全是 `corrupted`。
+  这条描述的是**修之前**的状态，而那条区分与它的判据早就在树里。
+- **否掉第 5 条（不是缺陷，是既定表示）**：`draftToAxs` 对空工程返回硬编码的 `# 开始`。
+  实测这个占位串在 **5 处**出现（`draftToAxs` / `useProjectEditor:303` / `writer/lib/projection.ts:90` + 两处测试），
+  而且被 `projection.test.ts:43` **刻意钉住**；更关键的是它就是**新建工程的 bootstrap 种子**
+  （`sqlite/sqliteProject.ts:112` / `memorySeed.ts:22`）。
+  ⇒ "空工程存成一个开场拍"是与种子一致的既定表示，不是内部不一致。
+  而且它**不静默**：节点是 `loadProject` 从库里读的，而删除后保存会经 `axs.import` 真的建出那一拍，
+  用户在画布上看得见。**不改。**
+- **两条仍按"潜在 + 要先定口径"挂着**（不修，理由在表里）：
+  `unpackAxsp` 只按清单取素材（**这是对的**——清单在那一半是承重的，宽容正好让书写松散的外部包能导进来），
+  `unpackAxspV1` 把 `manifest.assets` 抄进清单却返回空素材表（既有测试**钉住**了它，读那测试的意图才动）。
+
+**这一节的方法**：22 条线索走到这一步，累计**自证并修 9 条、否掉 5 条**（另有 1 条降级为"不是缺陷"）。
+否掉的比例这么高，本身就是结论：**一份对着大模块逐函数铺开的审计清单，尾巴基本是噪声**——
+真正会咬人的那 9 条全都落在"同一形状在两处不一致"或"契约与实现不符"这两类里，
+而"看起来不太对"的那些（命名不统一、少一个兜底、类型宽松）实测下来要么已修、要么是既定表示、要么不可达。
+**继续按同一标准筛剩下 4 条，预期收益已经低于把它们写清楚的收益。**
+
+#### 仍未复核的线索（4 条：**报告声称，我没有自己跑探针**，不作为结论引用）
+
+按本文件「审计产出必须逐条读」那条规矩登记，并写明"是什么会 settle 它"：
+
+| 线索 | 位置 | 是什么会 settle 它 |
+|---|---|---|
+| `visibility` 的 `authorId: ""` 让整份清单静默变空（`??` 只折叠 null/undefined） | `visibility.ts:15` | 传 `{ authorId: "" }` 读一次 |
+| `unpackAxspV1` 把 `manifest.assets` 抄进 v2 清单却返回空素材表（既有测试**钉住**了这个不一致） | `axsp.ts:171` | 读那条测试的意图 |
+| `unpackAxsp` 只按清单取素材，包里多带的条目静默丢弃 | `axsp.ts:128` | 清单少列一项的包 |
+| `canvas.ts` 的 `String()` 归一在非字符串 id 下可能产出重复节点 | `canvas.ts:70` | 需要确认 HTTP DTO 能否给出数字 id |
+
+**为什么不逐条修**：剩下这批里多数是**潜在**（需要一条今天没人走到的路径）或**契约本身要定**
+（`saveAsset` 那条可能该改的是 `types.ts:180` 那句承诺而不是代码）或**需要一次产品裁决**。
+把它们和已修那几条放在同一层「待办」里，会让真正会咬人的那几条被淹没。
+**下一步继续挑「潜在但一旦触发就丢数据」的逐条验**，而不是一次改完。
+（`.axsp` 导入会把作者排好的舞台顺序丢掉），以及 `saveCharacter` 不兜底 authorId
+（角色会落进「谁的都不是」，在所有列表里都查不到——与在册的 #69 是同一族后果）。
+
+**这一节的方法**：22 条线索里我自证 5 条、修 5 条，其余 17 条如实分层登记。
+真正花时间的地方**不是修**，是**否掉与降级**——两条审计里那些"看起来很像真缺陷"的描述
+（`axsp.test.ts` 里那条被测试**钉住**的不一致、`String()` 归一那两条）在动手前量一下就发现要么是契约本意、
+要么不可达。**登记表比修复清单长，这就是"高信号"的形状。**
+
+### 七、审最大的一处双实现：TS 编译器 ↔ Python 编译器（**结论：实测为健康**，登记为主动排除项）
+
+前面每一处真缺陷都出在"同一形状有两份实现"。全仓最大的一处是
+`packages/core/src/compiler.ts`（438 行）↔ `backend/app/domains/narrative/compiler.py`（451 行），
+同一个 `project → StoryPackage`。纯函数一一对应：
+`normalizeInstruction`↔`_instruction_list_adapter.validate_python`、`buildScript`↔`_build_script`、
+`extractActors`↔`_extract_actors`、`pickStartBeat`↔`_pick_start_beat`、`buildGlossary`↔`_build_glossary`。
+
+**结构事实**：`packages/core/src/__golden__/` 有 **4 份**金样本（`input.json` + `expected.json`），
+由 `backend/scripts/dump_golden.py` 从真实 DB dump；`compiler.test.ts` 逐字段比对。
+所以它是一条**跨实现契约的枢轴**，而且**双向都会红**（Python 变而没重生成 ⇒ TS 红；TS 变 ⇒ TS 红）。
+
+**这次做的是一次免 DB 的差分**：把 `input.json` 直接喂给 Python 那四个纯函数，与 `expected.json` 比。
+四项**全部零差异**（`script` / `actors` / `startBeatId` / `glossary`）⇒ **两侧今天是对齐的**。
+
+**过程中探针错了两次，都记下来**（今天第三次与第四次）：
+① 序列化了 `exclude_none=True`，而 `expected.json` **保留 null 键**（`transition: null` / `voice: null`）
+   ⇒ 一度报出 **24 条"差异"**，全是假的。按 `dump_golden.py` 的真实写法（`by_alias=True`、不去 null）重跑才归零。
+② `script` 是 list 不是单对象，`model_dump_json` 用错。
+**"差异条数"这个读数本身会被探针的序列化方式放大**——先信格式、再信数字。
+
+**量到的两个真实盲区**（已写进 `compiler.test.ts` 的头注释）：
+- **金样本只被 TS 一侧消费**。它是枢轴，所以两侧都红；但**没有独立于枢轴的第三方校验**——
+  若有人同时改两侧并顺手重生成金样本，这道门禁不会发现。
+  Python 侧不是裸的：`backend/tests/test_story_compiler.py` 有 **8 条**走真实 DB + HTTP 的集成测试
+  （glossary、codex 去重、道具引用、私有门禁、fork/模板），缺的只是"这 4 份**真实工程**"这一层语料。
+- **语料对 `glossary` 的实际覆盖是 1/4**：4 份金样本里 **3 份的 glossary 是 0 条**，
+  只有 `【对照】分支兜底` 那份带 2 条。补语料要重跑 `dump_golden.py`（需要 DB），
+  所以这里**只登记分母、不假装已补**。
+
+**为什么不为它写新判据**：Python 的 `compile()` 需要 DB，
+一份"Python 侧也读这批金样本"的测试要么依赖 DB（那就等于手工重跑一次 `dump_golden.py`）、
+要么靠 `SimpleNamespace` 桩 ORM 属性（会与 ORM 悄悄漂移）。
+在 Python 已有 8 条真集成测试、而差分实测又确认两侧对齐的前提下，
+**这个新增判据的维护成本高于它挡住的漂移** ⇒ 不写。这是"主动排除"，不是"没想到"。
+
+
+### 八、补上一个**零覆盖的孪生实现**：Python 侧条件求值（跨实现共享向量，一份规格两个消费者）
+
+这一条不是从审计清单来的，是顺着上一节那句「真正会咬人的都出在**同一形状有两份实现**」找过去的——
+全仓还有一处比编译器更值得补：**条件的求值**。
+
+- **缺口是量出来的**：TS `packages/core/src/conditions.ts::compare` 有判据（`conditions.test.ts` 388 行 / **37** 条），
+  而它的孪生体 `backend/app/domains/runtime/service.py::PlayerService._compare`
+  （被 `_match_memory` / `_match_flag` / `_match_character_state` 三个分支调用）
+  **此前一条判据都没有**。上一轮修 `>=` / `<=` 缺失时，Python 那一侧只靠
+  「用 `.venv` 直调一次取数」验过——**取过数不等于有判据**，下一次谁动它仍然无人拦。
+- **做法沿用本仓已确立的模式**（先例：`testdata/axs-draft/*.json` 被 `packages/axs` 与
+  `backend/tests/test_axs_draft_vectors.py` 同跑）：**一份向量、两个消费者**。
+  新增 `testdata/conditions/compare.json`（**31 条**）+ 两个消费方
+  （`packages/core/src/conditionVectors.test.ts`、`backend/tests/test_condition_vectors.py`），
+  两边各带一条**分母守卫**（向量被清空或路径写错时那条红，否则会"全绿"而一条都没跑）。
+- **权威不归任何一侧**：向量每条写死 `want`，只收答案无歧义的形状，所以它是**规格**。
+  这一点与 AXS 草稿向量那批**故意不同**——那批是拿 TS 的 canonical 解析器裁决合法性，
+  这里两处实现各算一个布尔值，所以规格必须由人写清；因此也**刻意不**把
+  `conditions.test.ts` 的断言搬进向量（那是实现自己的期望，不是跨实现规格）。
+- **向量当场抓到我自己写错的一条规格**（方法记录，比结论更值钱）：
+  我第一版把 `eq` 的「带空白数字串」写成 `want: true`，以为 `eq` 会像 `gt` 那样做数值归一。
+  实测**两端独立地都返回 false** ⇒ 是**规格错了、不是代码错了**。
+  于是把一条真实的不对称钉进了规格：**`eq` 不做任何数值/空白归一**（只归一布尔字符串），
+  而 `gt` / `lt` / `gte` / `lte` **做**归一 ⇒ 同一个带空白的数字串在 `eq` 下是假、在 `gte` 下是真。
+  两侧一致说明这不是某一侧的缺陷；但它对作者是个陷阱，**登记为待观察、不改实现**
+  ——改它会动播放语义，那是产品决定。
+- **牙＝两端各自一次成对变异**（都先 `grep` 确认落点 0 残留）：
+  把 `gte` 退回 `gt`（上一轮那个缺陷的原形状）⇒ Python **2 failed**、TS **2 红**，
+  两边点名同样那两条 `gte` 边界。还原后 `diff -q` 两文件均一致。
+- **顺带记一个仍未闭合的**：`_value` 解包（`{"_value": x}` 单键对象取 `x`）
+  在 TS 是**一个 helper**、在 Python 是**内联在两个 `_match_*` 里**——形状不同、行为一致，
+  但属于"同一语义两份实现"。**这次没有把它写进向量**：它属于**匹配层**（`_match_memory` / `_match_flag`）
+  而不是 `compare`，要锁它得连 `memories` / `flags` 的形状一起定义，规格面更大。
+  登记在此，**不假装已锁**。
+
+
+### 九、把上一节登记的欠账补掉：匹配层的跨实现共享向量（并被变异抓出**用例名不等于覆盖**）
+
+上一节结尾登记了一条欠账：`_value` 解包在 TS 是一个 helper、在 Python 内联在两个 `_match_*` 里，
+「要锁它得连匹配层形状一起定义」。这一节就是那个"定义"。
+
+- **两侧存储形状本来就不同，所以消费者各翻各的**：TS 的 `vars.memory` / `vars.flags` 是**字典**
+  （`key in vars`），Python 的 `memories` / `flags` 是**行列表**（`for m in memories: if m.key == key`）。
+  向量只描述「键 + 存储形态 + 条件」，**翻译只做形状转换、不碰语义**。
+  `stored` 是**存储形态本身**（已经决定要不要包 `{"_value": …}`）——
+  若写成解包后的值，这条向量会**把自己要锁的东西先假设掉**。
+- 新增 `testdata/conditions/matcher.json`（**14 条**）+ 两个消费者
+  （`packages/core/src/matcherVectors.test.ts`、`backend/tests/test_condition_matcher_vectors.py`），各带分母守卫。
+- **一个由判据自己报出来的不对称**：条件 type 是 `flag`（单数）而容器字段是 `flags`（复数）。
+  消费者按 `c.source` 直接索引会拿到 `undefined`——已记进消费者注释。
+- **本节最值钱的一条：一个没红的变异抓出了用例名与覆盖不符**。
+  牙＝四道：TS「unwrap 改成两键也解包」⇒ 2 红；Python「解包去掉 `len == 1`」⇒ 2 failed；
+  **TS「键缺席兜底改成恒假」⇒ 15 全绿**。
+  归因：向量里那四条标着"键缺席"的用例其实设了 `key: "nope"` + `stored: null`——
+  测的是「**键在场值为 null**」，而缺席兜底只对「**根本没有那一行**」成立。
+  修法：给向量加 `absent: true`，两个消费者在它为真时**不插键 / 返回空列表**。
+  重跑那道牙 ⇒ TS **2 红**、Python **2 failed**，点名那两条 `ne` 用例。
+  **「用例名不等于覆盖」**：名字写着"缺席"的用例可能压根没测缺席——
+  这是**只有变异能发现**的一类缺陷，读断言读不出来（断言是绿的、名字是对的、覆盖是空的）。
+- **仍未锁的**（登记，不假装已锁）：`character_state` / `codex` / `relationship` 三个族——
+  形状更大（要连 `characters` 字典 / codex 账本 / 三段键一起定义），
+  且 `relationship` 的三段键语义刚在另一轮改过（`remapCharacterIds` 那两条）。
+
+### 十、锁 `relationship` 那族 ⇒ 顺带量出一条**真实的双实现分叉**（三族条件在 Python 侧静默为假）
+
+上一批把 `_value` 解包与「键缺席」锁了，剩下三族里我点名 `relationship`——它是刚改过语义的三段键。
+动手前先量两侧支持哪些族，结果量出的东西比预想的大：
+
+| 条件族 | TS `conditions.ts` | Python `PlayerService` |
+|---|---|---|
+| `memory` / `flag` / `character_state` / `node_completed` | 求值 | 求值 |
+| **`relationship`** | 求值 | **`return False`** |
+| **`achievement`** | 求值 | **`return False`** |
+| **`codex`** | 求值 | **`return False`** |
+
+- **后果**：同一份 AXS 在两端**行为不同**——被 `[if: relationship …]` 门控的分支，
+  在 TS 引擎（桌面 / 浏览器）会打开，经后端播放时**永远打不开**，而**两边都报成功、零诊断**。
+  这正是本会话反复在拆的那一族：静默降级伪装成合法。
+- **组类型意外一致**：我怀疑 TS 用 `not`、Python 用 `none`，**实测两边都是 `all`/`any`/`none`**。
+  写进向量当断言，免得下一次再怀疑一遍。
+- **为什么不把后三族补进 Python**：那个后端正在退场（ADR-029 桌面唯一化、S13-6 删 `backend/`），
+  给将死的后端加功能等于**扩大删除面**。TS 是对的一侧。
+- **做法不是改代码，是把分叉钉成规格 + 一条绊线**（`testdata/conditions/families.json`，7 族各带一个探针）：
+  - TS 侧断言「清单里声明会求值的族，TS 确实求值」⇒ 防止 TS **悄悄丢掉**某一族；
+  - Python 侧断言「这些族当前返回 False」⇒ 有人真去实现某族时**这条会红**，
+    逼他同时更新清单与 ADR/S13-6 ⇒ **分叉要变成一次显式决定，而不是一个安静的洞**。
+- **探针又错了两次**（今天第 6、7 次，且这次错得像真缺陷）：
+  ① 第一版给所有族套同一个 `key: "A.B.trust"` ⇒ `memory` 去查 `vars.memory["A.B.trust"]`、查不到落进 `ne` 兜底返回假，
+  判据红在 `memory` 上，**看起来像"memory 族坏了"**；
+  ② 修完发现 `character_state` 还红 ⇒ 它的键格式是 `characterId.field`（按**第一个**点切），
+  我却给了 `A.B.trust` + `characters: {"A.B": …}`。
+  **修法：把探针本身放进向量**——「这一族怎么被点亮」是规格的一部分，不该由每个消费者各自猜。
+- **牙＝两道**（第一道的变异也落歪过一次，缩进错、测试根本没跑 ⇒ 补 `ast.parse` 校验后才重跑）：
+  TS 删掉 `relationship` 那一支 ⇒ **1 红并点名该族**；
+  Python 真去实现 `relationship` ⇒ **1 failed**，消息直接写着「若你刚实现了这一族，请同步更新 families.json 与 ADR/S13-6」。
+- **仍未锁的**（登记，不假装已锁）：`character_state` / `codex` / `relationship` **三族的键格式与解包语义本身**
+  （本节锁的是"哪些族被求值"这个清单，不是各族的行为；行为里只覆盖了 TS 侧的"确实会求值"这一点）。
+
+### 十一、锁「哪些族被求值」之后 ⇒ 顺手把 `character_state` 的**键格式**也锁了，抓到一处**真分叉（假值字段被吞）**
+
+上一批只锁了"哪些族被求值"这个清单。我当时把"各族行为本身（键格式 + 解包语义）"记为未锁。
+这次就锁 `character_state`——它是清单里**唯一两端都真求值**、所以可以真正当契约来比的一族
+（`relationship` / `codex` 在 Python 侧压根不存在，比不了，只能靠那条绊线）。
+
+**动手前先量键格式**，量出一处此前没人看过的分叉：
+
+`key` 格式是 `characterId.field`（`key.indexOf(".")`，**只切第一个点**，所以 `field` 本身可以含点）。
+两端取值的写法不同——
+
+- TS：`vars.characters[charId][field]`，用 `!(field in state)` 做**存在性**判断；
+- Python：`getattr(s, field, None) or s.custom_state.get(field)`。
+
+**Python 那个 `or` 是缺陷**：`or` 对 `0` / `""` / `False` 这类**假值**短路，于是
+「`affection=0` 且 `custom_state` 里没有这一项」读到的**是 `None` 而不是 `0`**。
+而 `affection`（好感度）的初值就是 `0`，`affection >= 0` 这种**必然成立**的门
+在服务端恒为假 ⇒ **那条分支永远不开，而两端都报成功、零诊断**。
+
+实测对照（同一组值，2026-10-01）：
+
+| 形状 | TS | Python（原） |
+|---|---|---|
+| `affection=0, gte 0` | **true** | **false** ← 缺陷 |
+| `affection=0, eq 0` | **true** | **false** |
+| `mood="", eq ""` | **true** | **false** |
+| `flag=false, eq false` | **true** | **false** |
+| `affection=0, gte 1` | false | false |
+| 只在 `custom_state` 里的字段 | true | true |
+
+**修法**（`backend/app/domains/runtime/service.py`）：用哨兵把"字段不存在"与"字段值是假值"分开——
+`getattr(s, field, _FIELD_MISSING)`，**只有真的缺席**才回退 `custom_state`。
+这正是 TS 侧 `!(field in state)` 的语义，不是发明新口径。
+哨兵**不能用 `None`**：`None` 恰恰就是这个 bug 的成因，所以那个 `object()` 后面写了注释钉住。
+
+**形状翻译仍由消费者做，语义不翻译**：向量里这一族拆成 `chars`（TS 的 `vars.characters` 字典）
+与 `custom`（Python 的 `custom_state` 回退源）两段——TS 侧合并成一个字典，Python 侧拆成"行属性 + 回退"，
+这样"回退只在真的没有时发生"这件事**两边的判据长在各自真实形状上**，而不是把两边揉成同一种形状把语义糊掉。
+
+牙：把 Python 装回 `or` 短路那个原形状 ⇒ **4 failed**，点名的正是那四条假值用例。
+"别过度修正"那条（`0 gte 1` 仍为假）也在向量里 ⇒ 防止有人改成"什么缺失都当真"。
+
+**这次自己犯的错，两次，都是"改数据"而不是"改代码"**：
+① 我建的行字段叫 `cond`，而我随后那个键重排脚本的白名单里写的是 `condition`
+⇒ **`condition` 被整个丢掉 7 条**，TS 拿到 `undefined` 条件（`if (!condition) return true` 于是全返真、
+看着像"这一族全坏了"），Python 直接 KeyError 7 红。**教训：先 `assert` 每个消费方要的键都在，再跑**。
+② 新条目漏了 `id` 字段 ⇒ 用例名渲染成 `undefined`，一条假红。**教训：向量的 `id` 也是数据的一部分**。
+
+**仍未锁的**（登记，不假装已锁）：`relationship` 与 `codex` 的**行为本身**——
+它们在 Python 侧不存在，**没有第二份实现可对**，只能靠 TS 单侧行为 + 清单绊线。
+等哪天真有人给后端补这两族，或者 Python 彻底退场、只需证明"桌面端这族行为正确"，
+才谈得上对它们做同等级别的锁。
+
+### 十二、锁「键语法 + 写读往返」⇒ 一条跨族不一致，**降级为待决 ⑯**（并更正我两次说过的头）
+
+上一批留的债是"锁 `relationship` / `codex` 的行为本身"。本批锁的是**键怎么分段**与**写进去能不能按同一个键读回来**。
+
+**为什么不塞进跨实现向量**：那两族在 Python 侧**不存在**，跨实现向量覆盖不到。
+
+**为什么必须走一遍 effect**：只测读侧，分不出「两侧**同规则地**丢段」和「两侧**不同规则**」。
+实测 `relationship` 写 `A.B.affection.mood=7` 落进 `{affection: 7}`，
+于是**短名读得到、长名读也得到**——两者读到同一格，这才是"配套"的证据；
+若只断言"长名读得到"，哪天有人只改读侧就会静默变成错配。
+
+**量出来的跨族不一致**：
+
+| 族 | 键规则 | 键能带点吗 |
+|---|---|---|
+| `character_state` | 切**第一个**点，**其余整体**是字段名 | **能** |
+| `codex` | 切**第一个**点，**其余整体**是记忆键 | **能** |
+| `relationship` | 按点切，取第 3 段，**第 4 段起静默丢弃** | **不能**，且零诊断 |
+
+⇒ 同一个"带点的字段名"在两族里一个可用一个不可用。**降级为待决 ⑯**：① 改成"其余整体"
+（**向后兼容**，所有现役 3 段键行为不变）；② 保持丢弃但**补诊断**（不改语义）。
+复审不单方面选——① 改的是**键语法**（与 ⑭ 同族，ADR-016 冻结面），② 引入新的告警通道
+（"零诊断"本身在前几批被反复当缺陷治，但那是**分支开错**类，这是**作者写错字**类，代价不同）。
+
+牙：改**写侧** ⇒ 2 红；只改**读侧**（真错配）⇒ 2 红。
+
+## 本次审计我自己说过的头（更正留在案）
+
+1. **"生产代码从不往 `vars.relationships` / `vars.characters` 里写 ⇒ 这两族运行时恒为假"——错。**
+   我 grep 时把 `conditions.ts` 过滤掉了，而写入就在那个文件里（`applyEffects` 的两个分支）。
+   **今天第二次被自己的过滤器藏住答案。**
+2. **"作者打错字会静默开错分支"——过头。** 实测读写**同规则** ⇒ **无错配**，
+   残留的只是"多写的第 4 段被静默忽略" + 跨族键语法不一致。
+
+**共同根因**：两次都是**先下结论、后补测量**。顺序应当是**先量读写两侧、再定性**；
+过滤器要先确认它没把答案藏起来再下结论。判据已经补进 `families.json` 的 `_note`，让下一个人不必重新踩。
+
+> **⑫ 交付：同一个 `.axsp` 现在能重复导入——身份重映射补到节点与边（2026-10-09 第四十八次续做）**
+>
+> 接手第一件事不是写代码，是**重测环境**：距上次停车 7 天，`git status` 从 62/17/28 变成 78 M/36 ??，
+> `axspImport.ts` 在 10-05 被改过，另外多出条件向量一族的新工作。HEAD 仍是 `1b9ca06`（无人提交）
+> ⇒ 上周的读数一律不引用，全部按当前树重取。这一条写在最前面是因为它曾是本项目的老毛病：**拿昨天的绿当今天的证据**。
+>
+> **前提核实**：`project_nodes.id` / `project_edges.id` / `project_roles.id` 都是**全局** `TEXT PRIMARY KEY`（不是 `(project_id, id)` 复合键），
+> 而导入侧只重映射角色 id 与节点的 `stageId`。所以包里的节点与边原样插入必撞。
+>
+> **RED 的三种形状在这一刀里同时出现，值得记**：
+> ① **缺陷复现条当场就绿**（真 SQLite 上原样导第二次 ⇒ `ok=false`、整批回滚、第一份无损）——它钉的是"今天为什么坏"，不是"我要实现的期望"，
+> 所以它天然通过；把它误当成判据失败会白白推翻一个正确结论。
+> ② **期望行为条红**在 `remapNodeIds is not a function`（API 还没生）。
+> ③ **我的夹具自己撞了同一个坑**：拿源工程的 bundle 先往"第一个新工程"插，结果第一次就失败——
+> 因为包里的 id 已经在这台机器的库里。这等于第三次独立确认同一件事，而且把缺陷的严重性从"导第二次"抬到
+> **"从本机导出的包，导回本机连第一次都失败"**。修法不变，但这条读数要按这个更宽的说法写。
+>
+> **实现**：`remapNodeIds(project)` 放在 `packages/editor-core/src/axsp.ts`，与 `remapCharacterIds` 同族同形状；
+> id 取 `rows.ts::uuid`（存储行 id 的唯一权威，不另造第二个生成器）；
+> 同时换**节点 id、边 id、边的 `source`/`target`**——只换节点不换边是把"撞主键"换成"边悬空"，那更安静、更难发现。
+> 纯函数、不改入参、`narrativeData`/`editorData`/`axsSource` 一字不动：图内跳转按 Beat 标题寻址（ADR-016），
+> 节点 id 只存在于边两端，所以"要换哪些字段"是由**寻址方式**决定的，不是靠列清单列全的。
+>
+> **判据分层，且没为测试污染产物层**：真库那半在 editor-core（`SqlJsBackend` 只在包内可达；
+> **没有**为 apps/web 的测试把它新开成公共导出——那会把 sql.js 拖进 web 的入口依赖图，代价落在发布产物上）；
+> 通路那半在 apps/web 的往返条（新旧工程节点 id 互不相交、边数相等、边内容等价、边两端解析得到）。
+>
+> **既有基线改的是连接键，不是覆盖**：`seedPlayable.test.ts` 原先拿随包文件的原始 id 去 IR join，身份一换那 join 天然失效；
+> 改成「节点数 + 有舞台的节点数 ↔ 有 `sceneId` 的 Beat 数 + 每个 `sceneId` 真在 `scenes` 里 + `sceneTitle` 非空」——
+> 舞台解析那半反而更宽（遍历全部 Beat，不再只遍历 join 得上的那些）。
+> 往返条的夹具从 **0 条边补成 1 条边**，否则"边两端跟着换"是一条**恒真的空判据**。
+> 还有一个中文断言的坑：我先前用 `.sort()` 比标题多重集，默认按码点会把「乙拍」排在「甲拍」前 ⇒ 判据红在排序规则上而不是产品语义上；
+> 改成 `toContain` + 长度。**CJK 一律不要用默认 `sort()` 断言顺序。**
+>
+> **三刀变异**（每刀先 `grep` 出被改的那一行再跑）：只换节点不换边 ⇒ editor-core 2 红 + web 往返 1 红；
+> 节点 id 根本不换 ⇒ 2 红（含"互不相交"条）；把 `axspImport` 里的调用摘掉 ⇒ web 往返**恰好 1 红、其余 166 条仍绿**。
+> 第三刀的读数很重要：它说明**通路判据只有往返条在守**，`seedPlayable` 那三条换了连接键之后不再对身份敏感——
+> 这是覆盖面真相，不是我的夸大，三刀均以 `cp` 还原、`diff -q` 一致。
+>
+> 末轮（06:37）：`gates` **0**（14 道，`[desktop-seams] OK 9 / 有判据 6（真断言合计 99）/ 基线 3`）、
+> editor-core `tsc --noEmit` 0、web `tsc -b` 0、web storage 套件 **167 passed + 1 skipped**、`[doc-citations] OK 209 / 越界 5（基线在册，非本轮新增）`。
+> **两套 e2e 本轮欠着**：端口 8000/5174/5274 上有一支 8 天龄的别人的 dev 栈，非 CI 下 `reuseExistingServer` 会让套件测到别人的代码；
+> 本轮改的是产品代码（导入通路），所以这条欠账必须在 §5 写明，不能拿上周的 37/50 当今天的点击层证据。
+
+> **⑫ 的点击层补上了，顺手把我自己那句"结构上点不了"纠正到准确形状（2026-10-09 第四十九次续做）**
+>
+> 跑之前先做一件本会话被反复教育的事：**证明端口上是被测代码**。5174 上那支 vite 起了 9 天、不是我起的，
+> 所以先 `curl localhost:5174/src/shared/storage/axspImport.ts | grep -c remapNodeIds` ⇒ **2**（`main.tsx` 里 `shellSmokeGate` 同样 2，
+> 且返回的是转换后的模块、`"DEV": true`，不是 404 页）。证明成立，`e2e:desktop` 的读数才算数：**38 passed**（37 + E43）。
+> **浏览器那一半我没跑**：8000 上是别人的 `uvicorn app.main:app --reload`，它连的是**开发库**而不是 `axiforge_e2e`；
+> 复用那台等于把测试数据写进用户库——这不是"读数差一点"，是不可逆的副作用，所以我停下并写明欠账。
+>
+> **E43 测的是此前完全没有判据的一条路**：`.axsp` 导入。同一个 `showcase-1.axsp` 连导两次 ⇒
+> 两次各自落到 `/studio/projects/<id>`（内存库给顺序 id，实测 `proj-0001` / `proj-0002`），"还没有剧本"消失，没有「导入失败」弹窗。
+>
+> **一条纠正，也是一条过头**：上一轮我说「`openBinaryFile` 在测试宿主里结构上点不了」，随后我用 `filechooser` 把它点通了，
+> 于是写下"那句话是错的"。**纠正过头本身又是错**——真正的原因被下一条测试暴露：
+> `openBinaryFile` 先判 `isTauriEnvironment()`。**注入桌面标记（E17 一族的做法）时它走 `@tauri-apps/plugin-dialog` 支，
+> chromium 里确实开不出选择器**（我的第一次尝试就 60s 超时在这）；**不注入标记、只用 `?storage=memory` 时它走
+> `<input type=file>` + `click()` 回退支，Playwright 接得到**。所以准确说法是"两支持别"，而不是"我说错了"。
+> plugin-dialog 那一腿仍归真壳手验（待决⑦），我没有为它造 mock picker——那会给测试宿主新增一种壳语义，属新决策。
+>
+> **两条差点写成假判据的东西，都删了**：
+> ① 「零 `/api/v1`」——不注入标记时页面照旧发 4 笔（`users/session`、`editor/projects/user/<creator>`、`llm/health`），
+>    因为那些消费者由 `isLocalOnlyDeployment()` 闸门，与 `?storage=memory` 不是同一条件。
+>    在 E43 里断它会得到一条**永远为假**或**靠运气**的判据；把 `hits` 降级成断言消息里的诊断上下文，
+>    并删掉我差点留下的 `hits.length >= 0`（恒真条，等于没判）。
+> ② 「列表里有两张卡」——第一次按标题文本数，撞上页面顶部【示范】条带的同名项，且那个条带的元素在 Playwright 下
+>    60s 内一直 "not stable / detached from DOM"；第二次改按工程 id 找 `a[href]`，`element(s) not found`（卡片不是锚点）。
+>    结论：**这条判据今天写不出稳定形状，我选择不写**，而不是猜一个能过的选择器。
+>    顺带留下两条只登记不处置的观察：【示范】条带永不稳定意味着列表可能在持续重渲染（`key` 用的是 `proj.id`，不是重复键，怀疑无限动画），
+>    以及卡片不是锚点 ⇒ 列表的可访问性形状值得单独查。
+>
+> 末轮（06:55–06:56）：`e2e:desktop` **38 passed** 0、`tsc -p tsconfig.e2e.json --noEmit` **0**、产品代码本轮一字未改
+> （所以上一批 `gates` 0 仍代表代码状态）、`.e2e-lock` 跑完不在。
+
+> **把 S13-3 从"每次靠人读"变成一条五步收紧的数据链（2026-10-09 第五十次续做，对应 HANDOFF §4 第三十四…第四十一批）**
+>
+> 起点是一句我自己说过的话：「桌面态真会打到 `/api/v1` 的有 34 条」。**今天结束时这句话被证明是错的**，
+> 而把它证伪的过程就是这一整条链。为什么值得为一张"清单"做五轮：S13-3 要求逐条定性（判死 / 本地化 / 只差接线），
+> 而每一轮都要重新读 `shared/api` 的话，结论会随代码漂移变成假话——这正是本文件反复登记的那类失效。
+>
+> **五步，每步都只解决上一轮留下的一个具体假读数**：
+> ① 装载面普查两臂（`check:http-inventory`）。桌面臂原来只注入 `__TAURI_INTERNALS__`，在 chromium 里必败，
+>    于是报出一个**空载装出来的 0**。改成"标记 + `?storage=memory`"（要一个真可读写的本地库）并补齐路由到 9/9 ⇒ `DESKTOP_UNIQUE=0 / BROWSER_UNIQUE=11`（浏览器臂是正对照）。
+> ② 端点面六档（`cloud:callmap`）。95 个端点定义 ⇒ 死面 12 / 仅 HTTP 实现侧 9 / 绕过 34 / 已有分派口 26 / 混合 6 / 已接本地 8（相加 95 才敢用）。
+>    这一轮抓到分类器三处错：分派口只认 `*Saves` 命名（漏 `getStorageProvider`）、符号归属取每文件第一个 `xxxApi`、HTTP 实现文件被当界面绕过点。
+> ③ 资源 → 本地承载三态。**词元匹配从 substring 改成下划线/camelCase 全等**（`play` 曾匹进 `player_achievements`），
+>    且**只有路径末段命中才算"该资源自身有承载"**（`/characters/{id}/versions` 的 owner 是 characters，但"版本"没有专属表）。
+>    22 / 6 / 4 / 1 / 1 = 34。
+> ④ **壳守卫算到调用点**——这一步才真正改掉那句错话：34 条里有 5 条的调用点带 `enabled:` / 早退守卫，桌面根本不发。
+>    按文件算会把 `useRelations.ts`（五条查询只有 `presets` 带 `enabled`）读成五条全安全，所以判据必须定位到"被保护的那一次调用"：
+>    S1 同块（含调用**之后**写在同一对象里的 `enabled`）／S2 同句（块头）／S3 早退（祖先块的直接子语句且含 `return`/`throw`）。
+>    ⇒ **绕过 34 → 真会打出去 29**，其子集分档重算为 17 / 6 / 4 / 1 / 1。两次变异各证一头：关 S1 ⇒ 9→2；去掉 S3 的深度限制 ⇒ 9→**11**（把 `versionApi.get/rollback` 错判成安全）。
+>    S2 在本面 0 命中，于是**把扫描面扩到"混合"**让它有真样本，另用合成样本正反各两条钉住。
+> ⑤ 死面的两侧证据：读者面（`apps`+`packages`+`e2e`+`scripts` 448 文件，跑在剥注释与字符串之后的文本上）× 后端路由（107 个 .py 解析出 148 条）。
+>    12 条死面前端读者**全部为 0**、后端路由 **11 在 / 1 不在**。
+>
+> **⑤ 里那条"不在"是新登记的缺陷**：`projectApi.updateProjectNode` 指向 `PUT /editor/projects/{projectId}/nodes/{nodeId}`，
+> 而后端 `backend/app/domains/narrative/router.py` 对 node 的 PUT 只有带 scenes 段的那条（:237），DELETE 同理（:254）——**既零读者又指错**。
+> 零读者 ⇒ 今天无用户影响；摘不摘仍归待决 ②，我没有替自己拍这块板。
+> 同一批还留下一条**反面信息**：调用过任何 `xxxApi.method(` 的测试/e2e 文件数 = 0（机器算的，不是印象）。
+> 所以判死这批不会碰坏任何测试，代价是 api 层在测试层零覆盖、判错了没有回归网。
+>
+> **本轮的工具缺陷与流程错误，一并留档**：
+> `useRe` 带 `g` 却被跨文件反复 `.test()` ⇒ `lastIndex` 跟着对象走，理论上会静默漏计调用点（今日语料实测两版全等，属"形状上的洞"，已去掉 `g`）；
+> 一次 `grep` 空输出其实是脚本 `SyntaxError: suspect 已重复声明`——**判据脚本空输出先取退出码和输出尾部**；
+> 一次 `Edit` 漏传 `old_string` 把 `const root = process.cwd();` 整行吃掉，`node --check` 通过而运行时 `ReferenceError`——**改完脚本必须真跑一次**；
+> 两套分档交叉时我差点把母集数 22 当成子集数写进文档（正确是 17）。
+>
+> **限度（写在脚本头，不在这里冒充判据）**：本表只列 `apps/web/src` 的调用点；正向匹配必须回代码核对（`getCharacterStates` 是词元全等也挡不住的语义假阳性）；
+> "桌面不可达"只认调用者完全落在 `features/discover/` 下；`Clearance/` 在遍历跳过清单里写死（未纳管且含 `.env`）。
+> 三道普查都**不进 `gates`**：它们需要读 `backend/` 或扫全仓，且给的是定档弹药而非回归判据——把候选清单当成门禁是这个工具最容易被误用的方式。
+>
+> 末轮（08:53）：`cloud:callmap` **0**（连跑两次逐字节相同）、`gates` **0**（14 道；`[doc-citations]` 已判定 211 / 越界 5 = 基线数、`[desktop-seams]` 9 / 有判据 6 / 真断言合计 99、`[file-size]` 349 文件 0 越线）、
+> 单测 **706 passed + 1 skipped**（`awk` 从门禁日志加出）、`git diff --check` 0 行、`.e2e-lock` 不在；
+> 产品代码自 ⑫ 交付（第三十一批）后一字未改，所以点击层沿用**带取数时间**的读数：`e2e:desktop` **38 passed**（2026-10-09 06:55）、`e2e` **50 passed**（2026-10-01 收口那一次）；
+> 浏览器那一半今天没重跑，继续欠在别人的 dev 栈上（8000 上那支 uvicorn 连的是开发库）。
+
+> **「活着但没人测的本地读写」这一族从手工发现做到九格收口（2026-10-09 第五十一次续做，对应 HANDOFF §4 第六十八…七十二批）**
+>
+> 为什么这一族单独做：现有两道门禁都看不见它。`check:seams` 只认平台分支（`__TAURI_INTERNALS__` / `contextBridge` 那一类形状），
+> `check:dead-surface` 只管 import 闭包之外——而这九个模块**都在闭包内、都不是平台分支、却全在真写用户的机器**。
+> 桌面化把云端面挡掉之后，本地持久层就是剩下的唯一有状态表面，它出问题的方式是"数据没了但界面没说"。
+>
+> **分母先按命令取，不按印象取**：`grep -l localStorage apps/web/src/shared/lib/*.ts` ＝ **9 个模块**。
+> 我第一版心算成"七个"，写收口结论时按 `grep -c` 重取才纠正过来——收口类句子必须先测分母再测覆盖。
+> 现状：**8 格有同名测试**（`playerUnlocks` 10／`creatorId` 8／`playerToken` 8／`playerSettings` 8／`llmSettings` 7／`playerReadState` 7／`routeHistory` 7／`draftManager` 10），
+> `identityLink.ts` 仍无同名测试——它两个身份绑定导出**全仓零 import**（只有 `reportContent` 被 `DiscoverProjectsTab` 用），属 S13-3 判死名单该过的一格，
+> 我不给可能判死的函数搭测试设施；它的键耦合在下面那段第七十二批里已结构性关闭。
+>
+> **本轮真正值得留档的是三次自我证伪，不是这 68 条新判据本身**（web 单档从 241 → 309，差值正好 68）：
+> ① 上一批我写的「重复解锁…**且不重新写盘**」用的是 `expect(raw).toBe(before)`。设计本批变异时发现：重写同样内容得到的字符串与原串**相等**，
+>    `toBe` 比的是值 ⇒ 那一半当时没有牙。给替身加**写入计数器**后，变异 U2（保留去重、只拿掉"跳过写入"）给出直接证据
+>    `AssertionError: expected 2 to be 1`，而同一条里"只有一条""内容不变"两个断言全放行。
+>    推论要记下：`check:seams` 第三层数的是"有没有真断言"，它**看不见**这种弱判据——它测的是断言能否读，不是能否失败。
+> ② 我以为"草稿存不上时 `DraftIndicator` 会说『✓ 已保存』"。顺着数据流读到 `markClean()` 只在角色真保存成功后被调，就把这条否了；
+>    真实后果弱一档：草稿**静默丢失且无任何提示**（表现是下次不再问你是否恢复）。玩家侧同 hazard 已有 `syncNotice`，角色草稿侧没有——补不补是定档，登记不处置。
+> ③ `git rev-parse --short desktop-handoff-20260929` 打出 `dbf1dde` 而非 `1b9ca06`，一度像"tag 被动过"。
+>    实际它是附注标签，`%(*objectname)` peel 后仍是 `1b9ca06`、taggerdate 未变。比对引用必须 peel，这句已写进 HANDOFF §6。
+>
+> **两处平台/工具形状**（下次直接照抄，别再试）：
+> `globalThis.crypto` 是 getter-only（`configurable: true`、无 setter），`vi.stubGlobal("crypto", {})` 直接抛 `TypeError`；
+> 只能 `Object.defineProperty` 换值、`afterEach` 装回 getter，并且**两条分支各带一条探针控制位**（先断 `"randomUUID" in crypto` 为 true，另一条断为 false），
+> 否则"分支没走到"会伪装成双绿。`fileURLToPath(new URL("../..", import.meta.url))` 返回**带尾斜杠**的目录，
+> 遍历用 `${dir}/${name}` 拼接会得双斜杠路径，令任何"干净路径"豁免集永不命中——症状是扫描判据开局就红、且红在被豁免的文件身上。
+>
+> **最后一批动了产品代码**（第七十二次）：身份键两串字面量原手抄在四文件八处，收成 `CREATOR_ID_KEY`／`PLAYER_TOKEN_KEY` 单一权威（键值一字未改）。
+> 这道缺陷是**没有类型、没有门禁能看见**的：只改权威一处，登录与恢复身份就写进孤儿 key，而 `getCreatorId()` 读新 key 铸出全新身份
+> ⇒ 本地作品库按 `author_id` 整片不可见、界面上零错误。新判据 `identityKeyAuthority.test.ts` 的搜索串**由真相源运行时 import 得来**，
+> 所以守卫文件自己不含那两串（不会被自己的注释喂饱），改名时它自动跟着真相源走；另带扫描面地板 `>=200`（实测 255）与"权威确实带着串"两条对照位。
+> 归一判据按在册纪律做**双向**：改真相源 ⇒ 值钉类 6 红而扫描仍绿；把字面量抄回 `UserContext.tsx` 或 `identityLink.ts` ⇒ 扫描红并点名是哪个文件。
+>
+> 末轮（16:45 复取，因这批改过云端面上的文件，沿用旧绿灯对这一项不成立）：
+> `cloud:callmap` **0**——死面 11／仅实现侧 9／绕过 34／有分派口 27／混合 6／本地已接 8，未守卫调用点 37、宿主可达 20、端点级 24/30，
+> **逐档与 16:06 那次全等**（改动只是把字面量换成 import，没有增删调用点）；`check:http-inventory` **0**——桌面态零 `/api/v1`、
+> 正对照浏览器态 20 个唯一调用点、`ROUTES=25`（解析得出）、`SPEC_URLS=64`、正则 33/33、完全没证据的路由 0。
+> `gates` **0**（十五道；`test:unit` **774 passed + 1 skipped**、web **309 passed | 1 skipped**、`[file-size]` 349／0、`[desktop-seams]` 9／6／99、`[dead-surface]` 面 294）·
+> **`e2e:desktop` 重跑 62 passed／0 skipped（2.9m）**（产品代码动过就必须重跑点击层，这条不能沿用）· `git diff --check` 0 行 · stash 0 · `.e2e-lock` 不在 ·
+> 三引用按 peel 仍 `1b9ca06`，本会话未提交未推送未动 tag；`e2e`（浏览器那一半）继续欠着，等一句授权。
+>
+> **第五十二次续做**（2026-10-09 19:03，覆盖 HANDOFF 第七十三～八十二批；这一段的主题只有一个：**把"已经收口"的每句话交给机器看着**）
+>
+> 三批新判据把云端面的最后一格补上：`e2e:desktop` **62 → 68 passed／0 skipped**——
+> **E56**（账户页三条从未按名守过的动作入口）· **E57**（发现页四个 `?tab=` 子视图各访一遍，逐 tab 断占位符做正对照）·
+> **E58**（`/comments/{id}/report` 那颗「举报评论」键；难点是浏览器臂**必须喂一条别人写的评论**才点得亮，
+> 于是三条通路全部 `page.route` 就地应答，**连举报的 POST 也本地应答 ⇒ 一个字节都不出浏览器**——
+> 本机 :8000 跑着他的 uvicorn、vite 代理 `/api`，这是前提不是加分项）。
+>
+> 然后是两次"自己写的话自己不信"：
+> ① `cloud:callmap` 加**第十四段**＋真相源 `scripts/desktop-cloud-judgements.json`——「第十二段那 12 条已逐条有判据」
+>   原本只活在 README 里，改一个测试标题就静默变假。**身份键用标题原文不用 E 编号**（E20/E29 是在册的幽灵编号）。
+> ② `check:dead-surface` 长出**第二档＝多余的对外出口**（导出级，基线 24 条／340 个具名值导出／参考池 424 文件）：
+>   模块级判据看不见「活着的面包着死的口」，而 `identityLink.ts` 那三个零 import 的身份绑定导出正是 S13-3 该数清的一格
+>   （顺带把时机档「不明 8」定性完：**5 条死出口／1 条分派口远端支／1 条只在浏览器态／1 条已被守**，没有一条会在桌面真打出去）。
+>
+> 途中修掉一处**共用遮蔽层的真缺陷**：`maskNonCode` 不认正则字面量，`{url.replace(/^https?:\/\//, "")}` 被当成行注释抹到行尾
+> ⇒ 花括号失配 ⇒ "函数体"只剩一行 ⇒ **整页早退判据被结构性吃掉**。方向要说清：遮蔽过度是**藏缺陷**（保守上界从 20 缩到 16 是修复的副产物），
+> 不是虚报；同批把判据抽成纯函数并配 5 条合成样本（3 正 2 反），不一致就 `UNRELIABLE` 退出 1。
+>
+> 两次自我更正（都写进了 §4，不是悄悄改）：上一批写的「档位计数未变」当场被推翻；
+> 取变异牙时我写的 `io.open(f,"w").write(io.open(f).read()+…)` **先截断再读**，把 `identityLink.ts` 写成空壳，
+> 造出一串看着像"图判据对内容敏感"的红——只读探针复测同一改动证明是我的工具误用（产品文件靠"写前快照＋还原后相等断言"零损失救回）。
+>
+> 末轮读数（19:02 一次取齐）：`gates` **0**（**仍是十五道**，第二档长在既有命令里；`test:unit` 774 passed + 1 skipped；
+> `[dead-surface]` 第一档 10 在册／面 294／闭包 245，第二档 24＝基线 24；`[seams]` 9／6／99；`check:citations` 已判定 **254**）·
+> `pnpm cloud:callmap` 与 `LOADFACE=… pnpm cloud:callmap` 各 **0**（台账 12／B 档 12／缺判据 0；逐档与 18:15 四次全等）·
+> `check:http-inventory` **0**（`ROUTES=25`、桌面 0／浏览器 20、完全没证据的路由 0）· `git diff --check` 0 行 · `??` 52
+> ⇒ **待显式 add 十一份**（九份 `.test.ts`＋`desktop-cloud-judgements.json`＋`dead-export-baseline.json`，两份新基线都是"不在就红"的锁）·
+> 三引用按 peel 仍 `1b9ca06`，本会话未提交未推送未动 tag；`pnpm e2e`（浏览器那一半，会写他的开发库）继续欠着，等一句授权。

@@ -1,7 +1,7 @@
 # web 端退役：恢复锚点与还原手册
 
 > 2026-09-26 · 服务于「去掉 web 端、只保留桌面端」这一步及后续所有删除动作。
-> 配套：[WEB_FEATURE_DISPOSITION](./WEB_FEATURE_DISPOSITION.md)（逐功能去留清单——删之前先看那份）。
+> 配套：[归档盘点 WEB_FEATURE_DISPOSITION](./archive/WEB_FEATURE_DISPOSITION.md)（逐功能去留快照；当前执行清单以 [REFACTOR_DESKTOP](./REFACTOR_DESKTOP.md) 为准）。
 > 规则：**任何删除 web 路径或后端的提交，都必须能在本文件的锚点上回滚**；锚点若失效，先修锚点再动手。
 
 ## 为什么先立这份文件
@@ -82,16 +82,18 @@ git checkout web-archive-20260926 -- <path>
 | 云端分支层（S13-7 的目标） | 29 个文件、2538 行 | `apps/web/src/shared/storage/http*.ts` + `apps/web/src/shared/api/*.ts` |
 | 运行模式分叉点 | 25 个文件、34 处 | `grep -rE "isTauriEnvironment\(|isLocalOnlyDeployment\("` 全 `apps/web/src` + `packages` |
 | 后端本体（S13-6 的目标） | 107 个 `.py`、10 个 domain | `find backend/app -name "*.py"` / `ls backend/app/domains` |
-| 验收基线 | 3 个 spec、38 条用例 | `pnpm e2e`（`playwright.config.ts` 的 `webServer` 起 `uv run uvicorn app.main:app --port 8000`） |
+| 验收基线 | **2026-09-30 复测**：浏览器态 `Total: 50 tests in 3 files`（`baselines` 13 + `desktop-http` 33 + `llm-endpoint` 4）；桌面态 `pnpm e2e:desktop` **37 tests in 2 files**（`testIgnore: /baselines/`，零后端） | `npx playwright test --list` / `--config playwright.desktop.config.ts --list` |
 
 **由此得到一条不是观点、是配置的结论**：`playwright.config.ts` 的 `webServer` 现在就依赖 uvicorn:8000。
 所以「删后端」会在**启动阶段**打掉整条 e2e 基线，而不是只让某几条用例变红——
 这正是不变量②「验收基线最后搬家」的实测理由，也是 S13-6 的硬前置：
 **S13-6 不可开工的原因不是等一句批准，而是等基线搬家（S13-5 后半）先落地。**
 
-给定档用的最小决策集因此只剩两问，且都能就地执行：
-1. 基线搬家走哪条路：把 38 条里的桌面相关部分改由**壳内冒烟 + `?storage=memory` 宿主**承担（本轮 E17/E20/E21/E22 已经证明这条路能测写入回读与播放），
-   还是接受 e2e 长期把后端当**测试宿主**保留（后端不面向用户、只在 CI 里活着）。
-2. 云本质功能（发现/作者页/Nexus/版本/评论）在桌面要不要留入口——见 `WEB_FEATURE_DISPOSITION` 与本轮新登记的那 4 处导航出口。
-
-第 1 问的答案决定 S13-5/S13-6/S13-7 的次序；第 2 问决定 S13-3 的范围。两问都不需要新能力，只需要定档。
+**但这一句在 2026-09-30 需要按实测收窄**（原文写于搬家之前，那份「38 条」也是当日数字，不是估算）：
+桌面那一半**已经搬完了**——`pnpm e2e:desktop`（只起 vite、不起 uvicorn）跑 **37 条全绿**，
+覆盖 E14/E15/E17 一族（含 E20/E25/E27/E33 那几条嵌套腿）与 E18/E19/E21/E30/E31/E32/E35–E39/E40/E41/E42。
+于是删后端真正会打掉的只剩 **`baselines.spec.ts` 的 13 条**（37 条里的一条不多不少都在桌面配置里跑着）。
+这条数字变化的意义是把第 1 问从"要不要搬"改成了"**这 13 条归谁**"：
+它们要不要也搬成离线可跑（换成 `?storage=memory` 宿主或壳内冒烟），还是让后端只作为**测试宿主**为这 13 条活着。
+第 2 问（云本质功能——发现/作者页/Nexus/版本/评论——在桌面要不要留入口，见 `WEB_FEATURE_DISPOSITION` 归档快照与已登记的 4 处导航出口）不受影响，仍是 S13-3 的范围。
+第 1 问的答案决定 S13-5/S13-6/S13-7 的次序；两问都不需要新能力，只需要定档。

@@ -4,6 +4,8 @@
 **日期**：2026-08-26
 **关联**：ADR-008、ADR-016、ADR-022、[REFACTOR_DESKTOP](../REFACTOR_DESKTOP.md)（执行宪章与阶段计划）、VISION_AND_BRIDGES §5、ROADMAP_FINAL v2.0+
 
+> **现行效力**：桌面优先与本地存储决策仍有效。本文将 Web 描述为协作/发布服务的部分已由 [ADR-029](./029-desktop-only-build-target.md) 取代：桌面是唯一发行目标，协作/发布面不在当前产品范围。
+
 ## 背景
 
 产品重心已从「Web UI 应用」漂移到「NLE 式创作工作台」（ADR-022 将剪辑台定为默认主视图）。NLE 类交互对浏览器的三大结构性不适配：

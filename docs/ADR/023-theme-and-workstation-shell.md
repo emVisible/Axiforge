@@ -2,7 +2,7 @@
 
 - **状态**：已采纳
 - **日期**：2026-07-08
-- **取代**：LAYOUT_V2「不做全局主题切换」非目标
+- **取代**：归档的 LAYOUT_V2「不做全局主题切换」非目标
 
 ## 背景
 
@@ -24,5 +24,5 @@
 
 ## 相关
 
-- [`../LAYOUT_V3.md`](../LAYOUT_V3.md)
+- [归档：LAYOUT_V3.md](../archive/LAYOUT_V3.md)
 - [`../ADR/022-cut-studio-three-track-projection.md`](./022-cut-studio-three-track-projection.md)

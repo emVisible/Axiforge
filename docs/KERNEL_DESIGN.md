@@ -117,6 +117,18 @@ export interface Journal {
 | `mergeCanvasIntoProjectNodes` / `canvasEdgesForProjection` | L3：画布快照 → Draft 差异合并 |
 | `collectProjectNodes` | L5 兼容层（服务端响应形态归一），最终随旧 API 层消亡（铁律 7） |
 
+> 状态（2026-09-30）：这张表把 `axsToSyncPayload` 与 `axs.import` 画成同一归宿，**实态是两套实现**，按本文末尾的规矩在此回写而不是沉默漂移：
+> - `Transaction("axs.import")` 的载荷由 `packages/editor-core/src/axsImport.ts:56` 的 `importAxsDraft` 产出（`document.ts:355` 调用）——它读写 **Draft 的既有节点集合**。
+> - `axsToSyncPayload`（仍在 `apps/web/src/features/writer/lib/projection.ts:96,102`）调的是另一套 `parseAxsToPlan`（`packages/editor-core/src/projection/axs.ts`）——它产出**同步载荷**（节点 + 边 + sort_order + 网格位置）。
+> 两者对「标题命中既有节点」的复用与排序语义不是逐字相同，直接合并会把两种语义拧成第三种（这是 #69 那批缺陷的土壤），故归并登记在 S13-7 等定档，本轮不自作主张。
+> 临时保险两条，都是机械的：`packages/editor-core/src/document.test.ts:385` 那条**配对判据**「两条『AXS 文本 → 节点图』的通路守同一条 id 契约（防止只修一处）」在同一段测试里跑两套实现，断言两者都必须"两个桥段两个 id、第一个仍复用既有节点身份"（去掉任一侧的守卫都会让它红）；契约文本本身在 [ADR-016](./ADR/016-axs-narrative-language.md) 补记第 6 条。合并那天，这两条一起退场——它们的存在理由是一份尚未归并的实现，不是两种业务语义。
+>
+> 状态更新（2026-10-01）：上面那句"两套实现"要在**层次上说准**。实测 `beatToNarrative` ≡ `beatToNarrativeData` 是**逐字符相同的 8 个字段**（连 `is_anchor` 规则与 4 列落位公式都各抄了一遍）——
+> 那部分不是两种语义，是一份逻辑被抄两遍，**现已归一到 `projection/axs.ts` 一处**（`index.ts` 同时星号导出两侧，公开面不变、`check:circular` 仍无环）。
+> 真正仍并存的是**两条入口通路**：草稿事务 `axs.import`（读写 Draft 的节点集合）与 Writer 保存的同步载荷 `parseAxsToPlan`（产出节点 + 边 + 排序）。
+> 归并这两条入口需要动 Writer 保存的载荷形状，**仍属 S13-7、等定档**。归一后另补了一条主通路判据（`projection.test.ts` 的关键拍断言）：
+> 在此之前 Writer 那一侧对 `is_anchor` 没有任何断言，同一处回归只红一半。
+
 **不变量**：I8 投影函数无副作用、不读时钟、不触网——同一输入永远同一输出。
 
 ### 2.5 StorageProvider —— 显式失败语义的存取契约
@@ -154,6 +166,16 @@ export type StorageResult<T> =
 
 > 状态（2026-08-26）：契约已落地 `packages/editor-core/src/storage.ts`，
 > 契约测试套件 `storage/contract.test.ts` 是一切实现的验收标准（Memory 实现先行，SQLite 随 Phase 2）。
+>
+> 路径更正（2026-10-01 实测）：那个单文件 `storage.ts` 已不存在——契约与实现现拆在 **`packages/editor-core/src/storage/`** 目录下
+> （`contract.ts` 跑双支契约用例、`memory.ts` 是内存实现（`saveNarrative` 在 `:156`）、`contractAuthoring.ts` / `contractPools.ts` 拆脚手架）。
+> 上面那句按当时实态保留；后续引用请指目录，别再指 `storage.ts`。
+>
+> 第二次更正（2026-10-09 文档↔实树机检实测）：上一段只纠正了 `storage.ts` 那一半，**`storage/contract.test.ts` 那个文件名从来没有存在过**——
+> 现状是 `contract.ts` / `contractPools.ts` / `contractAuthoring.ts` **导出**契约套件，真正**跑**它的是
+> **`packages/editor-core/src/storage/memory.test.ts`**（`import { runStorageContractSuite } from "./contract"`，同一文件还跑了 pool 与 authoring 两支），
+> 云端与 Tauri 两支的实现则由 `apps/web/src/shared/storage/` 那 22 个测试文件按各自契约面覆盖。
+> 所以上面"`contract.ts` 跑双支契约用例"这句也不准确：它是定义处，不是运行处。历史句子按当时实态保留。
 
 ## 三、内核原则 → 本项目落地映射
 

@@ -2,7 +2,7 @@
 
 **状态**：已采纳（Cut Studio v1）  
 **日期**：2026-07-08  
-**关联**：ADR-009、ADR-016、ADR-017、VISION_AND_BRIDGES 桥2、REFACTOR_CUT_STUDIO.md
+**关联**：ADR-009、ADR-016、ADR-017、[归档：VISION_AND_BRIDGES](../archive/VISION_AND_BRIDGES.md) 桥2、[归档：REFACTOR_CUT_STUDIO](../archive/REFACTOR_CUT_STUDIO.md)
 
 ## 背景
 
@@ -28,7 +28,7 @@ ADR-009 已规划 v1.3「分轨时间轴 + 实时预览」；本 ADR 将剪辑�
 2. **剧本（Writer）** — AXS 文本轨，高级用户
 3. **结构（Flow）** — React Flow 鸟瞰分支
 
-同步通道：[`projection.ts`](../apps/web/src/features/writer/lib/projection.ts)。
+同步通道：[`projection.ts`](../../apps/web/src/features/writer/lib/projection.ts)。
 
 - **Writer → 图**：`saveWriter` / `syncNarrative`，ADR-016 **文本优先**覆写 nodes。
 - **剪辑/结构 → AXS**：`saveAll` 成功后 `projectToAxs` 写回 `axs_source`；切到剧本轨前 `projectAxsFromCanvas` 投影当前画布（含未保存编辑）。

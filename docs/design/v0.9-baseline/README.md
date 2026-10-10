@@ -57,5 +57,8 @@ Tailwind v4 的自动源扫描不覆盖 `apps/web` 之外的 workspace 包，
 | `discover-error-state-when-api-down.png` | 同样停机条件下显示「剧本清单加载失败」+ 重试 |
 
 复现方式（这一步很关键，否则测的是旧产物）：
-只启动 `vite preview`、**不启动后端**，且必须 `rm -rf apps/web/dist && pnpm build` 之后再看。
+只启动 `vite preview`、**不启动后端**，且必须 `rm -rf apps/web/dist && pnpm build:web` 之后再看。
 本次第一版验证就是因为用了改动前构建的 dist，误判成「修复没生效」。
+> 命令更正（2026-09-30）：这里当年写的是 `pnpm build`。从 v1.0 起根 `build` 已改指**桌面 `.app` 打包**
+> （`build:desktop`），照旧命令复现会去跑一次 Tauri 构建而不是产出 `apps/web/dist`。
+> renderer 的构建命令是 `pnpm build:web`，语义与原样保留的 `apps/web` 内 `build` 一致。

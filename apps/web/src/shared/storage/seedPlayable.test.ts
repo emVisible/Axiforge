@@ -55,15 +55,20 @@ describe("随包示范作首启可玩", () => {
       it("每个节点都成 Beat，且挂着的舞台真的解析得到（不是悬空 stageId）", async () => {
         const { shipped, pkg } = await playShippedPackage(file);
         expect(pkg.beats).toHaveLength(shipped.project.nodes.length);
+        /**
+         * 2026-10-09 改连接键：导入侧现在**重映射节点身份**（`project_nodes.id` 是全局主键，
+         * 不换就导不回本机——判据见 `packages/editor-core/src/axspReimport.test.ts`），
+         * 所以这里不能再拿包内的原始 id 去 IR 里 join。
+         * 覆盖一条没减：节点数、**有舞台的节点数 ↔ 有 sceneId 的 Beat 数**、每个 sceneId 都真在 scenes 里、
+         * 且都有 sceneTitle。舞台解析那半的判据反而更宽——它是遍历全部 Beat，不再只遍历 join 得上的那些。
+         */
+        const withStage = shipped.project.nodes.filter((n) => n.stageId).length;
+        const beatsWithScene = pkg.beats.filter((b) => b.sceneId);
+        expect(beatsWithScene).toHaveLength(withStage);
         const sceneIds = new Set(pkg.scenes.map((s) => s.id));
-        for (const node of shipped.project.nodes) {
-          const beat = pkg.beats.find((b) => b.id === node.id);
-          expect(beat, `节点 ${node.id} 没进 IR`).toBeDefined();
-          if (!node.stageId) continue;
-          // 这一条就是 S13-2g 的追溯判据：舞台没被导入时 beat.sceneId 是 null
-          expect(beat?.sceneId, `节点 ${node.id} 的舞台 ${node.stageId} 悬空`).not.toBeNull();
-          expect(sceneIds.has(beat?.sceneId ?? "")).toBe(true);
-          expect(beat?.sceneTitle).toBeTruthy();
+        for (const beat of beatsWithScene) {
+          expect(sceneIds.has(beat.sceneId ?? "")).toBe(true);
+          expect(beat.sceneTitle).toBeTruthy();
         }
       });
 

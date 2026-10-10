@@ -130,6 +130,25 @@ export function getSeedOutcome(): SeedOutcome | null {
   return seedOutcome;
 }
 
+/**
+ * 工厂这次走了哪一支。桌面态的云端回落是整场重构最忌讳的失效形状——它不报错，只是"存到别处去了"，
+ * 所以支名必须是**程序可读的事实**，而不是要人下断点才知道的秘密。
+ */
+export type StorageProviderBranch = "memory" | "shell" | "cloud";
+let lastProviderBranch: StorageProviderBranch | null = null;
+
+export function getStorageProviderBranch(): StorageProviderBranch | null {
+  return lastProviderBranch;
+}
+
+function markStorageProviderBranch(branch: StorageProviderBranch) {
+  lastProviderBranch = branch;
+  // DEV 才挂给页面：e2e 的红消息要能直接说出"这一页其实没挂上本地库"，生产产物里不留这个句柄
+  if (import.meta.env.DEV && typeof window !== "undefined") {
+    (window as unknown as Record<string, string>).__AXIFORGE_PROVIDER_BRANCH__ = branch;
+  }
+}
+
 export async function createStorageProvider(): Promise<StorageProvider> {
   /*
    * S13-5 的测试宿主：`?storage=memory` 在浏览器里挂一个内存本地库。
@@ -143,10 +162,12 @@ export async function createStorageProvider(): Promise<StorageProvider> {
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).get("storage") === "memory"
   ) {
+    markStorageProviderBranch("memory");
     setLocalAssetRoot(null);
     return new MemoryStorageProvider();
   }
   if (isTauriEnvironment()) {
+    markStorageProviderBranch("shell");
     const assets = await TauriAssetStore.create();
     setLocalAssetRoot(assets.rootDir);
     const provider = new SqliteStorageProvider(
@@ -159,6 +180,7 @@ export async function createStorageProvider(): Promise<StorageProvider> {
     seedOutcome = await seedOnce;
     return provider;
   }
+  markStorageProviderBranch("cloud");
   setLocalAssetRoot(null);
   return new HttpStorageProvider(getCreatorId());
 }

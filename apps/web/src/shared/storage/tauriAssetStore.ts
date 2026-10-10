@@ -10,7 +10,6 @@ import {
   LOCAL_ASSET_PREFIX,
   assetRefFor,
   classifyAssetRef,
-  contentKey,
   err,
   extensionFor,
   ok,
@@ -27,12 +26,18 @@ export const ASSET_PROJECT_DIR = "Axiforge";
 const ASSET_SUBDIR = LOCAL_ASSET_PREFIX.replace(/\/$/, "");
 
 /**
- * 内容摘要：优先 SHA-256；非安全上下文（无 crypto.subtle）退化为 FNV 内容键。
- * 摘要只用于「同内容→同 ref」的去重，不承担安全语义，故退化可用但须留痕。
+ * 内容摘要：**只做 SHA-256**，缺 `crypto.subtle` 就抛——不做非加密兜底。
+ *
+ * 两条在册契约都要求它：`contentKey` 在 editor-core 里写明「仅供内存实现与测试做同内容去重，
+ * 桌面/服务端落盘用 sha256」；用户文档（desktop-and-axsp）写明「素材文件名是它内容的 SHA-256 摘要，
+ * 工程包在别的电脑上打开时能认得同一个文件」。换成 FNV 键会让同一张图在两台机器上得到两个 ref，
+ * 而写入本身照样"成功"——那是静默失效，不是降级。宁可让上传报错并说清原因。
  */
 export async function contentDigest(bytes: Uint8Array): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
-  if (!subtle) return contentKey(bytes);
+  if (!subtle) {
+    throw new Error("素材摘要不可用：当前环境没有 crypto.subtle（非安全上下文），拒绝用非加密键落盘");
+  }
   const view = new Uint8Array(bytes.byteLength);
   view.set(bytes);
   const hash = await subtle.digest("SHA-256", view.buffer as ArrayBuffer);
@@ -64,10 +69,15 @@ export class TauriAssetStore implements AssetStore {
     if (input.bytes.byteLength === 0) {
       return err({ code: "io", detail: "素材字节为空" });
     }
-    const ref = assetRefFor(
-      await contentDigest(input.bytes),
-      extensionFor(input.name, input.mime),
-    );
+    let ref: string;
+    try {
+      ref = assetRefFor(
+        await contentDigest(input.bytes),
+        extensionFor(input.name, input.mime),
+      );
+    } catch (cause) {
+      return err({ code: "io", detail: "素材摘要不可用（缺 SHA-256），已拒绝落盘", cause });
+    }
     try {
       const fs = await fsPlugin();
       const abs = this.absOf(ref);

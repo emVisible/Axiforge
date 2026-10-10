@@ -25,8 +25,16 @@ describe(".axsp 导出/导入组合", () => {
           narrativeData: { title: "开始", script: [{ op: "narration", text: "往返验证。" }] },
           sortOrder: 0,
         },
+        {
+          id: "n2",
+          stageId: null,
+          editorData: { position: { x: 3, y: 4 } },
+          narrativeData: { title: "续拍", script: [{ op: "narration", text: "第二拍。" }] },
+          sortOrder: 1,
+        },
       ],
-      edges: [],
+      // 边上真放一条：往返判据要验「边跟着换端点」，空数组会让那条断言恒真
+      edges: [{ id: "e1", source: "n1", target: "n2", label: "继续" }],
     });
     await provider.addRole(id, { characterRefId: "char-9" });
 
@@ -53,8 +61,32 @@ describe(".axsp 导出/导入组合", () => {
     const copy = await provider.loadProject(imported.data.id);
     expect(orig.ok && copy.ok).toBe(true);
     if (!orig.ok || !copy.ok) return;
-    expect(copy.data.nodes.map((n) => ({ ...n, stageId: null }))).toEqual(orig.data.nodes.map((n) => ({ ...n, stageId: null })));
-    expect(copy.data.edges).toEqual(orig.data.edges);
+    expect(
+      copy.data.nodes.map((n) => ({ ...n, id: "", stageId: null })),
+    ).toEqual(
+      orig.data.nodes.map((n) => ({ ...n, id: "", stageId: null })),
+    );
+    /**
+     * 标题里那句「新 id」从今天起真的**包括节点与边**：`project_nodes.id` / `project_edges.id`
+     * 是全局主键，原样插入 ⇒ 同一台机器上再导一次必撞主键、整批事务回滚
+     * （真库复现与判据在 `packages/editor-core/src/axspReimport.test.ts`；内存宿主跨工程不查重复，
+     * 只在这里测就会得到一个永不失败的形状）。
+     */
+    const origNodeIds = new Set(orig.data.nodes.map((n) => n.id));
+    const copyNodeIds = new Set(copy.data.nodes.map((n) => n.id));
+    for (const id of copyNodeIds) expect(origNodeIds.has(id)).toBe(false);
+    expect(copy.data.edges).toHaveLength(orig.data.edges.length);
+    expect(
+      copy.data.edges.map((e) => ({ ...e, id: "", source: "", target: "" })),
+    ).toEqual(
+      orig.data.edges.map((e) => ({ ...e, id: "", source: "", target: "" })),
+    );
+    // 边的两端必须跟着换成新工程的节点：只换节点不换边＝把"撞主键"换成"边悬空"，那更安静
+    for (const e of copy.data.edges) {
+      expect(copyNodeIds.has(e.source)).toBe(true);
+      expect(copyNodeIds.has(e.target)).toBe(true);
+    }
+    expect(orig.data.edges.length).toBeGreaterThan(0);
     expect(copy.data.axsSource).toBe(orig.data.axsSource);
     expect(copy.data.roles.map((r) => r.characterRefId)).toEqual(
       orig.data.roles.map((r) => r.characterRefId),
@@ -155,8 +187,16 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
     });
     if (!sprite.ok || !portrait.ok) throw new Error("asset failed");
 
+    // 显式 id，不用 `id: ""` 让 provider 自己发：**下面那条"新身份不等于包内 id"的断言
+    // 只有在包内 id 不会被接收方碰巧发出来时才成立**。而 `MemoryStorageProvider.nextId`
+    // 是**跨前缀共用一个计数器**（`this.seq`），所以接收方发什么完全取决于它此前调过几次。
+    // 原先那条用例之所以绿，是靠"接收方先建角色、后建工程"这个调用顺序让计数器错开——
+    // 2026-10-01 复审把 `createProject` 提到导入最前（修 `createProject` 失败留下整组孤儿角色那条缺陷），
+    // 顺序一换，两个 provider 就发出了同一个 `char-0002`，而**契约本身没变**。
+    // 把包内 id 钉成一个显式值，断言才量的是"接收方分配了新身份"这件事。
+    const charId = "char-src-linsha";
     const saved = await src.saveCharacter({
-      id: "",
+      id: charId,
       name: "堰纱",
       characterData: { sprites: { smile: sprite.data.ref } },
       imagePath: portrait.data.ref,
@@ -164,7 +204,7 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
       authorId: "e2e-author",
     });
     if (!saved.ok) throw new Error("character failed");
-    const charId = saved.data.id;
+    expect(saved.data.id).toBe(charId);
     await src.addRole(id, { characterRefId: charId });
 
     await src.saveNarrative(id, {
@@ -202,6 +242,7 @@ describe(".axsp v2 导出/导入：演员表与素材随包", () => {
     if (!load.ok) return;
     const newId = load.data.roles[0]!.characterRefId;
     expect(newId).toBeTruthy();
+    // 契约是"接收方分配新身份、不沿用包内 id"，不是"新 id 恰好不等于某个值"
     expect(newId).not.toBe(charId);
 
     const importedChar = await dst.getCharacter(newId);

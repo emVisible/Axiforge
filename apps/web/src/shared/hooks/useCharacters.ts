@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { characterApi } from '@/shared/api/characters';
+import { getCreatorId } from '@/shared/lib/creatorId';
 import { getPlayerToken } from '@/shared/lib/playerToken';
 import { getStorageProvider, storedCharacterToResponse } from '@/shared/storage';
 import { isTauriEnvironment } from '@/shared/storage/tauriSqlBackend';
@@ -92,7 +93,17 @@ export const useCreateCharacter = () => {
     mutationFn: async (data: CharacterCreate): Promise<Character> => {
       if (isTauriEnvironment()) {
         const p = await getStorageProvider();
-        const authorId = data.author_id ?? '';
+        // 2026-10-01 复审：原先是 `data.author_id ?? ''`。
+        // `??` 只折叠 null/undefined，于是"没给作者"被折成 `""` —— 那是**第三种东西**：
+        // 既不是 null（无归属），也不是任何一个真作者 id。而可见性判定是
+        // 「`authorId` 相等」或「`isPublic`」，所以 `""` 两边都不匹配 ⇒
+        // 角色存进去了，却在**所有列表里都查不到**，只有 `getCharacter(id)` 能拿到。
+        // 同一族里 `saveItem` / `saveScene` 早就用「本地作者」兜底了
+        // （`SqliteStorageProvider` 的第三个构造参数就是 `getCreatorId()`），
+        // 角色是唯一没有的。核心里补那条兜底要动两个后端的构造参数，
+        // 而这条 hook 是唯一活路径、且调用方本来就传对了 ⇒ **先改这一行**（确定的缺陷、零风险），
+        // 核心里那条不对称登记为待决（见 REFACTOR_DESKTOP 第六节）。
+        const authorId = data.author_id ?? getCreatorId();
         const r = await p.saveCharacter(
           toStored({
             name: localNameOf(data.character_data),

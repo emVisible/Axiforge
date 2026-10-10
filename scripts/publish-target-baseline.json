@@ -1,0 +1,9 @@
+{
+  "allow": [
+    "CI 仍在构建非桌面目标：.github/workflows/ci.yml:69 pnpm build:admin",
+    "CI 仍在构建非桌面目标：.github/workflows/ci.yml:69 pnpm build:web",
+    "部署声明文件仍在仓根：docker-compose.yml",
+    "部署声明文件仍在仓根：vercel.json"
+  ],
+  "_note": "发布目标残差（ADR-029）。清理一项后应重跑 --update 让它缩短，而不是留着当豁免。"
+}

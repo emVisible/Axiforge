@@ -1,0 +1,19 @@
+{
+  "allow": [
+    "docs/REFACTOR_DESKTOP.md → apps/web/src/features/studio/components/ScriptEditor.tsx:572 #d180294a04",
+    "docs/REFACTOR_DESKTOP.md → apps/web/src/features/studio/components/ScriptEditor.tsx:572 #4a774e75fc",
+    "docs/REFACTOR_DESKTOP.md → apps/web/src/features/studio/components/ScriptEditor.tsx:574 #f1e036c766",
+    "docs/REFACTOR_DESKTOP.md → packages/axs/src/parse.ts:391 #29a53ccc87",
+    "docs/REFACTOR_DESKTOP.md → packages/axs/src/parse.ts:417 #6c1fe9cabc"
+  ],
+  "_note": [
+    "文档里的悬空引用；清偿后应缩短。键 = 文档 → 目标:行号 # 所在句子的指纹（不含文档行号，见脚本头）。",
+    "前三条是同一类：`ScriptEditor.tsx` 按 check:size 棘轮从 568 行收到 512 行之后，",
+    "REFACTOR 里那两段「非 htmlFor 形态的 7 处 / 真正待分派 4 处」是 2026-09-30 当时状态的快照，",
+    "行号按当时实态记录、不追改（历史文本不重写）。第一条 #d180294a04 在 2026-10-01 复审之前就在册；",
+    "另两条是复审把 `suffixHits` 从 everyFile 收窄到 tracked 之后才浮出来的——",
+    "它们原先因为同名副本太多被判成 ambiguous 而静默跳过，不是新引入的漂移。",
+    "后两条是 parse.ts 按域外提（420 → 330 行）之后失效的历史坐标，同样冻结。",
+    "要让这一栏缩短，办法是把那两段快照改写成带日期的现状描述，而不是改行号。"
+  ]
+}

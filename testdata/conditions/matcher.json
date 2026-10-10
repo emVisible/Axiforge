@@ -1,0 +1,355 @@
+{
+  "_note": [
+    "条件**匹配层**的跨实现共享向量（`memory` / `flag` 两族）。",
+    "",
+    "2026-10-01 复审补上，补的是同一轮登记的那条欠账：`{\"_value\": x}` 单键解包在 TS 是一个",
+    "`unwrap` helper、在 Python 是**内联在 `_match_memory` 与 `_match_flag` 两处**——形状不同、行为一致，",
+    "而 `compare.json` 只锁了 `compare` 那一半，解包与「键缺席 ⇒ `operator === \"ne\"`」都还在规格之外。",
+    "",
+    "`absent: true` = **这一行/这个键根本不存在**（与「键在场但值是 null」是两件事，",
+    "后者已由 `memory/_value 包装 null` 那条覆盖）。这条标志是复审用变异抓出来的：",
+    "把 TS 侧「键缺席 ⇒ `operator === \"ne\"`」改成恒假时，判据一度全绿——",
+    "因为当时那几条只是设了 `key + null`，测的是「在场为 null」而不是缺席。**用例名不等于覆盖**。",
+    "**两侧的存储形状本来就不同，所以向量要带一次翻译**：",
+    "TS 的 `vars.memory` / `vars.flags` 是**字典**（`key in vars`），",
+    "Python 的 `memories` / `flags` 是**行列表**（`for m in memories: if m.key == key`）。",
+    "向量只描述「键 + 存储形态 + 条件」，由两个消费者各自翻译成自己那一侧的形状。",
+    "",
+    "`stored` 是**存储形态本身**（即已经决定要不要包 `{\"_value\": …}`），不是解包后的值——",
+    "否则这条向量会把自己要锁的东西先假设掉。",
+    "",
+    "**仍然没锁的**（登记，不假装已锁）：`character_state` / `codex` / `relationship` 三个族。",
+    "它们的形状更大（要连 `characters` 字典 / codex 账本 / 三段键一起定义），",
+    "且 `relationship` 的三段键语义刚在另一轮改过（见 `edges.ts` 与 `remapCharacterIds` 那两条）。",
+    "",
+    "**2026-10-01 第二批：`character_state` 族（复审抓到一处真分叉）。**",
+    "原 Python 写法是 `getattr(s, field, None) or s.custom_state.get(field)`——`or` 会把",
+    "0 / 空串 / False 这类**假值**短路成 None，于是「好感度=0」读到 None，",
+    "而 `affection >= 0` 这种**必然成立**的门在服务端恒为假、那条分支永远不开，两端都报成功、零诊断。",
+    "TS 侧用 `!(field in state)` 做存在性判断、不受影响。已按 TS 语义改成哨兵回退。",
+    "这一族用 `chars`（TS 的 `vars.characters` 字典）与 `custom`（Python 的 `custom_state` 回退源）两个字段描述：",
+    "TS 侧把两者合并成一个字典，Python 侧拆成「行属性 + custom_state 回退」——**形状翻译仍由消费者做，语义不翻译**。"
+  ],
+  "matcherCases": [
+    {
+      "id": "memory/_value 包装的数字",
+      "source": "memory",
+      "key": "score",
+      "stored": {
+        "_value": 10
+      },
+      "condition": {
+        "type": "memory",
+        "key": "score",
+        "operator": "gte",
+        "value": 10
+      },
+      "want": true
+    },
+    {
+      "id": "memory/_value 包装后 gte 成立",
+      "source": "memory",
+      "key": "score",
+      "stored": {
+        "_value": 11
+      },
+      "condition": {
+        "type": "memory",
+        "key": "score",
+        "operator": "gte",
+        "value": 10
+      },
+      "want": true
+    },
+    {
+      "id": "memory/_value 包装后 gte 不成立",
+      "source": "memory",
+      "key": "score",
+      "stored": {
+        "_value": 9
+      },
+      "condition": {
+        "type": "memory",
+        "key": "score",
+        "operator": "gte",
+        "value": 10
+      },
+      "want": false
+    },
+    {
+      "id": "memory/裸数字不解包也能比",
+      "source": "memory",
+      "key": "score",
+      "stored": 10,
+      "condition": {
+        "type": "memory",
+        "key": "score",
+        "operator": "gte",
+        "value": 10
+      },
+      "want": true
+    },
+    {
+      "id": "memory/_value 包装布尔字符串",
+      "source": "memory",
+      "key": "door",
+      "stored": {
+        "_value": "true"
+      },
+      "condition": {
+        "type": "memory",
+        "key": "door",
+        "operator": "eq",
+        "value": true
+      },
+      "want": true
+    },
+    {
+      "id": "memory/_value 包装 null",
+      "source": "memory",
+      "key": "k",
+      "stored": {
+        "_value": null
+      },
+      "condition": {
+        "type": "memory",
+        "key": "k",
+        "operator": "eq",
+        "value": null
+      },
+      "want": true
+    },
+    {
+      "id": "memory/双键对象**不解包**（按对象比）",
+      "source": "memory",
+      "key": "k",
+      "stored": {
+        "_value": 1,
+        "extra": 2
+      },
+      "condition": {
+        "type": "memory",
+        "key": "k",
+        "operator": "eq",
+        "value": 1
+      },
+      "want": false
+    },
+    {
+      "id": "flag/_value 包装的标志为真",
+      "source": "flag",
+      "key": "door_open",
+      "stored": {
+        "_value": true
+      },
+      "condition": {
+        "type": "flag",
+        "key": "door_open",
+        "operator": "eq",
+        "value": true
+      },
+      "want": true
+    },
+    {
+      "id": "flag/裸 True 也成立",
+      "source": "flag",
+      "key": "door_open",
+      "stored": true,
+      "condition": {
+        "type": "flag",
+        "key": "door_open",
+        "operator": "eq",
+        "value": true
+      },
+      "want": true
+    },
+    {
+      "id": "flag/双键对象不解包",
+      "source": "flag",
+      "key": "door_open",
+      "stored": {
+        "_value": true,
+        "x": 1
+      },
+      "condition": {
+        "type": "flag",
+        "key": "door_open",
+        "operator": "eq",
+        "value": true
+      },
+      "want": false
+    },
+    {
+      "id": "memory/键缺席且 eq 为假",
+      "source": "memory",
+      "key": "nope",
+      "absent": true,
+      "condition": {
+        "type": "memory",
+        "key": "nope",
+        "operator": "eq",
+        "value": 1
+      },
+      "want": false
+    },
+    {
+      "id": "memory/键缺席且 ne 为真",
+      "source": "memory",
+      "key": "nope",
+      "absent": true,
+      "condition": {
+        "type": "memory",
+        "key": "nope",
+        "operator": "ne",
+        "value": 1
+      },
+      "want": true
+    },
+    {
+      "id": "memory/键缺席且 gte 为假",
+      "source": "memory",
+      "key": "nope",
+      "absent": true,
+      "condition": {
+        "type": "memory",
+        "key": "nope",
+        "operator": "gte",
+        "value": 1
+      },
+      "want": false
+    },
+    {
+      "id": "flag/键缺席且 ne 为真",
+      "source": "flag",
+      "key": "nope",
+      "absent": true,
+      "condition": {
+        "type": "flag",
+        "key": "nope",
+        "operator": "ne",
+        "value": 0
+      },
+      "want": true
+    },
+    {
+      "id": "character_state/affection=0 且 gte 0（假值字段不能被吞）",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {
+          "affection": 0
+        }
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A.affection",
+        "operator": "gte",
+        "value": 0
+      },
+      "want": true
+    },
+    {
+      "id": "character_state/affection=0 且 eq 0",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {
+          "affection": 0
+        }
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A.affection",
+        "operator": "eq",
+        "value": 0
+      },
+      "want": true
+    },
+    {
+      "id": "character_state/mood 空串且 eq 空串",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {
+          "mood": ""
+        }
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A.mood",
+        "operator": "eq",
+        "value": ""
+      },
+      "want": true
+    },
+    {
+      "id": "character_state/flag=false 且 eq false",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {
+          "flag": false
+        }
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A.flag",
+        "operator": "eq",
+        "value": false
+      },
+      "want": true
+    },
+    {
+      "id": "character_state/affection=0 但 gte 1 仍为假（别过度修正）",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {
+          "affection": 0
+        }
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A.affection",
+        "operator": "gte",
+        "value": 1
+      },
+      "want": false
+    },
+    {
+      "id": "character_state/只在 custom 字典里的字段",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {}
+      },
+      "custom": {
+        "x": 7
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A.x",
+        "operator": "gte",
+        "value": 7
+      },
+      "want": true
+    },
+    {
+      "id": "character_state/键无点 → ne 兜底为真",
+      "source": "character_state",
+      "key": "A",
+      "chars": {
+        "A": {
+          "affection": 1
+        }
+      },
+      "condition": {
+        "type": "character_state",
+        "key": "A",
+        "operator": "ne",
+        "value": 1
+      },
+      "want": true
+    }
+  ]
+}

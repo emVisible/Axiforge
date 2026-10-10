@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createDraft } from "../document";
 import type { Draft, Edge, NarrativeNode } from "../types";
+import type { AxsDiagnostic } from "@axiforge/axs";
 import {
   beatLineForNode,
   draftToAxs,
@@ -94,16 +96,46 @@ describe("draftToAxs", () => {
     expect(draftToAxs(d, {})).toBe("# 抉择\n天色渐晚。\n阿凛: 走吧。\n> 离开\n> 留下\n");
   });
 
-  it("旧版选项带目标节点时同样打印为无目标选项（既有行为基线）", () => {
+  it("旧版选项目标 ID 投影为目标 Beat 标题", () => {
     const d = draftOf([
       node("old", {
         title: "抉择",
         dialogue: "走哪？",
         choices: [{ label: "东", target_node_id: "east" }],
       }),
+      node("east", { title: "东方" }),
     ]);
-    // 无 speaker 的 legacy 对白打印为 ": text"（既有行为，基线钉住）
-    expect(draftToAxs(d, {})).toBe("# 抉择\n: 走哪？\n> 东\n");
+    // 2026-10-01 更正：无 speaker 的 legacy 对白以前打印成 ": text"，那一行回读会被解析器拒掉
+    // 并降级成旁白、冒号还留在玩家文本里。发射器现在按旁白那一支印出去（与运行端 resolveSpeaker→null
+    // 时不显示名字、`ir.ts:90`「缺省为旁白」同一语义）。本条对选项目标映射的钉原样保留。
+    expect(draftToAxs(d, {})).toBe("# 抉择\n走哪？\n> 东 -> 东方\n\n# 东方\n");
+  });
+
+  it("legacy 选项指向同名 Beat 的第二个时投影出消歧形式，不静默指到第一个", () => {
+    const d = draftOf([
+      node("old", {
+        title: "抉择",
+        dialogue: "走哪？",
+        choices: [{ label: "东", target_node_id: "east2" }],
+      }),
+      node("east1", { title: "开场" }),
+      node("east2", { title: "开场" }),
+    ]);
+
+    // 打印侧的消歧规则与解析侧 assignBeatIds 一致：第一个沿用裸标题，第二个起加 -N
+    expect(draftToAxs(d, {})).toContain("> 东 -> 开场-2");
+  });
+
+  it("ChoiceInstruction 目标 ID 投影为目标 Beat 标题", () => {
+    const d = draftOf([
+      node("choice", {
+        title: "抉择",
+        script: [{ op: "choice", options: [{ label: "向东", to: "east" }] }],
+      }),
+      node("east", { title: "东方" }),
+    ]);
+
+    expect(draftToAxs(d, {})).toBe("# 抉择\n> 向东 -> 东方\n\n# 东方\n");
   });
 
   it("舞台标题经 scenes 解析进入标题行", () => {
@@ -165,6 +197,35 @@ describe("parseAxsToPlan", () => {
       op: "say",
       characterId: "char-1",
     });
+  });
+
+  it("同名 Beat 不许共用同一个既有节点 id（这是 Writer 保存的主通路）", () => {
+    let n = 0;
+    const plan = parseAxsToPlan(
+      "# 开场\n第一处开场。\n\n# 开场\n第二处开场。\n",
+      {},
+      [{ id: "existing-1", title: "开场" }],
+      [],
+      () => `gen-${++n}`,
+    );
+    // 载荷里节点 id 必须唯一：两个同 id 节点送到存储侧就是后写悄悄覆盖前写
+    expect(plan.nodes.map((p) => p.id)).toEqual(["existing-1", "gen-1"]);
+    // 邻接边两端若解析成同一个 id，会退化成自环
+    expect(plan.edges.every((e) => e.source !== e.target)).toBe(true);
+  });
+
+  it("关键拍判定在 Writer 主通路上也钉住（映射归一成一份权威后，两路都要拦得下来）", () => {
+    let n = 0;
+    const plan = parseAxsToPlan(
+      "# 开始\n旁白：开场。\n\n# 第二拍 [key: intro]\n旁白：说明。\n\n# 第三拍\n旁白：其它。\n",
+      {},
+      [],
+      [],
+      () => `n${++n}`,
+    );
+    // 「标题=开始」或「key=intro」才算关键拍；这条此前只在 axs.import 那一侧被钉过，
+    // 而 Writer 保存走的是这里——一次 is_anchor 的回归只会红一半。
+    expect(plan.nodes.map((p) => p.narrative.is_anchor)).toEqual([true, true, false]);
   });
 
   it("网格位置与 sort_order 按序生成", () => {
@@ -292,6 +353,86 @@ describe("canvasEdgesForProjection", () => {
 });
 
 describe("projectAxsFromCanvas", () => {
+  /**
+   * 2026-10-01 复审新增：画布投影曾把 `narrative_data` 按 13 键白名单**重建**，
+   * 于是 legacy 分支组 `choices`（`buildScriptFromLegacy` 的唯一输入）连同
+   * 白名单外的所有键一起消失，零诊断。生产链是
+   * `openWriterAtSelection` → `projectAxsFromCanvas` → `setAxsSource` → 保存落盘，
+   * 所以"在 Writer 里打开一次"就足以永久删掉选项。
+   *
+   * 这条特意**带对照组**（同一节点走 `draftToAxs` 直连），
+   * 因为责任很容易被推给 `buildScriptFromLegacy`：只有两组读数一起看，
+   * 才能证明丢失发生在画布这一层而不是投影层。
+   * 牙：把 `canvasNodeToMergeable` 装回"白名单重建"形状 ⇒ 恰好 1 红（对照组那半仍绿）。
+   */
+  it("画布碰过节点后仍保留 legacy choices 与白名单外的键（对照组：直连投影本就保留）", () => {
+    const narrative = {
+      title: "岔路口",
+      script: [] as unknown[],
+      choices: [
+        { label: "走左", target_node_id: "b" },
+        { label: "走右", target_node_id: "c" },
+      ],
+      customNarrativeKey: 42,
+    };
+    const base = {
+      id: "a",
+      stage_id: null,
+      editor_data: { position: { x: 0, y: 0 }, customEditorKey: "keep-me" },
+      narrative_data: narrative,
+      sort_order: 0,
+    };
+    const all = [
+      base,
+      { id: "b", stage_id: null, narrative_data: { title: "左路", script: [] }, sort_order: 1 },
+      { id: "c", stage_id: null, narrative_data: { title: "右路", script: [] }, sort_order: 2 },
+    ];
+
+    // 对照组：不经画布，直连内核投影——本来就该有选项。
+    // 注意这里必须用 **Draft 形态**（`narrative`）另建一份：`all` 是传输态形态（`narrative_data`），
+    // 两种形态字段名不同，混用会造出一个"节点没有 narrative"的假红。
+    const direct = draftToAxs(
+      createDraft({
+        nodes: [
+          { id: "a", narrative: narrative as never },
+          { id: "b", narrative: { title: "左路", script: [] } as never },
+          { id: "c", narrative: { title: "右路", script: [] } as never },
+        ],
+      }),
+      ROLES,
+    );
+    expect(direct).toContain("走左");
+    expect(direct).toContain("走右");
+
+    // 实验组：同节点经画布投影
+    const viaCanvas = projectAxsFromCanvas(
+      [{ id: "a", position: { x: 0, y: 0 }, data: { ...narrative } }],
+      [],
+      all as never,
+      [],
+      [],
+      ROLES,
+    );
+    expect(viaCanvas).toContain("走左");
+    expect(viaCanvas).toContain("走右");
+  });
+
+  it("画布投影不得把画布私有的 stage_id 漏进 narrative_data", () => {
+    // 上一条的改法是"以 base 的持久态为底 + 覆盖已知键"，刻意**不**整体铺开画布 data，
+    // 因为生产里 data = {...narrative, stage_id}。这条钉住那个取舍。
+    const out = projectAxsFromCanvas(
+      [{ id: "a", position: { x: 0, y: 0 }, data: { title: "相遇", script: [], stage_id: "s9" } }],
+      [],
+      [mergeable("a", "相遇", "s1")],
+      [],
+      [{ id: "s9", title: "新舞台" }],
+      ROLES,
+    );
+    // stage_id 只该影响 @stage(...) 那一行，不该作为拍字段混进正文
+    expect(out).toContain("@stage(新舞台)");
+    expect(out.split("\n").filter((l) => l.trim().startsWith("stage_id"))).toHaveLength(0);
+  });
+
   it("未保存的画布编辑即时反映在投影中", () => {
     const out = projectAxsFromCanvas(
       [
@@ -341,5 +482,88 @@ describe("projectAxsFromCanvas", () => {
     );
     expect(out).toContain("# 甲");
     expect(out).toContain("# 保留");
+  });
+
+  it("画布物化把第二组分支的丢失交给调用方，且文本与不传诊断时逐字相同", () => {
+    /*
+     * 三个投影时刻里的第三个：`openWriterAtSelection` 把这次投影的返回值**直接写进用户正在看的
+     * 编辑框**，所以"丢了东西却没人说"在这一趟比装载或保存时更没有别的出口。
+     * 对照组（只有一组分支 ⇒ 诊断必须为空）是这条判据的一部分：没有它，
+     * "只要递了数组就永远塞一条告警"这种假接法也能全绿。
+     */
+    const beat = (labels: string[][]) => ({
+      title: "抉择",
+      script: [
+        { op: "narration", text: "天色渐晚。" },
+        ...labels.map((opts) => ({
+          op: "choice",
+          options: opts.map((label) => ({ label, target_node_id: null })),
+        })),
+      ],
+    });
+    type Beat = ReturnType<typeof beat>;
+    const call = (narrative: Beat, diagnostics?: AxsDiagnostic[]) =>
+      projectAxsFromCanvas(
+        [{ id: "a", position: { x: 0, y: 0 }, data: { ...narrative } }],
+        [],
+        [mergeable("a", "抉择")],
+        [],
+        [],
+        ROLES,
+        undefined,
+        diagnostics,
+      );
+
+    const two = beat([["离开"], ["留下"]]);
+    const warns: AxsDiagnostic[] = [];
+    const withDiag = call(two, warns);
+    expect(withDiag, `诊断出参不该改变文本：${JSON.stringify(warns)}`).toBe(call(two));
+    expect(warns.map((w) => w.message).join("\n")).toContain("读不回来");
+
+    const clean: AxsDiagnostic[] = [];
+    call(beat([["离开"]]), clean);
+    expect(clean, "一组分支不该被报成丢失").toHaveLength(0);
+  });
+});
+
+describe("draftToAxs 的发射侧诊断出参（Writer 主通路会把它显示出来）", () => {
+  /*
+   * `printAxs` 那三条判据量的是发射器本身；这一段量的是**投影层有没有把那个出参真的接上**。
+   * 少接一层（editor-core 收了但不往上交，或 web 交了但 hook 不用）在这段就会红，
+   * 而只在最底下加参数、上面全是摆设——正是本项目点过名的「收下形参却不用」那一族。
+   */
+  const twoGroups = {
+    title: "抉择",
+    script: [
+      { op: "narration", text: "天色渐晚。" },
+      { op: "choice", options: [{ label: "离开", target_node_id: null }] },
+      { op: "choice", options: [{ label: "留下", target_node_id: null }] },
+    ],
+  };
+
+  it("把第二组分支的丢失报给调用方，且投影文本与不传诊断时逐字相同", () => {
+    const d = draftOf([node("a", twoGroups as never)]);
+    const plain = draftToAxs(d, {});
+    const diagnostics: AxsDiagnostic[] = [];
+    const withDiag = draftToAxs(d, {}, diagnostics);
+    expect(withDiag).toBe(plain);
+    expect(withDiag).not.toContain("留下");
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.severity).toBe("warning");
+    expect(diagnostics[0]?.message).toContain("读不回来");
+  });
+
+  it("一组分支时投影层也不该报（否则 Writer 每次都挂着一条噪音条）", () => {
+    const d = draftOf([
+      node("a", {
+        title: "抉择",
+        script: [
+          { op: "choice", options: [{ label: "离开", target_node_id: null }] },
+        ],
+      } as never),
+    ]);
+    const diagnostics: AxsDiagnostic[] = [];
+    draftToAxs(d, {}, diagnostics);
+    expect(diagnostics).toEqual([]);
   });
 });

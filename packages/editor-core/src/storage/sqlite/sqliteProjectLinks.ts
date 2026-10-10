@@ -92,13 +92,20 @@ export class SqliteProjectLinkStore {
       );
       if (!exists.length) return err({ code: "not_found", entity: "project", id });
       const sceneId = uuid();
+      // 排序号：**给了就照给，没给才算下一个**（2026-10-01 复审）。
+      // 原先这里硬编码 `COUNT(*)`，把 `ProjectSceneInput` 里声明过的 `sortOrder` 整个忽略——
+      // 而 `.axsp` 导入（`axspImport.ts`）显式传的就是它，所以**生产路径上**作者排好的舞台顺序会被丢掉。
+      // `null` 与 `undefined` 同义：随包三份 `.axsp` 的 `sortOrder` 全是 `null`（运行时不满足那个可选数字的声明），
+      // 两者都必须走"算下一个"这一支，否则现有内容的行为会变。
+      // 规则的另一半（Memory 侧）与理由见 `memoryLinks.ts::addProjectScene` 的注释。
+      const wanted = scene.sortOrder;
+      const useGiven = typeof wanted === "number" && Number.isFinite(wanted);
       await this.backend.execute(
         `INSERT INTO project_scenes
          (id, project_id, title, sort_order, description, location, atmosphere, scene_ref_id, source)
-         VALUES (?, ?, ?,
-           (SELECT COUNT(*) FROM project_scenes WHERE project_id = ?), ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ${useGiven ? "?" : "(SELECT COUNT(*) FROM project_scenes WHERE project_id = ?)"}, ?, ?, ?, ?, ?)`,
         [
-          sceneId, id, scene.title, id,
+          sceneId, id, scene.title, ...(useGiven ? [wanted] : [id]),
           scene.description ?? "", scene.location ?? null, scene.atmosphere ?? null,
           scene.sceneRefId ?? null, scene.source ?? "inline",
         ],
@@ -165,10 +172,15 @@ export class SqliteProjectLinkStore {
         `SELECT id FROM projects WHERE id = ?`, [id],
       );
       if (!projectExists.length) return err({ code: "not_found", entity: "project", id });
-      await this.backend.execute(
+      const deleted = await this.backend.execute(
         `DELETE FROM project_roles WHERE project_id = ? AND id = ?`,
         [id, roleId],
       );
+      // 0 行受影响 = 这个 role 不存在 ⇒ 报 not_found，与 Memory 端和后端（404）同一语义。
+      // 依据与理由见 `memoryLinks.ts::removeRole` 的注释（2026-10-01 复审）。
+      if ((deleted.rowsAffected ?? 0) === 0) {
+        return err({ code: "not_found", entity: "role", id: roleId });
+      }
       return ok(undefined);
     } catch (cause) {
       return err({ code: "io", detail: "removeRole 失败", cause });

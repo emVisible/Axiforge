@@ -4,13 +4,22 @@
  * 全部纯函数：无副作用、不读时钟、不触网（不变量 I8）。
  */
 
-import type { AxsBeat, AxsDocument, AxsEdge } from "@axiforge/axs";
+import type { AxsBeat, AxsDiagnostic, AxsDocument, AxsEdge } from "@axiforge/axs";
 import { parseAxs, printAxs } from "@axiforge/axs";
 import type { Instruction } from "@axiforge/core";
 import type { Draft, Edge, NarrativeData, NarrativeNode, NodeId } from "../types";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * 「什么样的 beat.id 算既有节点身份」的唯一判据（2026-10-01 归一）。
+ * 此前 `axsImport.ts` 里的 `NODE_ID_RE` 与本行的 `UUID_RE` 是同一串字面量抄两遍——
+ * 只放宽一边，另一条通路的 id 契约就悄悄换了口径，而两条通路守的是同一条 I5 确定性。
+ */
+export function isReusableNodeId(id: string): boolean {
+  return UUID_RE.test(id);
+}
 
 function stageTitle(
   stageId: string | null | undefined,
@@ -62,7 +71,7 @@ function buildScriptFromLegacy(nd: NarrativeData): Instruction[] {
       op: "choice",
       options: choices.map((c) => ({
         label: c.label,
-        to: c.target_node_id ? undefined : null,
+        to: c.target_node_id ?? null,
       })),
     });
   }
@@ -114,10 +123,17 @@ export function topologicalOrder(
   return ordered;
 }
 
-/** Draft → AXS 源文本（roles：显示名 → characterRefId，用于反解说话人）。 */
+/**
+ * Draft → AXS 源文本（roles：显示名 → characterRefId，用于反解说话人）。
+ *
+ * 第三个参数是**可选出参**：发射侧的告警（例如"这一拍有第二组分支，印出来的文本里读不回来"）。
+ * 之所以要它：Writer 主通路是把节点图投影成 `axs_source` 并**在保存时写回去**，
+ * 丢了东西却无人说一声，就是把丢失固化进存档。文本输出与之前逐字相同。
+ */
 export function draftToAxs(
   draft: Draft,
   roles: Record<string, string>,
+  diagnostics?: AxsDiagnostic[],
 ): string {
   if (draft.nodes.size === 0) {
     return `# 开始\n旁白：故事从这里开始。\n`;
@@ -139,10 +155,19 @@ export function draftToAxs(
     }));
 
   const doc: AxsDocument = { beats, edges: axsEdges, diagnostics: [] };
-  return printAxs(doc, { roles });
+  return printAxs(doc, { roles, diagnostics });
 }
 
-/** AXS Beat → 域 NarrativeData（is_anchor 规则与既有行为一致） */
+/**
+ * 新建节点的网格落位：每行 4 个，横向 220、纵向 140。
+ * **这是唯一一份**（2026-10-01 归一）：`axs.import` 与 Writer 保存的 `parseAxsToPlan` 此前各写了一遍同样的公式，
+ * 而它决定的是"用户打开画布时节点长在哪"——两半各抄一份时，改一处只会让两条通路摆出不同的图。
+ */
+export function gridPosition(index: number): { x: number; y: number } {
+  return { x: 120 + (index % 4) * 220, y: 80 + Math.floor(index / 4) * 140 };
+}
+
+/** AXS Beat → 域 NarrativeData（**两处映射归一后的唯一权威**；is_anchor 规则见 ADR-016 的 `[key]` 语义） */
 export function beatToNarrativeData(beat: AxsBeat): NarrativeData {
   return {
     title: beat.title,
@@ -175,24 +200,33 @@ export function parseAxsToPlan(
   idGen: () => string,
 ): AxsPlan {
   const doc = parseAxs(source, { roles });
-  const existingByTitle = new Map(
-    existing.map((n) => [n.title ?? "", String(n.id)]),
-  );
+  // 标题索引取**第一个**同名既有节点（与 importAxsDraft 同策略，2026-10-01 归一）：
+  // `new Map(existing.map(...))` 是"最后一个赢"，于是同一份源文本在草稿事务里改 A、在 Writer 保存里改 Z。
+  const existingByTitle = new Map<string, string>();
+  for (const n of existing) {
+    const title = n.title ?? "";
+    if (title && !existingByTitle.has(title)) existingByTitle.set(title, String(n.id));
+  }
   const beatIdToNodeId = new Map<string, NodeId>();
   const nodes: NarrativeNode[] = [];
+  const usedNodeIds = new Set<NodeId>();
 
   doc.beats.forEach((beat, idx) => {
+    const candidate =
+      (isReusableNodeId(beat.id) ? beat.id : undefined) ??
+      existingByTitle.get(beat.title);
+    // 一次同步里一个节点 id 只许被消费一次（与 axs.import 走同一条契约）：
+    // 两个同名 Beat 若都复用同一个既有 id，载荷里就会出现两个同 id 节点，存储侧后写悄悄盖掉前写。
     const resolvedId =
-      (UUID_RE.test(beat.id) ? beat.id : undefined) ??
-      existingByTitle.get(beat.title) ??
-      idGen();
+      candidate && !usedNodeIds.has(candidate) ? candidate : idGen();
+    usedNodeIds.add(resolvedId);
     beatIdToNodeId.set(beat.id, resolvedId);
     nodes.push({
       id: resolvedId,
       stageId: beat.stage
         ? (scenes.find((s) => s.title === beat.stage)?.id ?? null)
         : null,
-      position: { x: 120 + (idx % 4) * 220, y: 80 + Math.floor(idx / 4) * 140 },
+      position: gridPosition(idx),
       narrative: beatToNarrativeData(beat),
       sortOrder: idx,
     });

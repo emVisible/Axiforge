@@ -38,7 +38,20 @@ export class MemoryLinks {
     const row = this.rowOf(id);
     if (!row) return err({ code: "not_found", entity: "project", id });
     const sceneId = this.nextId("scene");
-    row.scenes = [...row.scenes, { ...scene, id: sceneId }];
+    // 排序号的规则（2026-10-01 复审）：**给了就照给，没给才算下一个**。
+    // 此前 Memory 原样存调用方的值，于是不传时留下 `undefined`（读回是 `null`），
+    // 而 SQLite 恒给 `COUNT(*)` ⇒ 同一份契约在两端读回不同：
+    // 实测三个舞台，Memory `[null,null,null]` / SQLite `[0,1,2]`。
+    // Memory 不是生产路径（只有 DEV 的 `?storage=memory`），但**契约套件跑的就是它**——
+    // 一个在测试宿主上顺序不同、对桌面又绿的排序，是最难查的那类偏差。
+    // 顺带收掉 SQLite 那一侧的契约违反：`ProjectSceneInput = Omit<StoredScene, "id">`
+    // 声明了 `sortOrder`，而 SQLite 原先硬编码 `COUNT(*)` 把它整个忽略（生产路径，
+    // `.axsp` 导入显式传的就是它）。分母：随包三份 `.axsp` 的 `sortOrder` 全是 `null`
+    // ⇒ 现有内容零影响，所以这条改动是纯"让实现兑现声明"。
+    const wanted = scene.sortOrder;
+    const sortOrder =
+      typeof wanted === "number" && Number.isFinite(wanted) ? wanted : this.rowOf(id)!.scenes.length;
+    row.scenes = [...row.scenes, { ...scene, id: sceneId, sortOrder }];
     return ok({ id: sceneId });
   }
 
@@ -72,6 +85,16 @@ export class MemoryLinks {
   async removeRole(id: string, roleId: string): Promise<StorageResult<void>> {
     const row = this.rowOf(id);
     if (!row) return err({ code: "not_found", entity: "project", id });
+    // 对不存在的 role 报 not_found，不做幂等吞掉——2026-10-01 复审。
+    // 依据是**后端已经这么实现**（`router.py::remove_role` 在 `remove_role()` 返回假时抛 404，
+    // HTTP provider 原样转成本地错误码），所以原先这里是本地两端与后端的三方分歧：
+    // Memory 与 SQLite 都报 ok，而浏览器态会拿到 not_found。
+    // 理由与 `removeAssetRef` 同源（见 `types.ts` 里那行注释）：吞掉会把"点错了行"
+    // 报成"已经删好了"，而它其实什么都没删——`CutWorkspace` 的成功 toast 就是这句话。
+    // 同族另外两个 remove（`removeProjectScene` / `removeAssetRef`）本来就报 not_found。
+    if (!row.roles.some((r) => r.id === roleId)) {
+      return err({ code: "not_found", entity: "role", id: roleId });
+    }
     row.roles = row.roles.filter((r) => r.id !== roleId);
     return ok(undefined);
   }

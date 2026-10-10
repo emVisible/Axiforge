@@ -159,6 +159,24 @@ export class MemoryStorageProvider implements StorageProvider {
   ): Promise<StorageResult<void>> {
     const row = this.projects.get(id);
     if (!row) return err({ code: "not_found", entity: "project", id });
+    // 重复 node id 必须显式失败，不能让 Map 静默吃掉——2026-10-01 复审。
+    // 原形状 `new Map(payload.nodes.map(n => [n.id, n]))` 对重复 id 返回 ok:true，
+    // 而读回来只剩**最后一个**（实测送 2 个 id="dup" 的节点 ⇒ 读回 1 个、且是后者）。
+    // SQLite 那一侧因为 `project_nodes.id` 是主键而报错并整体回滚
+    // （实测 `io「saveNarrative 事务失败已回滚」`、读回仍是原来的 2 个），
+    // 于是同一个契约方法在两个本地后端给出相反的语义：桌面测试宿主悄悄丢节点，真桌面报 io。
+    // 这里选对齐 SQLite（而不是改 schema 容忍重复）：铁律 8 要求显式失败语义，
+    // 而"后写的顶掉先写的"正是今天在 AXS 侧刚修掉的那一类静默丢失。
+    const seenIds = new Set<string>();
+    for (const n of payload.nodes) {
+      if (seenIds.has(n.id)) {
+        return err({
+          code: "io",
+          detail: `saveNarrative 拒绝重复的 node id：${n.id}（两个后端必须同一语义）`,
+        });
+      }
+      seenIds.add(n.id);
+    }
     row.nodes = new Map(payload.nodes.map((n) => [n.id, n]));
     row.edges = [...payload.edges];
     row.axsSource = payload.axsSource;

@@ -72,9 +72,12 @@ export function proseToScriptDraft(prose: string, roleNames?: string[]): Instruc
       flushChoice();
       const name = speaker[1] ?? "";
       const text = speaker[2] ?? "";
-      // 认不出的名字不猜角色，退回旁白并保留全角冒号原样——与 Python 侧同一裁决
       if (names.size === 0 || names.has(name)) script.push({ op: "say", speaker: name, text });
-      else script.push({ op: "narration", text: `${name}：${text}` });
+      else {
+        // 认不出的名字不猜角色，退回旁白。拼接固定用全角 `：`，与输入的冒号种类无关
+        // （`ai_draft.py:71` 同一写法，向量 `unknown-speaker` 在两端各钉一遍这条归一化）
+        script.push({ op: "narration", text: `${name}：${text}` });
+      }
       continue;
     }
 

@@ -18,8 +18,18 @@ export type AssetRefKind = "empty" | "local" | "direct" | "invalid";
 export function classifyAssetRef(ref: string | null | undefined): AssetRefKind {
   if (ref === null || ref === undefined || ref.trim() === "") return "empty";
   const value = ref.trim();
-  if (value.includes("..")) return "invalid";
-  if (value.startsWith(LOCAL_ASSET_PREFIX)) return "local";
+  // 越界守卫**只对本地 ref 有意义**——只有它会被拼进文件系统路径（`localAssetPath`）。
+  // 2026-10-01 复审改：原守卫在归属判定**之前**无条件生效，于是 `..` 也作废了三族
+  // 下一行明说「内核不做判断」的引用，代价比"显示坏图"更大：
+  // `httpStorageProvider.readAsset` 要求 `kind === "direct"` 才读，
+  // 所以一个带双点的**后端上传路径**（`/uploads/characters/a..b.png`）既显示成缺图、又读不回字节。
+  // 守卫强度不变：本地 ref 里的 `..` 仍然照拦（下面这条与既有那两条判据都钉着它）。
+  // 顺带一句量级：我们自己生成的 ref 是 `sha256 + 扩展名`，**永远不含 `..`**，
+  // 所以这道守卫实际只对**外来 ref**点火——而那正是它此前误伤的那一族。
+  if (value.startsWith(LOCAL_ASSET_PREFIX)) {
+    if (value.includes("..")) return "invalid";
+    return "local";
+  }
   // /uploads/…、http(s)://、data:、blob: 及历史裸路径：WebView 自行解析，内核不做判断
   return "direct";
 }
@@ -54,8 +64,25 @@ export function assetRefFor(key: string, ext: string): string {
 
 /**
  * 内容键（FNV-1a 128bit 变体，非加密）——仅供内存实现与测试做同内容去重。
- * 桌面/服务端落盘用 sha256（由 L5 平台侧计算）；契约只断言
- * 「同字节→同 ref、异字节→异 ref」，不锁定算法，故两轨不冲突。
+ * 桌面/服务端落盘用 sha256（由 L5 平台侧计算）。
+ *
+ * **精确的不变量是「同字节 + 同后缀 → 同 ref」**，不是「同字节 → 同 ref」
+ * ——2026-10-01 复审把这里原来那句「契约只断言『同字节→同 ref、异字节→异 ref』」改正了。
+ * 起因是有人照那句措辞去找代码缺陷，找到 `saveAsset` 的 ref 里含扩展名
+ * （`assetRefFor(contentKey(bytes), extensionFor(name, mime))`），
+ * 而实测**同一份字节换一个后缀会得到两个 ref**（`…<key>.png` 与 `…<key>.jpg`）。
+ *
+ * **为什么含扩展名是对的**：ref 就是**落盘文件名**（`assets/<摘要>.<扩展名>`），
+ * 去掉扩展名文件就没有类型了，而 `readAsset` 与 `resolveAssetUrl` 都要靠它选解码路径。
+ * 所以这是**契约那句话不精确，不是实现有缺陷**。
+ *
+ * **两条用户承诺都不受这条影响**（`docs/user/desktop/desktop-and-axsp.md`）：
+ * ① 「同一张图重复导入只会存一份」——重复导入意味着同一个文件名、因而同一个后缀；
+ *    而"字节完全相同但后缀不同"对真实格式几乎不可达（同一张图的 JPEG 与 PNG 字节本就不同）。
+ * ② 「工程包在别的电脑上打开时能认得同一个文件」——ref（摘要 + 后缀）随包一起过去，
+ *    接收方按 ref 解析，**不重新算摘要**，所以后缀在不在身份里都不影响认得。
+ * 精确形状由 `assets.test.ts` 那条「同字节换后缀给两个 ref」钉住，
+ * 好让下一个人别照那句宽松措辞把代码"修"成真的缺陷。
  */
 export function contentKey(bytes: Uint8Array): string {
   const parts: number[] = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b];

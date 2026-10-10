@@ -35,8 +35,16 @@ export const err = <T>(error: StorageError): StorageResult<T> => ({
 
 /**
  * 素材字节与落位结果（ADR-024 决策 3：素材是本地文件，DB 只存引用）。
- * ref 形态由实现决定（桌面 `assets/<摘要>.<ext>` / 服务端 `/uploads/...`），
- * 契约只保证：同一内容 → 同一 ref；ref 可 readAsset 回等价字节。
+ * ref 形态由实现决定（桌面 `assets/<摘要>.<ext>` / 服务端 `/uploads/...`）。
+ *
+ * 契约保证两条：
+ * ① ref 可 `readAsset` 回等价字节；
+ * ② **同一内容 + 同一后缀 → 同一 ref**。
+ * ② 里的"同一后缀"不是限定词、而是**身份的一部分**（2026-10-01 复审改）：
+ * 原文写的是「同一内容 → 同一 ref」，而实现把扩展名拼进 ref（本地那侧 ref 就是**落盘文件名**，
+ * 去掉后缀文件就没有类型、读路径也认不出来），所以同一份字节换一个后缀会得到两个 ref——
+ * 实测 `…<key>.png` 与 `…<key>.jpg`。措辞不改会让人把代码"修"成真的缺陷，
+ * 理由与两条用户承诺为何不受影响的完整推导见 `assets.ts::contentKey` 上方那段注释。
  */
 export interface AssetInput {
   readonly name: string;

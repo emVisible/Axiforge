@@ -10,8 +10,8 @@
  *   I5 确定性：同一起始 Draft + 同一事务序列（含注入的 idGen）必产出相同结果
  */
 
-import { parseAxs } from "@axiforge/axs";
-import type { Effect, Instruction } from "@axiforge/core";
+import type { Instruction } from "@axiforge/core";
+import { importAxsDraft } from "./axsImport";
 import type {
   ApplyError,
   ApplyResult,
@@ -112,37 +112,10 @@ function reorder<T>(list: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
-/** AXS 导入时新节点的网格布局（与既有 web 投影公式一致，行为等价） */
-export function gridPosition(index: number): { x: number; y: number } {
-  return { x: 120 + (index % 4) * 220, y: 80 + Math.floor(index / 4) * 140 };
-}
-
 export type IdGen = () => string;
 
 export function defaultIdGen(): string {
   return crypto.randomUUID();
-}
-
-/** AXS Beat → 域 NarrativeData（is_anchor 规则与既有投影一致） */
-function beatToNarrative(beat: {
-  title: string;
-  key?: string | null;
-  isEnding?: boolean;
-  endingLabel?: string | null;
-  trigger?: NarrativeData["trigger_condition"];
-  script: Instruction[];
-  effects?: Effect[];
-}): NarrativeData {
-  return {
-    title: beat.title,
-    key: beat.key ?? undefined,
-    is_anchor: beat.key === "intro" || beat.title === "开始",
-    is_ending: beat.isEnding ?? false,
-    ending_label: beat.endingLabel ?? null,
-    trigger_condition: beat.trigger ?? null,
-    script: beat.script,
-    effects: beat.effects ?? [],
-  };
 }
 
 /** 应用一个事务：唯一写入口。 */
@@ -379,52 +352,11 @@ export function apply(
     }
 
     case "axs.import": {
-      let doc;
-      try {
-        doc = parseAxs(tx.source, { roles: tx.roles });
-      } catch (err) {
-        return fail({
-          code: "parse_failed",
-          detail: err instanceof Error ? err.message : String(err),
-        });
-      }
-      const titleToId = new Map<string, NodeId>();
-      for (const n of draft.nodes.values()) {
-        const t = n.narrative.title;
-        if (t && !titleToId.has(t)) titleToId.set(t, n.id);
-      }
-      const nodes = new Map<NodeId, NarrativeNode>();
-      const beatIdToNodeId = new Map<string, NodeId>();
-      doc.beats.forEach((beat, idx) => {
-        const resolved =
-          (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-            beat.id,
-          )
-            ? beat.id
-            : undefined) ??
-          titleToId.get(beat.title) ??
-          idGen();
-        beatIdToNodeId.set(beat.id, resolved);
-        const stage = beat.stage
-          ? (draft.scenes.find((s) => s.title === beat.stage)?.id ?? null)
-          : null;
-        nodes.set(resolved, {
-          id: resolved,
-          stageId: stage,
-          position: gridPosition(idx),
-          narrative: beatToNarrative(beat),
-          sortOrder: idx,
-        });
-      });
-      const edges: Edge[] = doc.edges.map((e) => ({
-        id: `${e.from}-${e.to}`,
-        source: beatIdToNodeId.get(e.from)!,
-        target: beatIdToNodeId.get(e.to)!,
-        label: e.label ?? null,
-      }));
+      const imported = importAxsDraft(draft, tx.source, tx.roles, idGen);
+      if (!imported.ok) return fail(imported.error);
       return done(
-        { ...draft, rev: draft.rev + 1, nodes, edges },
-        { nodes: new Set(nodes.keys()), edges: true, roles: false },
+        { ...draft, rev: draft.rev + 1, nodes: imported.nodes, edges: imported.edges },
+        { nodes: new Set(imported.nodes.keys()), edges: true, roles: false },
       );
     }
   }

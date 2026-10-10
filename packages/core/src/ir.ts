@@ -20,7 +20,14 @@ export type ConditionSourceType =
   | "achievement"
   | "relationship";
 
-export type ComparisonOperator = "eq" | "ne" | "gt" | "lt" | "contains";
+export type ComparisonOperator =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "lt"
+  | "gte"
+  | "lte"
+  | "contains";
 
 export type EffectType =
   | "memory"

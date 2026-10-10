@@ -60,6 +60,27 @@ describe("evaluateCondition", () => {
     ).toBe(true);
   });
 
+  it("gte/lte 在边界上必须与 gt/lt 不同（#82：`>=` 曾被静默降成 eq）", () => {
+    expect(
+      evaluateCondition({ type: "memory", key: "coins", operator: "gte", value: 10 }, vars),
+    ).toBe(true);
+    expect(
+      evaluateCondition({ type: "memory", key: "coins", operator: "gt", value: 10 }, vars),
+    ).toBe(false);
+    expect(
+      evaluateCondition({ type: "memory", key: "coins", operator: "gte", value: 11 }, vars),
+    ).toBe(false);
+    expect(
+      evaluateCondition({ type: "memory", key: "coins", operator: "lte", value: 10 }, vars),
+    ).toBe(true);
+    expect(
+      evaluateCondition({ type: "memory", key: "coins", operator: "lt", value: 10 }, vars),
+    ).toBe(false);
+    expect(
+      evaluateCondition({ type: "memory", key: "coins", operator: "lte", value: 9 }, vars),
+    ).toBe(false);
+  });
+
   it("缺失 key：ne 为真，其它为假", () => {
     expect(evaluateCondition({ type: "memory", key: "nope", operator: "ne", value: 1 }, vars)).toBe(true);
     expect(evaluateCondition({ type: "memory", key: "nope", operator: "eq", value: 1 }, vars)).toBe(false);

@@ -86,6 +86,30 @@ describe("显示解析 resolveAssetUrl（宪章 C1 的唯一规则处）", () =>
     );
   });
 
+  /**
+   * 2026-10-01 复审新增：越界守卫只对**本地** ref 有意义。
+   * 守卫原先在归属判定之前无条件生效，于是 `..` 作废了三族下一行明说「内核不做判断」的引用。
+   * 代价不只是"显示成缺图"——`httpStorageProvider.readAsset` 要求 `kind === "direct"` 才读，
+   * 所以一个带双点的**后端上传路径**（文件名 `a..b.png` 在磁盘上完全合法）
+   * 在浏览器态**既显示成缺图、又读不回字节**。
+   * 与上面那条 `assets/../../etc/passwd` 并排看才完整：**守卫对本地 ref 一步没让**，
+   * 放开的只是它此前误伤的那一族。
+   */
+  it("带 .. 的外来引用归 direct（内核不判）；本地 ref 里的 .. 仍照拦", () => {
+    // 外来：内核不碰文件系统，交给 WebView 解析
+    expect(classifyAssetRef("/uploads/characters/a..b.png")).toBe("direct");
+    expect(classifyAssetRef("https://cdn.example.com/a..b.png")).toBe("direct");
+    expect(classifyAssetRef("第1章..png")).toBe("direct");
+    // 可显示 URL 原样透传（不再渲染成缺图态）
+    expect(resolveAssetUrl("/uploads/characters/a..b.png", desktop)).toBe(
+      "/uploads/characters/a..b.png",
+    );
+    // 本地：越界仍然拒绝，且不拼路径
+    expect(classifyAssetRef("assets/../x.png")).toBe("invalid");
+    expect(localAssetPath("/root", "assets/../x.png")).toBeNull();
+    expect(resolveAssetUrl("assets/../../x.png", desktop)).toBe("");
+  });
+
   it("assets/... 在桌面态经根目录 + 协议转换", () => {
     expect(resolveAssetUrl("assets/ab.png", desktop)).toBe(
       "asset://localhost//Users/x/Documents/Axiforge/assets/ab.png",

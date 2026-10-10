@@ -5,6 +5,7 @@
 
 export * from "./types";
 export * from "./document";
+export * from "./axsImport";
 export * from "./journal";
 export * from "./projection/axs";
 export * from "./projection/canvas";

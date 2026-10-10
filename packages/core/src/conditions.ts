@@ -74,6 +74,16 @@ export function compare(
       const b = toNumber(expected);
       return a !== null && b !== null ? a < b : false;
     }
+    case "gte": {
+      const a = toNumber(actual);
+      const b = toNumber(expected);
+      return a !== null && b !== null ? a >= b : false;
+    }
+    case "lte": {
+      const a = toNumber(actual);
+      const b = toNumber(expected);
+      return a !== null && b !== null ? a <= b : false;
+    }
     case "contains":
       if (Array.isArray(actual)) return actual.includes(expected);
       if (typeof actual === "string") return actual.includes(String(expected));

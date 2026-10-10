@@ -8,6 +8,20 @@ import type { StoryPackage } from "./ir";
  * 金样本验收（宪章 G6）：对真实工程（含示范作 codex 场景），
  * TS compileStory 输出与 Python StoryCompiler 输出逐字段一致。
  * 金样本再生成：backend/scripts/dump_golden.py <project_id>...
+ *
+ * **金样本是跨实现契约的枢轴，但它只被这一侧消费**（2026-10-01 复审实测登记）：
+ * - 方向是**双向都变红**的：Python 改了而金样本没重生成 ⇒ 这里红；TS 改了 ⇒ 这里也红。
+ *   这比"只有一侧有判据"要好，但**没有独立于枢轴的第三方校验**——
+ *   换句话说，若有人同时改了两侧并顺手重生成金样本，这道门禁不会发现。
+ * - Python 侧**另有 8 条**走真实 DB + HTTP 的集成测试（`backend/tests/test_story_compiler.py`：
+ *   glossary、codex 去重、道具引用、私有门禁、fork/模板），所以 Python 不是裸的；
+ *   缺的只是"这 4 份**真实工程**"这一层语料。
+ * - 复审做过一次**免 DB 的差分**（直接喂 `input.json` 给 Python 的 `_build_script` /
+ *   `_extract_actors` / `_pick_start_beat` / `_build_glossary`），与 `expected.json`
+ *   在这四项上**零差异**——所以两侧今天是对齐的，这是登记，不是修法。
+ * - **语料的一个盲区（量出来的）**：4 份金样本里 **3 份的 `glossary` 是 0 条**，
+ *   只有 `b1a7c0d0-【对照】分支兜底` 那份带 2 条 ⇒ `buildGlossary` 的实际覆盖是 **1/4**。
+ *   补语料要重跑 `dump_golden.py`（需要 DB），所以这里只登记分母、不假装已补。
  */
 
 const GOLDEN_DIR = join(import.meta.dirname, "__golden__");

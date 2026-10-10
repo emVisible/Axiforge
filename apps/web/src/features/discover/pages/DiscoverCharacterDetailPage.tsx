@@ -10,6 +10,8 @@ import ForkChain from "@/features/character/components/ForkChain";
 import DiscoverCommentSection from "@/features/discover/components/DiscoverCommentSection";
 import PageMeta from "@/shared/components/PageMeta";
 import ShareActions from "@/shared/components/ShareActions";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import {
   BackLink,
   LoadingSpinner,
@@ -24,7 +26,12 @@ export default function DiscoverCharacterDetailPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const shareUrl = `${window.location.origin}/discover/characters/${id}`;
 
+  // 桌面态这一页没有读者：它与 DiscoverPage 同进退（E35「入口与目标同生共死」），
+  // 否则直接输 URL 进来就是一次注定失败的云端请求。
+  const localOnly = isLocalOnlyDeployment();
+
   useEffect(() => {
+    if (localOnly) return;
     (async () => {
       try {
         const data = await characterApi.get(id, { bump_view: true });
@@ -38,7 +45,18 @@ export default function DiscoverCharacterDetailPage() {
         setStatus("error");
       }
     })();
-  }, [id]);
+  }, [id, localOnly]);
+
+  if (localOnly) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <CloudFeatureNotice feature="公开角色详情" />
+        <div className="mt-4">
+          <BackLink to={routes.discover}>返回发现</BackLink>
+        </div>
+      </div>
+    );
+  }
 
   if (status === "loading") {
     return (

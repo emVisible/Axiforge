@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Instruction, InstructionOp, ChoiceOption } from "@axiforge/core";
+import type { Instruction, InstructionOp } from "@axiforge/core";
 import {
   OP_LABEL,
   OP_META,
@@ -7,6 +7,7 @@ import {
   defaultInstruction,
 } from "./instructionOps";
 import { Input, Select, Textarea, cn, labelSm, Button } from "@/shared/components/ui";
+import ChoiceOptionsEditor from "./ChoiceOptionsEditor";
 import { applyDraft, requestDraft } from "@/shared/api/draftDispatch";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
 import { getCreatorId } from "@/shared/lib/creatorId";
@@ -505,63 +506,6 @@ export default function ScriptEditor({
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-function ChoiceOptionsEditor({
-  options,
-  nodes,
-  onChange,
-}: {
-  options: ChoiceOption[];
-  nodes: NodeOption[];
-  onChange: (next: ChoiceOption[]) => void;
-}) {
-  const set = (index: number, next: ChoiceOption) =>
-    onChange(options.map((o, i) => (i === index ? next : o)));
-  return (
-    <div className="space-y-2">
-      <label className={cn(labelSm, "block")}>分支选项</label>
-      {options.map((opt, i) => (
-        <div key={i} className="rounded-lg border border-border/70 bg-canvas/40 p-2">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <input
-              className="flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs"
-              value={opt.label}
-              onChange={(e) => set(i, { ...opt, label: e.target.value })}
-              placeholder="选项文本"
-            />
-            <button
-              type="button"
-              onClick={() => onChange(options.filter((_, j) => j !== i))}
-              className="px-1 text-red-400 hover:text-red-600"
-              aria-label="删除选项"
-            >
-              ✕
-            </button>
-          </div>
-          <select
-            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-2xs text-ink-muted"
-            value={opt.to ?? ""}
-            onChange={(e) => set(i, { ...opt, to: e.target.value || null })}
-          >
-            <option value="">跳转：按标签匹配连线（默认）</option>
-            {nodes.map((n) => (
-              <option key={n.id} value={n.id}>
-                跳转到：{n.title}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() => onChange([...options, { label: "" }])}
-        className="rounded-lg border border-dashed border-border px-2.5 py-1 text-2xs text-ink-muted hover:border-brand hover:text-brand"
-      >
-        + 添加选项
-      </button>
     </div>
   );
 }

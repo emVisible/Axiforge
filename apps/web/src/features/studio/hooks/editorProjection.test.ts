@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Draft, NarrativeNode } from "@axiforge/editor-core";
 
 import {
+  canvasSnapshotFromKernel,
   conditionGroupFromItems,
   inspectorFromNarrative,
   patchFromForm,
@@ -140,5 +141,21 @@ describe("检视器读写侧（Inspector ↔ narrativeData）", () => {
     expect(conditionGroupFromItems([])).toBeNull();
     const one = [{ type: "flag", key: "k", operator: "eq", value: "1" }] as ConditionItem[];
     expect(conditionGroupFromItems(one)).toEqual({ type: "all", conditions: one });
+  });
+});
+
+describe("canvasSnapshotFromKernel（内核节点 → 投影器入参；从 hook 里搬出来的那一截）", () => {
+  it("摊平 narrative 并把 stage_id 注入 data，同时不写回内核节点", () => {
+    const n = node("a", "s1");
+    expect(canvasSnapshotFromKernel(n)).toEqual({
+      id: "a",
+      position: { x: 10, y: 20 },
+      data: { title: "a", script: [], stage_id: "s1" },
+    });
+    expect("stage_id" in n).toBe(false);
+  });
+
+  it("stageId 为 null 时 data.stage_id 如实为 null（投影器据此排舞台，不能糊成空串）", () => {
+    expect(canvasSnapshotFromKernel(node("b", null)).data.stage_id).toBeNull();
   });
 });

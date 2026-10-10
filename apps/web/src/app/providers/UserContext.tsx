@@ -10,8 +10,8 @@ import {
 
 import { userApi, type UserProfile } from "@/shared/api/user";
 import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
-import { getCreatorId } from "@/shared/lib/creatorId";
-import { getPlayerToken } from "@/shared/lib/playerToken";
+import { CREATOR_ID_KEY, getCreatorId } from "@/shared/lib/creatorId";
+import { PLAYER_TOKEN_KEY, getPlayerToken } from "@/shared/lib/playerToken";
 
 interface UserContextValue {
   profile: UserProfile | null;
@@ -74,8 +74,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
     const { profiles } = await userApi.resolve(email);
     const hit = profiles[0];
     if (!hit) throw new Error("not found");
-    localStorage.setItem("axiforge.creatorId", hit.creator_id);
-    localStorage.setItem("axiforge.playerToken", hit.player_token);
+    localStorage.setItem(CREATOR_ID_KEY, hit.creator_id);
+    localStorage.setItem(PLAYER_TOKEN_KEY, hit.player_token);
     setProfile(hit);
     window.location.reload();
   }, []);
@@ -119,8 +119,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
       creator_id: getCreatorId(),
       player_token: getPlayerToken(),
     });
-    localStorage.removeItem("axiforge.creatorId");
-    localStorage.removeItem("axiforge.playerToken");
+    localStorage.removeItem(CREATOR_ID_KEY);
+    localStorage.removeItem(PLAYER_TOKEN_KEY);
     window.location.reload();
   }, []);
 

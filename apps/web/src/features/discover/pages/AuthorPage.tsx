@@ -16,6 +16,8 @@ import { getImageUrl } from "@/shared/lib/imageUrl";
 import { routes } from "@/shared/lib/routes";
 import PageMeta from "@/shared/components/PageMeta";
 import ShareActions from "@/shared/components/ShareActions";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import {
   Button,
   CardGrid,
@@ -33,7 +35,12 @@ export default function AuthorPage() {
   const isSelf = authorId === getCreatorId();
   const shareUrl = `${window.location.origin}${routes.author(authorId)}`;
 
+  // 桌面态这一页没有读者：它与 DiscoverPage 同进退（E35「入口与目标同生共死」），
+  // 否则直接输 URL 进来就是一次注定失败的云端请求。
+  const localOnly = isLocalOnlyDeployment();
+
   useEffect(() => {
+    if (localOnly) return;
     (async () => {
       try {
         const data = await creatorApi.hub(authorId);
@@ -43,7 +50,15 @@ export default function AuthorPage() {
         setStatus("error");
       }
     })();
-  }, [authorId]);
+  }, [authorId, localOnly]);
+
+  if (localOnly) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <CloudFeatureNotice feature="创作者主页" />
+      </div>
+    );
+  }
 
   const displayName =
     isSelf && !hub?.display_name

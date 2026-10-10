@@ -1,4 +1,5 @@
 import { useState, type ComponentType } from "react";
+import { copyText } from "@/shared/lib/clipboard";
 import { getImageUrl } from "@/shared/lib/imageUrl";
 import { useParams, useNavigate, Link } from "react-router";
 import {
@@ -142,6 +143,7 @@ export default function CharacterDetailPage() {
     "info",
   );
   const [copiedId, setCopiedId] = useState(false);
+  const [copyIdFailed, setCopyIdFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
   /** 导出/复制的失败原因（这两个动作共用一条错误线，不再 console.error 掉） */
   const [exportError, setExportError] = useState<string | null>(null);
@@ -223,9 +225,13 @@ export default function CharacterDetailPage() {
   };
 
   const handleCopyId = async () => {
-    await navigator.clipboard.writeText(character.id);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
+    const r = await copyText(character.id);
+    setCopiedId(r === "copied");
+    setCopyIdFailed(r !== "copied");
+    setTimeout(() => {
+      setCopiedId(false);
+      setCopyIdFailed(false);
+    }, 2000);
   };
 
   const renderLayerFields = (layerKey: string) => {
@@ -326,16 +332,7 @@ export default function CharacterDetailPage() {
             <button
               onClick={async () => {
                 const url = window.location.href;
-                try {
-                  await navigator.clipboard.writeText(url);
-                } catch {
-                  const ta = document.createElement("textarea");
-                  ta.value = url;
-                  document.body.appendChild(ta);
-                  ta.select();
-                  document.execCommand("copy");
-                  document.body.removeChild(ta);
-                }
+                                await copyText(url);
                 setCopiedLink(true);
                 setTimeout(() => setCopiedLink(false), 2000);
               }}
@@ -385,16 +382,7 @@ export default function CharacterDetailPage() {
                 setExportError(null);
                 try {
                   const md = await buildCharacterExport(character);
-                  try {
-                    await navigator.clipboard.writeText(md);
-                  } catch {
-                    const ta = document.createElement("textarea");
-                    ta.value = md;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(ta);
-                  }
+                                  await copyText(md);
                   setCopiedText(true);
                   setTimeout(() => setCopiedText(false), 2000);
                 } catch (e) {
@@ -516,7 +504,7 @@ export default function CharacterDetailPage() {
                     d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                   />
                 </svg>
-                {copiedId ? "✓ 已复制" : "复制 ID"}
+                {copiedId ? "✓ 已复制" : copyIdFailed ? "复制失败，请手动选中" : "复制 ID"}
               </button>
               <span className="text-border">·</span>
               {character.fork_from ? (

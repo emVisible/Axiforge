@@ -1,7 +1,12 @@
 import { MarkerType, type Edge, type Node } from "reactflow";
 
 import type { Instruction } from "@axiforge/core";
-import type { Draft } from "@axiforge/editor-core";
+import type {
+  CanvasNodeSnapshot,
+  Draft,
+  Edge as KernelEdge,
+  NarrativeNode as KernelNode,
+} from "@axiforge/editor-core";
 import type { ProjectSceneResponse } from "@/shared/types/project";
 
 import { STAGE_PALETTE, stageColorIndex } from "../flow/stageColors";
@@ -201,4 +206,29 @@ export function conditionGroupFromItems(
   items: ConditionItem[],
 ): { type: "all"; conditions: ConditionItem[] } | null {
   return items.length > 0 ? { type: "all", conditions: items } : null;
+}
+
+/** React Flow 边 → 内核边（dispatch 载荷的窄形状） */
+export function kernelEdgeFromRf(e: Edge): KernelEdge {
+  return { id: e.id, source: e.source, target: e.target, label: (e.label as string) ?? null };
+}
+
+/** React Flow 节点 → 内核节点；sortOrder 由调用方给（原实现就地取 rfNodes.length） */
+export function kernelNodeFromRf(n: Node, sortOrder: number): KernelNode {
+  return {
+    id: n.id,
+    stageId: (n.data.stage_id as string) ?? null,
+    position: n.position,
+    narrative: n.data as Record<string, unknown>,
+    sortOrder,
+  };
+}
+
+/**
+ * 内核节点 → editor-core 的画布快照（`projectAxsFromCanvas` 的入参形状）。
+ * 与 `kernelNodeFromRf` 方向相反：那一条把画布节点折进内核，这一条把内核节点摊给投影器。
+ * `stage_id` 只进 `data`（投影器据此排舞台），不写回内核节点本身。
+ */
+export function canvasSnapshotFromKernel(n: KernelNode): CanvasNodeSnapshot {
+  return { id: n.id, position: n.position, data: { ...n.narrative, stage_id: n.stageId } };
 }

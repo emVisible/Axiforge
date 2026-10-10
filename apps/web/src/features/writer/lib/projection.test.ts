@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { AxsDiagnostic } from "@axiforge/axs";
 import type { Instruction } from "@axiforge/core";
 import {
   axsToSyncPayload,
@@ -7,7 +8,9 @@ import {
   collectProjectNodes,
   mergeCanvasIntoProjectNodes,
   projectAxsFromCanvas,
+  noticeFor,
   projectToAxs,
+  projectWithNotice,
 } from "./projection";
 import type {
   ProjectEdgeResponse,
@@ -175,6 +178,95 @@ describe("projectToAxs", () => {
 });
 
 // ---------------------------------------------------------------------------
+// projectWithNotice —— 装载路径「什么时候该报」的那条判据
+// ---------------------------------------------------------------------------
+
+describe("projectWithNotice", () => {
+  const twoGroups = [
+    makeNode("a", {
+      title: "分岔",
+      script: [
+        { op: "say", text: "两条路。" },
+        { op: "choice", options: [{ label: "左", to: "b" }] },
+        { op: "choice", options: [{ label: "右", to: "b" }] },
+      ] as Instruction[],
+    }),
+    makeNode("b", { title: "汇合" }),
+  ];
+  const oneGroup = [
+    makeNode("a", {
+      title: "分岔",
+      script: [
+        { op: "choice", options: [{ label: "左", to: "b" }] },
+      ] as Instruction[],
+    }),
+    makeNode("b", { title: "汇合" }),
+  ];
+
+  it("存档里没有文本：屏幕上就是这次投影，丢了东西要说", () => {
+    const { text, notice } = projectWithNotice(twoGroups, [], [], {}, null);
+    expect(notice).toContain("读不回来");
+    expect(text).not.toContain("右");
+  });
+
+  it("存档文本与投影逐字节相同（它就是上次写回去的投影）：重新打开仍要说", () => {
+    const { text } = projectWithNotice(twoGroups, [], [], {}, null);
+    expect(projectWithNotice(twoGroups, [], [], {}, text).notice).toContain("读不回来");
+  });
+
+  it("存档里躺着 Writer 手写文本（与投影不同）：不报，但文本一字不改", () => {
+    const written = "# 分岔\n两条路。\n> 左\n> 右\n";
+    const { text, notice } = projectWithNotice(twoGroups, [], [], {}, written);
+    expect(notice).toBeNull();
+    expect(text).not.toBe(written);
+  });
+
+  it("投影本身没丢东西：一律静默", () => {
+    for (const stored of [null, "# 分岔\n> 左\n"]) {
+      expect(projectWithNotice(oneGroup, [], [], {}, stored).notice).toBeNull();
+    }
+  });
+
+  it("空工程（早退那条路径的输入）：出默认开场文本，且不报任何丢失", () => {
+    const empty = projectWithNotice([], [], [], {}, null);
+    expect(empty.text).toBe("# 开始\n旁白：故事从这里开始。\n");
+    expect(empty.notice).toBeNull();
+    // 存档里已经躺着这份默认文本时（第二次打开），也不该有说明
+    expect(projectWithNotice([], [], [], {}, empty.text).notice).toBeNull();
+  });
+});
+
+describe("noticeFor（一条横幅要说出这次投影丢了几处）", () => {
+  /*
+   * 发射器是**逐拍**报的（每条消息写着「第「X」拍有 N 组分支」），界面上却只有一条常驻横幅。
+   * 只印 warns[0] 等于把「总共几处」吞掉——用户读到第一拍的例子，其余几拍无声消失，
+   * 而「还有几处」正是他决定要不要逐拍拆开的依据。
+   * 牙：多条那支退回 warns[0].message ⇒「多处时把总数说出口」红；0 条那支改成空串 ⇒「没丢就不说话」红。
+   */
+  const w = (message: string) => ({ line: 1, severity: "warning" as const, message });
+
+  it("没丢就不说话：空数组出 null", () => {
+    expect(noticeFor([])).toBeNull();
+  });
+
+  it("一条时逐字沿用那条告警，不加前缀不改写", () => {
+    expect(noticeFor([w("第「甲」拍有 2 组分支，发射时只印得出第一组。")])).toBe(
+      "第「甲」拍有 2 组分支，发射时只印得出第一组。",
+    );
+  });
+
+  it("多处时把总数说出口，且第一条的原文仍在", () => {
+    const text = noticeFor([
+      w("第「甲」拍读不回来。"),
+      w("第「乙」拍读不回来。"),
+      w("第「丙」拍读不回来。"),
+    ]);
+    expect(text).toContain("第「甲」拍");
+    expect(text).toContain("共有 3 处");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // axsToSyncPayload —— AXS 文本 → 同步载荷（Writer 轨保存通道）
 // ---------------------------------------------------------------------------
 
@@ -317,6 +409,55 @@ describe("projectAxsFromCanvas", () => {
     const out = projectAxsFromCanvas(canvas, [], [saved], [], [], ROLES);
     expect(out).toContain("新台词");
     expect(out).not.toContain("旧台词");
+  });
+
+  it("画布物化的发射侧诊断要交回调用方（web 这层不许收了就丢）", () => {
+    /*
+     * editor-core 里有一条同名判据，量的是最底层；这一条只量**中间这层有没有往上交**。
+     * 「收下形参却不用」是本项目点过名的族——只在最底下加参数、上面全是摆设，
+     * 而 `openWriterAtSelection` 恰恰是那个摆设，界面级 E63 才会红。
+     */
+    const beat = makeNode("a", {
+      title: "抉择",
+      script: [
+        { op: "choice", options: [{ label: "离开", target_node_id: null }] },
+        { op: "choice", options: [{ label: "留下", target_node_id: null }] },
+      ],
+    });
+    const canvas = [{ id: "a", position: { x: 0, y: 0 }, data: { ...beat.narrative_data } }];
+
+    const warns: AxsDiagnostic[] = [];
+    const withDiag = projectAxsFromCanvas(
+      canvas,
+      [],
+      [beat],
+      [],
+      [],
+      ROLES,
+      undefined,
+      warns,
+    );
+    expect(withDiag, "诊断出参不该改变文本").toBe(
+      projectAxsFromCanvas(canvas, [], [beat], [], [], ROLES),
+    );
+    expect(warns.map((w) => w.message).join("\n")).toContain("读不回来");
+
+    const oneGroup = makeNode("a", {
+      title: "抉择",
+      script: [{ op: "choice", options: [{ label: "离开", target_node_id: null }] }],
+    });
+    const clean: AxsDiagnostic[] = [];
+    projectAxsFromCanvas(
+      [{ id: "a", position: { x: 0, y: 0 }, data: { ...oneGroup.narrative_data } }],
+      [],
+      [oneGroup],
+      [],
+      [],
+      ROLES,
+      undefined,
+      clean,
+    );
+    expect(clean, "一组分支不该被报成丢失").toHaveLength(0);
   });
 });
 

@@ -9,6 +9,7 @@ function scriptToAxsSource(
   script: Instruction[],
   beatTitle: string,
   roles?: Record<string, string>,
+  diagnostics?: AxsDiagnostic[],
 ): string {
   const beat = {
     id: "",
@@ -19,7 +20,14 @@ function scriptToAxsSource(
     jumps: [] as string[],
     passthrough: [] as string[],
   };
-  return printAxs({ beats: [beat as never], edges: [], diagnostics: [] }, { roles });
+  /*
+   * 发射侧的告警走的是**可选出参**：文本输出与之前逐字相同，只把"这一拍的第二个分支组被丢掉"登记下来。
+   * 解析看不到这件事（文本里本来就只剩一组），所以这条只能由发射器报——而发射器今天只在有人递数组时才说话。
+   */
+  return printAxs(
+    { beats: [beat as never], edges: [], diagnostics: [] },
+    { roles, diagnostics },
+  );
 }
 
 /** 指令下标 -> AXS 行号（基于 lineMap，回退为标题后顺序） */
@@ -76,13 +84,26 @@ export default function MiniAxsEditor({
   const [collapsed, setCollapsed] = useState(false);
   const [diagnostics, setDiagnostics] = useState<AxsDiagnostic[]>([]);
 
-  // 生成基准 AXS 源码（外部 script 变更时更新）
-  const baseSource = useMemo(
-    () => scriptToAxsSource(script, beatTitle, roles),
-    [script, beatTitle, roles],
-  );
+  // 生成基准 AXS 源码（外部 script 变更时更新）；同一趟打印顺带把发射侧诊断收下来
+  const { baseSource, printerDiagnostics } = useMemo(() => {
+    const collected: AxsDiagnostic[] = [];
+    const text = scriptToAxsSource(script, beatTitle, roles, collected);
+    return { baseSource: text, printerDiagnostics: collected };
+  }, [script, beatTitle, roles]);
 
   const [source, setSource] = useState(baseSource);
+  /*
+   * 两半都要显示：解析报的是"文本里读不回来什么"，发射侧报的是"这一拍的 IR 里有第二组分支、
+   * 印出来的文本只剩第一组"。后者在文本里根本没有痕迹，所以只能从打印那一趟拿。按消息去重，
+   * 免得当同一件事被两边各报一次。
+   */
+  const shownDiagnostics = useMemo(
+    () => [
+      ...diagnostics,
+      ...printerDiagnostics.filter((p) => !diagnostics.some((d) => d.message === p.message)),
+    ],
+    [diagnostics, printerDiagnostics],
+  );
   const lastScriptJsonRef = useRef(JSON.stringify(script));
   const internalChangeRef = useRef(false);
 
@@ -166,15 +187,15 @@ export default function MiniAxsEditor({
               onChange={handleChange}
               scrollToLine={scrollToLine}
               onCursorLine={handleCursorLine}
-              diagnostics={diagnostics}
+              diagnostics={shownDiagnostics}
               roleNames={roleNames}
               directives={DIRECTIVES}
               placeholder="# Beat 标题&#10;角色: 台词"
             />
           </div>
-          {diagnostics.length > 0 && (
+          {shownDiagnostics.length > 0 && (
             <div className="border-t border-border bg-surface-raised px-3 py-1.5 text-3xs text-ink-faint">
-              {diagnostics[0]?.message}
+              {shownDiagnostics[0]?.message}
             </div>
           )}
         </div>

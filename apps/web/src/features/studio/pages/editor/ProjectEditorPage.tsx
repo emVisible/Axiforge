@@ -12,11 +12,6 @@ import CutWorkspace from "./CutWorkspace";
 import WriterWorkspace from "./WriterWorkspace";
 import FlowWorkspace from "./FlowWorkspace";
 
-function prefetchStudioModes() {
-  void import("./FlowWorkspace");
-  void import("./WriterWorkspace");
-}
-
 /** Studio 编辑器宿主：路由参数 + 模式头 + 三工作台切换（原 ProjectFlowPage 薄壳） */
 export default function ProjectEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -113,7 +108,6 @@ export default function ProjectEditorPage() {
               ]}
             />
             )}
-            <div onMouseEnter={prefetchStudioModes}>
             <SegmentedControl
               size="sm"
               value={editorMode}
@@ -127,7 +121,6 @@ export default function ProjectEditorPage() {
                 { value: "flow", label: "结构" },
               ]}
             />
-            </div>
           </div>
         }
         actions={
@@ -187,6 +180,19 @@ export default function ProjectEditorPage() {
           </WorkspaceToolbar>
         }
       />
+
+      {editor.projectionNotice && (
+        /*
+         * 投影或保存时发射侧报出来的丢失（例如「这一拍有第二组分支，印出来的文本里读不回来」）。
+         * 用常驻条而不是 toast：它说的是**存档里已经少了内容**，一闪而过等于没说过。
+         */
+        <div
+          role="status"
+          className="mx-4 mt-2 rounded-lg border border-border bg-surface-raised px-3 py-2 text-2xs text-ink-muted"
+        >
+          {editor.projectionNotice}
+        </div>
+      )}
 
       
 {editorMode === "writer" ? (

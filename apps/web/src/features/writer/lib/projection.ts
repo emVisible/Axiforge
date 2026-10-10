@@ -6,7 +6,7 @@
  * apps/web 的 18 例行为基线钉住本文件公共签名，迁移期不得变更语义。
  */
 
-import type { AxsBeat } from "@axiforge/axs";
+import type { AxsBeat, AxsDiagnostic } from "@axiforge/axs";
 import { parseAxs } from "@axiforge/axs";
 import type { Draft, Edge, NarrativeData, NarrativeNode } from "@axiforge/editor-core";
 import {
@@ -85,11 +85,47 @@ export function projectToAxs(
   edges: ProjectEdgeResponse[],
   scenes: ProjectSceneResponse[],
   roles: Record<string, string>,
+  diagnostics?: AxsDiagnostic[],
 ): string {
   if (!nodes.length) {
     return `# 开始\n旁白：故事从这里开始。\n`;
   }
-  return draftToAxs(draftFromProject(nodes, edges, scenes), roles);
+  return draftToAxs(draftFromProject(nodes, edges, scenes), roles, diagnostics);
+}
+
+/**
+ * 装载路径专用：一次投影同时给出文本和那条「读不回来」的常驻说明。
+ *
+ * 告警只在**屏幕上显示的就是这次投影的结果**时才对用户成立：存档里没有文本，或存档文本
+ * 与投影逐字节相同（那它就是上一次投影写回去的）。存档里躺着 Writer 手写文本时报「投影会丢」
+ * 是误导——用户看到的并不是投影。
+ */
+export function projectWithNotice(
+  nodes: ProjectNodeResponse[],
+  edges: ProjectEdgeResponse[],
+  scenes: ProjectSceneResponse[],
+  roles: Record<string, string>,
+  storedSource: string | null | undefined,
+): { text: string; notice: string | null } {
+  const warns: AxsDiagnostic[] = [];
+  const text = projectToAxs(nodes, edges, scenes, roles, warns);
+  const showsProjection = !storedSource || storedSource === text;
+  return { text, notice: showsProjection ? noticeFor(warns) : null };
+}
+
+/**
+ * 发射侧告警 → 那条常驻说明。
+ *
+ * 发射器**逐拍**报（一条消息里写着「第「X」拍有 N 组分支」），而界面上只有一条横幅：
+ * 只印 `warns[0]` 就等于把"这次投影丢了几处"吞掉——用户读到第一拍的例子，其余几拍无声消失，
+ * 那正是本家族要修的「静默」本身。多条时把总数说出来，第一条的原文照旧保留。
+ */
+export function noticeFor(warns: AxsDiagnostic[]): string | null {
+  if (!warns.length) return null;
+  const first = warns[0]!.message;
+  return warns.length === 1
+    ? first
+    : `${first}（这次投影共有 ${warns.length} 处读不回来的丢失）`;
 }
 
 /** AXS 源文本 → 同步载荷（委托 editor-core 的物化计划，映射为传输 DTO） */
@@ -198,7 +234,11 @@ function canvasEdgeToProjectEdge(e: CanvasEdgeSnapshot): ProjectEdgeResponse {
   };
 }
 
-/** 从当前画布状态生成 AXS 文本（未保存的剪辑/结构编辑也可预览到剧本轨）。 */
+/**
+ * 从当前画布状态生成 AXS 文本（未保存的剪辑/结构编辑也可预览到剧本轨）。
+ * `diagnostics` 是可选出参，语义与 `projectToAxs` 的那一个相同；这一趟的返回值会被
+ * `openWriterAtSelection` **直接写进用户正在看的编辑框**，所以丢失只能在这里说。
+ */
 export function projectAxsFromCanvas(
   canvasNodes: CanvasNodeSnapshot[],
   canvasEdges: CanvasEdgeSnapshot[],
@@ -207,6 +247,7 @@ export function projectAxsFromCanvas(
   scenes: ProjectSceneResponse[],
   roles: Record<string, string>,
   options?: { scopeStageId?: string | null },
+  diagnostics?: AxsDiagnostic[],
 ): string {
   return coreProjectAxsFromCanvas(
     canvasNodes,
@@ -216,5 +257,6 @@ export function projectAxsFromCanvas(
     scenes.map((s) => ({ id: s.id, title: s.title })),
     roles,
     options,
+    diagnostics,
   );
 }

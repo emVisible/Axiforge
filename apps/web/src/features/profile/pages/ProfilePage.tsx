@@ -61,7 +61,7 @@ export default function ProfilePage() {
       <>
         <PageHeader
           title="账户设置"
-          description="管理昵称、头像、邮箱与数据"
+          description="这一页在本机只保留你的身份；昵称、头像、邮箱与数据管理都在协作服务那一侧"
         />
         <div className="mx-auto max-w-lg">
           <Card>

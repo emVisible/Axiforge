@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { MarkerType, type Node, type Edge, type Connection, type NodeChange, type EdgeChange, type NodeMouseHandler } from "reactflow";
 import type { Instruction, Condition } from "@axiforge/core";
+import type { AxsDiagnostic } from "@axiforge/axs";
 import type { NarrativeSyncRequest } from "@/shared/api/editor";
 import { useDeleteProject } from "@/shared/hooks/useProjects";
 import type { SimTarget } from "../components/ConditionSimulator";
@@ -30,11 +31,14 @@ import { useProjectOutliner } from "../cut/hooks/useProjectOutliner";
 import { useCanvasView } from "./useCanvasView";
 import {
   conditionGroupFromItems,
+  canvasSnapshotFromKernel,
   flowNodeOf,
   inspectorFromNarrative,
   patchFromForm,
   projectRfEdges,
   projectRfNodes,
+  kernelEdgeFromRf,
+  kernelNodeFromRf,
 } from "./editorProjection";
 import { exportProjectMarkdown } from "../lib/exportProjectMarkdown";
 import { routes } from "@/shared/lib/routes";
@@ -42,18 +46,15 @@ import {
   axsToSyncPayload,
   beatLineForNode,
   collectProjectNodes,
+  noticeFor,
   projectToAxs,
+  projectWithNotice,
   projectAxsFromCanvas,
 } from "@/features/writer/lib/projection";
 import { sanitizeScript } from "@/features/studio/cut/timelineUtils";
 import { useDraftJournal } from "./useDraftJournal";
 import { fetchProjectDirectory } from "./useProjectDirectory";
-import type {
-  Edge as KernelEdge,
-  NarrativeNode as KernelNode,
-  Origin,
-  ProjectMetaPatch,
-} from "@axiforge/editor-core";
+import type { Origin, ProjectMetaPatch } from "@axiforge/editor-core";
 import { draftFromProject } from "@/features/writer/lib/projection";
 import {
   bundleToResponse,
@@ -121,6 +122,8 @@ export function useProjectEditor(id: string) {
   const [showAchievements, setShowAchievements] = useState(false);
   const [axsSource, setAxsSource] = useState("");
   const [axsDirty, setAxsDirty] = useState(false);
+  /** 投影丢了东西的那条常驻说明（toast 会自己消失，而这条说的是存档里已经少了内容） */
+  const [projectionNotice, setProjectionNotice] = useState<string | null>(null);
   const [allProjectNodes, setAllProjectNodes] = useState<ProjectNodeResponse[]>([]);
   const [writerScrollLine, setWriterScrollLine] = useState<number | null>(null);
   const clearSelection = useCallback(() => {
@@ -183,37 +186,21 @@ export function useProjectEditor(id: string) {
   );
 
   const editOrigin: Origin = editorMode === "writer" ? "writer" : editorMode === "flow" ? "flow" : "cut";
-  const toKernelEdge = (e: Edge): KernelEdge => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: (e.label as string) ?? null,
-  });
-  const flowNodeToKernelNode = (n: Node): KernelNode => ({
-    id: n.id,
-    stageId: (n.data.stage_id as string) ?? null,
-    position: n.position,
-    narrative: n.data as Record<string, unknown>,
-    sortOrder: rfNodes.length,
-  });
 
-  const projectAxsFromCanvasState = useCallback(() => {
+  const projectAxsFromCanvasState = useCallback((diagnostics?: AxsDiagnostic[]) => {
     if (!project) return axsSource;
     const stageScoped = viewMode === "stage" && currentScene;
     return projectAxsFromCanvas(
       [...draft.nodes.values()]
         .filter((n) => (stageScoped ? n.stageId === currentScene!.id : true))
-        .map((n) => ({
-          id: n.id,
-          position: n.position,
-          data: { ...n.narrative, stage_id: n.stageId },
-        })),
+        .map(canvasSnapshotFromKernel),
       draft.edges.map((e) => ({ source: e.source, target: e.target, label: e.label ?? null })),
       allProjectNodes,
       project.edges || [],
       project.scenes || [],
       rolesMap,
       stageScoped ? { scopeStageId: currentScene!.id } : undefined,
+      diagnostics,
     );
   }, [
     project,
@@ -255,8 +242,10 @@ export function useProjectEditor(id: string) {
   );
 
   const openWriterAtSelection = useCallback(() => {
-    const projected = projectAxsFromCanvasState();
+    const warns: AxsDiagnostic[] = [];
+    const projected = projectAxsFromCanvasState(warns);
     setAxsSource(projected);
+    setProjectionNotice(noticeFor(warns));
     setAxsDirty(false);
     if (selectedNode) {
       const line = beatLineForNode(
@@ -283,9 +272,7 @@ export function useProjectEditor(id: string) {
       const { roleOptions, items } = await fetchProjectDirectory(p);
       setProjectRoles(roleOptions);
       setItemOptions(items);
-      const roleNameMap = Object.fromEntries(
-        roleOptions.map((r) => [r.name, r.characterRefId]),
-      );
+      const roleNameMap = Object.fromEntries(roleOptions.map((r) => [r.name, r.characterRefId]));
 
       const projectNodes = collectProjectNodes(p.nodes, p.scenes || []);
       setAllProjectNodes(projectNodes);
@@ -295,21 +282,19 @@ export function useProjectEditor(id: string) {
         setActiveStageId(scenes[0].id);
       }
 
-      const scene = sceneId
-        ? p.scenes?.find((s) => s.id === sceneId)
-        : null;
+      const scene = sceneId ? p.scenes?.find((s) => s.id === sceneId) : null;
       if (!scene && !projectNodes.length) {
         setCurrentScene(null);
+        setProjectionNotice(null); // 这条早退没走投影：不清掉就会把上一次装载的说明挂在一个空工程上
         setAxsSource(p.axs_source || `# 开始\n旁白：故事从这里开始。\n`);
         setAxsDirty(false);
         return;
       }
       setCurrentScene(scene ?? null);
 
-      setAxsSource(
-        p.axs_source ||
-          projectToAxs(projectNodes, p.edges || [], p.scenes || [], roleNameMap),
-      );
+      const proj = projectWithNotice(projectNodes, p.edges || [], scenes, roleNameMap, p.axs_source);
+      setProjectionNotice(proj.notice);
+      setAxsSource(p.axs_source || proj.text);
       setAxsDirty(false);
       setFitViewTrigger((t) => t + 1);
     },
@@ -477,7 +462,7 @@ export function useProjectEditor(id: string) {
           stage_dot: palette.dot,
         },
       };
-      dispatch({ kind: "node.add", node: flowNodeToKernelNode(newNode) }, "flow");
+      dispatch({ kind: "node.add", node: kernelNodeFromRf(newNode, rfNodes.length) }, "flow");
     },
     [dispatch, project, viewMode, activeStageId, currentScene, rfNodes.length],
   );
@@ -496,7 +481,7 @@ export function useProjectEditor(id: string) {
         label: "",
       };
       dispatch(
-        { kind: "edges.replaceAll", edges: addEdge(newEdge, rfEdges).map(toKernelEdge) },
+        { kind: "edges.replaceAll", edges: addEdge(newEdge, rfEdges).map(kernelEdgeFromRf) },
         "flow",
       );
     },
@@ -864,13 +849,18 @@ export function useProjectEditor(id: string) {
           // axsDirty=true 说明 Writer 有未保存的文本编辑，保留其手写内容不覆盖
           if (!axsDirty) {
             const freshResponse = bundleToResponse(fresh.data);
+            // 投影就在这一刻被写回 axs_source，丢失从此进存档，所以这里无条件报；
+            // 装载那条腿要先问「屏幕上是不是投影」（见 projectWithNotice）。
+            const warns: AxsDiagnostic[] = [];
             const projected = projectToAxs(
               collectProjectNodes(freshResponse.nodes, freshResponse.scenes || []),
               freshResponse.edges || [],
               freshResponse.scenes || [],
               rolesMap,
+              warns,
             );
             await persistAxsProjection(projected);
+            setProjectionNotice(noticeFor(warns));
           }
         }
       }
@@ -1012,6 +1002,7 @@ export function useProjectEditor(id: string) {
     setAxsSource,
     axsDirty,
     setAxsDirty,
+    projectionNotice,
     allProjectNodes,
     writerScrollLine,
     setWriterScrollLine,

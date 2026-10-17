@@ -68,6 +68,34 @@ jobs:
       - name: Build renderer and internal Admin
         run: pnpm build:web && pnpm build:admin
 
+      # 桌面主线（ADR-029：桌面是唯一构建与发布目标）的编译信号。
+      #
+      # 为什么是 `cargo check` 而不是 `pnpm build:desktop`：后者是
+      # `tauri build --bundles app`，而 `--bundles app` 是 **macOS 专有**的打包格式，
+      # 这一套 job 跑在 ubuntu-latest 上必然失败，且不是加一行能解决的。
+      # `cargo check` 给的是"桌面壳的 Rust 侧能编译"这一层，正好补上此前 CI 完全不构建主线产物的缺口。
+      #
+      # 必须排在上面 `pnpm build:web` **之后**：`tauri.conf.json` 的 `beforeBuildCommand`
+      # 是 `pnpm --filter @axiforge/web build`、`frontendDist` 指向 `apps/web/dist`，
+      # 目录不存在时 tauri-build 的 codegen 过不去。
+      - name: Install Tauri Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            file \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Type-check the desktop crate
+        run: pnpm check:desktop
+
       - uses: astral-sh/setup-uv@v5
 
       - name: Setup API and database

@@ -3880,3 +3880,62 @@ plugin-dialog 宁可归真壳手验也不造 mock picker），所以我不推荐
 
 **这一批的净产出**：1 处产品级修复（E64）+ 1 条被压到一行可决的 S13-6 决定（见第十三节）
 + 当前树权威读数 + 两条定位清楚的红。**没有擅自动别人的测试形状。**
+
+## 十四、合并 `desktop` → `main` 前的自查：干净 clone 才是判据
+
+计划里的四个"未完成"阶段全部卡在口径决定上，本轮把重心转到**主线归属**：
+`desktop` 是否可以快进合并进 `main`、并且**完全优于** `main`。
+
+### 结构层：严格超集，可以无损快进
+
+`git rev-list --left-right --count main...desktop` = **`0 / 277`**
+⇒ main **没有任何** desktop 不含的提交；desktop 有 277 笔 main 没有的。
+main tip 停在 `777591f "feat: v0.4"`（**2026-07-09**，落后约三个月）。
+528 文件、+67711 / −3613。desktop 会顺带删掉 main 上的 2 个文件（`ProjectFlowPage.tsx`、
+`docs/ADMIN_VNEXT.md`）：都是重构有意删的，desktop 上只剩文档/历史提及、**无悬空 import**。
+
+### 但"完全优于"不成立：合并进去的那棵树，CI 本来会红
+
+`package.json`（已跟踪）引用三个**不在树里**的脚本：`check:apibase` / `check:tracked` / `cloud:callmap`
+各自指向 `scripts/check-apibase-literals.mjs` / `check-chain-tracked.mjs` / `cloud-callmap.mjs`。
+三个都不在 `gates` 的 15 条里，所以**本机 gates 绿**；而 `check:citations`（在 gates 里）本机绿是靠
+`existsSync` 命中磁盘上那份未跟踪文件，**干净 clone 上判 `missing` ⇒ gates 红 ⇒ CI 红**。
+
+这不是新问题，是 `docs/HANDOFF.md` 里已记载的同一类（"门禁脚本与基线自己也在未跟踪里……
+干净 clone 上 `pnpm gates` 整条链跑不起来"），10-10 那轮修了一部分，**这三个漏了**。
+
+补齐时又当场抓到**第四处、第五处**同一形状：
+- `cloud-callmap.mjs:1230` **真去读** `scripts/desktop-cloud-judgements.json`，而台账自己未跟踪 ⇒ 干净 clone 上它自判「文件不存在」。**这是上一笔提交引进来的**，我在提交它之后才发现。
+- `testdata/axs-draft/unknown-speaker.json` 未跟踪，而两端 harness 都是**枚举**（`glob` / `readdirSync`）⇒ 这份向量**本机已在两端各参与一次，干净 clone 上不存在** ⇒ CI 比本机**少判一格**。它不会报错，只是判据少一条——比前四处更隐蔽。
+
+### 干净 clone 的诚实读数（2026-10-18，`--depth 1` clone 到临时目录）
+
+| 项 | 读数 |
+|---|---|
+| `pnpm install --frozen-lockfile` | exit 0 |
+| `pnpm gates` | **exit 0**（796 passed + 1 skipped；`doc-citations` 不存在 0、`publish-target` 残差 4 全在册） |
+| `pnpm check:apibase` | 越界调用点 **0**（脚本在树上、跑得起来了） |
+| 后端 `pytest -q` | **226 passed**（与本机同数 ⇒ 那三个 Python 向量确实在树里） |
+| `pnpm e2e:desktop` | **77 passed / 1 skipped**，exit 0 |
+| `pnpm e2e` | **91 passed**，exit 0 |
+
+跑 E2E 前按老规矩先证明了端口上是被测代码：`lsof` 看 5174/8000 **都空** ⇒ clone 自己起 vite，
+不复用本机那台（复用等于把两棵树的读数混成一条）。
+
+### 顺带抓到一处真缺陷（已登记，未在本轮改）
+
+`scripts/check-chain-tracked.mjs` 的 `CG_CONTROLS` **硬编码了作者那台机器的瞬时状态**：
+
+```js
+{ p: "packages/axs/src/condition.ts", want: true, why: "…import 且未跟踪" }
+```
+
+它断言这个文件**应当**被算成"未跟踪的编译缺口"。而它现在**已被正确跟踪**
+（`git ls-files` 认它）⇒ 对照组不符 ⇒ 脚本判 `UNRELIABLE` 并 **exit 1**。
+症状是**同一份代码在两台机器上给不同读数**：本机 exit 0（因为 `clipboard.ts` 恰好未跟踪，
+另一条对照过了），干净 clone exit 1。
+
+**为什么本轮不顺手改**：它的对照是"该拦的必须被拦、该放的必须被放"这类**判据自证**，
+改成合成对照（同族脚本 `check-doc-citations.mjs` 的 `extControls` 就是合成对照、
+`check-chain-tracked.mjs` 自己的 `JD` 也是）属于改它的判据设计，是口径不是顺手修。
+它**不在 `gates` 里**，所以不阻断 CI、不阻断合并。**如实登记，不假装已修。**

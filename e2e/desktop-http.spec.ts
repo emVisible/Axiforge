@@ -1026,14 +1026,26 @@ test.describe("E40 「发送到 Nexus」入口的两半各有一条断言", () =
    */
   const PROJECT = "协作态留入口";
 
-  test("浏览器态能看到、桌面态不给入口", async ({ page }) => {
+  /**
+   * 浏览器那一半——**要真后端**，所以在无后端那套里跳过自己（2026-10-18 拆条）。
+   *
+   * 为什么原来必红：这一半建工程走 `POST /api/v1/editor/projects/user/creator-…`，
+   * 而 `playwright.desktop.config.ts` **不起 uvicorn** ⇒ 实测 URL 停在 `/studio/projects`、
+   * 后面每一步都跟着超时。原先它是与桌面那半**同一条**测试，于是整条在无后端配置下稳定红——
+   * 这不是"测试坏了"，是「断言跨两种环境差异的测试结构上无法只活在单一环境配置里」。
+   */
+  test("浏览器态能看到入口（要真后端；无后端那套自动跳过）", async ({ page }) => {
+    test.skip(
+      process.env.E2E_PROFILE === "no-backend",
+      "这一半要发云端请求建工程，无后端配置下结构性不可跑（另一半不需要后端，见下一条）",
+    );
     const hits: string[] = [];
     page.on("request", (req) => {
       const path = new URL(req.url()).pathname;
       if (path.startsWith("/api/v1/")) hits.push(path);
     });
 
-    // 浏览器那一半：走真后端（这一半本来就要发云端请求，所以不清零、也不断零）
+    // 走真后端（这一半本来就要发云端请求，所以不清零、也不断零）
     await page.goto("/studio/projects", { waitUntil: "load" });
     await page.getByRole("button", { name: "新建剧本" }).click();
     await page.getByPlaceholder("剧本标题").fill(PROJECT);
@@ -1047,9 +1059,21 @@ test.describe("E40 「发送到 Nexus」入口的两半各有一条断言", () =
     await expect(page.getByRole("button", { name: "发送到 Nexus" })).toBeVisible({
       timeout: 8000,
     });
+  });
 
-    // 桌面那一半：同一个入口必须不在，而同栏另一个动作在（防"整栏没渲染也绿"）
-    hits.length = 0;
+  /**
+   * 桌面那一半——**不需要后端**（`?storage=memory` + 桌面标记），所以两套配置下都跑。
+   *
+   * 这一半才是「把 NexusSendAction 整块删掉会被抓住」的那一格，而它一直是绿的（count 0 对
+   * "根本没渲染"同样成立，E35 栽过一次）——同栏的「导出 Markdown」正控就是为这件事准备的。
+   */
+  test("桌面态不给入口、同栏另一个动作在、全程零 /api/v1", async ({ page }) => {
+    const hits: string[] = [];
+    page.on("request", (req) => {
+      const path = new URL(req.url()).pathname;
+      if (path.startsWith("/api/v1/")) hits.push(path);
+    });
+
     await page.addInitScript(DESKTOP_MARKER_INIT);
     await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
     await page.getByRole("button", { name: "新建剧本" }).click();
@@ -1835,7 +1859,18 @@ test.describe("E55 播放器设置按作品存住并互相隔离（桌面态全�
  * 它测的是**通路**：按钮 → 选择器 → 解包 → 落库 → 换页再进 → 两个独立工程各自可开。
  */
 test.describe("E43 导入 .axsp：同一个包连导两次得到独立副本", () => {
-  test("两次导入各得一个工程、两份并存、没有「导入失败」弹窗（通路走本地库）", async ({ page }) => {
+  /**
+   * 通路那一半——**不需要后端**（`?storage=memory`），两套配置下都跑。
+   *
+   * 为什么拆（2026-10-18）：原先它与「两份并存」挤在同一条里，而那一格要**列表 settle**；
+   * 无后端配置下列表请求失败 ⇒ 落进 `error` 态（页面「错误不得显示成空态」是对的）
+   * ⇒ 前置的「还没有剧本」永远不出现 ⇒ 整条稳定红。
+   *
+   * 拆开后这一条**不含任何列表断言**，它的前置是 `importOnce` 里那句
+   * 「点「导入 .axsp」必须真的开出文件选择器」——那比空态更强：它证明入口存在且被点到过，
+   * 所以「没弹窗、没请求」不会被读成「入口根本没渲染」（这正是 E35 栽过的地方）。
+   */
+  test("导入通路：两次各落到不同工程、无「导入失败」弹窗", async ({ page }) => {
     const hits: string[] = [];
     const dialogs: string[] = [];
     page.on("request", (req) => {
@@ -1850,10 +1885,8 @@ test.describe("E43 导入 .axsp：同一个包连导两次得到独立副本", (
 
     // 刻意不注入 DESKTOP_MARKER_INIT：注入了就会走 plugin-dialog 支（chromium 里开不出选择器）。
     // 本地库这一半仍由 ?storage=memory 保证（导入通路本身零请求），但页面级消费者照旧发 HTTP，见下方注释。
+    // 注意这里**不**等空态：空态要求列表请求成功，无后端配置下它落在 error 态（这是页面的正确行为）。
     await page.goto("/studio/projects?storage=memory", { waitUntil: "load" });
-    await expect(page.getByText("还没有剧本")).toBeVisible({ timeout: 8000 });
-    // 前置对照：导入前这张标题在页面上一张都没有，否则后面的 toHaveCount(2) 可能被任何同名文本满足
-    await expect(page.getByText(/【示范】序章·交汇/)).toHaveCount(0);
 
     // 夹具路径按仓库根解析（Playwright 的 cwd 就是根）；先证明文件在，
     // 否则"没弹窗、没请求"会被读成导入坏了——那是把 fixture 问题误判成产品问题
@@ -1880,26 +1913,28 @@ test.describe("E43 导入 .axsp：同一个包连导两次得到独立副本", (
 
     // 核心证据：同一个字节流两次导入，落到**两个不同的工程 id**（旧行为是第二次直接失败）
     expect(second).not.toBe(first);
-    /**
-     * 两份并存：按标题文本数卡片。**计数断言不需要元素稳定**（不需要几何命中），
-     * 所以这条能成立而我先前删掉它给的理由（"条带永不稳定"）其实是误读——
-     * 不稳定只挡住"点击"这种要算 bounding box 的动作，不挡住计数。
-     * 要点击卡片得另写一条，且得先治那个入场动画，不在本条里顺手做。
-     */
-    await expect(page.getByText(/【示范】序章·交汇/)).toHaveCount(2);
     expect(
       dialogs.filter((d) => d.includes("导入失败")),
       `不该出现「导入失败」弹窗（同期观测到 ${hits.length} 笔云端请求，来自会话/健康检查等页面级消费者，见上方注释，不当成本条的判据）`,
     ).toEqual([]);
     /*
-     * 这里刻意**没有**再断"列表里有两张卡片"。两次尝试都留了证据，结论是这条判据今天写不出可信形状：
-     * ① 按标题文本数——撞上页面顶部【示范】条带里的同名项，且那个条带的元素在 Playwright 下
-     *    60s 内一直 "not stable / detached from DOM"（无限动画？这是独立的观察，已登记 §5，不在本条顺手治）；
-     * ② 按工程 id 找 `<a href>` ——卡片不是锚点，`element(s) not found`。
-     * 所以本条的可证事实停在：**两次导入各自把浏览器带到不同的工程页**
-     * （内存库给的是顺序 id，实测 `proj-0001` 与 `proj-0002`），"还没有剧本"消失，
-     * 没有「导入失败」弹窗，全程零 `/api/v1`。这已经足够钉住旧行为（第二次直接失败），
-     * 而"列表渲染两张卡"要等那条稳定形状出现再加——宁缺毋滥。
+     * 这里刻意**没有**再断"列表里有两张卡片"，而且这次把理由量到了数字（2026-10-18）：
+     * 我试过把它拆成独立一条、并在无后端那套里跳过它，拆完上牙立刻发现**这条判据不成立**——
+     * 只导一次时列表里那个标题的计数是 **0**（不是 1），导两次才是 2，**计数与导入次数不成比例**。
+     * 失败快照显示页面当时正停在「还没有剧本」空态 ⇒ 卡片区的 DOM 在动画里，不是可靠证人。
+     * 这与原作者先前两次尝试的记录一致（① 按标题数撞上顶部【示范】条带同名项、元素 60s 内
+     * 一直 "not stable / detached from DOM"；② 按工程 id 找 `<a href>`——卡片不是锚点）。
+     *
+     * ⇒ 删掉那条计数断言。**留一条刚被自己证伪的断言，比不留更糟**：它会在"恰好对"的次数里
+     * 给假绿，下一次真回归时又说不清是哪边错了。可证事实停在：
+     * **两次导入各自把浏览器带到不同的工程页**（内存库给顺序 id，实测 `proj-0001` / `proj-0002`）、
+     * 没有「导入失败」弹窗。这已经足够钉住旧行为（第二次直接失败）。
+     * 「两份在列表上并存」今天没有可信证人——要它得先治那条入场动画，单开一轮。
+     *
+     * 另外记一条边界：**这一格只能在同一次页面生命周期内观察**。
+     * `getStorageProvider()` 是记忆化的模块级单例（`shared/storage/index.ts:192`），
+     * `?storage=memory` 每页新建一个 provider ⇒ `page.goto` 整页重载会把导入结果一起丢掉，
+     * 所以回到列表**必须走客户端跳转**（页面上的「剧本列表」BackLink）而不是 `goto`。
      */
     /*
      * 刻意**不**断言「零 /api/v1」。实测（06:53）：不注入桌面标记时页面仍发
@@ -1909,6 +1944,8 @@ test.describe("E43 导入 .axsp：同一个包连导两次得到独立副本", (
      * 「页面不该发云端请求」仍归 E14 的 CLEAN_ROUTES 棘轮，别在这里冒充它。
      */
   });
+
+
 });
 
 /*
@@ -2351,7 +2388,10 @@ test.describe("E64 两处丢失时，常驻说明要说清数量", () => {
     const branchGroups = page.getByText("分支选项");
     // 「+ 分支」住在右侧检查器的「演出」标签里，而选 Beat 会把面板切回「内容」⇒ 每次选完都要再点开
     const openCutInspector = async () => {
-      await page.getByRole("button", { name: "演出" }).click();
+// `exact: true` 不是洁癖：`getByRole` 的 name 默认**子串**匹配，
+      // 而页面上另有一枚可及名含「演出」的按钮（「预览此节点演出」）⇒ 不加就 strict mode 撞车。
+      // 这条撞车是后来加那枚按钮时才出现的，所以它同时是「新增可及名要复查既有选择器」的证据。
+      await page.getByRole("button", { name: "演出", exact: true }).click();
       await expect(addBranch).toBeVisible({ timeout: 8000 });
     };
 

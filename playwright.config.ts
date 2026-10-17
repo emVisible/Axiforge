@@ -17,6 +17,18 @@ const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ??
   "postgresql+asyncpg://young@localhost:5432/axiforge_e2e";
 
+/**
+ * 档位标记：这一套**起了真后端**。用例里要真后端的那一格用 `E2E_PROFILE` 跳过自己，
+ * 而不是靠配置里的 glob 把整条用例排除掉。
+ *
+ * 为什么要有这个开关（2026-10-18）：`testIgnore` 只能按**文件路径**排除，没法按**测试名**排。
+ * 于是一条"断言跨两种环境差异"的用例只能整条活在一边，而它在无后端那套里必然红——
+ * 实测 E40（浏览器那半走真后端建工程）与 E43（前置要空态）在 `playwright.desktop.config.ts`
+ * 下稳定红、带后端这套绿。同一形状的判据此前只有 `baselines.spec.ts` 用**整文件排除**绕开，
+ * 那是文件粒度的运气，不是机制。
+ */
+process.env.E2E_PROFILE = "with-backend";
+
 export default defineConfig({
     // 基线不住在 apps/web 里：web 端退场（ADR-029 决策 2）时不能把 37 条行为基线一起删掉
   testDir: "e2e",

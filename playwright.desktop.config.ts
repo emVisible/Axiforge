@@ -8,6 +8,12 @@ import ports from "./scripts/ports.json";
  * 绑着 `webServer: uvicorn` 的整条基线，所以「桌面那一半」必须先能独立活着。
  * 这里跑的用例如果偷偷依赖后端，就会在这一份配置下红——那正是我们要的信号。
  */
+/**
+ * 档位标记：这一套**不起后端**。用例里要真后端的那一格靠它跳过自己。
+ * 说明见 `playwright.config.ts` 同一段（为什么不靠 `testIgnore`）。
+ */
+process.env.E2E_PROFILE = "no-backend";
+
 export default defineConfig({
   testDir: "e2e",
   /*

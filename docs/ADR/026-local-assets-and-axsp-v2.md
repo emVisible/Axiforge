@@ -2,7 +2,7 @@
 
 **状态**：已采纳
 **日期**：2026-09-24
-**关联**：[ADR-024](./024-desktop-local-first.md)（决策 3 本地优先存储、决策 4 工程容器）、[ADR-025](./025-axs-peer-dual-view.md)、[KERNEL_DESIGN.md](../KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP](../REFACTOR_DESKTOP.md) Phase 6、执行件 `BLUEPRINT_v0.7.md`
+**关联**：[ADR-024](./024-desktop-local-first.md)（决策 3 本地优先存储、决策 4 工程容器）、[ADR-025](./025-axs-peer-dual-view.md)、[KERNEL_DESIGN.md](../KERNEL_DESIGN.md) §2.5、[REFACTOR](../REFACTOR.md) Phase 6、执行件 `BLUEPRINT_v0.7.md`
 
 ## 背景
 

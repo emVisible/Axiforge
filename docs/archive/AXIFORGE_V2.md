@@ -4,7 +4,7 @@
 > **最后更新**：2026-07-09  
 > **北极星**：以 Axiforge 为统一平台核心；首波 Canopy 社群闭环，并行 RN 成就与 Nexus 数据总线。
 
-> **状态（2026-09-30）**：历史规划，已被桌面唯一产品决策 [ADR-029](../ADR/029-desktop-only-build-target.md) 取代。社群、发现、跨作品生态、Nexus 等波次不得视为当前 Axiforge 产品待办；现行范围见 [`REFACTOR_DESKTOP.md`](../REFACTOR_DESKTOP.md)。
+> **状态（2026-09-30）**：历史规划，已被桌面唯一产品决策 [ADR-029](../ADR/029-desktop-only-build-target.md) 取代。社群、发现、跨作品生态、Nexus 等波次不得视为当前 Axiforge 产品待办；现行范围见 [`REFACTOR.md`](../REFACTOR.md)。
 
 ---
 

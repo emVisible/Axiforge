@@ -34,7 +34,7 @@ vi.mock("@/shared/lib/creatorId", () => ({ getCreatorId: () => TEST_CREATOR }));
  *
  * 这里同时**如实钉住一处守不了的**：失败时本次新建的角色会留下——
  * L4 契约里根本没有删除角色的方法（只有 `saveCharacter`），所以导入无法自我撤销那一半。
- * 那条不是本文件的修法，是待决（见 docs/HANDOFF_DESKTOP.md §6 待你定档清单）。
+ * 那条不是本文件的修法，是待决（见 docs/HANDOFF.md §6 待你定档清单）。
  */
 
 type Failable =

@@ -2,7 +2,7 @@
 
 **状态**：已采纳
 **日期**：2026-08-26
-**关联**：ADR-008、ADR-016、ADR-022、[REFACTOR_DESKTOP](../REFACTOR_DESKTOP.md)（执行宪章与阶段计划）、VISION_AND_BRIDGES §5、ROADMAP_FINAL v2.0+
+**关联**：ADR-008、ADR-016、ADR-022、[REFACTOR](../REFACTOR.md)（执行宪章与阶段计划）、VISION_AND_BRIDGES §5、ROADMAP_FINAL v2.0+
 
 > **现行效力**：桌面优先与本地存储决策仍有效。本文将 Web 描述为协作/发布服务的部分已由 [ADR-029](./029-desktop-only-build-target.md) 取代：桌面是唯一发行目标，协作/发布面不在当前产品范围。
 

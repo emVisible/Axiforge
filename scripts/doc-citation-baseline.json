@@ -1,10 +1,10 @@
 {
   "allow": [
-    "docs/REFACTOR_DESKTOP.md → apps/web/src/features/studio/components/ScriptEditor.tsx:572 #d180294a04",
-    "docs/REFACTOR_DESKTOP.md → apps/web/src/features/studio/components/ScriptEditor.tsx:572 #4a774e75fc",
-    "docs/REFACTOR_DESKTOP.md → apps/web/src/features/studio/components/ScriptEditor.tsx:574 #f1e036c766",
-    "docs/REFACTOR_DESKTOP.md → packages/axs/src/parse.ts:391 #29a53ccc87",
-    "docs/REFACTOR_DESKTOP.md → packages/axs/src/parse.ts:417 #6c1fe9cabc"
+    "docs/REFACTOR.md → apps/web/src/features/studio/components/ScriptEditor.tsx:572 #d180294a04",
+    "docs/REFACTOR.md → apps/web/src/features/studio/components/ScriptEditor.tsx:572 #4a774e75fc",
+    "docs/REFACTOR.md → apps/web/src/features/studio/components/ScriptEditor.tsx:574 #f1e036c766",
+    "docs/REFACTOR.md → packages/axs/src/parse.ts:391 #29a53ccc87",
+    "docs/REFACTOR.md → packages/axs/src/parse.ts:417 #6c1fe9cabc"
   ],
   "_note": [
     "文档里的悬空引用；清偿后应缩短。键 = 文档 → 目标:行号 # 所在句子的指纹（不含文档行号，见脚本头）。",

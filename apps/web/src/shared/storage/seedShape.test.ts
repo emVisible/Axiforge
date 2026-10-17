@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  * 不是内容校验、也不是"这些字段该有的都在"——恰恰相反：实测随包三份
  * `project.json` 只有 `axsSource/edges/meta/nodes/roles/scenes`，
  * 而后端权威定义 `seed_showcase.py:209` 给示范作① 写了 `play_meta.glossary`。
- * 也就是说包里那份内容不是按当前定义导出来的，两份已经不一致（见 REFACTOR_DESKTOP 的 S13-6 第 2 条）。
+ * 也就是说包里那份内容不是按当前定义导出来的，两份已经不一致（见 REFACTOR 的 S13-6 第 2 条）。
  *
  * 这份用例的作用是把漂移钉成一个**会变的清单**：
  * - 少了清单之外的字段 → 红（随包内容被进一步截断，比如导出器改了投影）；

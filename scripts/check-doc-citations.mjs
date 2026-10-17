@@ -98,7 +98,7 @@ const SRC_EXT = /\.(ts|tsx|py|json|mjs|rs|bash|sh|yml|yaml|md)$/;
  * 「仓外未纳管」档（2026-10-10 加，由干净 clone 对照逼出来的）。
  *
  * 起因：`pnpm gates` 在这台机器上 0，在同一条 commit 的干净 clone 上 **FAIL**——
- * ADR-028 与 REFACTOR_DESKTOP 引的 `engines.py`／`gateway.py`／`store.py` 住在隔壁那个
+ * ADR-028 与 REFACTOR 引的 `engines.py`／`gateway.py`／`store.py` 住在隔壁那个
  * **未纳管的 `Clearance/`** 里。本机磁盘上有它 ⇒ 落进 `skippedHit`；clone 上没有 ⇒ 同样的
  * 引用落进 `missing`。**一个事实两种读法，就是"这台机器的读数"本身**。
  *

@@ -1,7 +1,7 @@
 # Build Blueprint v1.10 | Status: confirmed → executing（M1 ✓ · M2 ✓ · M3 进行中 · 已产出逐功能去留清单）
 
 > 日期 2026-09-25 · 分支 `desktop` · 基线 `af8ef81`（tag `desktop-v0.7` 之后）· 主题 **演绎内核：AXS 单一语法 + 创作端 AI 辅助**
-> 关联 [ADR-024](docs/ADR/024-desktop-local-first.md)、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR_DESKTOP.md](docs/REFACTOR_DESKTOP.md)、[归档 ROADMAP_FINAL.md](docs/archive/ROADMAP_FINAL.md) M3
+> 关联 [ADR-024](docs/ADR/024-desktop-local-first.md)、[KERNEL_DESIGN.md](docs/KERNEL_DESIGN.md) §2.5、[REFACTOR.md](docs/REFACTOR.md)、[归档 ROADMAP_FINAL.md](docs/archive/ROADMAP_FINAL.md) M3
 > 人类裁决四条（本轮对齐结果，不再重开）：① 语义=AXS 语法层的创作端 AI 辅助（不是运行时即兴）；② TS 为真相源 + 双端 golden；③ 冲突策略=只出建议，采纳才落文；④ 桌面纯离线是硬约束，rules 必须独立成拍；⑤ Ollama 走 webview fetch，文档要求用户自配 `OLLAMA_ORIGINS`。
 
 ---

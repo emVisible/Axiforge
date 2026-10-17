@@ -1,12 +1,12 @@
 # web 端退役：恢复锚点与还原手册
 
 > 2026-09-26 · 服务于「去掉 web 端、只保留桌面端」这一步及后续所有删除动作。
-> 配套：[归档盘点 WEB_FEATURE_DISPOSITION](./archive/WEB_FEATURE_DISPOSITION.md)（逐功能去留快照；当前执行清单以 [REFACTOR_DESKTOP](./REFACTOR_DESKTOP.md) 为准）。
+> 配套：[归档盘点 WEB_FEATURE_DISPOSITION](./archive/WEB_FEATURE_DISPOSITION.md)（逐功能去留快照；当前执行清单以 [REFACTOR](./REFACTOR.md) 为准）。
 > 规则：**任何删除 web 路径或后端的提交，都必须能在本文件的锚点上回滚**；锚点若失效，先修锚点再动手。
 
 ## 为什么先立这份文件
 
-`desktop` 分支接下来要做的不是加功能，而是**删**：删浏览器部署目标、可能删 FastAPI 后端与 Postgres、
+接下来要做的不是加功能，而是**删**：删浏览器部署目标、可能删 FastAPI 后端与 Postgres、
 删 HTTP-only 代码路径。删除类工作唯一的保险是事前可回滚，而不是事后靠 reflog 抢救。
 
 ## 三个锚点（已交叉验证，非推定）

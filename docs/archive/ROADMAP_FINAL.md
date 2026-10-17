@@ -4,7 +4,7 @@
 > **最后更新**：2026-07-07
 > **文档关系**：本文是 v1.x 执行基准；**v2 阶段（结构重组 / 叙事核心 / 中台 / 治理）的执行基准已移交 [`REFACTOR_V2.md`](./REFACTOR_V2.md)**；`VISION_AND_BRIDGES.md` 保留为架构诊断与愿景论证；`REFACTOR_PLAN.md` 为已完成的 v1.0 历史；偏离记入 `docs/ADR/`。
 
-> **状态（2026-09-30）**：历史战略记录，不是当前待办或执行基准。桌面唯一产品边界与现行工作项以 [`REFACTOR_DESKTOP.md`](../REFACTOR_DESKTOP.md) 和 [ADR-029](../ADR/029-desktop-only-build-target.md) 为准；本文中的 Web 平台、社群与跨作品生态路线已冻结，保留仅供追溯决策演进。
+> **状态（2026-09-30）**：历史战略记录，不是当前待办或执行基准。桌面唯一产品边界与现行工作项以 [`REFACTOR.md`](../REFACTOR.md) 和 [ADR-029](../ADR/029-desktop-only-build-target.md) 为准；本文中的 Web 平台、社群与跨作品生态路线已冻结，保留仅供追溯决策演进。
 
 ---
 

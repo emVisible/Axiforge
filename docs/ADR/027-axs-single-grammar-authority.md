@@ -2,7 +2,7 @@
 
 **状态**：已采纳
 **日期**：2026-09-25
-**关联**：[ADR-016](./016-axs-narrative-language.md)（AXS 语法定义；全局文本优先已由 ADR-025 修订）、[ADR-015](./015-ai-assisted-creation.md)（规则优先 + 可选 LLM）、[ADR-020](./020-llm-multi-provider-local-first.md)、[ADR-025](./025-axs-peer-dual-view.md)、[ADR-024](./024-desktop-local-first.md)、执行件 `BLUEPRINT_v1.0.md`、[REFACTOR_DESKTOP](../REFACTOR_DESKTOP.md) Phase 9 前置
+**关联**：[ADR-016](./016-axs-narrative-language.md)（AXS 语法定义；全局文本优先已由 ADR-025 修订）、[ADR-015](./015-ai-assisted-creation.md)（规则优先 + 可选 LLM）、[ADR-020](./020-llm-multi-provider-local-first.md)、[ADR-025](./025-axs-peer-dual-view.md)、[ADR-024](./024-desktop-local-first.md)、执行件 `BLUEPRINT_v1.0.md`、[REFACTOR](../REFACTOR.md) Phase 9 前置
 
 ## 背景
 

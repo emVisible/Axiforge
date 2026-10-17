@@ -102,7 +102,7 @@ export const useCreateCharacter = () => {
         // （`SqliteStorageProvider` 的第三个构造参数就是 `getCreatorId()`），
         // 角色是唯一没有的。核心里补那条兜底要动两个后端的构造参数，
         // 而这条 hook 是唯一活路径、且调用方本来就传对了 ⇒ **先改这一行**（确定的缺陷、零风险），
-        // 核心里那条不对称登记为待决（见 REFACTOR_DESKTOP 第六节）。
+        // 核心里那条不对称登记为待决（见 REFACTOR 第六节）。
         const authorId = data.author_id ?? getCreatorId();
         const r = await p.saveCharacter(
           toStored({

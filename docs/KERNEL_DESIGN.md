@@ -1,7 +1,7 @@
 # Axiforge 内核设计规约（Kernel Design）
 
 > **文档性质**：`packages/editor-core`（L2–L4）的构建规约——先于实现存在的底层契约。
-> **上位**：[ADR-024](./ADR/024-desktop-local-first.md)、[ADR-025](./ADR/025-axs-peer-dual-view.md)；执行计划见 [REFACTOR_DESKTOP.md](./REFACTOR_DESKTOP.md)。
+> **上位**：[ADR-024](./ADR/024-desktop-local-first.md)、[ADR-025](./ADR/025-axs-peer-dual-view.md)；执行计划见 [REFACTOR.md](./REFACTOR.md)。
 > **设计立场**：Linux 内核式——机制与策略分离；内核不知道 UI，UI 不知道存储。上层的表现与维护成本由本层的决定预先锁定。
 > **日期**：2026-08-26 · 状态：已评审采纳（随 Phase 1 实现演进，签名变更须回写本文）
 

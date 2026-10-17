@@ -10,7 +10,7 @@
 
 > **更新日期**：2026-09-30
 > **用途**：新会话或接手者快速建立当前产品边界、工作区状态、可执行下一步与安全限制。
-> **本文件是状态索引，不复制长篇实现记录**：执行项以 [`REFACTOR_DESKTOP.md`](./REFACTOR_DESKTOP.md) 为准；产品决策以 ADR 为准；本文件记录最新已验证状态和接手顺序。
+> **本文件是状态索引，不复制长篇实现记录**：执行项以 [`REFACTOR.md`](./REFACTOR.md) 为准；产品决策以 ADR 为准；本文件记录最新已验证状态和接手顺序。
 
 ## 1. 一句话产品定义
 
@@ -25,7 +25,7 @@
 - **同一编辑模型**：Draft/IR 是编辑期语义模型；剪辑、剧本、结构是同一作品的协同投影。AXS 不是全局优先的持久化真相源；冲突策略见 [ADR-025](./ADR/025-axs-peer-dual-view.md)。
 - **AXS 分支引用**：工程内部目标 ID 序列化时映射为 Beat 标题；空 choice 行是合法的未完成编辑态。实现与回归见 `packages/axs`、`packages/editor-core`。
 - **桌面本地优先**：Tauri + SQLite + 本地素材 + `.axsp`。任何服务端退场遵循“先替代、后删除”和“验收基线先搬迁”。
-- **现行执行清单**：[`REFACTOR_DESKTOP.md`](./REFACTOR_DESKTOP.md)。[`KERNEL_DESIGN.md`](./KERNEL_DESIGN.md) 是 editor-core 契约；[ADR-024](./ADR/024-desktop-local-first.md) 的 Web 协作/发布部分已由 ADR-029 修订。
+- **现行执行清单**：[`REFACTOR.md`](./REFACTOR.md)。[`KERNEL_DESIGN.md`](./KERNEL_DESIGN.md) 是 editor-core 契约；[ADR-024](./ADR/024-desktop-local-first.md) 的 Web 协作/发布部分已由 ADR-029 修订。
 
 ## 3. 入口与开发命令
 
@@ -38,7 +38,11 @@
 
 ## 4. 当前工作区状态
 
-工作分支是 `desktop`。重构文件仍在未提交工作区；**不要假设该状态已提交或可从远端恢复**。本轮已验证的改动包括：
+**这一段曾是"工作分支是 `desktop`，重构文件仍在未提交工作区；不要假设该状态已提交或可从远端恢复"——
+那句话现在不成立，且是别人替它作废的**：2026-10-10 前后有一次外部提交把这一串重构
+（`1b9ca06` → `4bdb4fb`，十三笔）提交并推送了。⇒ **接手第一件事是 `git log --oneline -15` 重新取读数，
+不要引用本文件里的历史数字**。2026-10-18 复核：主线已由 `desktop` 快进合并进 `main`。
+本轮已验证的改动包括：
 
 - 默认 dev/build 入口桌面化；README 与旧战略文档补上桌面产品边界。
 - AXS choice 目标从节点 ID 映射为 Beat 标题；空 `>` 不再静默降级为旁白。
@@ -68,7 +72,7 @@
 「质量要求」补一条"round-trip 必须覆盖同名的两种寻址形态、双向各测一次"；`docs/ADR/027` 的方言对照表后加交叉引用（表格按决策时实态保留）。
 **判据**：`grep -o "消歧\|同名\|序号\|标题唯一"` 在这两份 ADR 的 **HEAD 版各命中 0 次**——
 即 #68/#69 所依据的规则此前只存在于代码与测试里。这类"契约只活在实现层"的缺口，
-下一轮把 `idToBeatRef` 改回裸标题不会撞任何门禁，只会第三次静默换靶。明细见 `docs/REFACTOR_DESKTOP.md` Phase 13 末。
+下一轮把 `idToBeatRef` 改回裸标题不会撞任何门禁，只会第三次静默换靶。明细见 `docs/REFACTOR.md` Phase 13 末。
 同轮另在 `docs/KERNEL_DESIGN.md` §2.4 补一条 `> 状态（2026-09-30）`：那张迁移表把 `axsToSyncPayload` 与 `axs.import` 画成**一行归宿**，
 实态是两套实现（`axsImport.ts:56` 的 `importAxsDraft` 操作 Draft；`projection.ts:96,102` 的 `axsToSyncPayload` → `projection/axs.ts:170` 的 `parseAxsToPlan` 产出同步载荷）。
 按该文件末尾"不允许沉默漂移"的规矩回写了实态与临时保险（`document.test.ts:385` 的配对判据），**归并仍属 S13-7、等定档**。
@@ -114,7 +118,7 @@
 判据四条（映射两支 + 打印回到 `>=` + `coins=10` 的六格边界）；Python 侧**无测试覆盖 `_compare`**，改用 `backend/.venv/bin/python` 直调取数，
 与 TS 端逐位一致（`10 gte 10 True / 9 gte 10 False / 10 lte 10 True / 11 lte 10 False / 10 gt 10 False`）。
 文档同轮：ADR-016 加「补记 2026-10-01」两条、`docs/user/writing/axs-syntax.md` 补「键名写在冒号右边」与「认不出的方括号」容错条目、
-`>=`/`<=` 含边界这句今天才第一次真成立、`backend/.../narrative/models.py:188` 的 IR 运算符白名单注释跟上。明细见 `docs/REFACTOR_DESKTOP.md` Phase 13 末「第二十四次续做」。
+`>=`/`<=` 含边界这句今天才第一次真成立、`backend/.../narrative/models.py:188` 的 IR 运算符白名单注释跟上。明细见 `docs/REFACTOR.md` Phase 13 末「第二十四次续做」。
 
 同日第八批（**新增一条文档↔实现的机检通路**，仍未提交）：把 `docs/user/writing/axs-syntax.md` 的 **12 个 `axs` 示例**变成被测对象
 （新文件 **`packages/axs/src/doc-examples.test.ts`**，26 条判据：取块数量守卫 / 每块 0 error 诊断 / **`printAxs` 是纯函数** / 每块往返结构一致）。
@@ -123,7 +127,7 @@
 但"打印不改输入"是契约。变异证据：装回 stamp ⇒ 纯度那条红（「示例 L16 被打印改写了」）+ 往返三条红（4 failed）。
 **② 有权衡的不一致已登记为待决**——打印会把"指向下一拍的顺序边"物化成 `-> 标题` 行；
 我先实现"不物化"并跑绿（axs 76），既有契约断言 `projection.test.ts`「线性链按拓扑序打印…边打印为 -> 标题」随即变红，
-据此改判为**决策层两难**（显式化 ⇒ 中间插拍不自动接链；隐式化 ⇒ 移动节点静默重连），已撤回语义改动、判据只摘掉 `jumps` 这一维并注释点名工单（**引用用标题不用编号**，本轮编号漂移过一次）。明细见 `docs/REFACTOR_DESKTOP.md`「第二十六次续做」。
+据此改判为**决策层两难**（显式化 ⇒ 中间插拍不自动接链；隐式化 ⇒ 移动节点静默重连），已撤回语义改动、判据只摘掉 `jumps` 这一维并注释点名工单（**引用用标题不用编号**，本轮编号漂移过一次）。明细见 `docs/REFACTOR.md`「第二十六次续做」。
 
 同日第九批（**又回到解析器：演出指令的取值集合**，仍未提交）：文档列的 `@` 指令清单与解析器认识的清单逐项对过（两边一致，`@item` 文档已明说不提供），
 但顺着读 `parseDirectiveLine` 读出今天一直在那一族里的形状——**吃下任意拼写再用 `as` 把类型圆过去**：
@@ -136,7 +140,7 @@
 里这四族只出现 `fade`/`dissolve`/`rain`/`none`/`zoom` 与裸指令行，**0 处落进新分支** ⇒ 零误报上线。
 棘轮再挡一次（加分支会让 `parse.ts` 越过 420 档），于是把**演出指令取值**一族 11 个 `case` 外提成 **`packages/axs/src/instructions.ts`**（170 行，含 `resolveRole`——
 立绘指令与对白行共用同一个"角色名→id"解析，留在 `parse.ts` 会让新模块回头依赖而成环），`parse.ts` 落到 **330** 行。
-`ADR-027` 表里 `parse.ts:234-318` 那族行号随之失效，已按"历史文本不重写"另起带日期的补记指明新落点。明细见 `docs/REFACTOR_DESKTOP.md`「第二十七次续做」。
+`ADR-027` 表里 `parse.ts:234-318` 那族行号随之失效，已按"历史文本不重写"另起带日期的补记指明新落点。明细见 `docs/REFACTOR.md`「第二十七次续做」。
 
 同日第十批（**只动测试与文档，产品代码未改**，仍未提交）：读到对白分隔符那一处——`parseDialogueLine` 的正则只认半角冒号，
 全角 `堰纱：你来了。` 整行落进旁白兜底（说话人丢失、前缀照原样进玩家端）。这条规则此前只在 ADR-027 方言对照表与代码里，**用户文档与判据都没提**。
@@ -145,7 +149,7 @@
 落地的两件不需定档的事：`docs/user/writing/axs-syntax.md` 的对白段写清规则（含"`旁白：xxx` 是合法整行旁白"这半句），
 `parse.test.ts` 新两条特征化断言（全角支 + 半角对照组；变异证据：正则临时改 `[:：]` ⇒ `expected ['say'] to deeply equal ['narration']`）。
 warning 本体登记为待决（工单「全角冒号对白被静默当旁白」，三条候选各自的前置条件写在工单里）。
-同轮还纠正一次取证：三份 `.axsp` 报 `BadZipFile` 不是产物坏了，是 `rglob` 把 `target/` 里的 brotli 构建副本扫进了面（真随包文件魔数 `504b`，副本 `1b…`）——**扫描面要先分"跟踪文件 vs 构建目录"**。明细见 `docs/REFACTOR_DESKTOP.md`「第二十八次续做」。
+同轮还纠正一次取证：三份 `.axsp` 报 `BadZipFile` 不是产物坏了，是 `rglob` 把 `target/` 里的 brotli 构建副本扫进了面（真随包文件魔数 `504b`，副本 `1b…`）——**扫描面要先分"跟踪文件 vs 构建目录"**。明细见 `docs/REFACTOR.md`「第二十八次续做」。
 
 同日第十一批（**动了发射器**，仍未提交）：查 `draftFromProse` 的 `defaultSpeaker` 生不生效，顺出两层。
 ① 那条 `!i.speaker` 补默认名的分支**永不点火**（唯一生产者 `proseToScriptDraft` 的正则要求名字非空才成 `say`）；
@@ -158,14 +162,14 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 转义规则顺手归一：新增 `printNarrationLine` 一份，`narration` 与这一支共用。
 判据三条（`parse.test.ts` 新 describe，RED 先跑 `expected '# 测试\n: 你来了。\n' to be '# 测试\n你来了。\n'`，对照组一开始就绿）；
 **改断言不删断言**再一例：`projection.test.ts:107` 那条基线原本钉的就是坏输出（注释写着「既有行为，基线钉住」），已按新预期改写并留日期与原因，对 `> 东 -> 东方` 的钉原样保留。
-末轮：`gates` **0**、单测 **548 passed + 1 skipped**（axs 86）、`e2e:desktop` **37**、`e2e` **50**。明细见 `docs/REFACTOR_DESKTOP.md`「第二十九次续做」。
+末轮：`gates` **0**、单测 **548 passed + 1 skipped**（axs 86）、`e2e:desktop` **37**、`e2e` **50**。明细见 `docs/REFACTOR.md`「第二十九次续做」。
 
 同日第十二批（**只动测试数据与注释，产品代码未改**，仍未提交）：先查证"两端共享向量锁等价"有没有执行者——有：`ci.yml:88` 在 `working-directory: backend` 跑 `uv run pytest tests/`，
 `backend/tests/test_axs_draft_vectors.py` 消费同一批 `testdata/axs-draft/*.json`，且它只断言"发射器 reproduces 手写期望文本"（合法性由 TS canonical 解析器裁决，不拿 Python 自己的正则自证）。
 缺的是覆盖面：补第五条向量 `unknown-speaker.json` 锁住"认不出的名字不猜角色"这条双端同裁决，
 并把那条易漂细节钉死——**两端都固定用全角 `：` 重新拼接，与输入冒号种类无关**（TS 的注释此前写"保留全角冒号原样"，对半角输入不成立，已改写并把注释移进所属分支）。
 牙齿各验一侧（成对变异）：两端同时改半角 ⇒ TS `1 failed | 5 passed` 红在该条、Python `test_rules_emitter_reproduces_vector[unknown-speaker]` 红；还原后两端各自全绿。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十次续做」。
+明细见 `docs/REFACTOR.md`「第三十次续做」。
 
 同日第十三批（**只动测试**，仍未提交）：又抓到一处发射侧静默丢失，比前几处更重——
 `printBeatBody` 用 `script.find(op === "choice")` **只取第一个分支组**，第二个组连同选项一起消失且无诊断。
@@ -174,7 +178,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 「分支」就在指令面板里（`instructionOps.ts:21,58`）⇒ 连点两次即成立。
 三条候选修法各自动不同层（合并成一组／扩语法支持多组／发射侧加诊断），**都需要产品决策**，故本轮只落不需定档那半：
 `roundtrip.test.ts` 新增一条特征化断言钉住当前实态（注释写明修法定了要**改写而不是删除**它），并把三种修法与代价登记为待决（我建议 ③：先止住静默，代价是要给 `printAxs` 加一个可选诊断出参）。
-末轮：`gates` **0**、单测 **550 passed + 1 skipped**（axs 88）。明细见 `docs/REFACTOR_DESKTOP.md`「第三十一次续做」。
+末轮：`gates` **0**、单测 **550 passed + 1 skipped**（axs 88）。明细见 `docs/REFACTOR.md`「第三十一次续做」。
 
 同日第十四批（**新增一道门禁**，产品代码未改，仍未提交）：`scripts/check-doc-citations.mjs` 把文档里的 `路径:行号` 变成机检对象——
 **文件必须存在、行号必须落在文件长度内**（动因就是今天这三次按域外提把 `parse.ts` 从 600 行压到 331 行，旧坐标会指到文件外面）。
@@ -184,21 +188,21 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 真信号 12 条越界：现状类 **9 条已改到真实落点**（`assignBeatIds`/`titleToId`/两条 warning → `edges.ts:36/46/84/103`；分派四支 → `parse.ts:142/297/303/312`；`axsImport.ts:57-63`），
 历史日志类 **3 条不改写**、冻结进 `scripts/doc-citation-baseline.json`（注"清偿后应缩短"）。
 接线三处同轮：`package.json` 新增 `check:citations` 并插进 `gates`（链 **11 → 12 条**）、`README.md` 门禁表补一行、脚本头写自报限度。
-末轮 `pnpm gates` 退出码 **0**（含新那一道 OK）、单测维持 **550 passed + 1 skipped**。明细见 `docs/REFACTOR_DESKTOP.md`「第三十二次续做」。
+末轮 `pnpm gates` 退出码 **0**（含新那一道 OK）、单测维持 **550 passed + 1 skipped**。明细见 `docs/REFACTOR.md`「第三十二次续做」。
 
 同日第十五批（**一条线按证据作废，无代码改动**）：追「`reverseRole` 反解失败会把内部 id 印进作者文本」这条线，命中的前提是"角色被解绑后节点仍引用它"。
 内核确实留悬空引用（`role.remove` 只过滤 `draft.roles`），但**先跑对照组**：全仓 grep 分派点后，
 `role.remove` 只在内核与其单测里出现，而同联合的 `node.move` / `script.patch` 在 `apps/web/src` 有真实 dispatch 点 ⇒ **界面从不解绑角色，该路径今天不可达**。
 处置是**不修也不加防御分支**（为不可能的输入加提示，正是今天反复拆的那一类），
 并把真正值得留册的东西登记下来：**内核有 `role.remove` 能力、界面没有入口**——若将来补这个 UI 动作，必须同时决定"仍在引用该角色的节点怎么办"
-（清空成无名台词 / 退回旁白 / 阻止移除并列出引用点），且它会撞上今天定的"无说话人的 `say` 发射为旁白"那条。明细见 `docs/REFACTOR_DESKTOP.md`「第三十三次续做」。
+（清空成无名台词 / 退回旁白 / 阻止移除并列出引用点），且它会撞上今天定的"无说话人的 `say` 发射为旁白"那条。明细见 `docs/REFACTOR.md`「第三十三次续做」。
 
 同日第十六批（**只动测试与文档**，仍未提交）：拿三份**真实随包 `.axsp`** 量了一次 `unpack → pack → unpack`，project 逐字节一致、角色数守恒 ⇒ 无缺陷，
 但这条不变量在**容器层 + 真实产物**这个组合上没人走（**同日 03:21 更正**：我原写"此前没人守"是过强断言——`axspRoundTrip.test.ts` 早在 S13-2 就在 provider 层守着更强的 `exportProjectAsAxsp → importProjectFromAxsp` 字段守恒，只是输入是合成数据、不读随包文件；我按符号 `packAxsp` 扫，漏了包装函数）。补 4 条判据把它钉住：
 逐份断言再读回的 project / characters / manifest.assets 相等，另加"清单声明的素材必须真在包里"与一条"目录里有三份"的数量守卫（防空载）。
 牙验过：临时让 `packAxsp` 序列化时给标题加后缀 ⇒ 新增 3 条全红，还原后 18 passed。**如实说**：该变异也被既有两条夹具判据抓到，
 所以新增价值在输入类别（真实产物、归一化后的形态）而非新代码路径。末轮 `gates` **0**、单测 **556 passed + 1 skipped**（editor-core 163）。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十五次续做」。
+明细见 `docs/REFACTOR.md`「第三十五次续做」。
 
 同日第十七批（**新增一份测试 + 一处注释纠偏**，产品逻辑未改，仍未提交）：把桌面**生产后端**那条接缝钉进单测——`TauriSqlBackend` 此前**一条判据都没有**，
 而 I4（`saveNarrative` 原子覆写）在生产上的保障全压在那个文件的三个形状里，桌面壳又零 CI 信号。
@@ -217,7 +221,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 立刻重跑同一份代码 → **37 passed**；机制就是本文件 §6 待决清单里「自动存档的 600ms 防抖窗口」那条（写入被测试自己的快速离开清掉），
 **那是它的第 2 次观测，不是回归也不是新缺陷** ⇒ 登记成一条限度：那格定档前 `e2e:desktop` 的读数不能当"全绿信号"引用。我没改产品语义也没放宽断言。
 末轮：单测 **563 passed + 1 skipped**（web 181 → **188**）、`e2e:desktop` **37 passed**、`e2e` **50 passed**（03:43 两半各一次，退出码 0，`.e2e-lock` 不存在）。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十六次续做」。
+明细见 `docs/REFACTOR.md`「第三十六次续做」。
 
 同日第十八批（**一处运行时 fail-closed + 3 条判据**，仍未提交）：把上一批留在注释里的那条前提升成代码守的——`translatePlaceholders` 的唯一正确性依赖是
 "SQL 字面量里不含 `?`"，此前它只是注释 + 一次测量（66/0）。不建扫描型门禁（扫不到动态拼接，报的是假安全感），改建运行时守卫：
@@ -229,7 +233,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 **一条范围声明**：这一刀 e2e 两套都加载不到该模块（chromium 里 `isTauriEnvironment()` 为 false ⇒ 走 Memory 支；这条分派条件是上一批刚钉的第 7 项，
 所以"测不到"是有判据的说法不是推测），真壳内行为仍只有 DEV 冒烟覆盖——这也是选"抛"不选"记 warning"的理由：抛会被 Provider 收成 `io` 错误、界面可读。
 末轮：`gates` **0**（13 道，`[file-size]` 348 文件 0 越线）、单测 **566 passed + 1 skipped**（web 188 → **191**）、`git diff --check` 0 行。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十七次续做」。
+明细见 `docs/REFACTOR.md`「第三十七次续做」。
 
 同日第十九批（**一处改判 + 一个新测试文件（7 条）**，仍未提交）：桌面素材落盘 `TauriAssetStore` 也是**零判据的生产模块**（契约套件跑 Memory/sql.js，e2e 两套加载不到它）。
 读实现时撞上一条**已发布但站不住的 ADR 决策**：`ADR-026` 后果里写「非安全上下文退化为 FNV 内容键，仅用于去重不承担安全语义（代码内已写明）」——
@@ -241,7 +245,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 外部 URL 的 ref 不去拼路径、缺文件 not_found、读失败 io。**牙＝三次成对变异**：恢复兜底 ⇒ 1 红（红法正是"降级写会成功"）；摘要换成非加密键 ⇒ 2 红；去掉 `exists` 守卫 ⇒ 1 红。
 **改判的分寸**：没改写 ADR-026 那行历史，而是在其末尾**另起带日期的补记**（依据＝两条在册契约相撞、判据与变异读数、并把"保留兜底但显性化"的替代修法留给用户定档）；
 用户文档同轮补一句失败行为。改动局限在 `contentDigest` 一条分支 + `write` 一个 try，回退成本低。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十八次续做」。
+明细见 `docs/REFACTOR.md`「第三十八次续做」。
 
 同日第二十批（**只动文档，产品代码一字未改**，仍未提交）：把一条**在册的产物层"实测"证伪其取证方法**，再带对照组重证一次。
 被审的对象是 REFACTOR 里那条「生产产物不含 DEV 测试宿主 `?storage=memory`」——它已经历过一次更正（从 `strings` 二进制换成 grep dist），
@@ -251,7 +255,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 **并配两道对照**：① 同一个 chunk（`ui-*.js`，存储代码实际落处）里 `axiforge.db` 命中 1 次；② 产物里能看到 react-router 原样保留的 `URLSearchParams(a.search)` 与 `.getAll(\`index\`)`，
 证明构建不改写 `X.get("字面量")` 这种形状。结论不变（DEV 宿主确实没进产物），证据第一次成立。
 同轮把那条引用里指错位置的行号校正（原写 `139,143`，139 落在注释里；改成 `apps/web/src/shared/storage/index.ts:143,144`）。
-**方法收成一句**：验"某串没进产物"之前先问这个串在原代码里长什么样——文档里的措辞不是可搜索的字面量。明细见 `docs/REFACTOR_DESKTOP.md` 该项的「补记（2026-10-01 04:00）」。
+**方法收成一句**：验"某串没进产物"之前先问这个串在原代码里长什么样——文档里的措辞不是可搜索的字面量。明细见 `docs/REFACTOR.md` 该项的「补记（2026-10-01 04:00）」。
 
 同日第二十一批（**改门禁本体**，仍未提交）：上一批写作之后 `check:citations` 报 **3 条新增**，而那 3 条全是在册的历史引用——
 基线键里带着**文档行号**，我插入的段落把它们顶下去十几行，于是"写文档"这件事本身在制造假红。
@@ -274,7 +278,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 "要不要给契约补 `deleteCharacter`" 是**待决 ⑬**，它和今天在册的"内核有 `role.remove` 能力、界面没入口"共享同一个前置问题：仍在被引用的对象怎么办。
 两条测试宿主教训：node 无 `localStorage` 时 `getCreatorId()` **每次返回新 id**（壳里不是，非产品缺陷），不桩定它就会红在宿主上；
 不带范围的 `listCharacters()` 只回**公开**角色，而导入角色不继承公开位——读错范围会把残留伪装成"没有残留"，故同时钉住"带 authorId 有 1 个、公开面 0 个"。
-明细见 `docs/REFACTOR_DESKTOP.md`「第四十次续做」。
+明细见 `docs/REFACTOR.md`「第四十次续做」。
 
 同日第二十三批（**归一两条通路的策略 + 2 条判据**，产品行为按已定语义收敛，仍未提交）：把待决里"S13-7 两套 AXS→图 要不要归并"对着当前代码核了一遍——
 清单原来写的"`beatToNarrative` 与 `beatToNarrativeData` 是否逐字段等价未核对"**已经指不到东西**（那个符号今天早些时候的归一里已经不在了），
@@ -287,7 +291,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 **归一类判据双向取证**：把通路二钉回旧策略 ⇒ 恰好 1 红并点名 `keep-2` vs `keep-1`（而旧配对判据仍绿，这就是新夹具的理由）；
 把共享谓词放宽成"任何 id 都可复用" ⇒ 6 红，新那条在名单里。两次都以备份原样还原，还原后 36 passed、`tsc --noEmit` 0。
 S13-7 那条待决因此**只剩外层循环与返回形状是否合成一个**（映射、落位、id 判定、同名策略四处已同源），§6 已按实态改写。
-末轮：`gates` **0**、单测 **584 passed + 1 skipped**（editor-core 163 → **165**）、`e2e:desktop` **37 passed**（改动落在 Writer 保存路径，所以点击层重量一次）、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十一次续做」。
+末轮：`gates` **0**、单测 **584 passed + 1 skipped**（editor-core 163 → **165**）、`e2e:desktop` **37 passed**（改动落在 Writer 保存路径，所以点击层重量一次）、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十一次续做」。
 
 同日第二十四批（**上线第 14 道门禁 `check:seams` + 补一份判据**，产品代码一字未改，仍未提交）：本会话手工发现过三次"桌面生产模块零判据"（事务形状、摘要降级、导入回滚），
 所以把那个共同特征变成棘轮。判据特征选得机械可判：**直接 `import` 了 `@tauri-apps/*` 的模块只在壳里跑到**，而壳零 CI 信号、契约套件只跑 Memory/sql.js。
@@ -300,14 +304,14 @@ S13-7 那条待决因此**只剩外层循环与返回形状是否合成一个**�
 腿三还原 ⇒ OK 且 `--update` 可缩短。**退出码单独取**（上一条管道里 `$?` 拿到的是 `head` 的）：桩文件在时 **1**、删净后 **0**。
 `assetContext` 那 5 条也验过牙：把 `localRoot ? convertFileSrc : undefined` 摘成 `undefined` ⇒ **恰好 1 红**（红在"asset 协议没被调用"）。
 接线三处同轮：`package.json` 的 `check:seams` + `gates` 链（**13 → 14 道**）、`README.md` 门禁表补一行、脚本头写自报限度。
-末轮：`gates` **0**（14 道）、单测 **589 passed + 1 skipped**（web 207 → **212**）、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十二次续做」。
+末轮：`gates` **0**（14 道）、单测 **589 passed + 1 skipped**（web 207 → **212**）、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十二次续做」。
 
 同日第二十五批（**分派口补判据，接缝基线 2 → 1**，产品代码一字未改，仍未提交）：上一批留给我的那条"分派口 `index.ts` 要 mock 六个模块"，真去做之后结论变了——只替换本地五个模块即可（`@tauri-apps/*` 一个都不碰），editor-core 两个真 Provider 直接跑。
 新增 `index.test.ts` **4 条**，钉三条只有工厂知道的不变量：① **素材根目录必须先于播种登记**（晚一秒 ⇒ 首启播种的立绘解析成空串，图不出现且无错误可查）；② 播种每进程一次 + `getStorageProvider()` 每次同实例；③ `?storage=memory` **只替代存储不替代壳能力**（不得去建 `TauriAssetStore`）——这条边界原来只在文档里，现在有机器判据。
 **取证过程值得记**：三次变异有两次**根本没落进去而测试照绿**（第一次 `perl` 模式要求 `&&` 后带空格而源行是换行；第二次命中了**注释里同名的 `import.meta.env.DEV`**）。
 换成只可能命中代码的形状、并**先 `sed` 打印被改行**再跑，才拿到真红。**方法：变异跑绿先怀疑没写进去。** 另一坑：`vi.resetModules()` 后顶层静态 import 的类与工厂用的是两个不同对象，`toBeInstanceOf` 会假红 ⇒ 从同一份新模块图里动态取类。
 三次各红 1 条（顺序／记忆化／短路），每次都 `cp` 原样还原，末了 `git diff --stat index.ts` 为空。文件按门禁命名约定改成 `index.test.ts` ⇒ `check:seams` 当场缩短为"有判据 5、基线 1"（只剩 `desktopSmoke.ts` 带理由在册）。
-末轮：`gates` **0**（14 道）、单测 **593 passed + 1 skipped**（web 212 → **216**）、`[desktop-seams] OK`、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十三次续做」。
+末轮：`gates` **0**（14 道）、单测 **593 passed + 1 skipped**（web 212 → **216**）、`[desktop-seams] OK`、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十三次续做」。
 
 同日第二十六批（**又一份纯判据，产品代码一字未改**，仍未提交）：census 里最后一个"非云、非冒烟"的无判据模块是 `assetRecords.ts`（存储态→传输态投影，两个纯函数）。
 它文件头写着"已知缺席字段，如实标注而非编造"——而这类**刻意的不对称**最容易被"顺手统一"抹掉，代价是界面上出现假事实：
@@ -315,7 +319,7 @@ S13-7 那条待决因此**只剩外层循环与返回形状是否合成一个**�
 补 7 条：两支响应**键集合不多不少**、`ref_count` 的三处不对称（道具**无键** / 舞台**键在值缺** / `view_count` 恒 0）、**数组是拷贝**、可空字段原样透传与两个明说的等式。
 **一条类型系统挡不住的**：`readonly string[]` 直接把引用赋过去照样 `tsc -b` 退出码 0——别名缺陷只有行为判据能挡，所以第 ② 类要写成 `"ref_count" in r` 而不只是比值。
 三次变异都**先 `grep` 出被改行再跑**（上一批的教训当场兑现）：去掉 `effects` 展开 ⇒ 1 红；`ref_count: undefined` → `0` ⇒ 1 红；给道具补 `ref_count: 0` ⇒ 2 红。全部还原、`git diff --stat` 为空。
-末轮：`gates` **0**（14 道）、单测 **600 passed + 1 skipped**（web 216 → **223**）、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十四次续做」。
+末轮：`gates` **0**（14 道）、单测 **600 passed + 1 skipped**（web 216 → **223**）、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十四次续做」。
 
 同日第二十七批（**收口认证 + 把验收①从"不可判"做成一条可判候选**，产品代码一字未改，仍未提交）：
 ① **六条链一次跑齐、退出码逐条单独取**（04:56–04:58）：`gates` 0（14 道）· `test:unit` 600 passed + 1 skipped · `e2e` **50 passed** 0 · `e2e:desktop` **37 passed** 0 · `build:web` 0 · `build:admin` 0 · `check:desktop`（桌面壳 `cargo check`）**0** · 后端 `uv run pytest -q` **167 passed**（3.65s）0。
@@ -728,7 +732,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 
 同日第三十一批（**一次独立复审，107 个改动文件里抓到 6 处「判据够不着它声称守的契约」**，仍未提交）：
 起手假设是"上一轮留下的东西大体可信"，结论不成立。共同形状不是漏写，是**够不着**——三处在产品代码、三处在门禁。
-明细逐条在 `REFACTOR_DESKTOP.md`「补记（2026-10-01，复审）」，这里只留一句索引：
+明细逐条在 `REFACTOR.md`「补记（2026-10-01，复审）」，这里只留一句索引：
 ① `importProjectFromAxsp` 的 `saveAsset` / `saveCharacter` 两个出口**根本没有回滚**（`rollback` 那时还没定义），
 `createProject` 失败会留下整组孤儿角色 ⇒ 修法是把它提到最前，判据从 7 个出口补到 9 个并加一条"枚举与调用点数对账"；
 ② `translatePlaceholders` 的守卫靠正则猜引号边界，看不见标识符与注释里的 `?`，
@@ -805,7 +809,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
   **Writer 面板当场拿到丢过字段的文本**，保存即落盘。**责任用对照组钉死**：同一节点走 `draftToAxs` 直连两个选项都在，
   走画布两个都不在 ⇒ 丢失在画布这层，不在 `buildScriptFromLegacy`。改法＝以 base 持久态为底 + 覆盖已知键。
   牙：旧形状 ⇒ **恰好 1 红**，红的内容就是症状本身。
-- **17 条未复核的线索**按"是什么会 settle 它"逐条登记在 `REFACTOR_DESKTOP.md` 第六节（含 `deleteProject` 不级联、
+- **17 条未复核的线索**按"是什么会 settle 它"逐条登记在 `REFACTOR.md` 第六节（含 `deleteProject` 不级联、
   `saveAsset` 的 ref 含扩展名与契约矛盾、`visibility` 的 `authorId: ""`、`unpackAxsp` 抛 `TypeError`、`remapCharacterIds`
   漏 `relationship` 三段 key 与 `actors` 等）。**不作为结论引用**，也不和上面五条混在同一层待办里——
   否则真正会咬人的那几条会被淹没。
@@ -1737,7 +1741,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 - **README 三处抄数腐烂已换回现测**（这是同一规律第三次应验：抄门禁打印的数就一定会腐烂）：
   死表面面 `285` ⇒ **294**（两行都改，带 16:37／16:47）、`check:citations` 已判定 `216` ⇒ **243**、歧义跳过 `37` ⇒ **18**（带 16:46）。
   其余带日期的读数（labels 205、seams 9/6/99、file-size 349、dispatch 32/26/6）本次复核**仍为真**，未改。
-- `REFACTOR_DESKTOP.md` 补**第五十一次续做**条目，把第六十八…七十二批那段（为什么单独做这一族、分母怎么取、三次自我证伪、
+- `REFACTOR.md` 补**第五十一次续做**条目，把第六十八…七十二批那段（为什么单独做这一族、分母怎么取、三次自我证伪、
   `crypto` getter-only 与 `fileURLToPath` 尾斜杠两个平台形状、归一的双向判据、末轮读数）收在一处。
 - 写作过程中的自查：先写成"那 57 条判据"（按 web 单档 241→309 的差值重数＝**68**）、
   又写"键耦合已在第五十二次关闭"（下一段才是本段）⇒ **数量与交叉引用都要按命令/实际段落重数一遍**，不能顺着手感写。
@@ -2134,7 +2138,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 
 > **更新日期**：2026-09-30
 > **用途**：新会话或接手者快速建立当前产品边界、工作区状态、可执行下一步与安全限制。
-> **本文件是状态索引，不复制长篇实现记录**：执行项以 [`REFACTOR_DESKTOP.md`](./REFACTOR_DESKTOP.md) 为准；产品决策以 ADR 为准；本文件记录最新已验证状态和接手顺序。
+> **本文件是状态索引，不复制长篇实现记录**：执行项以 [`REFACTOR.md`](./REFACTOR.md) 为准；产品决策以 ADR 为准；本文件记录最新已验证状态和接手顺序。
 
 ## 1. 一句话产品定义
 
@@ -2149,7 +2153,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 - **同一编辑模型**：Draft/IR 是编辑期语义模型；剪辑、剧本、结构是同一作品的协同投影。AXS 不是全局优先的持久化真相源；冲突策略见 [ADR-025](./ADR/025-axs-peer-dual-view.md)。
 - **AXS 分支引用**：工程内部目标 ID 序列化时映射为 Beat 标题；空 choice 行是合法的未完成编辑态。实现与回归见 `packages/axs`、`packages/editor-core`。
 - **桌面本地优先**：Tauri + SQLite + 本地素材 + `.axsp`。任何服务端退场遵循“先替代、后删除”和“验收基线先搬迁”。
-- **现行执行清单**：[`REFACTOR_DESKTOP.md`](./REFACTOR_DESKTOP.md)。[`KERNEL_DESIGN.md`](./KERNEL_DESIGN.md) 是 editor-core 契约；[ADR-024](./ADR/024-desktop-local-first.md) 的 Web 协作/发布部分已由 ADR-029 修订。
+- **现行执行清单**：[`REFACTOR.md`](./REFACTOR.md)。[`KERNEL_DESIGN.md`](./KERNEL_DESIGN.md) 是 editor-core 契约；[ADR-024](./ADR/024-desktop-local-first.md) 的 Web 协作/发布部分已由 ADR-029 修订。
 
 ## 3. 入口与开发命令
 
@@ -2162,7 +2166,11 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 
 ## 4. 当前工作区状态
 
-工作分支是 `desktop`。重构文件仍在未提交工作区；**不要假设该状态已提交或可从远端恢复**。本轮已验证的改动包括：
+**这一段曾是"工作分支是 `desktop`，重构文件仍在未提交工作区；不要假设该状态已提交或可从远端恢复"——
+那句话现在不成立，且是别人替它作废的**：2026-10-10 前后有一次外部提交把这一串重构
+（`1b9ca06` → `4bdb4fb`，十三笔）提交并推送了。⇒ **接手第一件事是 `git log --oneline -15` 重新取读数，
+不要引用本文件里的历史数字**。2026-10-18 复核：主线已由 `desktop` 快进合并进 `main`。
+本轮已验证的改动包括：
 
 - 默认 dev/build 入口桌面化；README 与旧战略文档补上桌面产品边界。
 - AXS choice 目标从节点 ID 映射为 Beat 标题；空 `>` 不再静默降级为旁白。
@@ -2192,7 +2200,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 「质量要求」补一条"round-trip 必须覆盖同名的两种寻址形态、双向各测一次"；`docs/ADR/027` 的方言对照表后加交叉引用（表格按决策时实态保留）。
 **判据**：`grep -o "消歧\|同名\|序号\|标题唯一"` 在这两份 ADR 的 **HEAD 版各命中 0 次**——
 即 #68/#69 所依据的规则此前只存在于代码与测试里。这类"契约只活在实现层"的缺口，
-下一轮把 `idToBeatRef` 改回裸标题不会撞任何门禁，只会第三次静默换靶。明细见 `docs/REFACTOR_DESKTOP.md` Phase 13 末。
+下一轮把 `idToBeatRef` 改回裸标题不会撞任何门禁，只会第三次静默换靶。明细见 `docs/REFACTOR.md` Phase 13 末。
 同轮另在 `docs/KERNEL_DESIGN.md` §2.4 补一条 `> 状态（2026-09-30）`：那张迁移表把 `axsToSyncPayload` 与 `axs.import` 画成**一行归宿**，
 实态是两套实现（`axsImport.ts:56` 的 `importAxsDraft` 操作 Draft；`projection.ts:96,102` 的 `axsToSyncPayload` → `projection/axs.ts:170` 的 `parseAxsToPlan` 产出同步载荷）。
 按该文件末尾"不允许沉默漂移"的规矩回写了实态与临时保险（`document.test.ts:385` 的配对判据），**归并仍属 S13-7、等定档**。
@@ -2238,7 +2246,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 判据四条（映射两支 + 打印回到 `>=` + `coins=10` 的六格边界）；Python 侧**无测试覆盖 `_compare`**，改用 `backend/.venv/bin/python` 直调取数，
 与 TS 端逐位一致（`10 gte 10 True / 9 gte 10 False / 10 lte 10 True / 11 lte 10 False / 10 gt 10 False`）。
 文档同轮：ADR-016 加「补记 2026-10-01」两条、`docs/user/writing/axs-syntax.md` 补「键名写在冒号右边」与「认不出的方括号」容错条目、
-`>=`/`<=` 含边界这句今天才第一次真成立、`backend/.../narrative/models.py:188` 的 IR 运算符白名单注释跟上。明细见 `docs/REFACTOR_DESKTOP.md` Phase 13 末「第二十四次续做」。
+`>=`/`<=` 含边界这句今天才第一次真成立、`backend/.../narrative/models.py:188` 的 IR 运算符白名单注释跟上。明细见 `docs/REFACTOR.md` Phase 13 末「第二十四次续做」。
 
 同日第八批（**新增一条文档↔实现的机检通路**，仍未提交）：把 `docs/user/writing/axs-syntax.md` 的 **12 个 `axs` 示例**变成被测对象
 （新文件 **`packages/axs/src/doc-examples.test.ts`**，26 条判据：取块数量守卫 / 每块 0 error 诊断 / **`printAxs` 是纯函数** / 每块往返结构一致）。
@@ -2247,7 +2255,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 但"打印不改输入"是契约。变异证据：装回 stamp ⇒ 纯度那条红（「示例 L16 被打印改写了」）+ 往返三条红（4 failed）。
 **② 有权衡的不一致已登记为待决**——打印会把"指向下一拍的顺序边"物化成 `-> 标题` 行；
 我先实现"不物化"并跑绿（axs 76），既有契约断言 `projection.test.ts`「线性链按拓扑序打印…边打印为 -> 标题」随即变红，
-据此改判为**决策层两难**（显式化 ⇒ 中间插拍不自动接链；隐式化 ⇒ 移动节点静默重连），已撤回语义改动、判据只摘掉 `jumps` 这一维并注释点名工单（**引用用标题不用编号**，本轮编号漂移过一次）。明细见 `docs/REFACTOR_DESKTOP.md`「第二十六次续做」。
+据此改判为**决策层两难**（显式化 ⇒ 中间插拍不自动接链；隐式化 ⇒ 移动节点静默重连），已撤回语义改动、判据只摘掉 `jumps` 这一维并注释点名工单（**引用用标题不用编号**，本轮编号漂移过一次）。明细见 `docs/REFACTOR.md`「第二十六次续做」。
 
 同日第九批（**又回到解析器：演出指令的取值集合**，仍未提交）：文档列的 `@` 指令清单与解析器认识的清单逐项对过（两边一致，`@item` 文档已明说不提供），
 但顺着读 `parseDirectiveLine` 读出今天一直在那一族里的形状——**吃下任意拼写再用 `as` 把类型圆过去**：
@@ -2260,7 +2268,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 里这四族只出现 `fade`/`dissolve`/`rain`/`none`/`zoom` 与裸指令行，**0 处落进新分支** ⇒ 零误报上线。
 棘轮再挡一次（加分支会让 `parse.ts` 越过 420 档），于是把**演出指令取值**一族 11 个 `case` 外提成 **`packages/axs/src/instructions.ts`**（170 行，含 `resolveRole`——
 立绘指令与对白行共用同一个"角色名→id"解析，留在 `parse.ts` 会让新模块回头依赖而成环），`parse.ts` 落到 **330** 行。
-`ADR-027` 表里 `parse.ts:234-318` 那族行号随之失效，已按"历史文本不重写"另起带日期的补记指明新落点。明细见 `docs/REFACTOR_DESKTOP.md`「第二十七次续做」。
+`ADR-027` 表里 `parse.ts:234-318` 那族行号随之失效，已按"历史文本不重写"另起带日期的补记指明新落点。明细见 `docs/REFACTOR.md`「第二十七次续做」。
 
 同日第十批（**只动测试与文档，产品代码未改**，仍未提交）：读到对白分隔符那一处——`parseDialogueLine` 的正则只认半角冒号，
 全角 `堰纱：你来了。` 整行落进旁白兜底（说话人丢失、前缀照原样进玩家端）。这条规则此前只在 ADR-027 方言对照表与代码里，**用户文档与判据都没提**。
@@ -2269,7 +2277,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 落地的两件不需定档的事：`docs/user/writing/axs-syntax.md` 的对白段写清规则（含"`旁白：xxx` 是合法整行旁白"这半句），
 `parse.test.ts` 新两条特征化断言（全角支 + 半角对照组；变异证据：正则临时改 `[:：]` ⇒ `expected ['say'] to deeply equal ['narration']`）。
 warning 本体登记为待决（工单「全角冒号对白被静默当旁白」，三条候选各自的前置条件写在工单里）。
-同轮还纠正一次取证：三份 `.axsp` 报 `BadZipFile` 不是产物坏了，是 `rglob` 把 `target/` 里的 brotli 构建副本扫进了面（真随包文件魔数 `504b`，副本 `1b…`）——**扫描面要先分"跟踪文件 vs 构建目录"**。明细见 `docs/REFACTOR_DESKTOP.md`「第二十八次续做」。
+同轮还纠正一次取证：三份 `.axsp` 报 `BadZipFile` 不是产物坏了，是 `rglob` 把 `target/` 里的 brotli 构建副本扫进了面（真随包文件魔数 `504b`，副本 `1b…`）——**扫描面要先分"跟踪文件 vs 构建目录"**。明细见 `docs/REFACTOR.md`「第二十八次续做」。
 
 同日第十一批（**动了发射器**，仍未提交）：查 `draftFromProse` 的 `defaultSpeaker` 生不生效，顺出两层。
 ① 那条 `!i.speaker` 补默认名的分支**永不点火**（唯一生产者 `proseToScriptDraft` 的正则要求名字非空才成 `say`）；
@@ -2282,14 +2290,14 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 转义规则顺手归一：新增 `printNarrationLine` 一份，`narration` 与这一支共用。
 判据三条（`parse.test.ts` 新 describe，RED 先跑 `expected '# 测试\n: 你来了。\n' to be '# 测试\n你来了。\n'`，对照组一开始就绿）；
 **改断言不删断言**再一例：`projection.test.ts:107` 那条基线原本钉的就是坏输出（注释写着「既有行为，基线钉住」），已按新预期改写并留日期与原因，对 `> 东 -> 东方` 的钉原样保留。
-末轮：`gates` **0**、单测 **548 passed + 1 skipped**（axs 86）、`e2e:desktop` **37**、`e2e` **50**。明细见 `docs/REFACTOR_DESKTOP.md`「第二十九次续做」。
+末轮：`gates` **0**、单测 **548 passed + 1 skipped**（axs 86）、`e2e:desktop` **37**、`e2e` **50**。明细见 `docs/REFACTOR.md`「第二十九次续做」。
 
 同日第十二批（**只动测试数据与注释，产品代码未改**，仍未提交）：先查证"两端共享向量锁等价"有没有执行者——有：`ci.yml:88` 在 `working-directory: backend` 跑 `uv run pytest tests/`，
 `backend/tests/test_axs_draft_vectors.py` 消费同一批 `testdata/axs-draft/*.json`，且它只断言"发射器 reproduces 手写期望文本"（合法性由 TS canonical 解析器裁决，不拿 Python 自己的正则自证）。
 缺的是覆盖面：补第五条向量 `unknown-speaker.json` 锁住"认不出的名字不猜角色"这条双端同裁决，
 并把那条易漂细节钉死——**两端都固定用全角 `：` 重新拼接，与输入冒号种类无关**（TS 的注释此前写"保留全角冒号原样"，对半角输入不成立，已改写并把注释移进所属分支）。
 牙齿各验一侧（成对变异）：两端同时改半角 ⇒ TS `1 failed | 5 passed` 红在该条、Python `test_rules_emitter_reproduces_vector[unknown-speaker]` 红；还原后两端各自全绿。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十次续做」。
+明细见 `docs/REFACTOR.md`「第三十次续做」。
 
 同日第十三批（**只动测试**，仍未提交）：又抓到一处发射侧静默丢失，比前几处更重——
 `printBeatBody` 用 `script.find(op === "choice")` **只取第一个分支组**，第二个组连同选项一起消失且无诊断。
@@ -2298,7 +2306,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 「分支」就在指令面板里（`instructionOps.ts:21,58`）⇒ 连点两次即成立。
 三条候选修法各自动不同层（合并成一组／扩语法支持多组／发射侧加诊断），**都需要产品决策**，故本轮只落不需定档那半：
 `roundtrip.test.ts` 新增一条特征化断言钉住当前实态（注释写明修法定了要**改写而不是删除**它），并把三种修法与代价登记为待决（我建议 ③：先止住静默，代价是要给 `printAxs` 加一个可选诊断出参）。
-末轮：`gates` **0**、单测 **550 passed + 1 skipped**（axs 88）。明细见 `docs/REFACTOR_DESKTOP.md`「第三十一次续做」。
+末轮：`gates` **0**、单测 **550 passed + 1 skipped**（axs 88）。明细见 `docs/REFACTOR.md`「第三十一次续做」。
 
 同日第十四批（**新增一道门禁**，产品代码未改，仍未提交）：`scripts/check-doc-citations.mjs` 把文档里的 `路径:行号` 变成机检对象——
 **文件必须存在、行号必须落在文件长度内**（动因就是今天这三次按域外提把 `parse.ts` 从 600 行压到 331 行，旧坐标会指到文件外面）。
@@ -2308,21 +2316,21 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 真信号 12 条越界：现状类 **9 条已改到真实落点**（`assignBeatIds`/`titleToId`/两条 warning → `edges.ts:36/46/84/103`；分派四支 → `parse.ts:142/297/303/312`；`axsImport.ts:57-63`），
 历史日志类 **3 条不改写**、冻结进 `scripts/doc-citation-baseline.json`（注"清偿后应缩短"）。
 接线三处同轮：`package.json` 新增 `check:citations` 并插进 `gates`（链 **11 → 12 条**）、`README.md` 门禁表补一行、脚本头写自报限度。
-末轮 `pnpm gates` 退出码 **0**（含新那一道 OK）、单测维持 **550 passed + 1 skipped**。明细见 `docs/REFACTOR_DESKTOP.md`「第三十二次续做」。
+末轮 `pnpm gates` 退出码 **0**（含新那一道 OK）、单测维持 **550 passed + 1 skipped**。明细见 `docs/REFACTOR.md`「第三十二次续做」。
 
 同日第十五批（**一条线按证据作废，无代码改动**）：追「`reverseRole` 反解失败会把内部 id 印进作者文本」这条线，命中的前提是"角色被解绑后节点仍引用它"。
 内核确实留悬空引用（`role.remove` 只过滤 `draft.roles`），但**先跑对照组**：全仓 grep 分派点后，
 `role.remove` 只在内核与其单测里出现，而同联合的 `node.move` / `script.patch` 在 `apps/web/src` 有真实 dispatch 点 ⇒ **界面从不解绑角色，该路径今天不可达**。
 处置是**不修也不加防御分支**（为不可能的输入加提示，正是今天反复拆的那一类），
 并把真正值得留册的东西登记下来：**内核有 `role.remove` 能力、界面没有入口**——若将来补这个 UI 动作，必须同时决定"仍在引用该角色的节点怎么办"
-（清空成无名台词 / 退回旁白 / 阻止移除并列出引用点），且它会撞上今天定的"无说话人的 `say` 发射为旁白"那条。明细见 `docs/REFACTOR_DESKTOP.md`「第三十三次续做」。
+（清空成无名台词 / 退回旁白 / 阻止移除并列出引用点），且它会撞上今天定的"无说话人的 `say` 发射为旁白"那条。明细见 `docs/REFACTOR.md`「第三十三次续做」。
 
 同日第十六批（**只动测试与文档**，仍未提交）：拿三份**真实随包 `.axsp`** 量了一次 `unpack → pack → unpack`，project 逐字节一致、角色数守恒 ⇒ 无缺陷，
 但这条不变量在**容器层 + 真实产物**这个组合上没人走（**同日 03:21 更正**：我原写"此前没人守"是过强断言——`axspRoundTrip.test.ts` 早在 S13-2 就在 provider 层守着更强的 `exportProjectAsAxsp → importProjectFromAxsp` 字段守恒，只是输入是合成数据、不读随包文件；我按符号 `packAxsp` 扫，漏了包装函数）。补 4 条判据把它钉住：
 逐份断言再读回的 project / characters / manifest.assets 相等，另加"清单声明的素材必须真在包里"与一条"目录里有三份"的数量守卫（防空载）。
 牙验过：临时让 `packAxsp` 序列化时给标题加后缀 ⇒ 新增 3 条全红，还原后 18 passed。**如实说**：该变异也被既有两条夹具判据抓到，
 所以新增价值在输入类别（真实产物、归一化后的形态）而非新代码路径。末轮 `gates` **0**、单测 **556 passed + 1 skipped**（editor-core 163）。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十五次续做」。
+明细见 `docs/REFACTOR.md`「第三十五次续做」。
 
 同日第十七批（**新增一份测试 + 一处注释纠偏**，产品逻辑未改，仍未提交）：把桌面**生产后端**那条接缝钉进单测——`TauriSqlBackend` 此前**一条判据都没有**，
 而 I4（`saveNarrative` 原子覆写）在生产上的保障全压在那个文件的三个形状里，桌面壳又零 CI 信号。
@@ -2341,7 +2349,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 立刻重跑同一份代码 → **37 passed**；机制就是本文件 §6 待决清单里「自动存档的 600ms 防抖窗口」那条（写入被测试自己的快速离开清掉），
 **那是它的第 2 次观测，不是回归也不是新缺陷** ⇒ 登记成一条限度：那格定档前 `e2e:desktop` 的读数不能当"全绿信号"引用。我没改产品语义也没放宽断言。
 末轮：单测 **563 passed + 1 skipped**（web 181 → **188**）、`e2e:desktop` **37 passed**、`e2e` **50 passed**（03:43 两半各一次，退出码 0，`.e2e-lock` 不存在）。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十六次续做」。
+明细见 `docs/REFACTOR.md`「第三十六次续做」。
 
 同日第十八批（**一处运行时 fail-closed + 3 条判据**，仍未提交）：把上一批留在注释里的那条前提升成代码守的——`translatePlaceholders` 的唯一正确性依赖是
 "SQL 字面量里不含 `?`"，此前它只是注释 + 一次测量（66/0）。不建扫描型门禁（扫不到动态拼接，报的是假安全感），改建运行时守卫：
@@ -2353,7 +2361,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 **一条范围声明**：这一刀 e2e 两套都加载不到该模块（chromium 里 `isTauriEnvironment()` 为 false ⇒ 走 Memory 支；这条分派条件是上一批刚钉的第 7 项，
 所以"测不到"是有判据的说法不是推测），真壳内行为仍只有 DEV 冒烟覆盖——这也是选"抛"不选"记 warning"的理由：抛会被 Provider 收成 `io` 错误、界面可读。
 末轮：`gates` **0**（13 道，`[file-size]` 348 文件 0 越线）、单测 **566 passed + 1 skipped**（web 188 → **191**）、`git diff --check` 0 行。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十七次续做」。
+明细见 `docs/REFACTOR.md`「第三十七次续做」。
 
 同日第十九批（**一处改判 + 一个新测试文件（7 条）**，仍未提交）：桌面素材落盘 `TauriAssetStore` 也是**零判据的生产模块**（契约套件跑 Memory/sql.js，e2e 两套加载不到它）。
 读实现时撞上一条**已发布但站不住的 ADR 决策**：`ADR-026` 后果里写「非安全上下文退化为 FNV 内容键，仅用于去重不承担安全语义（代码内已写明）」——
@@ -2365,7 +2373,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 外部 URL 的 ref 不去拼路径、缺文件 not_found、读失败 io。**牙＝三次成对变异**：恢复兜底 ⇒ 1 红（红法正是"降级写会成功"）；摘要换成非加密键 ⇒ 2 红；去掉 `exists` 守卫 ⇒ 1 红。
 **改判的分寸**：没改写 ADR-026 那行历史，而是在其末尾**另起带日期的补记**（依据＝两条在册契约相撞、判据与变异读数、并把"保留兜底但显性化"的替代修法留给用户定档）；
 用户文档同轮补一句失败行为。改动局限在 `contentDigest` 一条分支 + `write` 一个 try，回退成本低。
-明细见 `docs/REFACTOR_DESKTOP.md`「第三十八次续做」。
+明细见 `docs/REFACTOR.md`「第三十八次续做」。
 
 同日第二十批（**只动文档，产品代码一字未改**，仍未提交）：把一条**在册的产物层"实测"证伪其取证方法**，再带对照组重证一次。
 被审的对象是 REFACTOR 里那条「生产产物不含 DEV 测试宿主 `?storage=memory`」——它已经历过一次更正（从 `strings` 二进制换成 grep dist），
@@ -2375,7 +2383,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 **并配两道对照**：① 同一个 chunk（`ui-*.js`，存储代码实际落处）里 `axiforge.db` 命中 1 次；② 产物里能看到 react-router 原样保留的 `URLSearchParams(a.search)` 与 `.getAll(\`index\`)`，
 证明构建不改写 `X.get("字面量")` 这种形状。结论不变（DEV 宿主确实没进产物），证据第一次成立。
 同轮把那条引用里指错位置的行号校正（原写 `139,143`，139 落在注释里；改成 `apps/web/src/shared/storage/index.ts:143,144`）。
-**方法收成一句**：验"某串没进产物"之前先问这个串在原代码里长什么样——文档里的措辞不是可搜索的字面量。明细见 `docs/REFACTOR_DESKTOP.md` 该项的「补记（2026-10-01 04:00）」。
+**方法收成一句**：验"某串没进产物"之前先问这个串在原代码里长什么样——文档里的措辞不是可搜索的字面量。明细见 `docs/REFACTOR.md` 该项的「补记（2026-10-01 04:00）」。
 
 同日第二十一批（**改门禁本体**，仍未提交）：上一批写作之后 `check:citations` 报 **3 条新增**，而那 3 条全是在册的历史引用——
 基线键里带着**文档行号**，我插入的段落把它们顶下去十几行，于是"写文档"这件事本身在制造假红。
@@ -2398,7 +2406,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 "要不要给契约补 `deleteCharacter`" 是**待决 ⑬**，它和今天在册的"内核有 `role.remove` 能力、界面没入口"共享同一个前置问题：仍在被引用的对象怎么办。
 两条测试宿主教训：node 无 `localStorage` 时 `getCreatorId()` **每次返回新 id**（壳里不是，非产品缺陷），不桩定它就会红在宿主上；
 不带范围的 `listCharacters()` 只回**公开**角色，而导入角色不继承公开位——读错范围会把残留伪装成"没有残留"，故同时钉住"带 authorId 有 1 个、公开面 0 个"。
-明细见 `docs/REFACTOR_DESKTOP.md`「第四十次续做」。
+明细见 `docs/REFACTOR.md`「第四十次续做」。
 
 同日第二十三批（**归一两条通路的策略 + 2 条判据**，产品行为按已定语义收敛，仍未提交）：把待决里"S13-7 两套 AXS→图 要不要归并"对着当前代码核了一遍——
 清单原来写的"`beatToNarrative` 与 `beatToNarrativeData` 是否逐字段等价未核对"**已经指不到东西**（那个符号今天早些时候的归一里已经不在了），
@@ -2411,7 +2419,7 @@ warning 本体登记为待决（工单「全角冒号对白被静默当旁白」
 **归一类判据双向取证**：把通路二钉回旧策略 ⇒ 恰好 1 红并点名 `keep-2` vs `keep-1`（而旧配对判据仍绿，这就是新夹具的理由）；
 把共享谓词放宽成"任何 id 都可复用" ⇒ 6 红，新那条在名单里。两次都以备份原样还原，还原后 36 passed、`tsc --noEmit` 0。
 S13-7 那条待决因此**只剩外层循环与返回形状是否合成一个**（映射、落位、id 判定、同名策略四处已同源），§6 已按实态改写。
-末轮：`gates` **0**、单测 **584 passed + 1 skipped**（editor-core 163 → **165**）、`e2e:desktop` **37 passed**（改动落在 Writer 保存路径，所以点击层重量一次）、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十一次续做」。
+末轮：`gates` **0**、单测 **584 passed + 1 skipped**（editor-core 163 → **165**）、`e2e:desktop` **37 passed**（改动落在 Writer 保存路径，所以点击层重量一次）、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十一次续做」。
 
 同日第二十四批（**上线第 14 道门禁 `check:seams` + 补一份判据**，产品代码一字未改，仍未提交）：本会话手工发现过三次"桌面生产模块零判据"（事务形状、摘要降级、导入回滚），
 所以把那个共同特征变成棘轮。判据特征选得机械可判：**直接 `import` 了 `@tauri-apps/*` 的模块只在壳里跑到**，而壳零 CI 信号、契约套件只跑 Memory/sql.js。
@@ -2424,14 +2432,14 @@ S13-7 那条待决因此**只剩外层循环与返回形状是否合成一个**�
 腿三还原 ⇒ OK 且 `--update` 可缩短。**退出码单独取**（上一条管道里 `$?` 拿到的是 `head` 的）：桩文件在时 **1**、删净后 **0**。
 `assetContext` 那 5 条也验过牙：把 `localRoot ? convertFileSrc : undefined` 摘成 `undefined` ⇒ **恰好 1 红**（红在"asset 协议没被调用"）。
 接线三处同轮：`package.json` 的 `check:seams` + `gates` 链（**13 → 14 道**）、`README.md` 门禁表补一行、脚本头写自报限度。
-末轮：`gates` **0**（14 道）、单测 **589 passed + 1 skipped**（web 207 → **212**）、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十二次续做」。
+末轮：`gates` **0**（14 道）、单测 **589 passed + 1 skipped**（web 207 → **212**）、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十二次续做」。
 
 同日第二十五批（**分派口补判据，接缝基线 2 → 1**，产品代码一字未改，仍未提交）：上一批留给我的那条"分派口 `index.ts` 要 mock 六个模块"，真去做之后结论变了——只替换本地五个模块即可（`@tauri-apps/*` 一个都不碰），editor-core 两个真 Provider 直接跑。
 新增 `index.test.ts` **4 条**，钉三条只有工厂知道的不变量：① **素材根目录必须先于播种登记**（晚一秒 ⇒ 首启播种的立绘解析成空串，图不出现且无错误可查）；② 播种每进程一次 + `getStorageProvider()` 每次同实例；③ `?storage=memory` **只替代存储不替代壳能力**（不得去建 `TauriAssetStore`）——这条边界原来只在文档里，现在有机器判据。
 **取证过程值得记**：三次变异有两次**根本没落进去而测试照绿**（第一次 `perl` 模式要求 `&&` 后带空格而源行是换行；第二次命中了**注释里同名的 `import.meta.env.DEV`**）。
 换成只可能命中代码的形状、并**先 `sed` 打印被改行**再跑，才拿到真红。**方法：变异跑绿先怀疑没写进去。** 另一坑：`vi.resetModules()` 后顶层静态 import 的类与工厂用的是两个不同对象，`toBeInstanceOf` 会假红 ⇒ 从同一份新模块图里动态取类。
 三次各红 1 条（顺序／记忆化／短路），每次都 `cp` 原样还原，末了 `git diff --stat index.ts` 为空。文件按门禁命名约定改成 `index.test.ts` ⇒ `check:seams` 当场缩短为"有判据 5、基线 1"（只剩 `desktopSmoke.ts` 带理由在册）。
-末轮：`gates` **0**（14 道）、单测 **593 passed + 1 skipped**（web 212 → **216**）、`[desktop-seams] OK`、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十三次续做」。
+末轮：`gates` **0**（14 道）、单测 **593 passed + 1 skipped**（web 212 → **216**）、`[desktop-seams] OK`、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十三次续做」。
 
 同日第二十六批（**又一份纯判据，产品代码一字未改**，仍未提交）：census 里最后一个"非云、非冒烟"的无判据模块是 `assetRecords.ts`（存储态→传输态投影，两个纯函数）。
 它文件头写着"已知缺席字段，如实标注而非编造"——而这类**刻意的不对称**最容易被"顺手统一"抹掉，代价是界面上出现假事实：
@@ -2439,7 +2447,7 @@ S13-7 那条待决因此**只剩外层循环与返回形状是否合成一个**�
 补 7 条：两支响应**键集合不多不少**、`ref_count` 的三处不对称（道具**无键** / 舞台**键在值缺** / `view_count` 恒 0）、**数组是拷贝**、可空字段原样透传与两个明说的等式。
 **一条类型系统挡不住的**：`readonly string[]` 直接把引用赋过去照样 `tsc -b` 退出码 0——别名缺陷只有行为判据能挡，所以第 ② 类要写成 `"ref_count" in r` 而不只是比值。
 三次变异都**先 `grep` 出被改行再跑**（上一批的教训当场兑现）：去掉 `effects` 展开 ⇒ 1 红；`ref_count: undefined` → `0` ⇒ 1 红；给道具补 `ref_count: 0` ⇒ 2 红。全部还原、`git diff --stat` 为空。
-末轮：`gates` **0**（14 道）、单测 **600 passed + 1 skipped**（web 216 → **223**）、`git diff --check` 0 行。明细见 `docs/REFACTOR_DESKTOP.md`「第四十四次续做」。
+末轮：`gates` **0**（14 道）、单测 **600 passed + 1 skipped**（web 216 → **223**）、`git diff --check` 0 行。明细见 `docs/REFACTOR.md`「第四十四次续做」。
 
 同日第二十七批（**收口认证 + 把验收①从"不可判"做成一条可判候选**，产品代码一字未改，仍未提交）：
 ① **六条链一次跑齐、退出码逐条单独取**（04:56–04:58）：`gates` 0（14 道）· `test:unit` 600 passed + 1 skipped · `e2e` **50 passed** 0 · `e2e:desktop` **37 passed** 0 · `build:web` 0 · `build:admin` 0 · `check:desktop`（桌面壳 `cargo check`）**0** · 后端 `uv run pytest -q` **167 passed**（3.65s）0。
@@ -2852,7 +2860,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 
 同日第三十一批（**一次独立复审，107 个改动文件里抓到 6 处「判据够不着它声称守的契约」**，仍未提交）：
 起手假设是"上一轮留下的东西大体可信"，结论不成立。共同形状不是漏写，是**够不着**——三处在产品代码、三处在门禁。
-明细逐条在 `REFACTOR_DESKTOP.md`「补记（2026-10-01，复审）」，这里只留一句索引：
+明细逐条在 `REFACTOR.md`「补记（2026-10-01，复审）」，这里只留一句索引：
 ① `importProjectFromAxsp` 的 `saveAsset` / `saveCharacter` 两个出口**根本没有回滚**（`rollback` 那时还没定义），
 `createProject` 失败会留下整组孤儿角色 ⇒ 修法是把它提到最前，判据从 7 个出口补到 9 个并加一条"枚举与调用点数对账"；
 ② `translatePlaceholders` 的守卫靠正则猜引号边界，看不见标识符与注释里的 `?`，
@@ -2929,7 +2937,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
   **Writer 面板当场拿到丢过字段的文本**，保存即落盘。**责任用对照组钉死**：同一节点走 `draftToAxs` 直连两个选项都在，
   走画布两个都不在 ⇒ 丢失在画布这层，不在 `buildScriptFromLegacy`。改法＝以 base 持久态为底 + 覆盖已知键。
   牙：旧形状 ⇒ **恰好 1 红**，红的内容就是症状本身。
-- **17 条未复核的线索**按"是什么会 settle 它"逐条登记在 `REFACTOR_DESKTOP.md` 第六节（含 `deleteProject` 不级联、
+- **17 条未复核的线索**按"是什么会 settle 它"逐条登记在 `REFACTOR.md` 第六节（含 `deleteProject` 不级联、
   `saveAsset` 的 ref 含扩展名与契约矛盾、`visibility` 的 `authorId: ""`、`unpackAxsp` 抛 `TypeError`、`remapCharacterIds`
   漏 `relationship` 三段 key 与 `actors` 等）。**不作为结论引用**，也不和上面五条混在同一层待办里——
   否则真正会咬人的那几条会被淹没。
@@ -3861,7 +3869,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 - **README 三处抄数腐烂已换回现测**（这是同一规律第三次应验：抄门禁打印的数就一定会腐烂）：
   死表面面 `285` ⇒ **294**（两行都改，带 16:37／16:47）、`check:citations` 已判定 `216` ⇒ **243**、歧义跳过 `37` ⇒ **18**（带 16:46）。
   其余带日期的读数（labels 205、seams 9/6/99、file-size 349、dispatch 32/26/6）本次复核**仍为真**，未改。
-- `REFACTOR_DESKTOP.md` 补**第五十一次续做**条目，把第六十八…七十二批那段（为什么单独做这一族、分母怎么取、三次自我证伪、
+- `REFACTOR.md` 补**第五十一次续做**条目，把第六十八…七十二批那段（为什么单独做这一族、分母怎么取、三次自我证伪、
   `crypto` getter-only 与 `fileURLToPath` 尾斜杠两个平台形状、归一的双向判据、末轮读数）收在一处。
 - 写作过程中的自查：先写成"那 57 条判据"（按 web 单档 241→309 的差值重数＝**68**）、
   又写"键耦合已在第五十二次关闭"（下一段才是本段）⇒ **数量与交叉引用都要按命令/实际段落重数一遍**，不能顺着手感写。
@@ -4286,6 +4294,39 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 ## 5. 最新验证与已知问题
 
 
+## ⚠ 当前树权威状态（2026-10-18 06:5x 实测，覆盖下面所有历史读数）
+
+**这一段是给下一个人先看的**：本文件的读数分属**不同的树**，混用会得出错的结论。
+
+- **`HEAD` 已从 `1b9ca06` 走到 `4bdb4fb`**：reflog 显示 **13 笔提交**（`fb810f9` → `71422b5` → `7b797f4` →
+  `5489665` → `f317dbf` → `4bdb4fb`），并且 handoff 里注明「**已 push**，快进 `1b9ca06..f317dbf` 十三笔，**tag 未动**」。
+  ⇒ **本会话早先那些 `78 M / 17 D / 36 ??`、`e2e:desktop 37 passed`、`单测 693/700/703` 全部描述的是提交前的树**，
+  它们当时是真的、现在**不再是当前树的读数**。教训照旧：**拿昨天的绿当今天的证据**，
+  这次是"拿上一轮的绿当这一轮的"，而中间**有另一会话提交并推送了**。
+- **工作区现状**：`3 M / 11 ??`（`M`：两个先前用户改动 + 本文件；`??`：`Clearance/`、`articles/`、
+  `docs/README.md`、四个脚本、`testdata/axs-draft/unknown-speaker.json`，
+  **以及本会话那三个后端条件向量测试仍是未跟踪**：`test_condition_vectors.py` /
+  `test_condition_matcher_vectors.py` / `test_condition_family_support.py`）。
+  TS 侧那几份向量与两个新测试文件**已随那 13 笔进树**。
+- **当前树诚实读数**：`pnpm gates` **0**（14 道）；
+  单测 **796 passed + 1 skipped**（core 143 / axs 97 / editor-core 192 / web 325 / admin 39）；
+  **后端 `uv run pytest -q` 226 passed**（8.4s，含那三个未跟踪文件的 12 条）；
+  **`pnpm e2e:desktop` 75 passed / 2 failed（77 条，退出码 1）**；
+  **`pnpm e2e` 89 passed / 1 failed（90 条，退出码 1）**；`git diff --check` 0 行、stash 0。
+- **三条 E2E 红（本会话只修了其中一条，另两条已定位、待你定夺）**：
+  - **E64 已修并验证转绿**（`e2e/desktop-http.spec.ts:2354`）：`getByRole("button", { name: "演出" })`
+    与后来新增的「预览此节点演出」按钮**可及名子串撞车** ⇒ strict mode 报 2 个元素。
+    修法是 Playwright 自己给出的 `exact: true`。它同时是「**新增可及名要回头复查既有选择器**」的证据。
+  - **E40（`desktop-http.spec.ts:1029`）在无后端配置里红**——它的浏览器那一半**明知要发云端请求**
+    （测试自己的注释写着「走真后端（这一半本来就要发云端请求）」），无 uvicorn 时创建工程必然失败、
+    URL 停在 `/studio/projects`。**实测对照：带后端时 ✓、不带时 ✗** ⇒ 后端依赖，非产品回归。
+    但它的名字是「**两半各有一条断言**」——**一个断言跨两种环境差异的测试，结构上无法只活在单一环境配置里**。
+  - **E43（`desktop-http.spec.ts:1838`）在两套配置里都红，且 flaky**：无后端时断在前置
+    （`还没有剧本` 不出现——因为请求失败落进 `error` 态，而页面「**错误不得显示成空态**」是对的）；
+    带后端时断在断言处（`toHaveCount(2)` 读到 **0**，导入发生了但列表里看不到）。
+    它的**被测对象**是本地库的重复导入（桌面本地行为），**观测面**却是页面级 HTTP 消费者供的列表，**两者不同源**；
+    且它对同库内其他测试的副作用敏感（E64 这次跑过之后它就红）。⇒ 详见待决 ⑰。
+
 最近一次完整验证：
 
 同日第四十五批（**锁条件键语法 + 写读往返 ⇒ 一条跨族不一致降级为待决 ⑯**，仍未提交）：
@@ -4481,7 +4522,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
   正对照三条（`characterApi.create` 2 / `update` 2 / `listUser` 3）证明读者匹配器不是恒零；"在"那一侧手工验过 `/{project_id}/nodes`、`/edges`、`/roles` 三条 POST 确实存在。
   末轮（08:53）：`cloud:callmap` **0**（连跑两次逐字节相同）、`gates` **0**（14 道；`[doc-citations]` 已判定 211 / 越界 5＝基线数、`[desktop-seams]` 9 接缝／有判据 6／真断言合计 99、`[file-size]` 349 文件 0 越线）、单测 **706 passed + 1 skipped**（`awk` 从日志加出）、`git diff --check` **0** 行、`.e2e-lock` 不在。
   流程错误留档一次：`Edit` 漏传 `old_string` 把 `const root = process.cwd();` 整行吃掉，`node --check` 仍通过、跑起来才 `ReferenceError` ⇒ **改完脚本必须真跑一次**，语法检查接不住"声明被删"。
-  同轮把 `REFACTOR_DESKTOP.md` 的续做台账补到**第五十次**（第三十四…第四十一批这条普查数据链的"为什么"此前只在 HANDOFF §4 有状态、没有理由记录）；产品代码自第三十一批后一字未改。
+  同轮把 `REFACTOR.md` 的续做台账补到**第五十次**（第三十四…第四十一批这条普查数据链的"为什么"此前只在 HANDOFF §4 有状态、没有理由记录）；产品代码自第三十一批后一字未改。
 
 - **2026-10-09 08:44 「绕过」按调用点减掉壳守卫（`cloud:callmap` 第八段）**：扫描面「绕过 + 混合」**40 条 / 调用点 53 处** ⇒ 有守卫 **9**（S1 同块 7 / S2 同句 0 / S3 早退 2）/ 无守卫 44；端点级 全有守卫 5 / 部分 4 / 全无 31（相加 40）。
   **只看绕过 34 条：5 条已被壳守卫显式降级、29 条桌面真会打出去** ⇒ S13-3 的候选分母从 34 更正为 **29**。
@@ -4551,7 +4592,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
   做法：把 `git status` 里今日改过的 `.ts/.tsx/.json` 收集成候选集，扫所有 `.md` 里的 `路径:行号`，命中候选集就把**被引行的实际内容**打出来给人读。
   读数 **89 处命中**，逐类分诊：绝大多数是历史日志里刻意标注的"旧 `X.ts:行`"（按"历史文本不重写"保留）；
   **1 处是我今天自己造成的真失效**——第三十批给 `main.tsx` 加了一行 import，把挂载点从第 6 行搬到第 7 行，
-  而 `REFACTOR_DESKTOP.md:2029` 还写着 `main.tsx:6`；已按 `grep -n createRoot` 的实际行号改成 **`main.tsx:7`** 并就地注明是谁搬的。
+  而 `REFACTOR.md:2029` 还写着 `main.tsx:6`；已按 `grep -n createRoot` 的实际行号改成 **`main.tsx:7`** 并就地注明是谁搬的。
   同一处判定还顺手给那条 09:xx 的历史发现补了带日期追注（判据现已抽成 `shellSmokeGate.shouldRunDesktopSmoke()`）。
   **审计自己的两处失真也要如实记**：① 我按 basename 解析简写路径，于是 `storage/index.ts:139,143` 被误配到 `packages/axs/src/index.ts` 与 `packages/editor-core/src/index.ts` 并报 `<EOF>`；
   实读 `apps/web/src/shared/storage/index.ts` 第 **139**（DEV 说明行）与 **143**（`import.meta.env.DEV &&`）——**那条引用本来就是对的，假警报来自量法**。
@@ -4573,18 +4614,18 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
   `[desktop-seams] OK —— 桌面接缝 9 个：有判据 6（真断言合计 94）、缺测试 3、测试未引用 0、无真断言 0、含恒真断言 0、基线在册 3`、
   `[doc-citations] OK 167 / 越界 3 / 基线 3`、单测 **606 passed + 1 skipped**（web 223 → **229**，新增 6 条全在 `shellSmokeGate.test.ts`）、`tsc -b` **0**、
   `git diff --check` **0 行**、`git status` **62 ` M` / 17 ` D` / 28 `??`**（新增两份文件都在面内，见 §6 显式 add 清单）。
-  牙：谓词"简化"成存在性判断（正是注释警告过的那个写法）⇒ **3 条红**；`cp` 还原后 `diff -q` 一致、6 条复绿。明细见 §4 第三十批与 `REFACTOR_DESKTOP.md`「第四十七次续做」。
+  牙：谓词"简化"成存在性判断（正是注释警告过的那个写法）⇒ **3 条红**；`cp` 还原后 `diff -q` 一致、6 条复绿。明细见 §4 第三十批与 `REFACTOR.md`「第四十七次续做」。
 
 - **2026-10-01 05:13 复跑（`check:seams` 扩面之后）**：`pnpm gates` 退出码 **0**（14 道）、
   `[desktop-seams] OK —— 桌面接缝 8 个：有判据 5（真断言合计 83）、缺测试 3、测试未引用 0、无真断言 0、含恒真断言 0、基线在册 3`
   （新增两条在册都是 `apps/nexus/electron/`，理由里带可测面读数）、`[doc-citations] OK 已判定 167 / 越界 3 / 基线 3`、
   单测 **600 passed + 1 skipped** 未变、`git diff --check` **0 行**、`git status` **61 ` M` / 17 ` D` / 26 `??`**（探针 `packages/ui/src/__probe_shell.ts` 已删净、`ls` 取不到）。
-  这一刀的牙是"扩面真接住了"：临时把壳耦合模块放进 `packages/ui/src` ⇒ FAIL 点名它、接缝 8→9；删净 ⇒ 回 8 且退出码 0。明细见 §4 第二十九批与 `REFACTOR_DESKTOP.md`「第四十六次续做」。
+  这一刀的牙是"扩面真接住了"：临时把壳耦合模块放进 `packages/ui/src` ⇒ FAIL 点名它、接缝 8→9；删净 ⇒ 回 8 且退出码 0。明细见 §4 第二十九批与 `REFACTOR.md`「第四十六次续做」。
 
 - **2026-10-01 05:06 复跑、05:07 文档改写后再复跑（第 14 道门禁补上第 3 层"有没有真断言"之后）**：`pnpm gates` 退出码两次都是 **0**（14 道；本轮改动落在 `check:citations` 的扫描面上，所以绿灯必须取改写后那一次——第二次 `[doc-citations] OK 已判定 167`，新增散文把可判引用从 165 推到 167，**越界仍 3、基线 3 条未动**，没拿 `--update` 绕白），
   `[desktop-seams] OK —— 桌面接缝 6 个：有判据 5（真断言合计 83）、缺测试 1、测试未引用 0、无真断言 0、含恒真断言 0、基线在册 1`；
   单测 **600 passed + 1 skipped** 未变（这一刀加的是判据强度不是测试数）、`git diff --check` **0 行**、`git status` **61 ` M` / 17 ` D` / 26 `??`**（探针已删净）。
-  牙取过四腿：空壳测试 `#no-assert` 红、恒真断言 `#trivial-assert` 红且合计只 +1、注释里的断言仍算空壳、删净后 OK 0。明细见 §4 第二十八批与 `REFACTOR_DESKTOP.md`「第四十五次续做」。
+  牙取过四腿：空壳测试 `#no-assert` 红、恒真断言 `#trivial-assert` 红且合计只 +1、注释里的断言仍算空壳、删净后 OK 0。明细见 §4 第二十八批与 `REFACTOR.md`「第四十五次续做」。
 
 - **2026-10-01 04:56 收口认证（六条链一次跑齐，退出码逐条单独取）**：
   `pnpm gates` **0**（14 道；**04:58 又整链复跑一次仍是 0**，取在全部文档改写之后）·
@@ -4627,7 +4668,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 
 - **2026-10-01 04:02 复跑（第二十批，只动文档）**：`pnpm build:web` 退出码 **0**；产物层三条 grep 全 0 命中，
   同一次扫描里正对照 `axiforge.db` 在同一 chunk 命中 1 次、形状对照看到 react-router 的 `URLSearchParams(a.search)` 与 `.getAll(\`index\`)` 原样存在
-  ⇒ 「DEV 测试宿主没进产物」这条**第一次有了能区分好坏的证据**（读数的完整推导见 `docs/REFACTOR_DESKTOP.md` 该项 04:00 补记）。
+  ⇒ 「DEV 测试宿主没进产物」这条**第一次有了能区分好坏的证据**（读数的完整推导见 `docs/REFACTOR.md` 该项 04:00 补记）。
   单测/门禁读数沿用 03:57 那次（**产品代码本轮一字未改**）；`check:citations` 那次首跑 **FAIL**，抓到的不是文档写错而是门禁本体的键设计（见下一条）。
 
 - **2026-10-01 04:05 复跑（改掉 `check:citations` 基线的位置键之后）**：`node scripts/check-doc-citations.mjs` **OK**——
@@ -4749,7 +4790,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 
 ## 6. 重构阶段状态
 
-> **`REFACTOR_DESKTOP.md` 那行「验收」的机械复核（2026-10-01 02:38 实测）：四条里两条达成、两条卡在决策，卡住的两条现在有了可点数的残项清单**
+> **`REFACTOR.md` 那行「验收」的机械复核（2026-10-01 02:38 实测）：四条里两条达成、两条卡在决策，卡住的两条现在有了可点数的残项清单**
 >
 > 原文判据：`grep -rn "/api/v1" apps/web/src` 只剩测试宿主所需或为 0；桌面是唯一构建与发布目标；gates 与新基线全绿；`backend/` 已不存在且桌面功能无回归。
 >
@@ -4785,7 +4826,7 @@ DELETE 同理，没有"不带 scenes 段的 PUT"。它零读者 ⇒ 今天没有
 > **结论：这道门禁停在存在性 + 范围这一层，下一会话不必再试内容层**（读数与成因已写进 `scripts/check-doc-citations.mjs` 的脚本头）。
 
 
-Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.md`。Phase 13 的总体情况：
+Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR.md`。Phase 13 的总体情况：
 
 - 已完成：S13-1；S13-2a/b/c/e/f/g；S13-8。此次 AXS choice 往返修复已落地，但不代表 S13-3/4/6/7 完成。
 - 部分完成：S13-2d（剩余调用路径处置/测试覆盖）；S13-5（桌面态 E2E 已建立，桌面为 CI 主目标及原生壳 CI 信号仍未完成）。
@@ -4804,7 +4845,7 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
    **这 13 条的分母已量好（2026-10-01 第十九次续做，只读）**：它们打的端点形状只有 **8 个**（4 处 `POST /characters/`、2 处 `GET /characters/{id}`、工程 CRUD、节点 POST/PUT、`/roles`、`/edges`），
    而本地是**一次原子覆写** `saveNarrative(id,{nodes,edges,axsSource})`（`storage/memory.ts` 第 156 行；契约用例同跑 Memory 与 SQLite），`*Saves.ts` 的 30 个导出函数全部有本地分支 ⇒
    **搬离线不需要新能力，需要的是把夹具从"逐节点 POST"改写成"一次 saveNarrative"**；
-   真正的分歧点是"改写后这 13 条不再覆盖后端 REST 契约"。明细与两条待验证点见 `docs/REFACTOR_DESKTOP.md` 第十九次补记。
+   真正的分歧点是"改写后这 13 条不再覆盖后端 REST 契约"。明细与两条待验证点见 `docs/REFACTOR.md` 第十九次补记。
    **端口散写已收成一个真相源（2026-09-30 第十二次续做）**：数字下沉进 **`scripts/ports.json`**，`ports.mjs` 只做派生视图（origins / corsOrigins），
    `playwright.config.ts`（4 处）、`playwright.desktop.config.ts`（2 处）、`e2e/helpers.ts`（1 处 API 基址）、`e2e/baselines.spec.ts`（5 处硬写角色端点）、
    `scripts/desktop-http-inventory.mjs`（1 处）全部改读它——工具与 e2e 层的 `5174`/`localhost:8000` 字面量实测 **0 处**。
@@ -4837,7 +4878,7 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
 - **一眼状态**：三引用重合 `HEAD == origin/desktop == desktop-handoff-20260929^{} == `**`1b9ca06`** ⇒ 本会话**未提交、未推送、未动 tag**。工作区现测 **99 个 `M` ＋ 17 个 `D` ＋ 55 个 `??`**（`git status --porcelain | awk '{print $1}' | sort | uniq -c`）。
 - **恢复点读数（全部现跑，别沿用上一段的旧数）**：`pnpm gates` **0**（十五道；web 单测 325＋1 skip、`[file-size]` 0 越线、`[desktop-seams]` 9／6／真断言 102／基线 3）· `pnpm e2e:desktop` **77 passed／0 failed**（03:23）· `check:citations` **0**（已判定 **380**）· `check:http-inventory` **0**（`SPEC_URLS=74`、`DATA_DESKTOP=0／DATA_BROWSER=20`）· `check:apibase` **0**（判定面越界 0；只读面疑似调用点 3）· `check:tracked` **1**（`待 add：` 现跑 **43 行**）。E 编号定义处 `test.describe("E…")` 现数 **39 个**（E14…E65 之间有历史洞：E16／E20／E22–E28／E33／E34 只以**注释里的编号**出现（判据后来并进了别的 describe），而 **E29 与 E46 在整个 `e2e/` 目录里一个字都没有** ⇒ 这两个是**幽灵编号**：文档与台账若按号引用，改引「测试标题原文＋文件行号」，别按编号 grep（同一个坑在 #76 那条里记过一次）。
 - **必须人点名、不能 `git add -A`**：这 99 个 `M` 里**混着本会话之外的改动**（会话开始时 `git status` 就已列出的那批：`.github/workflows/ci.yml`、`BLUEPRINT_v1.0.md`、`apps/web/src/features/discover/pages/*` 六页、`apps/web/src/app/providers/UserContext.tsx`、`packages/core/*`（`ir.ts`／`conditions.ts`／`compiler.test.ts` 等）、`packages/axs/src/draft.ts`、`backend/app/domains/narrative/models.py`、`dev.bash` …）。**`backend/uv.lock` 与 `backend/app/domains/llm/providers/__init__.py` 永不入本重构提交（§7），`Clearance/` 一律不碰（里面有 `.env`）**。
-- **本会话动过的文件**（提交时逐名点这些，别整目录扫）：`scripts/check-chain-tracked.mjs`、`scripts/desktop-http-inventory.mjs`、`scripts/file-size-baseline.json`、`package.json`（只加过 `check:tracked` 一行）、`e2e/desktop-http.spec.ts`（E62–E65）、`apps/web/src/shared/lib/clipboard.ts` ＋ `clipboard.test.ts`（**新文件，未跟踪**）、`apps/web/src/features/character/{components/PromptExport.tsx,pages/CharacterDetailPage.tsx,pages/StoryEditPage.tsx}`、`apps/web/src/features/studio/hooks/{useProjectEditor.ts,editorProjection.ts,editorProjection.test.ts}`、`apps/web/src/features/writer/lib/{projection.ts,projection.test.ts}`、`packages/editor-core/src/projection/{canvas.ts,projection.test.ts}`、`apps/web/src/shared/storage/index.ts`、`README.md`、`docs/HANDOFF_DESKTOP.md`、`docs/ADR/016-axs-narrative-language.md`、`docs/user/writing/axs-syntax.md`。**注意其中六个（`package.json`、`README.md`、`PromptExport.tsx`、`CharacterDetailPage.tsx`、`StoryEditPage.tsx`、`useProjectEditor.ts`、`editorProjection.ts`）在我动之前就已经带着别人的未提交改动** ⇒ `git add <文件>` 会把两份工作一起收进去，提交前必须逐文件 `git diff <文件>` 过一眼，或先问一句。
+- **本会话动过的文件**（提交时逐名点这些，别整目录扫）：`scripts/check-chain-tracked.mjs`、`scripts/desktop-http-inventory.mjs`、`scripts/file-size-baseline.json`、`package.json`（只加过 `check:tracked` 一行）、`e2e/desktop-http.spec.ts`（E62–E65）、`apps/web/src/shared/lib/clipboard.ts` ＋ `clipboard.test.ts`（**新文件，未跟踪**）、`apps/web/src/features/character/{components/PromptExport.tsx,pages/CharacterDetailPage.tsx,pages/StoryEditPage.tsx}`、`apps/web/src/features/studio/hooks/{useProjectEditor.ts,editorProjection.ts,editorProjection.test.ts}`、`apps/web/src/features/writer/lib/{projection.ts,projection.test.ts}`、`packages/editor-core/src/projection/{canvas.ts,projection.test.ts}`、`apps/web/src/shared/storage/index.ts`、`README.md`、`docs/HANDOFF.md`、`docs/ADR/016-axs-narrative-language.md`、`docs/user/writing/axs-syntax.md`。**注意其中六个（`package.json`、`README.md`、`PromptExport.tsx`、`CharacterDetailPage.tsx`、`StoryEditPage.tsx`、`useProjectEditor.ts`、`editorProjection.ts`）在我动之前就已经带着别人的未提交改动** ⇒ `git add <文件>` 会把两份工作一起收进去，提交前必须逐文件 `git diff <文件>` 过一眼，或先问一句。
 - **为什么此刻不开新切片（不是"没活"）**：能自主推进的都已闭合并各有见过红的牙。剩下的**全部欠一个外部输入**：① `git add` 那 43 个文件并提交（`check:tracked` 逐条点名；在此之前 "gates 0／e2e 77" 只是这台机器的读数，"CI 无桌面 job" 那条验收连讨论资格都没有）；② §6 的 **12 条定档**，其中 `S13-6`「那 13 条 `baselines` 归谁」一次解锁 ADR-029 两条验收，`定档①`（`/api/v1` 允许落点）四格输入已量齐；③ 真壳人工验收两格（素材到货、落盘与像素）；④ `pnpm e2e` 浏览器臂（经 :8000 写你的开发库）。另有两条在册小活不欠决策但欠工时：自动存档 **600ms 防抖**（#66）与 **术语表 glossary**（#58，组件零消费者）——它们都需要一次产品口径，不是我该拍的。
 - **一个收口建议**：把 ① 做掉，然后把 §6 的 12 条按"一句能拍"的先拍掉（`S13-6` → `定档①` → `ADR-029 未决第 2 条` nexus），这场重构就从"代码面已完成、事实面悬空"变成可发版状态。判据侧无需再加码：本轮之后新增的每一个缺陷都自带一条会红的腿。
 
@@ -5075,6 +5116,21 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
      折成 `""`，那是**第三种东西**，两边都不匹配 ⇒ 存进去却在所有列表里查不到；改成 `?? getCreatorId()`，零风险）。
      要问的是：**核心里要不要也补那条兜底**——补了要动两个后端的构造参数，
      而"一个没有作者的角色归谁"本身是个设计问题（与 ⑬ 同族的"仍在被引用的对象怎么办"）。
+   ⑰ **（复审 2026-10-18 新增）E40 / E43 两条 E2E 该怎么放：留在无后端配置、加桩、还是搬走**：
+     两条都在 `desktop-http.spec.ts`，都因**依赖后端**而在 `playwright.desktop.config.ts`（只起 vite）下红，
+     **实测对照已做：带后端 `pnpm e2e` 里 E40 ✓、不带时 ✗** ⇒ 依赖坐实、非产品回归。
+     三个候选，各有代价，**复审不单方面选**：
+     ① **按环境拆条**：E40 的「桌面态不给入口」留在桌面配置（它不需要后端），
+       「浏览器态能看到」搬进带后端那套；E43 同理按「被测对象 vs 观测面」拆。
+       **代价**：要动别人刚提交的测试的形状，且两半的前置不同（浏览器半要真后端、桌面半要注入标记）。
+     ② **给列表请求打桩**：用 `page.route()` 拦下页面级那几笔 `/api/v1`，让列表在无后端下也能 settle。
+       **代价**：**给测试宿主新增一种"假的云端形状"**，而项目此前明确拒绝过同类做法
+       （"为 UI 走不到的路径造工程"、plugin-dialog 那一腿宁可归真壳手验也不造 mock picker）。
+     ③ **接受现状、把它记成常驻红**：与 `check:desktop` / `check:apibase` 同列（"存在但不在链里"），
+       等桌面基线整体重排时一起处理。**代价**：`pnpm e2e:desktop` 长期不是全绿，
+       而"全绿"正是这条基线唯一的Signal——**这一条最接近本项目一贯的反面**，所以我不推荐。
+     另有一条**独立于上面三选**的事实值得记：E43 的**被测对象**（本地库重复导入）与**观测面**（HTTP 列表）不同源，
+     这本身可能是产品侧的一致性问题（本地库写入后列表为何不刷新），**值得单独查一次**，不要当成测试问题一并盖掉。
    ⑯ **（复审 2026-10-01 新增）`relationship` 族的键语法与另两族不一致，要不要统一、往哪边统一**：
      `character_state` 与 `codex` 是「切**第一个**点、**其余整体**当键」⇒ **键可以带点**；
      `relationship` 是「按点切、取第 3 段、**第 4 段起静默丢弃**」⇒ **键不能带点**，且**零诊断**。
@@ -5114,7 +5170,7 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
   产品 `apps/web/src/features/discover/pages/{DiscoverProjectDetailPage,DiscoverCharacterDetailPage,DiscoverItemDetailPage,DiscoverSceneDetailPage,DiscoverTopicPage,AuthorPage}.tsx`（6 个，桌面缺席闸门）；
   判据 `e2e/desktop-http.spec.ts`（E44 + CLOUD_ONLY_ROUTES）；
   工具 `scripts/{source-graph.mjs,cloud-callmap.mjs,desktop-http-inventory.mjs,check-dispatch-local.mjs,check-dead-surface.mjs,dead-surface-baseline.json}`；
-  文档 `README.md`、`docs/HANDOFF_DESKTOP.md`、`docs/REFACTOR_DESKTOP.md`、`docs/user/desktop/desktop-and-axsp.md`。
+  文档 `README.md`、`docs/HANDOFF.md`、`docs/REFACTOR.md`、`docs/user/desktop/desktop-and-axsp.md`。
   其中 `source-graph.mjs / cloud-callmap.mjs / check-dead-surface.mjs / dead-surface-baseline.json` 是**未跟踪新文件**（不 add 就永远不在树里，别的机器上门禁直接少四道）。
 - `??` 里剩下的都不是我的：`Clearance/`（未纳管、含 `.env`，**只读都不许**）、以及别人在飞的那几支。
   **未跟踪归属没有干净的机械信号**（mtime 与 `grep --include` 在 zsh 都会给假数），所以 add 名单只能这样人点名，别用 `git add -A` / `git add .`。
@@ -5166,7 +5222,7 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
   ——四批下来**静态分母一条没动**，因为这三批抵的全是判据层的账）· `pnpm check:citations` **0**（已判定 **234**）、
   `git diff --check` **0 行**、stash **0**、`.e2e-lock` 不存在、三引用仍重合（`1b9ca06`）。
   **这批改到的路径**（提交时逐条显式 add）：`e2e/desktop-http.spec.ts`（E48/E49/E50 三段）、
-  `apps/web/src/features/profile/pages/ProfilePage.tsx`（第五十五批那句文案）、`docs/HANDOFF_DESKTOP.md`、`README.md`。
+  `apps/web/src/features/profile/pages/ProfilePage.tsx`（第五十五批那句文案）、`docs/HANDOFF.md`、`README.md`。
   **产品代码在这三批里的净改动只有一处文案**（E48/E49/E50 三条判据都没逼出缺陷——这本身是要如实记的结论：
   "藏控件/藏入口/调用者侧闸门"这三种形状今天是对的，只是过去没人看着）。
 - **下一个最便宜的**（同一形状、不用新工具）：桌面的真角色详情页不给「关系」标签
@@ -5223,15 +5279,15 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
 - 不把 `backend/uv.lock`、`backend/app/domains/llm/providers/__init__.py` 或 `Clearance/` 纳入重构提交；只显式暂存目标路径，禁止 `git add -A` / `git add .`。
 - 不清理 dev 数据库中报告的测试工程残留（约 2638 条）除非获得明确决定；若获准，先 dump、再临时库 restore 并核对行数。
 - `e2e`、`e2e:desktop`、`e2e:ui` 共用 `.e2e-lock`，不得并跑、不得手动删锁。
-- 遵循 `REFACTOR_DESKTOP.md`：先替代后删除；变更前补能红的判据；文档/ADR/用户文档同轮同步；不提交、不推送、不改 tag，除非用户明确要求。
+- 遵循 `REFACTOR.md`：先替代后删除；变更前补能红的判据；文档/ADR/用户文档同轮同步；不提交、不推送、不改 tag，除非用户明确要求。
 
 ## 8. 文档可信度
 
-- `REFACTOR_DESKTOP.md` 的 checkbox 与本交接文档的最新补记是当前执行状态来源。
+- `REFACTOR.md` 的 checkbox 与本交接文档的最新补记是当前执行状态来源。
 - [ADR-029](./ADR/029-desktop-only-build-target.md) 是桌面唯一化的产品决策来源；ADR-025/027 分别定义对等视图与唯一 AXS 语法。
 - **Beat 目标寻址与同名消歧的权威是 [ADR-016](./ADR/016-axs-narrative-language.md) 的「补记 2026-09-30」一节**（六条契约 + 一条 lint 欠账）。改 `print.ts` / `axsImport.ts` / `projection/axs.ts` 之前先读它：序号规则是契约，不是当前实现的顺带行为。
 - `KERNEL_DESIGN.md` 是 L2–L4 的规约来源，其 §2.4 于 2026-09-30 起带一条状态注记，说明「AXS 文本 → 图」目前是**两套实现未归一**（不是已归一）。
-- [归档的 WEB_FEATURE_DISPOSITION](./archive/WEB_FEATURE_DISPOSITION.md) 是 2026-09-26 盘点快照，不是最新逐项状态；如与 `REFACTOR_DESKTOP.md` 冲突，以后者为准。
+- [归档的 WEB_FEATURE_DISPOSITION](./archive/WEB_FEATURE_DISPOSITION.md) 是 2026-09-26 盘点快照，不是最新逐项状态；如与 `REFACTOR.md` 冲突，以后者为准。
 - [归档路线与子产品计划](./README.md#归档)不再派生当前任务。
 
 ## 9. 文档自伤登记（2026-10-10 04:41 收束审计发现，**未处置**）
@@ -5247,15 +5303,15 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
 - 块 B＝第 2128 行 `# Axiforge…` 起…第 4285 行。**头部复量是旧的**（02:56／02:48／02:37／02:27），**台账完整到第一百一十批**（该批标题在 4277 行，全文件只此一处）。
 - 两块逐行 diff 差 **52 行**（`diff <(sed -n '1,2137p' F) <(sed -n '2139,4275p' F)`）。
 
-**为什么门禁没挡住（要登记的判据限度）**：`pnpm check:citations` 此时仍报 **0**——它验的是"被引用的 `路径:行号` 存在且在范围内"，而文内重复**两侧都能接住引用**，于是"指向内容错的那一份"也算绿。同理 README／§4 里任何 `docs/HANDOFF_DESKTOP.md:NNNN` 引用，今天有 52% 的前半概率落在错的那一份上。**这条限度是新的**：引用对账验不出"文档自己复制了一份"。
+**为什么门禁没挡住（要登记的判据限度）**：`pnpm check:citations` 此时仍报 **0**——它验的是"被引用的 `路径:行号` 存在且在范围内"，而文内重复**两侧都能接住引用**，于是"指向内容错的那一份"也算绿。同理 README／§4 里任何 `docs/HANDOFF.md:NNNN` 引用，今天有 52% 的前半概率落在错的那一份上。**这条限度是新的**：引用对账验不出"文档自己复制了一份"。
 
 **修法（下一轮做，需要一整轮预算，不要顺手删）**：
 1. 备份已在 `/tmp/HANDOFF_DESKTOP.pre-dedup-202601010-0440.md`（5235 行，`cmp -s` 与当时工作树**逐字节相同**）。
 2. 以**块 B 为正文**（它是唯一带着第一百零七～一百一十批的那一份），把块 A 头部那四条最新复量搬进 B 的头部、删掉 B 头部那四条旧复量，然后整体丢弃块 A，并把第 2128 行粘住的 `# Axiforge…` 从"第一百零六批第五面"那句里剥开——该句完整文本在 B 内。
 3. 完成后 `wc -l` 应≈**3110**（5235 − 2127 ± 搬行的几行），`grep -c '^## 1\.'` 应=**1**，`grep -c '^同日第一百一十批'` 应=**1**。
-4. **行数一变就要重读引用**（既有纪律）：`grep -rn 'HANDOFF_DESKTOP\.md:[0-9]' README.md docs/ e2e/ scripts/` 逐条打开看落点，再 `pnpm check:citations`。
+4. **行数一变就要重读引用**（既有纪律）：`grep -rn 'HANDOFF\.md:[0-9]' README.md docs/ e2e/ scripts/` 逐条打开看落点，再 `pnpm check:citations`。
 
-**为什么这一轮不修**：本文件在 HEAD 里只有 **83 行**（`git show HEAD:docs/HANDOFF_DESKTOP.md｜wc -l`）⇒ 这 5235 行台账**只活在未提交的工作树里，没有任何 git 恢复路径**。三块合并＋引用重读不是一轮能验完的量，做一半比现在更糟。**这同时也是 §6 那条"待 add 43 个文件"最硬的理由**：未提交的长文档一旦自我复制，没人能把它捞回来。
+**为什么这一轮不修**：本文件在 HEAD 里只有 **83 行**（`git show HEAD:docs/HANDOFF.md｜wc -l`）⇒ 这 5235 行台账**只活在未提交的工作树里，没有任何 git 恢复路径**。三块合并＋引用重读不是一轮能验完的量，做一半比现在更糟。**这同时也是 §6 那条"待 add 43 个文件"最硬的理由**：未提交的长文档一旦自我复制，没人能把它捞回来。
 
 ## 10. 进树（2026-10-10 05:00 两笔提交；**这是当前恢复点，取代 §6 上面那条 03:25**）
 
@@ -5287,7 +5343,7 @@ Phase 0“产品收敛与默认入口”已完成，细项见 `REFACTOR_DESKTOP.
 **「跑得起来≠跑得得过」由干净 clone 亲口判了**（`git worktree` 到 `/tmp/clonecheck`，`node_modules` 符号链接复用，不碰你的库、不跑 e2e）：
 
 1. clone 的 `pnpm typecheck` 起初**一个错**：`vite.config.ts:5` 要 `scripts/ports.d.mts`。这份**隐式伴随声明**没进树——`check:tracked` 的编译面只跟着显式 `from "…"` 走，而 `.d.mts` 不是任何人的 import 落点，**这一面结构性看不见它**。补进树（一笔）。
-2. clone 的 `pnpm gates` 起初断在 `check:citations`：ADR-028 与 REFACTOR_DESKTOP 引的 `engines.py`／`gateway.py`／`store.py` 住在本机隔壁那个**未纳管的 `Clearance/`** 里。本机磁盘上有 ⇒ 落 `skippedHit`；clone 没有 ⇒ 落 `missing` ⇒ **同一句引用两种读法**。加「仓外未纳管」档：手写 `(文档, 引用)` 清单、**在碰磁盘之前**判、身份不含行号、清单过期即 FAIL。
+2. clone 的 `pnpm gates` 起初断在 `check:citations`：ADR-028 与 REFACTOR 引的 `engines.py`／`gateway.py`／`store.py` 住在本机隔壁那个**未纳管的 `Clearance/`** 里。本机磁盘上有 ⇒ 落 `skippedHit`；clone 没有 ⇒ 落 `missing` ⇒ **同一句引用两种读法**。加「仓外未纳管」档：手写 `(文档, 引用)` 清单、**在碰磁盘之前**判、身份不含行号、清单过期即 FAIL。
 3. 修完：clone 上 `已判定 382`／`不存在 0`／`仓外 4 次`，与本机**逐字相同**；unit 全绿（143／96／192／325＋1skip／39）。
 
 **本轮我自己的三处量具缺陷（都是被对照抓的，不是被结果抓的）**：

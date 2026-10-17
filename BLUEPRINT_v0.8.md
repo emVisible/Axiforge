@@ -1,6 +1,6 @@
 # Build Blueprint v1.6 | Status: confirmed v1.0 → executing v1.6
 
-Version target: **v0.8** · Charter phase: **Phase 7 · 巨石清偿与运行时一致性**（`docs/REFACTOR_DESKTOP.md`）
+Version target: **v0.8** · Charter phase: **Phase 7 · 巨石清偿与运行时一致性**（`docs/REFACTOR.md`）
 Tier: Standard（8 节 · 单一执行权威）
 
 ---

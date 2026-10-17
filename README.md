@@ -43,7 +43,7 @@ pnpm dev:stack
 | `pnpm check:circular` | dpdm 循环依赖 = 0 |
 | `pnpm check:labels` | 表单标签的编程关联棘轮：扫 `apps/web` / `apps/admin` / `packages/ui` 三个界面层（门禁自报：2026-10-09 扫描 **205** 个文件、裸标签 0、基线 0），`htmlFor` / 命名分组（id 须真被 `aria-labelledby` 引用）/ 包裹型之外新增一处即失败（具名豁免在 `scripts/label-association-baseline.json`） |
 | `pnpm check:dispatch` | 分派口（`shared/storage/*Saves.ts`）里每个导出 async 函数都必须有本地分支——桌面唯一化后，"只走云端"的新函数就是给桌面留一个静默失败的入口。合法三档：本地那一支真 `await provider`、经兄弟分派口间接走、或带显式 `skipped-offline` 标记；正向 `if (isLocal()) {…}` 的证据只认它自己那个块（"本地空桩 + 块外真调"会红）。**两张面**（2026-10-09 扩）：`shared/storage/` 那族之外，`shared/api/draftDispatch.ts` 也在做本地/云端分派却按命名约定落在面外——本地证据因此多认两种形状：`await 注入的本地能力(…)`（AI 草稿族不走 Provider）与"退回规则保底"，而 **`remote` 被显式排除**（本地窗口里出现云端调用不算证据）。门禁自报：6 个文件（storage 5 + api 1）、导出 async 函数 **32** 个、形状 `after-guard=26 / positive-block=6`。牙齿两条各验过：把本地支改成只 `await draftDeps.remote(` ⇒ FAIL 点名两个函数；面二那个文件消失/改名 ⇒ 报"这张面正在静默消失"并 FAIL（面不会悄悄缩回一半）|
-| `pnpm check:publish` | 发布目标棘轮（ADR-029：桌面是唯一构建与发布目标）。命中两族形状：仓根的部署声明文件（vercel / netlify / docker-compose / Dockerfile / railway / fly）与 CI 里那行 `pnpm build:web && pnpm build:admin`。当前 **4 条残差具名登记在 `scripts/publish-target-baseline.json`**——它不判「这些该不该删」（那要产品定档，见 `docs/HANDOFF_DESKTOP.md` §6 第②条），只保证**不会悄悄多出第五件**；删掉一件须重跑 `node scripts/check-publish-target.mjs --update` 让基线缩短。牙齿验过：临时放一个 `netlify.toml` ⇒ FAIL 并点名，删掉 ⇒ OK |
+| `pnpm check:publish` | 发布目标棘轮（ADR-029：桌面是唯一构建与发布目标）。命中两族形状：仓根的部署声明文件（vercel / netlify / docker-compose / Dockerfile / railway / fly）与 CI 里那行 `pnpm build:web && pnpm build:admin`。当前 **4 条残差具名登记在 `scripts/publish-target-baseline.json`**——它不判「这些该不该删」（那要产品定档，见 `docs/HANDOFF.md` §6 第②条），只保证**不会悄悄多出第五件**；删掉一件须重跑 `node scripts/check-publish-target.mjs --update` 让基线缩短。牙齿验过：临时放一个 `netlify.toml` ⇒ FAIL 并点名，删掉 ⇒ OK |
 | `pnpm check:seams` | 桌面接缝判据棘轮（第 14 道）。命中一条机械特征：**引用了 Tauri / Electron 包，或直接读壳的全局句柄（`__TAURI_INTERNALS__`、`contextBridge`、`ipcRenderer`）的模块只在壳里跑到**；形状匹配只吃剥掉注释后的代码，而壳零 CI 信号、契约套件只跑 Memory/sql.js。三层判据——该模块要有同名测试文件；那个测试**必须真的 import 被测模块**（否则加个空测试就能骗过第一层）；那个测试**必须真下了断言**（数 `expect(...)` / `assert(...)`，先剥注释行，`expect(true)` 这类恒真断言另成一档）。扫描面是 `apps/` + `packages/`（2026-10-01 全仓普查 416 个源文件：`packages/*` 命中 0，但探针验过它会被抓住）。当前 9 个接缝：6 个有判据（真断言合计 **99**，2026-10-09 由门禁自己打印）、3 个具名登记在 `scripts/desktop-seam-baseline.json`（`desktopSmoke.ts` + `apps/nexus/electron/` 那两个，各自写着为什么不补的理由，补上后本表应变短） |
 | `pnpm check:citations` | 文档引用对账：`docs/**` 与两份根文档里写的 `路径:行号` 必须**文件存在且行号落在范围内**（条数以门禁自己打印的为准：2026-10-09 16:46 复扫 47 个文档、已判定 **243** 条、越界 5 全部在历史基线内）。今天三次按域外提把 `parse.ts` 从 600 行压到 331 行，文档里的旧坐标会指到文件外面——历史日志类引用冻结在 `scripts/doc-citation-baseline.json`（**5 条**在册，门禁打印数；清偿后应缩短），现状类 9 条已改到真实落点。自报限度：不判"那一行内容是否仍是当初那段代码"；同名/歧义路径与省略号写法跳过，但**各档计数打出来**（歧义 18、省略号 1、只落在被跳目录 4，2026-10-09 16:46 复扫），否则判据退化就是沉默放行 |
 | `pnpm check:dead-surface` | 死表面棘轮（第 15 道）。从**真入口** `apps/web/src/main.tsx` 走 import 闭包，闭包外的 `.ts/.tsx` 模块必须逐条在册（基线 `scripts/dead-surface-baseline.json`，10 条）。只用**闭包档**不用名字档：名字判据会被同名本地组件骗过去（实测 `shared/components/ItemCard.tsx` 已死而 `ItemsPage` 里有个同名本地 `function ItemCard` 在渲染）。被测试 import 的模块不算死（机制读者在册）；`*.test.tsx?` 自身不进基线。三条腿：新增死模块 ⇒ FAIL 点名；基线里有而实扫已无 ⇒ 提示跑 `--update` 缩短（具名基线不缩短等于没关）；面或闭包异常小 ⇒ `UNRELIABLE` 退出 1，绝不让"图没建起来"伪装成"没有死模块"。模块图与遮蔽口径来自 `scripts/source-graph.mjs`（与 `cloud:callmap` 同一真相源）。2026-10-09 16:37 实测：面 294 个文件、闭包内 245、闭包外 10（含两个零消费者 barrel：`shared/api/index.ts`、`shared/hooks/index.ts`；以及整条试玩云端通路 `shared/hooks/usePlayer.ts`） |解析 `apps/web/src/shared/api/**` 里每个 `xxxApi.method` 对应的 `动词 + 路径模板`，再扫界面侧的调用点，分六档：**死面**（无任何调用点）/ **仅 HTTP 实现侧**（只有 Provider 的 fallback 实现引用它）/ **绕过（无分派口引用）**（有界面调用点，但没有任何 `*Saves`/`assetPool*`/`achievementDefs` 引用这个函数 ⇒ 桌面态真会打到 `/api/v1` 的那一批）/ **已有分派口引用（云端是 fallback）** / **混合** / **调用者已接本地库**。2026-10-09 实测：端点定义 **95** 个（api 文件 19、消费者扫描 253 文件），六档 **11 / 9 / 34 / 27 / 6 / 8**（相加 = 95 才敢用；同一天早先的读数是 12/9/34/26/6/8，差别出在消费者面：把 `shared/api/` 整目录排除会连该层的分派口 `draftDispatch.ts` 一起排掉，`proseToScript` 因而被误报成死面——现已只排除"定义自身 + `client.ts` + barrel"）。跑不成会自己报 `UNRELIABLE` 并退出 1（api 目录读空或解析出 0 个端点）。表末另附一段**资源词元 → 本地表 / L4 契约方法**的并排事实（13 张表 / 39 个契约方法，词元按 `_` / camelCase 切开后**全等**比较，不做子串包含——包含匹配会把 `play` 匹到 `player_achievements`），只给匹配依据、不下结论：所以"匹配不到"只能当线索、"匹配到了"必须回代码核对（活例：`playerApi.getCharacterStates` 命中 `characters` 词元，但它是试玩会话里的角色状态，不是角色记录）。 **2026-10-09 加第二档＝多余的对外出口（导出级）**：模块在闭包内、但某个**具名值导出**零外部读者——直接证据是 `shared/lib/identityLink.ts` 的三个身份绑定导出全仓没人 import，而模块因为 `reportContent` 活着，所以**模块级判据结构性看不见「活着的面包着死的口」**。基线 `scripts/dead-export-baseline.json` 具名在册（实测 24 条／闭包内 245 个模块的 340 个具名值导出），多一条就红并点名。**口径要说准**：这一档说的是**对外暴露面宽了**，不是函数死了（同一符号在本文件内部完全可能还在用——`linkPlayerEmail` 就调 `linkCreatorEmail`）；参考池按**名字**数读者、保留字符串内容、且比导出面宽（含测试／`e2e/`／`scripts/`／admin／packages），所以它刻意**少判死不判死**（把活代码判成死是图判据最坏的方向）。类型与 `default` 导出不参与。四条腿：面或池异常小／对照组不成立／合成自测不成立 ⇒ `UNRELIABLE`；新增 ⇒ `FAIL` 点名；基线不在 ⇒ `UNRELIABLE`。牙（三次变异各见过红）：给活模块加一个没人 import 的导出 ⇒ 点名 `identityLink.ts :: b82ProbeUnused`；从基线删一条在册项 ⇒ 点名那条；把谓词退化成「什么都算有读者」⇒ 自测 2/4 且对照组失败 ⇒ 退出码 1。
@@ -93,19 +93,19 @@ backend/
   app/main.py      迁移期 API 与测试宿主（计划按 S13 退场）
   app/domains/     迁移期服务端域；桌面创作不以其运行作为前置
 docs/
-  HANDOFF_DESKTOP.md   桌面化重构的交接快照：当前边界、待决项按谁能推进分档、禁区
-  REFACTOR_DESKTOP.md  desktop 分支执行宪章与阶段计划
+  HANDOFF.md   桌面化重构的交接快照：当前边界、待决项按谁能推进分档、禁区
+  REFACTOR.md  主线执行宪章与阶段计划
   KERNEL_DESIGN.md     L2–L4 内核构建规约
   ADR/                 架构决策记录
   user/                用户文档（开发时见 http://localhost:5174/docs）
 ```
 
-分层与依赖方向铁律见 `docs/KERNEL_DESIGN.md`；桌面化战略与阶段验收见 `docs/REFACTOR_DESKTOP.md`；
-**要接手桌面化剩下的工作，先读 `docs/HANDOFF_DESKTOP.md`**（它登记边界与待决形状，不替代上面两份）。
+分层与依赖方向铁律见 `docs/KERNEL_DESIGN.md`；桌面化战略与阶段验收见 `docs/REFACTOR.md`；
+**要接手桌面化剩下的工作，先读 `docs/HANDOFF.md`**（它登记边界与待决形状，不替代上面两份）。
 
 ## Legacy Web / API Development
 
-PostgreSQL 与 API 仅供旧栈调试、迁移与回归测试使用，不是桌面创作器的运行依赖（`vercel.json` 那条见下方「Legacy Web Deployment」，它当前构建不起来）。相关实现按 `docs/REFACTOR_DESKTOP.md` 的 S13 顺序处置。
+PostgreSQL 与 API 仅供旧栈调试、迁移与回归测试使用，不是桌面创作器的运行依赖（`vercel.json` 那条见下方「Legacy Web Deployment」，它当前构建不起来）。相关实现按 `docs/REFACTOR.md` 的 S13 顺序处置。
 
 ## Database
 

@@ -4,6 +4,6 @@
     "docs/ADR/028-moderation-decision-layer-in-admin.md|engines.py",
     "docs/ADR/028-moderation-decision-layer-in-admin.md|gateway.py",
     "docs/ADR/028-moderation-decision-layer-in-admin.md|store.py",
-    "docs/REFACTOR_DESKTOP.md|gateway.py"
+    "docs/REFACTOR.md|gateway.py"
   ]
 }

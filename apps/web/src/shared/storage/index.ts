@@ -156,7 +156,7 @@ export async function createStorageProvider(): Promise<StorageProvider> {
    * 骗不过 Rust 连接，所以「桌面点击路径」（新建/删除剧本）结构上无法被 e2e 断言——
    * 有了一条真能读写的路径，才谈得上测它。
    * 只在 DEV 生效：`import.meta.env.DEV` 在生产构建里被静态替换成 `false`，整段成为死代码，
-   * 发布产物里连这个查询参数的字面量都不留（构建后可 grep dist 验证，见 REFACTOR_DESKTOP 的 S13-5 条）。
+   * 发布产物里连这个查询参数的字面量都不留（构建后可 grep dist 验证，见 REFACTOR 的 S13-5 条）。
    */
   if (
     import.meta.env.DEV &&

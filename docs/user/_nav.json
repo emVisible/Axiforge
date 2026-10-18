@@ -1,5 +1,15 @@
 [
   {
+    "section": "桌面版",
+    "items": [
+      {
+        "slug": "desktop/desktop-and-axsp",
+        "title": "桌面版与工程包",
+        "order": 1
+      }
+    ]
+  },
+  {
     "section": "写作",
     "items": [
       {

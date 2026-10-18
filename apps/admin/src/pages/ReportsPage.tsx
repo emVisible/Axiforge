@@ -6,25 +6,31 @@ import {
   ErrorDisplay,
   LoadingSpinner,
   PageHeader,
+  Pagination,
   SegmentedControl,
   useToast,
 } from "@axiforge/ui";
 import {
   adminApi,
   type AdminCommentSnippet,
+  type PaginatedResponse,
   type AdminReport,
   type AuthorModerationProfile,
+  type AutoJudgement,
 } from "@/api/adminClient";
 import ModerationPreviewPanel from "@/components/ModerationPreviewPanel";
 import { useAdminInvalidation, useAdminList } from "@/hooks/useAdminList";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
 import {
   countSiblingReports,
+  engineSilenceNote,
   formatReportTime,
   reportSummaryLine,
   reportTargetKey,
   targetTypeLabel,
 } from "@/lib/moderation";
+
+const PAGE_SIZE = 25;
 
 type ReportTab = "pending" | "resolved" | "dismissed";
 
@@ -36,16 +42,21 @@ interface PendingAction {
 export default function ReportsPage() {
   const [tab, setTab] = useState<ReportTab>("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data: items, loading, error, setError, reload } = useAdminList<AdminReport[]>({
-    queryKey: adminQueryKeys.reports(tab),
-    fetcher: () => adminApi.reports(tab),
-  });
+  const [page, setPage] = useState(0);
+  const { data, loading, error, setError, reload } =
+    useAdminList<PaginatedResponse<AdminReport>>({
+      queryKey: adminQueryKeys.reports(tab, page),
+      fetcher: () => adminApi.reports({ status: tab, limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+    });
+  const items = data?.items ?? null;
   const { invalidateStats } = useAdminInvalidation();
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [contextComments, setContextComments] = useState<AdminCommentSnippet[]>([]);
   const [authorProfile, setAuthorProfile] = useState<AuthorModerationProfile | null>(null);
+  const [autoJudgement, setAutoJudgement] = useState<AutoJudgement | null>(null);
   const [hidingCommentId, setHidingCommentId] = useState<string | null>(null);
+  const [rejudging, setRejudging] = useState(false);
   const { showToast } = useToast();
 
   const selected = items?.find((r) => r.id === selectedId) ?? items?.[0] ?? null;
@@ -67,6 +78,11 @@ export default function ReportsPage() {
     return items.filter((r) => reportTargetKey(r) === key);
   }, [items, selected]);
 
+  // 换 Tab 必须回第一页：偏移量属于上一个筛选条件，留着会停在一个空窗口上
+  useEffect(() => {
+    setPage(0);
+  }, [tab]);
+
   useEffect(() => {
     if (items?.length && !items.some((r) => r.id === selectedId)) {
       setSelectedId(items[0].id);
@@ -74,19 +90,23 @@ export default function ReportsPage() {
     if (!items?.length) setSelectedId(null);
   }, [items, selectedId]);
 
-  const loadContext = useCallback(async (report: AdminReport | null) => {
+  const loadContext = useCallback(async (report: AdminReport | null): Promise<AutoJudgement | null> => {
     if (!report) {
       setContextComments([]);
       setAuthorProfile(null);
-      return;
+      setAutoJudgement(null);
+      return null;
     }
     try {
       const ctx = await adminApi.moderationContext(report.target_type, report.target_id);
       setContextComments(ctx.related_comments);
       setAuthorProfile(ctx.author_profile);
+      setAutoJudgement(ctx.auto_judgement);
+      return ctx.auto_judgement;
     } catch {
       setContextComments([]);
       setAuthorProfile(null);
+      return null;
     }
   }, []);
 
@@ -106,7 +126,9 @@ export default function ReportsPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (pending || busy) return;
+      // 重判在途时禁止切换条目：两个 loadContext 并发时后写的那份会盖掉前一份，
+      // 面板就会把上一个条目的机器结论显示在当前条目上。
+      if (pending || busy || rejudging) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
@@ -126,7 +148,7 @@ export default function ReportsPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pending, busy, selectByOffset, selected, tab]);
+  }, [pending, busy, rejudging, selectByOffset, selected, tab]);
 
   const resolve = async (note?: string) => {
     if (!pending) return;
@@ -159,6 +181,37 @@ export default function ReportsPage() {
       setError(e instanceof Error ? e.message : "下架评论失败");
     } finally {
       setHidingCommentId(null);
+    }
+  };
+
+  /**
+   * 手动让模型用**全文**重判一次。路由返回的是判定结果而非面板那份契约，
+   * 所以结束后必须重新读 context——不能把内存里的旧结论就地改写。
+   *
+   * 提示语区分三种真实结果：模型没答话（后端保留上次结论，只加一行依据）、
+   * 内容与策略都没变（命中指纹缓存，结论不动只多一行判断记录）、结论真的变了。
+   * 第一种最容易被当成第二种：两者 `decided_at` 都不动，但含义完全不同。
+   */
+  const rejudge = async () => {
+    if (!selected || !autoJudgement) return;
+    const before = autoJudgement.decided_at;
+    setRejudging(true);
+    try {
+      await adminApi.moderationRejudge(autoJudgement.case_id);
+      const after = await loadContext(selected);
+      const silence = engineSilenceNote(after?.reasons);
+      showToast(
+        silence
+          ? `这台模型没答话——${after?.authoritative ? "上次模型结论已保留" : "这次只到词表那一层"}：${silence}`
+          : after?.decided_at === before
+            ? "已按全文送判：结论未变，判断记录加了一行"
+            : "模型结论已更新",
+        silence ? "error" : "success",
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "重判失败", "error");
+    } finally {
+      setRejudging(false);
     }
   };
 
@@ -235,6 +288,14 @@ export default function ReportsPage() {
                 );
               })}
             </ul>
+            <div className="border-t border-border px-1">
+              <Pagination
+                page={page}
+                pageSize={PAGE_SIZE}
+                total={data?.total ?? 0}
+                onPageChange={setPage}
+              />
+            </div>
           </div>
 
           <ModerationPreviewPanel
@@ -243,11 +304,14 @@ export default function ReportsPage() {
             siblingReports={siblingReports}
             relatedComments={contextComments}
             authorProfile={authorProfile}
+            autoJudgement={autoJudgement}
             busy={busy}
             hidingCommentId={hidingCommentId}
             onHideComment={tab === "pending" ? hideComment : undefined}
             onDismiss={() => selected && setPending({ report: selected, action: "dismiss" })}
             onTakeDown={() => selected && setPending({ report: selected, action: "take_down" })}
+            onRejudge={autoJudgement ? rejudge : undefined}
+            rejudging={rejudging}
           />
         </div>
       )}

@@ -61,7 +61,7 @@ export default function DiscoverGrovePanel() {
           {activity.map(({ label, value, icon: Icon }) => (
             <div
               key={label}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-panel px-2.5 py-1 text-[10px] text-ink-muted"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-panel px-2.5 py-1 text-3xs text-ink-muted"
             >
               <Icon className="h-3 w-3 text-ink-faint" />
               <span className="font-medium text-ink">{value}</span>
@@ -75,7 +75,7 @@ export default function DiscoverGrovePanel() {
         {counts.map((item) => (
           <div
             key={item.label}
-            className="rounded-full border border-border bg-panel px-2.5 py-1 text-[10px] text-ink-muted"
+            className="rounded-full border border-border bg-panel px-2.5 py-1 text-3xs text-ink-muted"
           >
             <span className="font-medium text-ink">{item.value}</span>
             <span className="ml-1">{item.label}</span>
@@ -111,7 +111,7 @@ export default function DiscoverGrovePanel() {
                   )
                 }
                 footer={
-                  <span className="text-[10px] text-ink-faint">
+                  <span className="text-3xs text-ink-faint">
                     {p.play_count} 次游玩
                   </span>
                 }

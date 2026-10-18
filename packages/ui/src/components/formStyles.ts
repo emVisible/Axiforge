@@ -2,18 +2,18 @@
 
 export const inputBase =
   "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-ink " +
-  "placeholder:text-ink-muted/50 transition-all duration-200 outline-none " +
+  "placeholder:text-ink-muted/50 transition-[border-color,box-shadow,background-color,color] duration-200 outline-none " +
   "hover:border-border-strong focus:border-brand focus:ring-2 focus:ring-brand/15 " +
   "disabled:cursor-not-allowed disabled:opacity-50";
 
 export const inputSm =
   "w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink " +
-  "placeholder:text-ink-muted/50 transition-all duration-200 outline-none " +
+  "placeholder:text-ink-muted/50 transition-[border-color,box-shadow,background-color,color] duration-200 outline-none " +
   "hover:border-border-strong focus:border-brand focus:ring-2 focus:ring-brand/15";
 
 export const inputCompact =
   "w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-[11px] text-ink " +
-  "placeholder:text-ink-muted/50 transition-all duration-200 outline-none " +
+  "placeholder:text-ink-muted/50 transition-[border-color,box-shadow,background-color,color] duration-200 outline-none " +
   "hover:border-border-strong focus:border-brand focus:ring-1 focus:ring-brand/15";
 
 export const inputError =

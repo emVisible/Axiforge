@@ -1,0 +1,9 @@
+[project]
+name = "axiforge-laya-sidecar"
+version = "0.1.0"
+description = "Axiforge 中台的 Laya 决策服务（torch 系重依赖隔离在此 venv，后端只走 HTTP）"
+requires-python = ">=3.10"
+dependencies = ["laya @ git+https://github.com/NandhaKishorM/laya.git@010bace"]
+
+[tool.uv]
+package = false

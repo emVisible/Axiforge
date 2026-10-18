@@ -13,6 +13,7 @@ import {
   CardOverflowMenu,
   CoverCard,
   EmptyState,
+  ErrorDisplay,
   LoadingSpinner,
   WorkflowGuide,
   useCardTheme,
@@ -33,6 +34,11 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
   const [items, setItems] = useState<ProjectResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  /** 请求失败必须与「库里确实没有内容」区分开：原先只有 try/finally 无 catch，
+   *  失败时 items 停在 []，页面照样渲染空态——公开发现页上的真实缺陷 */
+  const [error, setError] = useState<unknown>(null);
+  /** 重试要真的重新发请求：把 tick 放进 effect 依赖，否则按钮是死的 */
+  const [reloadTick, setReloadTick] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [reportingId, setReportingId] = useState<string | null>(null);
 
@@ -58,8 +64,11 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
           search: debouncedSearch || undefined,
         });
         if (cancelled) return;
+        setError(null);
         setTotal(data.total);
         setItems((prev) => (page === 0 ? data.items : [...prev, ...data.items]));
+      } catch (e) {
+        if (!cancelled) setError(e);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -71,7 +80,7 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
     return () => {
       cancelled = true;
     };
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, reloadTick]);
 
   const openProject = (projectId: string) => {
     navigate(routes.discoverProject(projectId));
@@ -101,7 +110,11 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
         </div>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && !!error && (
+        <ErrorDisplay message="剧本清单加载失败" onRetry={() => setReloadTick((t) => t + 1)} />
+      )}
+
+      {!loading && !error && items.length === 0 && (
         <EmptyState
           framed
           title={debouncedSearch ? "没有匹配的作品" : "还没有公开作品"}
@@ -159,7 +172,7 @@ export default function DiscoverProjectsTab({ search }: DiscoverProjectsTabProps
                   )
                 }
                 footer={
-                  <div className={`flex items-center gap-3 text-[11px] ${t.meta}`}>
+                  <div className={`flex items-center gap-3 text-2xs ${t.meta}`}>
                     {p.genre && <span>{p.genre}</span>}
                     <span className="flex items-center gap-1">
                       <Eye className="h-3 w-3" strokeWidth={1.75} />

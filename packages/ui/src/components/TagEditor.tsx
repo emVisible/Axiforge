@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useId, type KeyboardEvent } from "react";
 
 import Badge from "./Badge";
 import type { BadgeVariant } from "./Badge";
@@ -27,6 +27,7 @@ export default function TagEditor({
   placeholder = "添加标签",
   variant = "brand",
 }: TagEditorProps) {
+  const labelId = useId();
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.nativeEvent.isComposing) {
       e.preventDefault();
@@ -36,9 +37,10 @@ export default function TagEditor({
 
   return (
     <div>
-      <label className={labelSm}>{label}</label>
+      <label id={labelId} className={labelSm}>{label}</label>
       <div className="mb-2 flex gap-2">
         <Input
+          aria-labelledby={labelId}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}

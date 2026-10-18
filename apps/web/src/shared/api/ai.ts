@@ -2,12 +2,17 @@ import type { Instruction } from "@axiforge/core";
 import { apiClient } from "./client";
 import type { CharacterData } from "@/shared/types/character";
 
+export interface ProseToScriptResult {
+  script: Instruction[];
+  source: string;
+  /** canonical AXS 文本；模型路径下它是唯一产物 */
+  axs: string;
+  needs_parse: boolean;
+}
+
 export const aiApi = {
   proseToScript: (body: { prose: string; role_names?: string[]; author_id?: string }) =>
-    apiClient.post<{ script: Instruction[]; source: string }>(
-      "/editor/ai/prose-to-script",
-      body,
-    ),
+    apiClient.post<ProseToScriptResult>("/editor/ai/prose-to-script", body),
 
   proseToAxs: (body: {
     prose: string;

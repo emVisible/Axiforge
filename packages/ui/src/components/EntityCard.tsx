@@ -102,7 +102,7 @@ export default function EntityCard({
             type="button"
             onClick={handleDelete}
             className={cn(
-              "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100",
+              "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg opacity-0 transition-opacity group-hover:opacity-100",
               t.deleteBtn,
             )}
             aria-label="删除"
@@ -115,7 +115,7 @@ export default function EntityCard({
         <div className="flex flex-wrap items-center gap-1.5">
           {badges}
           {meta && (
-            <span className={cn("ml-auto text-[10px]", t.meta)}>{meta}</span>
+            <span className={cn("ml-auto text-3xs", t.meta)}>{meta}</span>
           )}
         </div>
       )}

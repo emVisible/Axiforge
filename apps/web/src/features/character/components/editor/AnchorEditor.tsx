@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useEditorStore } from "@/shared/stores/editorStore";
 import { Badge, ImageUpload, Input, ToggleInput } from "@/shared/components/ui";
 import TemplateSelector from "../TemplateSelector";
@@ -19,6 +19,7 @@ export default function AnchorEditor({
 }: AnchorEditorProps) {
   const { draft, updateField } = useEditorStore();
   const [tagInput, setTagInput] = useState("");
+  const tagLabelId = useId();
   if (!draft) return null;
 
   const addTag = () => {
@@ -97,11 +98,12 @@ export default function AnchorEditor({
       />
 
       <div>
-        <label className="block text-sm font-medium text-ink mb-1.5">
+        <label htmlFor={tagLabelId} className="block text-sm font-medium text-ink mb-1.5">
           标签
         </label>
         <div className="mb-2 flex items-center gap-2">
           <Input
+            id={tagLabelId}
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={handleTagKeyDown}

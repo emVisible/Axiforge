@@ -19,7 +19,8 @@ import MasterTimelineBar from "./MasterTimelineBar";
 import TransportBar from "./TransportBar";
 import OutlinerPanel from "./outliner/OutlinerPanel";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
-import { clipLabel, patchClipDuration, reorderScriptWithinTrack, totalDurationMs, indicesOnTrack, type CutTrackId } from "./timelineUtils";
+import MiniAxsEditor from "./MiniAxsEditor";
+import { clipLabel, patchClipDuration, reorderScriptByIndices, totalDurationMs, indicesOnTrack, characterTrackGroups, insertShowInstruction, type CutTrackId } from "./timelineUtils";
 import {
   buildMasterTimeline,
   locateMasterPosition,
@@ -183,11 +184,30 @@ export default function CutStudioView({
   const beatIdRef = useRef<string | null>(null);
 
   const handleReorderTrack = useCallback(
-    (trackId: CutTrackId, fromLocal: number, toLocal: number) => {
-      const next = reorderScriptWithinTrack(script, trackId, fromLocal, toLocal);
+    (trackKey: string, fromLocal: number, toLocal: number) => {
+      // 轨道键：char:<characterId> 角色轨（F2）| 其余为固定轨
+      const indices = trackKey.startsWith("char:")
+        ? (characterTrackGroups(script).find(
+            (g) => `char:${g.characterId}` === trackKey,
+          )?.indices ?? [])
+        : indicesOnTrack(script, trackKey.slice(4) as CutTrackId);
+      const next = reorderScriptByIndices(script, indices, fromLocal, toLocal);
       onScriptChange(next);
-      const indices = indicesOnTrack(next, trackId);
-      selectClip(indices[toLocal] ?? 0);
+      const nextIndices = trackKey.startsWith("char:")
+        ? (characterTrackGroups(next).find(
+            (g) => `char:${g.characterId}` === trackKey,
+          )?.indices ?? [])
+        : indicesOnTrack(next, trackKey.slice(4) as CutTrackId);
+      selectClip(nextIndices[toLocal] ?? 0);
+    },
+    [script, onScriptChange, selectClip],
+  );
+
+  const handleSpriteDrop = useCallback(
+    (characterId: string, expression: string, insertIndex: number) => {
+      const next = insertShowInstruction(script, insertIndex, characterId, expression);
+      onScriptChange(next);
+      selectClip(Math.min(insertIndex, next.length - 1));
     },
     [script, onScriptChange, selectClip],
   );
@@ -357,6 +377,44 @@ export default function CutStudioView({
         deleteClipAt(selectedIndex);
         return;
       }
+      // ArrowLeft/Right: 逐 clip 导航
+      if (e.key === "ArrowLeft" && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        stepPrev();
+        return;
+      }
+      if (e.key === "ArrowRight" && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        stepNext();
+        return;
+      }
+      // Alt+ArrowUp/Down: 在脚本内重排选中 clip（上移/下移一位）
+      if (e.key === "ArrowUp" && e.altKey && script.length > 1) {
+        e.preventDefault();
+        if (selectedIndex > 0) {
+          const next = [...script];
+          [next[selectedIndex - 1], next[selectedIndex]] = [next[selectedIndex], next[selectedIndex - 1]];
+          onScriptChange(next);
+          selectClip(selectedIndex - 1);
+        }
+        return;
+      }
+      if (e.key === "ArrowDown" && e.altKey && script.length > 1) {
+        e.preventDefault();
+        if (selectedIndex < script.length - 1) {
+          const next = [...script];
+          [next[selectedIndex], next[selectedIndex + 1]] = [next[selectedIndex + 1], next[selectedIndex]];
+          onScriptChange(next);
+          selectClip(selectedIndex + 1);
+        }
+        return;
+      }
+      // Cmd/Ctrl+D: 复制选中 clip
+      if (e.key === "d" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        duplicateClip();
+        return;
+      }
       if (e.key === "\\" && !e.shiftKey) {
         e.preventDefault();
         toggleOutliner();
@@ -385,6 +443,10 @@ export default function CutStudioView({
     script.length,
     selectedIndex,
     deleteClipAt,
+    stepPrev,
+    stepNext,
+    duplicateClip,
+    onScriptChange,
   ]);
 
   useEffect(() => {
@@ -398,6 +460,12 @@ export default function CutStudioView({
     : undefined;
 
   const selectedClip = script[selectedIndex];
+
+  const miniRoles = useMemo(
+    () => Object.fromEntries(projectRoles.map((r) => [r.name, r.characterRefId])),
+    [projectRoles],
+  );
+  const miniRoleNames = useMemo(() => projectRoles.map((r) => r.name), [projectRoles]);
 
   return (
     <>
@@ -487,7 +555,12 @@ export default function CutStudioView({
           onScrub={(index) => {
             scrubTo(index);
           }}
+          characterLabels={Object.fromEntries(
+            projectRoles.map((r) => [r.characterRefId, r.name]),
+          )}
           onReorderTrack={handleReorderTrack}
+          onSpriteDrop={handleSpriteDrop}
+          effects={effects as never[]}
           onDeleteClip={(index) => {
             selectClip(index);
             deleteClipAt(index);
@@ -503,10 +576,10 @@ export default function CutStudioView({
             <div className="shrink-0 border-b border-border bg-surface-raised px-3 py-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-medium uppercase tracking-wider text-ink-faint">
+                  <p className="text-3xs font-medium uppercase tracking-wider text-ink-faint">
                     当前片段
                   </p>
-                  <p className="truncate text-[11px] text-ink">
+                  <p className="truncate text-2xs text-ink">
                     #{selectedIndex + 1} · {selectedClip.op} · {clipLabel(selectedClip)}
                   </p>
                 </div>
@@ -530,6 +603,17 @@ export default function CutStudioView({
                 </div>
               </div>
             </div>
+          )}
+          {activePanel === "script" && selectedNode && (
+            <MiniAxsEditor
+              script={script}
+              selectedIndex={selectedIndex}
+              beatTitle={beatTitle ?? "未命名"}
+              roles={miniRoles}
+              roleNames={miniRoleNames}
+              onSelectClip={selectClip}
+              onScriptChange={onScriptChange}
+            />
           )}
           <div className="min-h-0 flex-1 overflow-hidden">
             <NodeInspectorPanel

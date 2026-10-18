@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Plus, Package } from "lucide-react";
 
 import { useItems, useCreateItem, useDeleteItem } from "@/shared/hooks/useAssets";
@@ -16,6 +16,7 @@ import {
   Modal,
   ModalActions,
   PageHeader,
+  QueryStatePanel,
   Select,
   Textarea,
   WorkflowGuide,
@@ -23,6 +24,7 @@ import {
 import type { AssetItemResponse } from "@/shared/types/asset";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import { ITEM_WORKFLOW } from "@/shared/lib/workflowSteps";
+import { resolveQueryState } from "@/shared/lib/queryState";
 
 const ITEM_CATEGORIES = ["日常", "魔幻", "科技", "关键道具"];
 const ITEM_RARITIES = ["普通", "稀有", "传说"];
@@ -93,9 +95,11 @@ const emptyForm = {
 export default function ItemsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const mechanismTagId = useId();
+  const effectTagId = useId();
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const { data: items, isLoading } = useItems({ author_id: getCreatorId() });
+  const { data: items, isLoading, error } = useItems({ author_id: getCreatorId() });
   const createItem = useCreateItem();
   const deleteItem = useDeleteItem();
 
@@ -238,11 +242,12 @@ export default function ItemsPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor={mechanismTagId} className="mb-1.5 block text-xs font-medium text-ink-muted">
               机制标签
             </label>
             <div className="mb-2 flex gap-2">
               <Input
+                id={mechanismTagId}
                 value={form.tagInput}
                 onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
                 onKeyDown={(e) => {
@@ -278,11 +283,12 @@ export default function ItemsPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor={effectTagId} className="mb-1.5 block text-xs font-medium text-ink-muted">
               效果标签
             </label>
             <div className="mb-2 flex gap-2">
               <Input
+                id={effectTagId}
                 value={form.effectInput}
                 onChange={(e) =>
                   setForm({ ...form, effectInput: e.target.value })
@@ -336,21 +342,24 @@ export default function ItemsPage() {
         </div>
       </Modal>
 
-      {isLoading && (
-        <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
-      )}
-      {!isLoading && !filteredItems.length && (
-        <EmptyState
-          icon={Package}
-          title={categoryFilter ? "该分类下暂无道具" : "还没有道具"}
-          description="创建第一个道具"
-        >
-          {!categoryFilter && (
-            <WorkflowGuide steps={ITEM_WORKFLOW} compact className="max-w-2xl" />
-          )}
-        </EmptyState>
-      )}
-      {filteredItems.length > 0 && (
+      <QueryStatePanel
+        state={resolveQueryState({ isLoading, error, count: filteredItems.length })}
+        error={error}
+        errorTitle="道具清单读取失败"
+        onRetry={() => window.location.reload()}
+        loading={<p className="py-10 text-center text-sm text-ink-muted">加载中...</p>}
+        empty={
+          <EmptyState
+            icon={Package}
+            title={categoryFilter ? "该分类下暂无道具" : "还没有道具"}
+            description="创建第一个道具"
+          >
+            {!categoryFilter && (
+              <WorkflowGuide steps={ITEM_WORKFLOW} compact className="max-w-2xl" />
+            )}
+          </EmptyState>
+        }
+      >
         <CardGrid>
           {filteredItems.map((item) => (
             <ItemCard
@@ -362,7 +371,7 @@ export default function ItemsPage() {
             />
           ))}
         </CardGrid>
-      )}
+      </QueryStatePanel>
     </Shell>
   );
 }

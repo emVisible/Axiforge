@@ -17,6 +17,7 @@ from app.domains.assets.router import routers as assets_routers
 from app.domains.character.router import routers as character_routers
 from app.domains.narrative.router import routers as narrative_routers
 from app.domains.llm.router import router as llm_router
+from app.domains.moderation.router import moderation_router
 from app.domains.platform.admin_router import admin_router
 from app.domains.platform.router import routers as platform_routers
 from app.domains.platform.search_router import router as search_router
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
         application.include_router(r)
     application.include_router(admin_router)
     application.include_router(llm_router)
+    application.include_router(moderation_router)
     application.include_router(ginkgo_router)
     application.include_router(nexus_router)
 

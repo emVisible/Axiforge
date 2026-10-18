@@ -10,14 +10,17 @@
   --ax-surface-raised: #ffffff;
   --ax-panel: #f0eeea;
   --ax-panel-raised: #e8e6e0;
+  /* 压在深色遮罩/封面图上时用的墨色：不随主题翻转，因为遮罩本身恒暗 */
+  --ax-ink-on-scrim: #f8f7f4;
   --ax-ink: #1f2937;
-  --ax-ink-muted: #6b7280;
-  --ax-ink-faint: #9ca3af;
+  --ax-ink-muted: #616975;
+  --ax-ink-faint: #7f8794;
   --ax-border: #e5e7eb;
   --ax-border-strong: #d1d5db;
-  --ax-accent: #c4944a;
+  --ax-accent: #b07d33;
   --ax-accent-soft: #6c8cff;
   --ax-danger: #dc2626;
+  --ax-on-brand: #ffffff;
   --ax-scrollbar: #d1d5db;
   --ax-scrollbar-hover: #9ca3af;
   --ax-font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -30,21 +33,36 @@
   --ax-canvas: #0e0e14;
   --ax-surface: #16161e;
   --ax-surface-raised: #1a1a22;
+  --ax-ink-on-scrim: #f2f0ec;
   --ax-panel: #14141c;
   --ax-panel-raised: #1e1e28;
   --ax-ink: #e8e8f0;
   --ax-ink-muted: #8a8aa0;
-  --ax-ink-faint: #5a5a6a;
+  --ax-ink-faint: #6f6f85;
   --ax-border: #2a2a36;
   --ax-border-strong: #3a3a48;
   --ax-accent: #d4a44a;
   --ax-accent-soft: #6c8cff;
   --ax-danger: #f87171;
   --ax-scrollbar: #3a3a48;
+  --ax-on-brand: #14141c;
   --ax-scrollbar-hover: #5a5a6a;
 }
 
 @theme {
+  /*
+   * 字阶低端。此前 12px 以下没有任何有名分的档位，于是全仓散落 168 处
+   * text-[9px]/[10px]/[11px] 任意值——三个微标签字号各写各的、没有语义，
+   * 且 9px 对中文可读性不友好。3xs/2xs 给它们一个可命名的落点；低于 3xs 不再提供。
+   *
+   * 刻意**不**定义 --*-line-height：Tailwind 的 text-[10px] 只设 font-size，
+   * 令牌若连带设行高，那 122 处任意值的迁移就会各自被改一次行高，
+   * 「等价替换」立刻不成立。行高仍由各处 leading-* 或继承决定。
+   * 1rem = 16px（全站未覆写根字号），故 3xs 恰为 10px、2xs 恰为 11px。
+   */
+  --text-3xs: 0.625rem;
+  --text-2xs: 0.6875rem;
+
   --color-brand: var(--ax-brand);
   --color-brand-hover: var(--ax-brand-hover);
   --color-brand-muted: var(--ax-brand-muted);
@@ -56,6 +74,8 @@
   --color-ink: var(--ax-ink);
   --color-ink-muted: var(--ax-ink-muted);
   --color-ink-faint: var(--ax-ink-faint);
+  --color-ink-on-scrim: var(--ax-ink-on-scrim);
+  --color-on-brand: var(--ax-on-brand);
   --color-border: var(--ax-border);
   --color-border-strong: var(--ax-border-strong);
   --color-accent: var(--ax-accent);

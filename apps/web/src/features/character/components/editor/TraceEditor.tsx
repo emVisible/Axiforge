@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useEditorStore } from "@/shared/stores/editorStore";
 import { Badge, Input, ToggleInput } from "@/shared/components/ui";
 import { layerPresets } from "@/shared/lib/presets";
 
 export default function TraceEditor() {
   const { draft, updateField } = useEditorStore();
+  const eventLabelId = useId();
   const [newEvent, setNewEvent] = useState("");
   if (!draft) return null;
 
@@ -39,7 +40,7 @@ export default function TraceEditor() {
         rows={2}
       />
       <div>
-        <label className="block text-sm font-medium text-ink mb-1.5">
+        <label htmlFor={eventLabelId} className="block text-sm font-medium text-ink mb-1.5">
           关键事件
         </label>
         <div className="flex flex-wrap gap-1.5 mb-2">
@@ -60,6 +61,7 @@ export default function TraceEditor() {
         </div>
         <div className="flex gap-2">
           <Input
+            id={eventLabelId}
             value={newEvent}
             onChange={(e) => setNewEvent(e.target.value)}
             onKeyDown={(e) =>

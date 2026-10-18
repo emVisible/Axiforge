@@ -4,7 +4,6 @@ import type { Node } from "reactflow";
 import {
   Clapperboard,
   Film,
-  Inbox,
   Link2,
   Network,
   Package,
@@ -16,16 +15,12 @@ import {
 import { cn } from "@/shared/components/ui";
 import CharacterSearchSelect from "@/features/character/components/CharacterSearchSelect";
 import { EntitySearchSelect } from "@/shared/components/ui";
-import { searchApi } from "@/shared/api/search";
-import type {
-  ProjectResponse,
-  ProjectRoleResponse,
-  ProjectSceneResponse,
-  ProjectUpdate,
-} from "@/shared/types/project";
+import { searchImportItems, searchImportScenes } from "@/shared/storage/assetPoolSaves";
+import { getImageUrl } from "@/shared/lib/imageUrl";
+import type { ProjectResponse, ProjectRoleResponse, ProjectSceneResponse } from "@/shared/types/project";
+import type { ProjectMetaPatch } from "@axiforge/editor-core";
 import type { ProjectRoleOption } from "../../flow/types";
-import { nexusApi } from "@/shared/api/nexus";
-import { getCreatorId } from "@/shared/lib/creatorId";
+import NexusSendAction from "./NexusSendAction";
 import OutlinerSection, { OutlinerRow } from "./OutlinerSection";
 import { routes } from "@/shared/lib/routes";
 
@@ -53,9 +48,7 @@ interface OutlinerPanelProps {
   onExportMarkdown?: () => void;
   onDeleteProject?: () => void;
   onBeatRename?: (nodeId: string, title: string) => void;
-  onProjectPatch?: (
-    patch: Pick<ProjectUpdate, "title" | "description" | "world_setting" | "rules">,
-  ) => void | Promise<void>;
+  onProjectPatch?: (patch: ProjectMetaPatch) => void | Promise<void>;
 }
 
 export default function OutlinerPanel({
@@ -93,28 +86,6 @@ export default function OutlinerPanel({
   const [newSceneTitle, setNewSceneTitle] = useState("");
   const [editingBeatId, setEditingBeatId] = useState<string | null>(null);
   const [editBeatTitle, setEditBeatTitle] = useState("");
-  const [nexusBusy, setNexusBusy] = useState(false);
-  const [nexusHint, setNexusHint] = useState<string | null>(null);
-
-  const sendToNexus = async () => {
-    setNexusBusy(true);
-    setNexusHint(null);
-    try {
-      const excerpt = (project.description || project.world_setting || "").slice(0, 500);
-      await nexusApi.sendToInbox({
-        author_id: getCreatorId(),
-        title: project.title,
-        body: `# ${project.title}\n\n[[project:${project.id}]]\n\n${excerpt}`,
-        related_projects: [project.id],
-      });
-      setNexusHint("已发送到 Nexus 收件箱");
-    } catch {
-      setNexusHint("发送失败，请确认后端已启动");
-    } finally {
-      setNexusBusy(false);
-    }
-  };
-
   const toggle = (key: SectionKey) =>
     setOpen((s) => ({ ...s, [key]: !s[key] }));
 
@@ -160,12 +131,12 @@ export default function OutlinerPanel({
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-panel">
       <div className="shrink-0 border-b border-border px-3 py-2.5">
-        <p className="text-[9px] font-semibold uppercase tracking-widest text-ink-faint">
+        <p className="text-3xs font-semibold uppercase tracking-widest text-ink-faint">
           Outliner
         </p>
         <p className="truncate text-xs font-medium text-ink">{project.title}</p>
         {filterScene && (
-          <p className="mt-0.5 truncate text-[9px] text-accent-soft">
+          <p className="mt-0.5 truncate text-3xs text-accent-soft">
             筛选 · {filterScene.title}
           </p>
         )}
@@ -173,7 +144,7 @@ export default function OutlinerPanel({
           <button
             type="button"
             onClick={onOpenFlow}
-            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-[9px] text-ink-muted hover:text-ink"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-3xs text-ink-muted hover:text-ink"
           >
             <Network className="h-3 w-3" />
             结构
@@ -181,14 +152,14 @@ export default function OutlinerPanel({
           <button
             type="button"
             onClick={onOpenWriter}
-            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-[9px] text-ink-muted hover:text-ink"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-3xs text-ink-muted hover:text-ink"
           >
             <ScrollText className="h-3 w-3" />
             剧本
           </button>
           <Link
             to={routes.play(project.id)}
-            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-[9px] text-ink-muted hover:text-ink"
+            className="flex flex-1 items-center justify-center gap-1 rounded bg-panel-raised py-1 text-3xs text-ink-muted hover:text-ink"
           >
             <Play className="h-3 w-3" />
             试玩
@@ -208,10 +179,10 @@ export default function OutlinerPanel({
             value={beatQuery}
             onChange={(e) => setBeatQuery(e.target.value)}
             placeholder="筛选…"
-            className="mb-1.5 w-full rounded bg-surface-raised px-2 py-1 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+            className="mb-1.5 w-full rounded bg-surface-raised px-2 py-1 text-3xs text-ink outline-none placeholder:text-ink-faint"
           />
           {filteredBeats.length === 0 ? (
-            <p className="px-1 py-2 text-[10px] text-ink-faint">无 Beat</p>
+            <p className="px-1 py-2 text-3xs text-ink-faint">无 Beat</p>
           ) : (
             filteredBeats.map((node, idx) =>
               editingBeatId === node.id ? (
@@ -225,7 +196,7 @@ export default function OutlinerPanel({
                       if (e.key === "Enter") commitBeatRename(node.id);
                       if (e.key === "Escape") setEditingBeatId(null);
                     }}
-                    className="w-full rounded bg-surface-raised px-2 py-1 text-[11px] text-ink outline-none ring-1 ring-brand/40"
+                    className="w-full rounded bg-surface-raised px-2 py-1 text-2xs text-ink outline-none ring-1 ring-brand/40"
                   />
                 </div>
               ) : (
@@ -239,14 +210,14 @@ export default function OutlinerPanel({
                     setEditBeatTitle((node.data.title as string) || "");
                   }}
                 >
-                  <span className="font-mono text-[9px] text-ink-faint">
+                  <span className="font-mono text-3xs text-ink-faint">
                     {String(idx + 1).padStart(2, "0")}
                   </span>
                   <span className="min-w-0 truncate">
                     {(node.data.title as string) || "未命名"}
                   </span>
                   {!sceneFilterId && node.data.stage_title ? (
-                    <span className="ml-auto shrink-0 truncate text-[8px] text-ink-faint">
+                    <span className="ml-auto shrink-0 truncate text-3xs text-ink-faint">
                       {String(node.data.stage_title)}
                     </span>
                   ) : null}
@@ -293,7 +264,7 @@ export default function OutlinerPanel({
                 }
               }}
               placeholder="新舞台…"
-              className="min-w-0 flex-1 rounded bg-surface-raised px-2 py-1 text-[10px] text-ink outline-none"
+              className="min-w-0 flex-1 rounded bg-surface-raised px-2 py-1 text-3xs text-ink outline-none"
             />
             <button
               type="button"
@@ -302,14 +273,14 @@ export default function OutlinerPanel({
                 void onAddScene(newSceneTitle.trim());
                 setNewSceneTitle("");
               }}
-              className="shrink-0 rounded bg-panel-raised px-2 py-1 text-[10px] text-ink disabled:opacity-40"
+              className="shrink-0 rounded bg-panel-raised px-2 py-1 text-3xs text-ink disabled:opacity-40"
             >
               +
             </button>
           </div>
-          <div className="mt-1.5 [&_input]:text-[10px]">
+          <div className="mt-1.5 [&_input]:text-3xs">
             <EntitySearchSelect
-              fetcher={searchApi.scenes}
+              fetcher={searchImportScenes}
               onSelect={(item) => void onImportScene(item.id)}
               placeholder="从舞台库导入…"
             />
@@ -324,35 +295,77 @@ export default function OutlinerPanel({
           onToggle={() => toggle("roles")}
         >
           {roles.length === 0 ? (
-            <p className="px-1 py-2 text-[10px] text-ink-faint">暂无角色</p>
+            <p className="px-1 py-2 text-3xs text-ink-faint">暂无角色</p>
           ) : (
             roles.map((role) => {
               const pr = projectRoles.find((r) => r.character_ref_id === role.characterRefId);
               return (
                 <div
                   key={role.roleId}
-                  className="group flex items-center justify-between rounded px-1.5 py-1 hover:bg-surface-raised"
+                  className="group/role rounded hover:bg-surface-raised"
                 >
-                  <Link
-                    to={routes.characters.detail(role.characterRefId)}
-                    className="min-w-0 truncate text-[11px] text-ink-muted hover:text-ink"
-                  >
-                    {role.name}
-                  </Link>
-                  {pr && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveRole(pr.id)}
-                      className="text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
+                  <div className="flex items-center justify-between px-1.5 py-1">
+                    <Link
+                      to={routes.characters.detail(role.characterRefId)}
+                      className="min-w-0 truncate text-2xs text-ink-muted hover:text-ink"
                     >
-                      移除
-                    </button>
+                      {role.name}
+                    </Link>
+                    {pr && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveRole(pr.id)}
+                        className="text-3xs text-ink-faint opacity-0 hover:text-red-400 group-hover/role:opacity-100"
+                      >
+                        移除
+                      </button>
+                    )}
+                  </div>
+                  {role.spriteKeys && role.spriteKeys.length > 0 && (
+                    <div className="flex flex-wrap gap-1 px-1.5 pb-1">
+                      {role.spriteKeys.map((key) => {
+                        const src = getImageUrl(role.sprites?.[key]);
+                        return (
+                          <div
+                            key={key}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData(
+                                "application/axiforge/sprite",
+                                JSON.stringify({
+                                  characterId: role.characterRefId,
+                                  expression: key,
+                                }),
+                              );
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
+                            className="flex cursor-grab flex-col items-center gap-0.5 rounded border border-border bg-surface p-0.5 transition-colors hover:border-brand active:cursor-grabbing"
+                            title={`拖入时间轴：${role.name} · ${key}`}
+                          >
+                            {src ? (
+                              <img
+                                src={src}
+                                alt={key}
+                                className="h-6 w-6 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-6 w-6 items-center justify-center rounded bg-surface-raised text-3xs text-ink-faint">
+                                {key[0]}
+                              </div>
+                            )}
+                            <span className="max-w-[40px] truncate text-3xs text-ink-faint">
+                              {key}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               );
             })
           )}
-          <div className="mt-1.5 [&_input]:text-[10px]">
+          <div className="mt-1.5 [&_input]:text-3xs">
             <CharacterSearchSelect
               resetOnSelect
               onChange={(id, name) => void onAddRole(id, name)}
@@ -368,7 +381,7 @@ export default function OutlinerPanel({
           onToggle={() => toggle("assets")}
         >
           {itemRefs.length === 0 ? (
-            <p className="px-1 py-2 text-[10px] text-ink-faint">暂无道具引用</p>
+            <p className="px-1 py-2 text-3xs text-ink-faint">暂无道具引用</p>
           ) : (
             itemRefs.map((ref) => (
               <div
@@ -377,23 +390,23 @@ export default function OutlinerPanel({
               >
                 <Link
                   to={routes.item(ref.asset_id)}
-                  className="min-w-0 truncate text-[11px] text-ink-muted hover:text-ink"
+                  className="min-w-0 truncate text-2xs text-ink-muted hover:text-ink"
                 >
                   {ref.name}
                 </Link>
                 <button
                   type="button"
                   onClick={() => onRemoveItemRef(ref.id)}
-                  className="text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
+                  className="text-3xs text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
                 >
                   移除
                 </button>
               </div>
             ))
           )}
-          <div className="mt-1.5 [&_input]:text-[10px]">
+          <div className="mt-1.5 [&_input]:text-3xs">
             <EntitySearchSelect
-              fetcher={searchApi.items}
+              fetcher={searchImportItems}
               onSelect={(item) => void onAddItem(item.id)}
               placeholder="搜索道具…"
             />
@@ -406,11 +419,11 @@ export default function OutlinerPanel({
           open={open.project}
           onToggle={() => toggle("project")}
         >
-          <div className="space-y-2 px-1 py-1 text-[10px] text-ink-muted">
+          <div className="space-y-2 px-1 py-1 text-3xs text-ink-muted">
             {onProjectPatch ? (
               <>
                 <label className="block">
-                  <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-ink-faint">
+                  <span className="mb-0.5 block text-3xs uppercase tracking-wider text-ink-faint">
                     简介
                   </span>
                   <textarea
@@ -419,24 +432,24 @@ export default function OutlinerPanel({
                     rows={2}
                     onBlur={(e) => void onProjectPatch({ description: e.target.value })}
                     placeholder="项目简介…"
-                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-ink-faint">
+                  <span className="mb-0.5 block text-3xs uppercase tracking-wider text-ink-faint">
                     世界观
                   </span>
                   <textarea
                     key={`world-${project.updated_at}`}
                     defaultValue={project.world_setting || ""}
                     rows={3}
-                    onBlur={(e) => void onProjectPatch({ world_setting: e.target.value })}
+                    onBlur={(e) => void onProjectPatch({ worldSetting: e.target.value })}
                     placeholder="世界观设定…"
-                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-0.5 block text-[9px] uppercase tracking-wider text-ink-faint">
+                  <span className="mb-0.5 block text-3xs uppercase tracking-wider text-ink-faint">
                     规则
                   </span>
                   <textarea
@@ -445,7 +458,7 @@ export default function OutlinerPanel({
                     rows={3}
                     onBlur={(e) => void onProjectPatch({ rules: e.target.value })}
                     placeholder="玩法/叙事规则…"
-                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-[10px] text-ink outline-none placeholder:text-ink-faint"
+                    className="w-full resize-none rounded bg-surface-raised px-2 py-1.5 text-3xs text-ink outline-none placeholder:text-ink-faint"
                   />
                 </label>
               </>
@@ -458,7 +471,7 @@ export default function OutlinerPanel({
                 )}
                 {project.world_setting && (
                   <div>
-                    <p className="mb-0.5 text-[9px] uppercase tracking-wider text-ink-faint">
+                    <p className="mb-0.5 text-3xs uppercase tracking-wider text-ink-faint">
                       世界观
                     </p>
                     <p className="line-clamp-4 leading-relaxed">{project.world_setting}</p>
@@ -466,7 +479,7 @@ export default function OutlinerPanel({
                 )}
                 {project.rules && (
                   <div>
-                    <p className="mb-0.5 text-[9px] uppercase tracking-wider text-ink-faint">
+                    <p className="mb-0.5 text-3xs uppercase tracking-wider text-ink-faint">
                       规则
                     </p>
                     <p className="line-clamp-4 leading-relaxed">{project.rules}</p>
@@ -476,7 +489,7 @@ export default function OutlinerPanel({
             )}
             {nexusNotes.length > 0 && (
               <div>
-                <p className="mb-1 text-[9px] uppercase tracking-wider text-ink-faint">
+                <p className="mb-1 text-3xs uppercase tracking-wider text-ink-faint">
                   Nexus 策划备忘
                 </p>
                 <ul className="space-y-1.5">
@@ -487,7 +500,7 @@ export default function OutlinerPanel({
                     >
                       <p className="line-clamp-4 whitespace-pre-wrap">{entry.text}</p>
                       {entry.created_at && (
-                        <p className="mt-0.5 text-[8px] text-ink-faint">
+                        <p className="mt-0.5 text-3xs text-ink-faint">
                           {new Date(entry.created_at).toLocaleString("zh-CN")}
                         </p>
                       )}
@@ -502,23 +515,12 @@ export default function OutlinerPanel({
             <p>{project.is_public ? "公开" : "私有"}</p>
           </div>
           <div className="mt-1 flex flex-col gap-0.5 px-1">
-            <button
-              type="button"
-              disabled={nexusBusy}
-              onClick={() => void sendToNexus()}
-              className="rounded py-1 text-left text-[10px] text-ink-muted hover:bg-surface-raised hover:text-ink disabled:opacity-50"
-            >
-              <Inbox className="mr-1 inline h-3 w-3" />
-              {nexusBusy ? "发送中…" : "发送到 Nexus"}
-            </button>
-            {nexusHint && (
-              <p className="px-1 text-[9px] text-brand">{nexusHint}</p>
-            )}
+            <NexusSendAction project={project} />
             {onExportMarkdown && (
               <button
                 type="button"
                 onClick={onExportMarkdown}
-                className="rounded py-1 text-left text-[10px] text-ink-muted hover:bg-surface-raised hover:text-ink"
+                className="rounded py-1 text-left text-3xs text-ink-muted hover:bg-surface-raised hover:text-ink"
               >
                 <Link2 className="mr-1 inline h-3 w-3" />
                 导出 Markdown
@@ -528,7 +530,7 @@ export default function OutlinerPanel({
               <button
                 type="button"
                 onClick={onDeleteProject}
-                className="rounded py-1 text-left text-[10px] text-red-400/80 hover:bg-surface-raised"
+                className="rounded py-1 text-left text-3xs text-red-400/80 hover:bg-surface-raised"
               >
                 删除剧本
               </button>
@@ -563,16 +565,16 @@ function SceneRow({
       >
         <span className="truncate">{scene.title}</span>
         {hint && (
-          <span className="ml-1 shrink-0 truncate text-[8px] text-ink-faint">{hint}</span>
+          <span className="ml-1 shrink-0 truncate text-3xs text-ink-faint">{hint}</span>
         )}
-        <span className="ml-auto font-mono text-[9px] text-ink-faint">
+        <span className="ml-auto font-mono text-3xs text-ink-faint">
           {scene.nodes?.length ?? 0}
         </span>
       </OutlinerRow>
       <button
         type="button"
         onClick={onDelete}
-        className="shrink-0 px-1 text-[9px] text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
+        className="shrink-0 px-1 text-3xs text-ink-faint opacity-0 hover:text-red-400 group-hover:opacity-100"
       >
         ×
       </button>

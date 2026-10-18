@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Sun,
   Users,
+  ShieldCheck,
 } from "lucide-react";
 import { adminApi, clearAdminToken, getAdminToken } from "@/api/adminClient";
 import { adminQueryKeys } from "@/hooks/adminQueryKeys";
@@ -41,6 +42,7 @@ const groups: NavGroup[] = [
     label: "内容审核",
     items: [
       { to: "/reports", label: "审核工作台", icon: FileWarning },
+      { to: "/moderation", label: "自动判断队列", icon: ShieldCheck },
       { to: "/content", label: "内容管理", icon: ShieldAlert },
       { to: "/violations", label: "违规记录", icon: AlertTriangle },
     ],

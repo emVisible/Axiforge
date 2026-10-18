@@ -132,7 +132,7 @@ export default function RadarChart({
               y={ly}
               textAnchor={isLeft ? "end" : isRight ? "start" : "middle"}
               dominantBaseline="middle"
-              className="fill-ink-muted text-[10px]"
+              className="fill-ink-muted text-3xs"
               style={{ fontSize: "11px", fontFamily: "Inter, sans-serif" }}
             >
               {LABELS[i]}

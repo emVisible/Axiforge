@@ -1,0 +1,242 @@
+"""审核队列 API（ADR-028）。挂在既有 admin 鉴权之下：`/api/v1/admin/moderation/*`。"""
+
+from __future__ import annotations
+
+from typing import List, Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.admin_auth import require_admin
+from app.database import get_db
+from app.domains.moderation.background import batch_status, cancel_batch, start_batch
+from app.domains.moderation.content import load_subject_content
+from app.domains.moderation.questions import (
+    QUESTIONS_VERSION,
+    REGISTERED_CLAUSES,
+    question_types,
+)
+from app.domains.moderation.registry import build_policy
+from app.domains.moderation.schemas import (
+    CaseResponse,
+    LabelTargetsResponse,
+    QueuePage,
+    RequeueRequest,
+    RequeueStatus,
+    ResolveRequest,
+    WhatIfResponse,
+    WhatIfRowResponse,
+    StatsResponse,
+    VocabularyResponse,
+)
+from app.domains.moderation.service import ModerationService
+from app.domains.moderation.vocabulary import vocabulary
+
+moderation_router = APIRouter(
+    prefix="/api/v1/admin/moderation",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+#: 处置主体标签。ADMIN_TOKEN 是共享令牌、不是身份，所以这里不能记"谁"，
+#: 只能记"以管理员角色"——把它写成 token 会把密钥复制进每一行案件。
+ADMIN_PRINCIPAL = "admin-role"
+
+
+def _svc(db: AsyncSession) -> ModerationService:
+    return ModerationService(db)
+
+
+@moderation_router.get("/queue", response_model=QueuePage)
+async def moderation_queue(
+    state: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    order: str = Query(default="risk", pattern="^(risk|new|axis)$"),
+    offset: int = Query(default=0, ge=0),
+    axis: Optional[str] = Query(default=None, description="order=axis 时要按哪条轴的可能性排序"),
+    db: AsyncSession = Depends(get_db),
+):
+    if order == "axis":
+        qtype = question_types().get(axis or "")
+        if qtype is None:
+            raise HTTPException(422, f"未注册的题目：{axis}")
+        # 只有 noul 轴存了可比较的标量概率；choice/score 的概率在 `probabilities` 里，
+        # 按哪一档排是另一个判断，别在这里悄悄替它选。
+        if qtype != "noul":
+            raise HTTPException(422, f"{axis} 不是 noul 轴，不能按它排序")
+    return await _svc(db).queue(state=state, limit=limit, order=order, offset=offset, axis=axis)
+
+
+@moderation_router.get("/label-targets", response_model=LabelTargetsResponse)
+async def moderation_label_targets(
+    per_axis: int = Query(default=5, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """每条轴"该标哪几行"：报警可能性最高的若干条待处置案件 + 这条轴现在的判断力状态。
+
+    存在的理由是 D25 那条读数的下一步：知道"8/10 题打不过常数预测器"之后，
+    缺的是一个能把标注量补到那些题上的动作。这里只指路（排序 + 计数），
+    不代答——真值仍然由人在行内逐轴勾（`human_clauses`）。
+    """
+    return await _svc(db).label_targets(per_axis=per_axis)
+
+
+@moderation_router.get("/stats", response_model=StatsResponse)
+async def moderation_stats(db: AsyncSession = Depends(get_db)):
+    return await _svc(db).stats()
+
+
+@moderation_router.get("/vocabulary", response_model=VocabularyResponse)
+async def moderation_vocabulary():
+    """判断层词汇表：条款/规则/结论的中文短名，由定义它们的那三个模块投影出来。
+
+    不带版本键的话前端只能"启动时取一次"，而条款集是会长的——
+    新加一条轴时，缓存到死的词表会把内部 id 直接印到运营眼前。
+    """
+    return VocabularyResponse(
+        **vocabulary(),
+        policy_version=build_policy().version,
+        questions_version=QUESTIONS_VERSION,
+    )
+
+
+@moderation_router.get("/what-if", response_model=WhatIfResponse)
+async def moderation_what_if(
+    approve: float = Query(default=0.75, ge=0.0, le=1.0),
+    reject: float = Query(default=0.95, ge=0.0, le=1.0),
+    #: 窗口默认覆盖全库（实测 979 条读全量 ~10ms，与读 500 条无差别），
+    #: 上限留在那里当增长的闸；真被截断时 `population` 会让面板说出来。
+    scan: int = Query(default=2000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+):
+    """**只读**的阈值假设：这条线画到这里，已处置过的案件里有几条会被机器自动执行、
+    其中几条与当时的人工结论相反（`conflicts`）。不改策略、不写库、不给任何引擎新资格。
+    """
+    report = await _svc(db).whatif(approve=approve, reject=reject, scan=scan)
+    return WhatIfResponse(
+        **{k: v for k, v in report.__dict__.items() if k != "rows"},
+        scanned=report.evaluated + sum(report.skipped.values()),
+        rows=[WhatIfRowResponse(**r.__dict__) for r in report.rows],
+    )
+
+
+@moderation_router.get("/cases/{case_id}", response_model=CaseResponse)
+async def moderation_case(case_id: UUID, db: AsyncSession = Depends(get_db)):
+    case = await _svc(db).get(case_id)
+    if not case:
+        raise HTTPException(404, "案件不存在")
+    return case
+
+
+@moderation_router.post("/cases/{case_id}/resolve", response_model=CaseResponse)
+async def moderation_resolve(
+    case_id: UUID,
+    body: ResolveRequest,
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(require_admin),
+):
+    """处置人记为角色标签，不记 token 本身。
+
+    两个方向都要避开：① 不接受请求体自报 actor——参照实现让客户端传且默认 "admin"，
+    任何调用方都能冒充管理员结案；② 也不能把 `require_admin` 的返回值写进库，
+    它返回的就是 Bearer token 原文，落库等于把 ADMIN_TOKEN 复制进每一行案件。
+    ADR-018 的正式 RBAC 还没做，这里先记角色；等 user_accounts.role 生效时换成主体 id。
+
+    `human_clauses` 在这里校验而不是在模型层写 `pattern`：合法名单只有一份且在
+    `questions.REGISTERED_CLAUSES`，抄一份到 Pydantic 里就是第二个真相源，
+    加条款时会漏改这一处，而漏改的表现是"勾了新轴被 422"。
+    """
+    if body.human_clauses is not None:
+        unknown = [c for c in body.human_clauses if c not in REGISTERED_CLAUSES]
+        if unknown:
+            raise HTTPException(422, f"未注册的条款：{'、'.join(unknown)}")
+    case = await _svc(db).resolve(
+        case_id, outcome=body.outcome, actor=ADMIN_PRINCIPAL, note=body.note,
+        human_clauses=body.human_clauses,
+    )
+    if not case:
+        raise HTTPException(404, "案件不存在")
+    return case
+
+
+@moderation_router.post("/cases/{case_id}/rejudge", response_model=CaseResponse)
+async def moderation_rejudge(case_id: UUID, db: AsyncSession = Depends(get_db)):
+    """让模型**现在**重判一次——"通过 Laya 进行自动判断"的手动入口。
+
+    为什么需要它：判断只发生在内容保存的那一刻，那么重拟温度表、改词表、
+    换题集之后，队列里的旧结论没有任何一条路能变成新结论——除非作者重新存一次稿。
+    §12 把模型状态放进了幂等键，但没人触发它就没人重算。
+
+    取的是**全文**而不是审阅面板那份 280 字摘录：看不全就自动裁决，
+    是 `MAX_MODEL_CHARS` 明令禁止的事，不能因为换了入口就变成允许的。
+    """
+    svc = _svc(db)
+    case = await svc.get(case_id)
+    if not case:
+        raise HTTPException(404, "案件不存在")
+    content = await load_subject_content(
+        db, subject_type=case.subject_type, subject_id=case.subject_id)
+    if content is None:
+        raise HTTPException(410, "原内容已删除，或这类主体暂不支持重判")
+    title, body, author_id = content
+    again = await svc.review(
+        subject_type=case.subject_type, subject_id=case.subject_id,
+        title=title, body=body, author_id=author_id)
+    if again is None:
+        raise HTTPException(409, "这条链现在给不出可落库的结论（引擎不可用、全部弃权，"
+                                 "或正文超出模型窗口）")
+    await db.commit()
+    return again
+
+
+@moderation_router.post("/requeue", response_model=RequeueStatus)
+async def moderation_requeue_start(
+    body: RequeueRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """批量重判：把"机器其实没看过"和"版本推进了但结论没重算"的那批内容真判一遍。
+
+    默认 `allow_close=false`——**结论照刷新，state 一律不动**。
+    这条链的 `auto_closed` 在代码里只是台账（没有任何下游读它去真下架或发布内容），
+    但它决定的是"人还要不要看这条"：一次批量把待人工队列清空，等于替运营决定
+    "这些不用看了"，那不该是批量任务的副作用。攒标定数据要的是答案与处置，不是结案。
+
+    进程内状态，重启即丢（与 `background.py` 第 3 条同源）：批量刷新是可重入的
+    ——再点一次就把剩下的补上，不存在"半个作业"要恢复。
+    """
+    candidates = await _svc(db).requeue_candidates(scope=body.scope, limit=body.limit)
+    if not candidates:
+        return RequeueStatus(**batch_status(), queued=0)
+    if not start_batch(candidates, allow_close=body.allow_close):
+        raise HTTPException(409, "已经有一批重判在跑；先看 GET /requeue，必要时 POST /requeue/cancel")
+    # queued 用真正取到的坐标数（请求里的 limit 可能被库里不足截断）
+    return RequeueStatus(**{**batch_status(), "queued": len(candidates)})
+
+
+@moderation_router.get("/requeue", response_model=RequeueStatus)
+async def moderation_requeue_status():
+    """批量进度。跑过一次之后各计数含义见 `RequeueStatus`：
+    `would_close` 是"这批里有几条机器已经给出可执行结论"——那才是需要人先看一眼的量。"""
+    return RequeueStatus(**batch_status())
+
+
+@moderation_router.post("/requeue/cancel", response_model=RequeueStatus)
+async def moderation_requeue_cancel():
+    """让在跑的批量在下一条处停下（在途的那几条会跑完，硬断会把 session 留在中间态）。"""
+    cancel_batch()
+    return RequeueStatus(**batch_status())
+
+
+@moderation_router.post("/cases/{case_id}/reopen", response_model=CaseResponse)
+async def moderation_reopen(
+    case_id: UUID,
+    note: str = Query(default=""),
+    db: AsyncSession = Depends(get_db),
+    _: str = Depends(require_admin),
+):
+    case = await _svc(db).reopen(case_id, actor=ADMIN_PRINCIPAL, note=note)
+    if not case:
+        raise HTTPException(404, "案件不存在")
+    return case

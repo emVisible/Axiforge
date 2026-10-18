@@ -47,6 +47,10 @@ def register_models() -> None:
         UserAccount,
         Violation,
     )
+    from app.domains.moderation.models import (  # noqa: F401
+        ModerationCase,
+        ModerationDecisionLog,
+    )
     from app.domains.runtime.models import (  # noqa: F401
         CharacterRuntimeState,
         PlayerCodexEntry,

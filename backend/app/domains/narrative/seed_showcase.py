@@ -81,6 +81,44 @@ async def _create_yansha(db: AsyncSession) -> Character:
     return char
 
 
+async def _create_player(db: AsyncSession) -> Character:
+    existing = (
+        await db.execute(
+            select(Character).where(
+                Character.name == "旅人",
+                Character.author_id == OFFICIAL_AUTHOR,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return existing
+    char = await CharacterService(db).create_character(
+        CharacterCreate(
+            is_public=True,
+            character_data=CharacterData(
+                anchor=Anchor(
+                    name="旅人",
+                    essence="玩家的化身，沉默却坚定的旅者",
+                    tags=["RN", "示范角色"],
+                    summary="关系网演示用角色",
+                ),
+                contour=Contour(
+                    identity="旅人",
+                    first_impression="背着旧地图，目光落在远方",
+                ),
+                demeanor=Demeanor(speech_style="简洁、直接"),
+                psyche=Psyche(desire="寻找答案", fear="迷失"),
+                trace=Trace(background="从交汇港启程"),
+                bond=Bond(attitude_to_others="以行动表达信任"),
+            ),
+        )
+    )
+    char.author_id = OFFICIAL_AUTHOR
+    await db.commit()
+    await db.refresh(char)
+    return char
+
+
 async def _proj(
     db: AsyncSession,
     title: str,
@@ -328,6 +366,11 @@ async def seed_sg_origin(db: AsyncSession, yansha_id: UUID) -> Dict[str, str]:
                     "key": f"{yansha_id}.trust",
                     "value": "high",
                 },
+                {
+                    "type": "relationship",
+                    "key": f"{yansha_id}.player.trust",
+                    "value": "high",
+                },
             ],
             "is_ending": True,
             "ending_label": "信任结局",
@@ -352,6 +395,11 @@ async def seed_sg_origin(db: AsyncSession, yansha_id: UUID) -> Dict[str, str]:
                 {
                     "type": "codex_write",
                     "key": f"{yansha_id}.trust",
+                    "value": "low",
+                },
+                {
+                    "type": "relationship",
+                    "key": f"{yansha_id}.player.trust",
                     "value": "low",
                 },
             ],
@@ -429,7 +477,13 @@ async def seed_sg_reunion(db: AsyncSession, yansha_id: UUID) -> Dict[str, str]:
                         "key": f"{yansha_id}.trust",
                         "operator": "eq",
                         "value": "high",
-                    }
+                    },
+                    {
+                        "type": "relationship",
+                        "key": f"{yansha_id}.player.trust",
+                        "operator": "eq",
+                        "value": "high",
+                    },
                 ],
             },
             "script": [
@@ -462,6 +516,12 @@ async def seed_sg_reunion(db: AsyncSession, yansha_id: UUID) -> Dict[str, str]:
                         "operator": "eq",
                         "value": "low",
                     },
+                    {
+                        "type": "relationship",
+                        "key": f"{yansha_id}.player.trust",
+                        "operator": "eq",
+                        "value": "low",
+                    },
                 ],
             },
             "script": [
@@ -487,6 +547,7 @@ async def seed_sg_reunion(db: AsyncSession, yansha_id: UUID) -> Dict[str, str]:
 
 async def seed_all_showcases(db: AsyncSession) -> Dict[str, Any]:
     yansha = await _create_yansha(db)
+    await _create_player(db)
     yid = yansha.id
     return {
         "character_id": str(yid),

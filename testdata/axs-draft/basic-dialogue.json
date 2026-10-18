@@ -1,0 +1,10 @@
+{
+  "name": "basic-dialogue",
+  "title": "测试",
+  "role_names": ["小明"],
+  "default_speaker": "旁白",
+  "prose": "小明：你好\n这是旁白。",
+  "axs": "# 测试\n小明: 你好\n这是旁白。\n",
+  "expected_ops": ["say", "narration"],
+  "note": "全角冒号的输入速记 → canonical 的半角冒号；旁白不加星号"
+}

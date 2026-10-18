@@ -1,15 +1,21 @@
 
-const API_BASE = '/api/v1';
+/**
+ * API 基址。浏览器态用同源相对路径（dev 由 Vite 代理、线上由 vercel.json 反代）；
+ * 构建期工具在 Node 里跑真实请求时用 setApiBase 指到绝对地址。
+ */
+let apiBase = '/api/v1';
+
+export function setApiBase(base: string): void {
+  apiBase = base;
+}
+
+export function getApiBase(): string {
+  return apiBase;
+}
 
 class ApiClient {
-  private base: string;
-
-  constructor(base: string) {
-    this.base = base;
-  }
-
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.base}${path}`;
+    const url = `${apiBase}${path}`;
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json', ...options.headers },
       ...options,
@@ -17,7 +23,9 @@ class ApiClient {
     if (res.status === 204) return undefined as T;
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(text || `Request failed: ${res.status}`);
+      const err = new Error(text || `Request failed: ${res.status}`);
+      (err as { status?: number }).status = res.status;
+      throw err;
     }
     return res.json();
   }
@@ -59,4 +67,4 @@ class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient(API_BASE);
+export const apiClient = new ApiClient();

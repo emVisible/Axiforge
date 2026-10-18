@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { cn, inputCompact, labelSm } from "@/shared/components/ui";
 
 import {
@@ -21,6 +23,7 @@ export default function ConditionEditor({
   onChange,
   roles,
 }: ConditionEditorProps) {
+  const groupId = useId();
   const add = () =>
     onChange([
       ...conditions,
@@ -38,20 +41,20 @@ export default function ConditionEditor({
   const remove = (i: number) => onChange(conditions.filter((_, j) => j !== i));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="group" aria-labelledby={groupId}>
       <div className="flex items-center justify-between">
-        <label className={labelSm}>触发条件</label>
+        <label id={groupId} className={labelSm}>触发条件</label>
         <button
           type="button"
           onClick={add}
-          className="text-[10px] font-medium text-brand hover:underline"
+          className="text-3xs font-medium text-brand hover:underline"
         >
           + 添加
         </button>
       </div>
       {conditions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-canvas/50 py-6 text-center">
-          <p className="text-[11px] text-ink-muted/60">无条件 — 始终可用</p>
+          <p className="text-2xs text-ink-muted/60">无条件 — 始终可用</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -79,7 +82,7 @@ export default function ConditionEditor({
                         type: e.target.value as ConditionItem["type"],
                       })
                     }
-                    className="cursor-pointer border-none bg-transparent text-[11px] font-medium outline-none"
+                    className="cursor-pointer border-none bg-transparent text-2xs font-medium outline-none"
                   >
                     {CONDITION_TYPES.map((ct) => (
                       <option key={ct.value} value={ct.value}>
@@ -157,7 +160,7 @@ export default function ConditionEditor({
                       placeholder="期望值"
                       className={cn(inputCompact, "w-full bg-surface")}
                     />
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       查询玩家在其它作品中留下的角色记忆（RN Codex）
                     </p>
                   </div>
@@ -240,7 +243,7 @@ export default function ConditionEditor({
                         className={cn(inputCompact, "w-full bg-surface")}
                       />
                     )}
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       {roles.length === 0
                         ? "请先在剧本详情页关联角色"
                         : "选择剧本已关联的角色"}

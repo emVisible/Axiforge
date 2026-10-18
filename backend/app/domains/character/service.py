@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.content_validate import validate_publish_text
+from app.domains.moderation.background import schedule_review
 from app.core.strike_policy import publish_block_reasons
 from app.domains.character.models import Character
 from app.domains.character.models import Tag
@@ -52,6 +53,17 @@ class CharacterService:
         await self.tag_service.update_tag_counts([t.id for t in tags])
         await self.db.commit()
         return db_character
+
+    async def get_characters_batch(self, ids: list[UUID]) -> list[Character]:
+        """按 id 集合批量获取（工程目录装载用，消除 N+1）。缺失 id 静默跳过。"""
+        if not ids:
+            return []
+        result = await self.db.execute(
+            select(Character)
+            .where(Character.id.in_(ids))
+            .options(selectinload(Character.tags))
+        )
+        return list(result.scalars().all())
 
     async def get_character(
         self,
@@ -142,53 +154,6 @@ class CharacterService:
             .options(selectinload(Character.tags))
         )
         return result.scalars().unique().all()
-
-    async def update_character(
-        self, character_id: UUID, update: CharacterUpdate
-    ) -> Optional[Character]:
-
-        character = await self.get_character(character_id)
-        if not character:
-            return None
-
-        version_service = VersionService(self.db)
-        await version_service.create_version(character)
-
-        if update.character_data is not None:
-            cd = update.character_data
-            character.character_data = cd.model_dump()
-            character.name = cd.anchor.name or character.name
-
-        if update.is_public is not None:
-            if update.is_public:
-                summary = ""
-                if update.character_data is not None:
-                    summary = update.character_data.anchor.essence or ""
-                elif character.character_data:
-                    summary = (character.character_data.get("anchor") or {}).get(
-                        "essence", ""
-                    )
-                errors = validate_publish_text(character.name, summary)
-                errors.extend(await publish_block_reasons(self.db, character.author_id))
-                if errors:
-                    raise ValueError("; ".join(errors))
-            character.is_public = update.is_public
-
-        if update.image_path is not None:
-            character.image_path = update.image_path
-
-        if update.character_data is not None and hasattr(
-            update.character_data.anchor, "tags"
-        ):
-            tag_names = update.character_data.anchor.tags
-            tags = await self.tag_service.get_or_create_tags(tag_names)
-            character.tags = tags
-            await self.db.flush()
-            await self.tag_service.update_tag_counts([t.id for t in tags])
-
-        await self.db.commit()
-        await self.db.refresh(character, ["tags"])
-        return character
 
     async def delete_character(self, character_id: UUID) -> bool:
         from app.domains.character.version_service import VersionService
@@ -331,7 +296,12 @@ class CharacterService:
                 if errors:
                     raise ValueError("; ".join(errors))
             character.is_public = update.is_public
+            needs_review = True
 
         await self.db.commit()
         await self.db.refresh(character, ["tags"])
+        # 公开瞬间留一次痕，派到后台（ADR-028 的"发布只跑规则校验"不变：
+        # 判断层既不阻塞发布，也不参与这里的放行判定）。
+        if needs_review:
+            schedule_review("character", character.id)
         return character

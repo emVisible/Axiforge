@@ -94,20 +94,33 @@ async def prose_to_script_with_source(
     role_names: Optional[List[str]] = None,
     author_id: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """散文 → 指令序列 + canonical 文本。
+
+    规则路径在 Python 直接切句（切的是**散文**，不是 AXS 文本）；模型路径只回 canonical
+    文本并置 `needs_parse=True`，由前端 `parseAxs` 解析——Python 没有 canonical AXS 解析器，
+    原先用 `axs_to_script()` 把文本读回 IR 的做法是第二套解析器，已按 ADR-027 废除。
+    """
     axs_result = await prose_to_axs_with_source(
         prose=prose,
         role_names=role_names,
         author_id=author_id,
     )
-    from app.domains.narrative.ai_draft import axs_to_script, prose_to_script
+    source = axs_result["source"]
+    if source == "rules":
+        from app.domains.narrative.ai_draft import prose_to_script
 
-    script = prose_to_script(prose, role_names)
-    if axs_result["source"] != "rules":
-        try:
-            script = axs_to_script(axs_result["axs"], role_names)
-        except Exception:
-            pass
-    return {"script": script, "source": axs_result["source"]}
+        return {
+            "script": prose_to_script(prose, role_names),
+            "axs": axs_result["axs"],
+            "source": source,
+            "needs_parse": False,
+        }
+    return {
+        "script": [],
+        "axs": axs_result["axs"],
+        "source": source,
+        "needs_parse": True,
+    }
 
 
 async def health_status() -> Dict[str, Any]:

@@ -27,7 +27,7 @@ function cardVariantClasses(
 ): string {
   const t = cardTheme[theme];
   if (variant === "muted") return t.muted;
-  if (variant === "interactive") return cn("transition-all duration-200", t.surface);
+  if (variant === "interactive") return cn("transition-[border-color,box-shadow,background-color,transform] duration-200", t.surface);
   return t.surfaceStatic;
 }
 
@@ -75,7 +75,7 @@ export function CardLink({
     <Link
       to={to}
       className={cn(
-        "group block rounded-2xl border p-5 transition-all duration-200",
+        "group block rounded-2xl border p-5 transition-[border-color,box-shadow,background-color,transform] duration-200",
         t.surface,
         className,
       )}

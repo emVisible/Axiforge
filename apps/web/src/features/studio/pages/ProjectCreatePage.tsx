@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useNavigate } from "react-router";
 import { useCreateProject } from "@/shared/hooks/useProjects";
 import Shell from "@/shared/components/Shell";
@@ -33,19 +33,27 @@ export default function ProjectCreatePage() {
   const [genre, setGenre] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const tagLabelId = useId();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    const project = await createProject.mutateAsync({
-      title: title.trim(),
-      description,
-      mechanism: mechanism || undefined,
-      genre: genre || undefined,
-      theme_tags: tags,
-      author_id: getCreatorId(),
-    });
-    navigate(`/studio/projects/${project.id}`);
+    /*
+     * 用 mutate + onSuccess 而不是 await mutateAsync：后者原先没有 catch，
+     * 失败只是一条未处理的 rejection，表单停在原地、用户不知道为什么不建。
+     * 失败原因取 mutation 自己的 error——不再另存一份本地 state（同一语义一处权威）。
+     */
+    createProject.mutate(
+      {
+        title: title.trim(),
+        description,
+        mechanism: mechanism || undefined,
+        genre: genre || undefined,
+        theme_tags: tags,
+        author_id: getCreatorId(),
+      },
+      { onSuccess: (project) => navigate(`/studio/projects/${project.id}`) },
+    );
   };
 
   const addTag = () => {
@@ -102,11 +110,12 @@ export default function ProjectCreatePage() {
               </Select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-ink">
+              <label htmlFor={tagLabelId} className="mb-1.5 block text-sm font-medium text-ink">
                 主题标签
               </label>
               <div className="mb-2 flex gap-2">
                 <Input
+                  id={tagLabelId}
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={(e) =>
@@ -139,6 +148,11 @@ export default function ProjectCreatePage() {
                 ))}
               </div>
             </div>
+            {createProject.isError && (
+              <p role="alert" className="text-sm text-danger">
+                {createProject.error.message}
+              </p>
+            )}
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 type="button"

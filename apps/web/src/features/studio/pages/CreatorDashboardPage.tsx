@@ -18,6 +18,8 @@ import {
   StatStripItem,
 } from "@/shared/components/ui";
 import { useCreatorDashboard } from "@/shared/hooks/useCreatorDashboard";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import { getCreatorId } from "@/shared/lib/creatorId";
 import { routes } from "@/shared/lib/routes";
 import type { CreatorDashboard } from "@/shared/api/creator";
@@ -62,7 +64,7 @@ function TrendChart({ trend }: { trend: CreatorDashboard["trend"] }) {
           return <circle key={p.date} cx={x} cy={y} r="3" fill="currentColor" />;
         })}
       </svg>
-      <div className="mt-2 flex justify-between text-[10px] text-ink-muted">
+      <div className="mt-2 flex justify-between text-3xs text-ink-muted">
         {trend.map((p) => (
           <span key={p.date}>{p.date}</span>
         ))}
@@ -74,6 +76,16 @@ function TrendChart({ trend }: { trend: CreatorDashboard["trend"] }) {
 export default function CreatorDashboardPage() {
   const authorId = getCreatorId();
   const { data, isLoading, error } = useCreatorDashboard(authorId);
+
+  // 桌面离线直接输 URL 进来时，给一句准确说明而不是「读取失败」
+  if (isLocalOnlyDeployment()) {
+    return (
+      <Shell>
+        <PageHeader title="创作概览" />
+        <CloudFeatureNotice feature="创作数据面板" />
+      </Shell>
+    );
+  }
 
   if (isLoading) {
     return (

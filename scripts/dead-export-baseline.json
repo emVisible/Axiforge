@@ -1,0 +1,29 @@
+{
+  "allow": [
+    "apps/web/src/features/docs/docRegistry.ts :: assertNavIntegrity",
+    "apps/web/src/features/player/components/SaveSlotPanel.tsx :: MAX_SAVE_SLOTS",
+    "apps/web/src/features/studio/cut/masterTimelineUtils.ts :: beatIndexInMaster",
+    "apps/web/src/features/studio/cut/masterTimelineUtils.ts :: sortBeatsForMaster",
+    "apps/web/src/features/studio/cut/timelineUtils.ts :: EFFECT_LABELS",
+    "apps/web/src/features/studio/cut/timelineUtils.ts :: formatTimecode",
+    "apps/web/src/features/studio/cut/timelineUtils.ts :: localIndexAtPixel",
+    "apps/web/src/features/studio/cut/timelineUtils.ts :: reorderScript",
+    "apps/web/src/features/writer/lib/projection.ts :: nodeIdForBeat",
+    "apps/web/src/shared/hooks/useAssets.ts :: ITEM_KEYS",
+    "apps/web/src/shared/hooks/useAssets.ts :: useDeleteSceneAsset",
+    "apps/web/src/shared/hooks/useAssets.ts :: useItem",
+    "apps/web/src/shared/hooks/useAssets.ts :: useSceneAsset",
+    "apps/web/src/shared/hooks/useAssets.ts :: useUpdateItem",
+    "apps/web/src/shared/hooks/useAssets.ts :: useUpdateSceneAsset",
+    "apps/web/src/shared/hooks/useRelations.ts :: RELATION_KEYS",
+    "apps/web/src/shared/hooks/useStories.ts :: STORY_KEYS",
+    "apps/web/src/shared/hooks/useTags.ts :: TAG_KEYS",
+    "apps/web/src/shared/lib/constants.ts :: MECHANISM_TAGS",
+    "apps/web/src/shared/lib/expressions.ts :: EXPRESSION_LABELS",
+    "apps/web/src/shared/lib/identityLink.ts :: linkCreatorEmail",
+    "apps/web/src/shared/lib/identityLink.ts :: linkPlayerEmail",
+    "apps/web/src/shared/lib/identityLink.ts :: restoreIdentityFromEmail",
+    "apps/web/src/shared/storage/tauriAssetStore.ts :: ASSET_PROJECT_DIR"
+  ],
+  "_note": "活着模块里零外部读者的具名值导出（第 15 道门禁第二档）。说的是**对外暴露面宽了**，不是函数死了；参考池按名字数读者、且保留字符串内容，所以这一档刻意少判死。摘掉一条之后重跑 --update 让它缩短。"
+}

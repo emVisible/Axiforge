@@ -30,7 +30,7 @@ export default function RouteReplayPanel({
             已达成结局 ({history.endings.length})
           </h3>
           {history.endings.length === 0 ? (
-            <p className="text-sm text-white/15">尚未达成任何结局</p>
+            <p className="text-sm text-white/65">尚未达成任何结局</p>
           ) : (
             <ul className="space-y-2">
               {history.endings.map((e) => (
@@ -49,7 +49,7 @@ export default function RouteReplayPanel({
             选择记录 ({history.choices.length})
           </h3>
           {history.choices.length === 0 ? (
-            <p className="text-sm text-white/15">暂无分支选择记录</p>
+            <p className="text-sm text-white/65">暂无分支选择记录</p>
           ) : (
             <ul className="space-y-2">
               {history.choices.map((c, i) => (

@@ -1,37 +1,59 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sceneAssetApi, itemApi } from '@/shared/api/editor';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  createItem,
+  createScene,
+  readItem,
+  readItems,
+  readScene,
+  readScenes,
+  removeItem,
+  removeScene,
+  updateItem,
+  updateScene,
+} from "@/shared/storage/assetPoolSaves";
+import { getCreatorId } from "@/shared/lib/creatorId";
 import type {
   AssetSceneCreate, AssetSceneUpdate,
   AssetItemCreate, AssetItemUpdate,
-} from '@/shared/types/asset';
+} from "@/shared/types/asset";
 
-// ============================================================
-// Scene Assets
-// ============================================================
+/**
+ * 道具 / 场景的数据入口。
+ *
+ * 平台分派与「写→回读」都在 assetPoolSaves，本文件只管 queryKey 与失效范围——
+ * 与角色域同一分层：hook 不掺 if (isTauri)。
+ */
 
 export const SCENE_ASSET_KEYS = {
-  all: ['sceneAssets'] as const,
-  list: (filters?: Record<string, unknown>) => ['sceneAssets', 'list', filters] as const,
-  detail: (id: string) => ['sceneAssets', 'detail', id] as const,
+  all: ["sceneAssets"] as const,
+  list: (filters?: Record<string, unknown>) => ["sceneAssets", "list", filters] as const,
+  detail: (id: string) => ["sceneAssets", "detail", id] as const,
 };
 
-export const useSceneAssets = (params?: { author_id?: string }) =>
+export const ITEM_KEYS = {
+  all: ["items"] as const,
+  list: (filters?: Record<string, unknown>) => ["items", "list", filters] as const,
+  detail: (id: string) => ["items", "detail", id] as const,
+};
+
+export const useSceneAssets = (params?: { author_id?: string; search?: string }) =>
   useQuery({
     queryKey: SCENE_ASSET_KEYS.list(params),
-    queryFn: () => sceneAssetApi.list(params),
+    queryFn: () =>
+      readScenes({ authorId: params?.author_id, search: params?.search }),
   });
 
 export const useSceneAsset = (id: string) =>
   useQuery({
     queryKey: SCENE_ASSET_KEYS.detail(id),
-    queryFn: () => sceneAssetApi.get(id),
+    queryFn: () => readScene(id),
     enabled: !!id,
   });
 
 export const useCreateSceneAsset = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: AssetSceneCreate) => sceneAssetApi.create(data),
+    mutationFn: (data: AssetSceneCreate) => createScene(data, getCreatorId()),
     onSuccess: () => qc.invalidateQueries({ queryKey: SCENE_ASSET_KEYS.all }),
   });
 };
@@ -40,7 +62,7 @@ export const useUpdateSceneAsset = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: AssetSceneUpdate }) =>
-      sceneAssetApi.update(id, data),
+      updateScene(id, data, getCreatorId()),
     onSuccess: () => qc.invalidateQueries({ queryKey: SCENE_ASSET_KEYS.all }),
   });
 };
@@ -48,38 +70,33 @@ export const useUpdateSceneAsset = () => {
 export const useDeleteSceneAsset = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => sceneAssetApi.delete(id),
+    mutationFn: (id: string) => removeScene(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: SCENE_ASSET_KEYS.all }),
   });
 };
 
-// ============================================================
-// Items
-// ============================================================
-
-export const ITEM_KEYS = {
-  all: ['items'] as const,
-  list: (filters?: Record<string, unknown>) => ['items', 'list', filters] as const,
-  detail: (id: string) => ['items', 'detail', id] as const,
-};
-
-export const useItems = (params?: { author_id?: string; category?: string }) =>
+export const useItems = (params?: { author_id?: string; category?: string; search?: string }) =>
   useQuery({
     queryKey: ITEM_KEYS.list(params),
-    queryFn: () => itemApi.list(params),
+    queryFn: () =>
+      readItems({
+        authorId: params?.author_id,
+        category: params?.category,
+        search: params?.search,
+      }),
   });
 
 export const useItem = (id: string) =>
   useQuery({
     queryKey: ITEM_KEYS.detail(id),
-    queryFn: () => itemApi.get(id),
+    queryFn: () => readItem(id),
     enabled: !!id,
   });
 
 export const useCreateItem = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: AssetItemCreate) => itemApi.create(data),
+    mutationFn: (data: AssetItemCreate) => createItem(data, getCreatorId()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ITEM_KEYS.all }),
   });
 };
@@ -88,7 +105,7 @@ export const useUpdateItem = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: AssetItemUpdate }) =>
-      itemApi.update(id, data),
+      updateItem(id, data, getCreatorId()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ITEM_KEYS.all }),
   });
 };
@@ -96,7 +113,7 @@ export const useUpdateItem = () => {
 export const useDeleteItem = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => itemApi.delete(id),
+    mutationFn: (id: string) => removeItem(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ITEM_KEYS.all }),
   });
 };

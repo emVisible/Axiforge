@@ -30,7 +30,7 @@ export default function AppBrand({
         </span>
         {zone && (
           <span
-            className={`font-mono text-[10px] uppercase tracking-widest ${
+            className={`font-mono text-3xs uppercase tracking-widest ${
               isDark ? "text-white/30" : "text-ink-muted"
             }`}
           >

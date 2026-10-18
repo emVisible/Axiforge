@@ -1,0 +1,10 @@
+{
+  "name": "choices-at-tail",
+  "title": "选择",
+  "role_names": ["堰纱"],
+  "default_speaker": "旁白",
+  "prose": "堰纱：你要帮我，还是只是路过？\n> 我来帮你 | 只是路过",
+  "axs": "# 选择\n堰纱: 你要帮我，还是只是路过？\n> 我来帮你\n> 只是路过\n",
+  "expected_ops": ["say", "choice"],
+  "note": "canonical 的发射器把选项排在拍末（printBeatBody 先正文后 choice），不是书写位置"
+}

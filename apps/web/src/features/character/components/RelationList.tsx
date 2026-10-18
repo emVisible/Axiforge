@@ -68,7 +68,7 @@ export default function RelationList({ characterId }: RelationListProps) {
             </div>
             <button
               onClick={() => deleteRelation.mutate(r.id)}
-              className="text-ink-muted/40 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all text-sm flex-shrink-0 ml-2"
+              className="text-ink-muted/40 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-[opacity,color] text-sm flex-shrink-0 ml-2"
             >
               ×
             </button>

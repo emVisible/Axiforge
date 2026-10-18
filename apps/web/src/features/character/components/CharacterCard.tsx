@@ -82,7 +82,7 @@ export default function CharacterCard({
         {character.tags.slice(0, 3).map((tag) => (
           <span
             key={tag.id}
-            className="rounded-full border px-2 py-0.5 text-[11px] font-medium"
+            className="rounded-full border px-2 py-0.5 text-2xs font-medium"
             style={{
               color: tag.color,
               borderColor: tag.color + "40",

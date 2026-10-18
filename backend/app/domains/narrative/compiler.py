@@ -111,11 +111,14 @@ class StoryCompiler:
 
         glossary = self._build_glossary(project)
         profiles = await self._build_character_profiles(project)
-        codex_scope = [
+        # 选角引用不去重（编排台允许同一角色挂两条），但 codexScope 的用途是
+        # "查哪些角色的跨作品记忆"：重复项没有语义，而两端各给一份就是第二个真相源。
+        # TS 侧 packages/core/compiler.ts:419 一直去重，这里按它的口径收敛（保持首次出现顺序）。
+        codex_scope = list(dict.fromkeys(
             str(r.character_ref_id)
             for r in (project.roles or [])
             if r.character_ref_id
-        ]
+        ))
 
         return StoryPackage(
             irVersion=1,

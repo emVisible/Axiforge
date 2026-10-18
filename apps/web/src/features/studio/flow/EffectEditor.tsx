@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { cn, inputCompact, labelSm } from "@/shared/components/ui";
 
 import {
@@ -20,6 +22,7 @@ export default function EffectEditor({
   onChange,
   roles,
 }: EffectEditorProps) {
+  const groupId = useId();
   const add = () =>
     onChange([...effects, { type: "memory", key: "", value: "" }]);
   const update = (i: number, d: Partial<EffectItem>) => {
@@ -34,20 +37,20 @@ export default function EffectEditor({
   const remove = (i: number) => onChange(effects.filter((_, j) => j !== i));
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="group" aria-labelledby={groupId}>
       <div className="flex items-center justify-between">
-        <label className={labelSm}>完成效果</label>
+        <label id={groupId} className={labelSm}>完成效果</label>
         <button
           type="button"
           onClick={add}
-          className="text-[10px] font-medium text-brand hover:underline"
+          className="text-3xs font-medium text-brand hover:underline"
         >
           + 添加
         </button>
       </div>
       {effects.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-canvas/50 py-6 text-center">
-          <p className="text-[11px] text-ink-muted/60">无效果 — 纯叙事节点</p>
+          <p className="text-2xs text-ink-muted/60">无效果 — 纯叙事节点</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -72,7 +75,7 @@ export default function EffectEditor({
                     onChange={(ev) =>
                       update(i, { type: ev.target.value as EffectItem["type"] })
                     }
-                    className="cursor-pointer border-none bg-transparent text-[11px] font-medium outline-none"
+                    className="cursor-pointer border-none bg-transparent text-2xs font-medium outline-none"
                   >
                     {EFFECT_TYPES.map((et) => (
                       <option key={et.value} value={et.value}>
@@ -125,7 +128,7 @@ export default function EffectEditor({
                       placeholder="写入值"
                       className={cn(inputCompact, "w-full bg-surface")}
                     />
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       写入跨作品 IP 账本，供后续作品读取
                     </p>
                   </div>
@@ -190,7 +193,7 @@ export default function EffectEditor({
                         className={cn(inputCompact, "w-full bg-surface")}
                       />
                     )}
-                    <p className="text-[9px] text-ink-muted">
+                    <p className="text-3xs text-ink-muted">
                       {roles.length === 0
                         ? "请先在剧本详情页关联角色"
                         : "选择剧本已关联的角色"}
@@ -204,7 +207,7 @@ export default function EffectEditor({
                       placeholder="键名"
                       className={cn(flowSelectClass, "flex-1")}
                     />
-                    <span className="text-[11px] text-ink-muted">=</span>
+                    <span className="text-2xs text-ink-muted">=</span>
                     <input
                       value={e.value}
                       onChange={(ev) => update(i, { value: ev.target.value })}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { copyText } from "@/shared/lib/clipboard";
 import { Check, Copy, Download } from "lucide-react";
 import type { CharacterData } from "@/shared/types/character";
 import { renderCharacterPrompt, renderSystemPrompt } from "@/shared/lib/promptRenderer";
@@ -23,6 +24,7 @@ export default function PromptExport({
   const [includeStories, setIncludeStories] = useState(false);
   const [includeRelations, setIncludeRelations] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -67,7 +69,7 @@ export default function PromptExport({
         }
         setContent(text);
       }
-    } catch (e) {
+    } catch {
       setContent("导出失败");
     } finally {
       setLoading(false);
@@ -76,9 +78,13 @@ export default function PromptExport({
 
   const handleCopy = async () => {
     if (!content) return;
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const r = await copyText(content);
+    setCopied(r === "copied");
+    setCopyFailed(r !== "copied");
+    setTimeout(() => {
+      setCopied(false);
+      setCopyFailed(false);
+    }, 2000);
   };
 
   const handleDownload = () => {
@@ -109,7 +115,7 @@ export default function PromptExport({
               setMode(key);
               setContent("");
             }}
-            className={`px-4 py-2 rounded-xl border-2 text-sm transition-all ${
+            className={`px-4 py-2 rounded-xl border-2 text-sm transition-colors ${
               mode === key
                 ? "border-brand bg-brand-muted"
                 : "border-border hover:border-ink-muted/30"
@@ -181,7 +187,7 @@ export default function PromptExport({
                   )
                 }
               >
-                {copied ? "已复制" : "复制"}
+                {copied ? "已复制" : copyFailed ? "复制失败，请手动选中" : "复制"}
               </Button>
             </div>
           </div>

@@ -1,20 +1,19 @@
 import { useState, type ComponentType } from "react";
+import { copyText } from "@/shared/lib/clipboard";
+import { getImageUrl } from "@/shared/lib/imageUrl";
 import { useParams, useNavigate, Link } from "react-router";
 import {
   Anchor,
-  BookOpen,
   Brain,
   Drama,
   Copy,
   Download,
   Eye,
-  FileText,
   GitFork,
   Globe,
   History,
   Link2,
   Lock,
-  Network,
   Pencil,
   ScrollText,
   Share2,
@@ -40,10 +39,12 @@ import { Skeleton } from "@/shared/components/ui";
 import StoryList from "@/features/character/components/StoryList";
 import CreateStoryDialog from "@/features/character/components/CreateStoryDialog";
 import VersionPanel from "@/features/character/components/VersionPanel";
+import { type CharacterTabKey, visibleCharacterTabs } from "@/features/character/lib/characterTabs";
 import { versionApi } from "@/shared/api/versions";
-import { characterApi } from "@/shared/api/characters";
-import { renderCharacterPrompt } from "@/shared/lib/promptRenderer";
+import { buildCharacterExport } from "@/shared/storage/characterExport";
+import { saveBinaryFile } from "@/shared/storage";
 import { routes } from "@/shared/lib/routes";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 
 const layerTabs: {
   key: string;
@@ -124,17 +125,13 @@ const fieldLabels: Record<string, Record<string, string>> = {
   },
 };
 
-const mainTabs = [
-  { key: "info" as const, label: "角色信息", Icon: FileText },
-  { key: "relations" as const, label: "关系", Icon: Network },
-  { key: "stories" as const, label: "传记", Icon: BookOpen },
-];
-
 export default function CharacterDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: character, isLoading, error } = useCharacter(id!, { bumpView: true });
   const deleteCharacter = useDeleteCharacter();
+  /** 关系/版本/Fork 仍只有云端通路：桌面离线态不给入口（见 deployment.ts；标签那一栏的判据在 lib/characterTabs.ts） */
+  const localOnly = isLocalOnlyDeployment();
   const forkCharacter = useForkCharacter();
 
   const [isForkOpen, setIsForkOpen] = useState(false);
@@ -142,11 +139,14 @@ export default function CharacterDetailPage() {
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
   const [isVersionOpen, setIsVersionOpen] = useState(false);
   const [activeLayer, setActiveLayer] = useState("anchor");
-  const [activeTab, setActiveTab] = useState<"info" | "relations" | "stories">(
+  const [activeTab, setActiveTab] = useState<CharacterTabKey>(
     "info",
   );
   const [copiedId, setCopiedId] = useState(false);
+  const [copyIdFailed, setCopyIdFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
+  /** 导出/复制的失败原因（这两个动作共用一条错误线，不再 console.error 掉） */
+  const [exportError, setExportError] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -154,46 +154,23 @@ export default function CharacterDetailPage() {
   const { data: versions } = useQuery({
     queryKey: ["versions", character?.id],
     queryFn: () => versionApi.list(character!.id),
-    enabled: !!character,
+    enabled: !!character && !localOnly,
   });
   const versionsCount = versions?.length || 0;
   const handleExportMarkdown = async () => {
     if (!character) return;
     setExporting(true);
+    setExportError(null);
     try {
-      const data = await characterApi.export(character.id, {
-        format: "markdown",
-        include_stories: true,
-        include_relations: true,
-      });
-
-      let md = renderCharacterPrompt(
-        character.character_data as CharacterData,
-        "markdown",
+      const md = await buildCharacterExport(character);
+      await saveBinaryFile(
+        `${character.name || "character"}.md`,
+        new TextEncoder().encode(md),
+        "text/markdown",
       );
-
-      if ((data as any).stories?.length) {
-        md += "\n\n## 传记\n\n";
-        (data as any).stories.forEach((s: any) => {
-          md += `### ${s.title}\n\n${s.content}\n\n`;
-        });
-      }
-      if ((data as any).relations?.length) {
-        md += "\n## 关系\n\n";
-        (data as any).relations.forEach((r: any) => {
-          md += `- ${r.relation_name}: ${r.target_name}\n`;
-        });
-      }
-
-      const blob = new Blob([md], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.download = `${character.name || "character"}.md`;
-      a.href = url;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch (e) {
-      console.error("导出失败", e);
+      // 原先只有 console.error：桌面上这两个按钮点了毫无反应，用户无从判断是没数据还是没接通
+      setExportError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -248,9 +225,13 @@ export default function CharacterDetailPage() {
   };
 
   const handleCopyId = async () => {
-    await navigator.clipboard.writeText(character.id);
-    setCopiedId(true);
-    setTimeout(() => setCopiedId(false), 2000);
+    const r = await copyText(character.id);
+    setCopiedId(r === "copied");
+    setCopyIdFailed(r !== "copied");
+    setTimeout(() => {
+      setCopiedId(false);
+      setCopyIdFailed(false);
+    }, 2000);
   };
 
   const renderLayerFields = (layerKey: string) => {
@@ -337,28 +318,21 @@ export default function CharacterDetailPage() {
 
       <BackLink to={routes.characters.mine}>我的角色</BackLink>
       <div className="mb-6 rounded-2xl border border-border bg-surface p-8 group/card relative overflow-hidden">
-        <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 opacity-0 translate-x-2 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-all duration-300 ease-out z-10">
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-0.5 opacity-0 translate-x-2 group-hover/card:opacity-100 group-hover/card:translate-x-0 transition-[opacity,transform] duration-300 ease-out z-10">
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsVersionOpen(true)}
-              className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
-            >
-              <History className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {versionsCount} 个版本
-            </button>
+            {!localOnly && (
+              <button
+                onClick={() => setIsVersionOpen(true)}
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-xs text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
+              >
+                <History className="h-3.5 w-3.5" strokeWidth={1.75} />
+                {versionsCount} 个版本
+              </button>
+            )}
             <button
               onClick={async () => {
                 const url = window.location.href;
-                try {
-                  await navigator.clipboard.writeText(url);
-                } catch {
-                  const ta = document.createElement("textarea");
-                  ta.value = url;
-                  document.body.appendChild(ta);
-                  ta.select();
-                  document.execCommand("copy");
-                  document.body.removeChild(ta);
-                }
+                                await copyText(url);
                 setCopiedLink(true);
                 setTimeout(() => setCopiedLink(false), 2000);
               }}
@@ -378,64 +352,42 @@ export default function CharacterDetailPage() {
           >
             编辑
           </Button>
-          <Button
-            onClick={() => setIsForkOpen(true)}
-            variant="ghost"
-            size="sm"
-            icon={<GitFork className="h-3.5 w-3.5" strokeWidth={1.75} />}
-          >
-            Fork
-          </Button>
-          <Button
-            onClick={handleDelete}
-            variant="ghost"
-            size="sm"
-            className="text-ink-muted hover:text-red-500"
-            icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />}
-          >
-            删除
-          </Button>
+          {!localOnly && (
+            <Button
+              onClick={() => setIsForkOpen(true)}
+              variant="ghost"
+              size="sm"
+              icon={<GitFork className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            >
+              Fork
+            </Button>
+          )}
+          {!localOnly && (
+            <Button
+              onClick={handleDelete}
+              variant="ghost"
+              size="sm"
+              className="text-ink-muted hover:text-red-500"
+              icon={<Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />}
+            >
+              删除
+            </Button>
+          )}
           <div className="h-px bg-canvas my-0.5 w-8" />
           <div className="flex items-center gap-1">
             <button
               onClick={async () => {
                 if (!character) return;
                 setCopying(true);
+                setExportError(null);
                 try {
-                  const data = await characterApi.export(character.id, {
-                    format: "markdown",
-                    include_stories: true,
-                    include_relations: true,
-                  });
-                  let md = renderCharacterPrompt(
-                    character.character_data as CharacterData,
-                    "markdown",
-                  );
-                  if ((data as any).stories?.length) {
-                    md += "\n\n## 传记\n\n";
-                    (data as any).stories.forEach((s: any) => {
-                      md += `### ${s.title}\n\n${s.content}\n\n`;
-                    });
-                  }
-                  if ((data as any).relations?.length) {
-                    md += "\n## 关系\n\n";
-                    (data as any).relations.forEach((r: any) => {
-                      md += `- ${r.relation_name}: ${r.target_name}\n`;
-                    });
-                  }
-                  try {
-                    await navigator.clipboard.writeText(md);
-                  } catch {
-                    const ta = document.createElement("textarea");
-                    ta.value = md;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(ta);
-                  }
+                  const md = await buildCharacterExport(character);
+                                  await copyText(md);
                   setCopiedText(true);
                   setTimeout(() => setCopiedText(false), 2000);
-                } catch {
+                } catch (e) {
+                  // 原先是空的 catch {}：复制失败时连一句「没复制上」都不说
+                  setExportError(e instanceof Error ? e.message : String(e));
                 } finally {
                   setCopying(false);
                 }
@@ -465,6 +417,11 @@ export default function CharacterDetailPage() {
               )}
             </button>
           </div>
+          {exportError && (
+            <p role="alert" className="text-xs text-danger">
+              {exportError}
+            </p>
+          )}
         </div>
 
         <div className="flex items-start gap-8">
@@ -481,7 +438,7 @@ export default function CharacterDetailPage() {
               </div>
             )}
             {/* 浏览量角标 */}
-            <span className="absolute -top-1.5 -right-1.5 px-2 py-0.5 text-[10px] bg-surface border border-border rounded-full shadow-sm text-ink-muted inline-flex items-center gap-0.5">
+            <span className="absolute -top-1.5 -right-1.5 px-2 py-0.5 text-3xs bg-surface border border-border rounded-full shadow-sm text-ink-muted inline-flex items-center gap-0.5">
               <Eye className="h-3 w-3" strokeWidth={1.75} />
               {(character.view_count ?? 0) > 999
                 ? `${((character.view_count ?? 0) / 1000).toFixed(1)}k`
@@ -547,7 +504,7 @@ export default function CharacterDetailPage() {
                     d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                   />
                 </svg>
-                {copiedId ? "✓ 已复制" : "复制 ID"}
+                {copiedId ? "✓ 已复制" : copyIdFailed ? "复制失败，请手动选中" : "复制 ID"}
               </button>
               <span className="text-border">·</span>
               {character.fork_from ? (
@@ -570,11 +527,12 @@ export default function CharacterDetailPage() {
 
       {/* Tab */}
       <div className="flex gap-1 mb-6 bg-canvas p-1 rounded-xl">
-        {mainTabs.map(({ key, label, Icon }) => (
+        {visibleCharacterTabs(localOnly)
+          .map(({ key, label, Icon }) => (
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
+            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200 ${activeTab === key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}
           >
             <Icon className="h-4 w-4" strokeWidth={1.75} />
             {label}
@@ -590,7 +548,7 @@ export default function CharacterDetailPage() {
               <button
                 key={key}
                 onClick={() => setActiveLayer(key)}
-                className={`flex flex-col items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 border ${activeLayer === key ? color + " shadow-sm" : "border-border text-ink-muted hover:bg-canvas"}`}
+                className={`flex flex-col items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 border ${activeLayer === key ? color + " shadow-sm" : "border-border text-ink-muted hover:bg-canvas"}`}
               >
                 <Icon className="mb-1 h-5 w-5" strokeWidth={1.75} />
                 <span className="text-xs">{label}</span>
@@ -649,6 +607,53 @@ export default function CharacterDetailPage() {
           <StoryList />
         </div>
       )}
+
+      {/* 立绘 */}
+      {activeTab === "sprites" && (() => {
+        const cd = character.character_data as CharacterData;
+        const sprites = (cd?.sprites || {}) as Record<string, string>;
+        const entries = Object.entries(sprites);
+        return (
+          <div className="bg-surface rounded-2xl border border-border shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-ink">立绘管理</h2>
+              <Button
+                size="sm"
+                onClick={() => navigate(`/studio/characters/${character.id}/edit`)}
+              >
+                编辑立绘
+              </Button>
+            </div>
+            {entries.length === 0 ? (
+              <p className="text-sm text-ink-muted py-8 text-center">
+                暂无立绘差分。点击「编辑立绘」添加表情差分图片。
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                {entries.map(([key, url]) => (
+                  <div
+                    key={key}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-border p-3"
+                  >
+                    {url ? (
+                      <img
+                        src={getImageUrl(url) || url}
+                        alt={key}
+                        className="h-20 w-20 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-canvas text-lg font-semibold text-ink-faint">
+                        {key[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-xs font-medium text-ink-muted">{key}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div className="mt-6 text-xs text-ink-muted/40 flex justify-between">
         <span>

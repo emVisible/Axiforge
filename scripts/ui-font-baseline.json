@@ -1,0 +1,11 @@
+{
+  "apps/web/src/features/character/pages/StoryEditPage.tsx": 5,
+  "apps/admin/src/components/ModerationPreviewPanel.tsx": 5,
+  "apps/web/src/features/character/pages/StoryReadPage.tsx": 4,
+  "apps/admin/src/components/ModerationContextSections.tsx": 4,
+  "apps/admin/src/pages/ContentPage.tsx": 4,
+  "apps/admin/src/layout/AdminLayout.tsx": 3,
+  "packages/ui/src/components/formStyles.ts": 2,
+  "apps/admin/src/components/ContentInspectPanel.tsx": 1,
+  "apps/admin/src/pages/ReportsPage.tsx": 1
+}

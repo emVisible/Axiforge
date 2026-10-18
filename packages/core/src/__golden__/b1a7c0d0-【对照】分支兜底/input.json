@@ -1,0 +1,219 @@
+{
+  "id": "b1a7c0d0-0000-4000-8000-000000000001",
+  "title": "【对照】分支兜底",
+  "isPublic": true,
+  "worldSetting": "近未来移动都市「交汇港」",
+  "playMeta": {
+    "glossary": [
+      {
+        "id": "g1",
+        "term": " 交汇港 ",
+        "definition": "漂浮在大陆边缘的港口都市"
+      },
+      {
+        "term": "无 id 词条",
+        "definition": "缺 id 时按下标补"
+      },
+      {
+        "term": "   ",
+        "definition": "空 term 应当被丢弃"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000050",
+      "stageId": "b1a7c0d0-0000-4000-8000-000000000041",
+      "editorData": {
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "narrativeData": {
+        "title": "开场",
+        "script": [
+          {
+            "op": "bg",
+            "image": "scenes/parity-under.png"
+          },
+          {
+            "op": "bgm",
+            "loop": true,
+            "track": "night_hum"
+          },
+          {
+            "op": "say",
+            "text": "别站在灯下。",
+            "speaker": "朝"
+          }
+        ],
+        "speaker": "朝",
+        "is_anchor": true,
+        "narration": "灯一盏盏灭下去。"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000051",
+      "stageId": "b1a7c0d0-0000-4000-8000-000000000043",
+      "editorData": {},
+      "narrativeData": {
+        "title": "分支",
+        "script": [
+          {
+            "op": "narration",
+            "text": "两条路。"
+          },
+          {
+            "op": "choice",
+            "options": [
+              {
+                "to": null,
+                "label": "走左边",
+                "condition": {
+                  "flag": "left"
+                }
+              },
+              {
+                "to": null,
+                "label": "走右边"
+              }
+            ]
+          }
+        ],
+        "narration": "两条路。"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000052",
+      "stageId": "b1a7c0d0-0000-4000-8000-000000000042",
+      "editorData": {},
+      "narrativeData": {
+        "title": "收束",
+        "is_ending": true,
+        "narration": "天亮。"
+      },
+      "sortOrder": 0
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeId": "b1a7c0d0-0000-4000-8000-000000000050",
+      "targetNodeId": "b1a7c0d0-0000-4000-8000-000000000051",
+      "label": "继续",
+      "condition": {
+        "op": "and",
+        "items": [
+          {
+            "key": "visited",
+            "type": "flag",
+            "value": true
+          }
+        ]
+      }
+    },
+    {
+      "sourceNodeId": "b1a7c0d0-0000-4000-8000-000000000051",
+      "targetNodeId": "b1a7c0d0-0000-4000-8000-000000000052",
+      "label": null,
+      "condition": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000040",
+      "title": "自有值优先",
+      "location": "站内",
+      "atmosphere": "干燥",
+      "sceneRefId": null,
+      "nodes": []
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000041",
+      "title": "空串算没值",
+      "location": "",
+      "atmosphere": "",
+      "sceneRefId": "b1a7c0d0-0000-4000-8000-000000000020",
+      "nodes": [],
+      "sceneRef": {
+        "location": "方舟·地下",
+        "atmosphere": "潮湿",
+        "imagePath": "scenes/parity-under.png"
+      }
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000042",
+      "title": "资产字段也空",
+      "location": "月台",
+      "atmosphere": null,
+      "sceneRefId": "b1a7c0d0-0000-4000-8000-000000000021",
+      "nodes": [],
+      "sceneRef": {
+        "location": null,
+        "atmosphere": null,
+        "imagePath": null
+      }
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000043",
+      "title": "资产查不到",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": "b1a7c0d0-0000-4000-8000-999999999999",
+      "nodes": []
+    }
+  ],
+  "roles": [
+    {
+      "characterRefId": "b1a7c0d0-0000-4000-8000-000000000010"
+    },
+    {
+      "characterRefId": "b1a7c0d0-0000-4000-8000-000000000011"
+    },
+    {
+      "characterRefId": "b1a7c0d0-0000-4000-8000-000000000010"
+    }
+  ],
+  "characters": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000010",
+      "name": "朝",
+      "characterData": {
+        "anchor": {
+          "name": "朝",
+          "essence": "守夜人"
+        }
+      },
+      "imagePath": null
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000011",
+      "name": "陌生人",
+      "characterData": {
+        "anchor": {
+          "name": "陌生人"
+        }
+      },
+      "imagePath": null
+    }
+  ],
+  "items": [
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000070",
+      "assetId": "b1a7c0d0-0000-4000-8000-000000000030",
+      "asset": {
+        "id": "b1a7c0d0-0000-4000-8000-000000000030",
+        "name": "旧钥匙",
+        "category": "道具",
+        "imagePath": "items/parity-key.png"
+      }
+    },
+    {
+      "id": "b1a7c0d0-0000-4000-8000-000000000071",
+      "assetId": "b1a7c0d0-0000-4000-8000-888888888888",
+      "asset": null
+    }
+  ]
+}

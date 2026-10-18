@@ -25,7 +25,7 @@ export default function DiscoverTopicsBar() {
           <Link
             key={t.slug}
             to={routes.discoverTopic(t.slug)}
-            className="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-[11px] text-ink-muted hover:border-brand hover:text-brand"
+            className="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-2xs text-ink-muted hover:border-brand hover:text-brand"
           >
             {t.label}
             <span className="ml-1 opacity-60">{t.project_count}</span>

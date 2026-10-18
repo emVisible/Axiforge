@@ -1,0 +1,10 @@
+{
+  "name": "unknown-speaker",
+  "title": "测试",
+  "role_names": ["堰纱"],
+  "default_speaker": "旁白",
+  "prose": "陌生人: 别过来。\n堰纱：你来接我？",
+  "axs": "# 测试\n陌生人：别过来。\n堰纱: 你来接我？\n",
+  "expected_ops": ["narration", "say"],
+  "note": "锁两端同一条裁决：认不出的名字不猜角色，退回旁白并保留名字在前（两端都用全角冒号重新拼接，输入是半角也一样）。SPEAKER_RE 两种冒号都收，所以第二行按角色表命中成 say。"
+}

@@ -1,0 +1,484 @@
+"""案件生命周期：同一篇内容重复送审时会发生什么（ADR-028 §12）。
+
+引擎层的判定正确性在 `test_moderation_engine.py`，HTTP 跨层在 `test_moderation_api.py`。
+这里管的是两者都够不到的一段：内容指纹命中已有案件之后，
+**这一次模型调用得出的新结论去哪儿了**。旧代码把它丢了——队列里会永远挂着旧裁决，
+而重拟温度表恰恰是要它变的时机。
+"""
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import replace
+from datetime import datetime, timezone
+from typing import Optional
+
+import pytest
+from sqlalchemy import delete, select
+
+from app.domains.moderation.contracts import (
+    ACTION_APPROVE,
+    ACTION_HUMAN,
+    ModerationSubject,
+    Policy,
+    Verdict,
+)
+from app.domains.moderation.engine import ModerationEngine
+from app.domains.moderation.models import (
+    ModerationCase,
+    ModerationDecisionLog,
+    STATE_AUTO_CLOSED,
+    STATE_PENDING,
+    STATE_RESOLVED,
+)
+from app.domains.moderation.service import ModerationService
+
+
+class Switchable:
+    """假引擎：结论可以中途换，用来模拟"标定/策略变了，同一篇稿子不再同一个结论"。
+
+    `model_version` 跟着结论走是有意的——生产上"结论变了"正是通过模型状态变化
+    进入幂等键的（ADR-028 §12）。若这里返回常量，engine 的缓存会让第二次判定
+    直接吐回旧结论，测到的就不是服务层而是缓存。
+    """
+
+    name = "fake:model"
+    authoritative = True
+
+    def __init__(self, verdict: Verdict) -> None:
+        self.verdict = verdict
+
+    def model_version(self) -> str:
+        v = self.verdict
+        return f"fake:{v.action}:{v.confidence:.2f}:{int(v.calibrated)}"
+
+    def health_check(self) -> bool:
+        return True
+
+    def moderate(self, subject: ModerationSubject) -> Verdict:  # noqa: ARG002
+        return self.verdict
+
+
+def _verdict(action: str, *, confidence: float, calibrated: bool) -> Verdict:
+    return Verdict(action=action, confidence=confidence, engine="fake:model",
+                   calibrated=calibrated, rule="manual_test")
+
+
+async def _logs(db, case_id) -> list:
+    """按 created_at 取，不能按 id：`id` 是 uuid4，按它排序等于随机。
+    （表上建的也是 (case_id, created_at) 索引——判定历史本来就按时间读。）"""
+    rows = await db.execute(
+        select(ModerationDecisionLog)
+        .where(ModerationDecisionLog.case_id == case_id)
+        .order_by(ModerationDecisionLog.created_at)
+    )
+    return list(rows.scalars())
+
+
+async def _purge(db, subject_id: str) -> None:
+    """测试自带清理：这些行落在真库上，不清就会被下一次运行当成重复指纹冲突。"""
+    await db.execute(delete(ModerationDecisionLog).where(
+        ModerationDecisionLog.case_id.in_(
+            select(ModerationCase.id).where(ModerationCase.subject_id == subject_id))))
+    await db.execute(delete(ModerationCase).where(ModerationCase.subject_id == subject_id))
+    await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_repeated_review_of_unchanged_conclusion_stays_one_case(db_session):
+    switch = Switchable(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        first: Optional[ModerationCase] = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="雨落下来")
+        second = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="雨落下来")
+        await db_session.commit()
+
+        assert first is not None and second is not None
+        assert second.id == first.id, "同一内容同一结论不该再开一条案件"
+        logs = await _logs(db_session, first.id)
+        assert [bool(x.dedupe_hit) for x in logs] == [False, True]
+        # 这一列在建案与去重两个分支里必须是同一种东西：引擎名。
+        # 去重分支从前存的是 reasons，同一列两种含义 = 复盘时分不清问了几台引擎。
+        assert [x.engines_tried for x in logs] == [["fake:model"], ["fake:model"]]
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
+async def test_changed_conclusion_updates_the_case_instead_of_being_dropped(db_session):
+    """命中旧案件 ≠ 结论相同。温度表重拟后必须看见新结论。"""
+    switch = Switchable(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="很干净的一篇")
+        assert case is not None and case.state == STATE_PENDING
+        await db_session.commit()
+
+        # 标定到位、置信度过通过线：这一次它真的有资格自动放行
+        switch.verdict = _verdict(ACTION_APPROVE, confidence=0.99, calibrated=True)
+        again = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="很干净的一篇")
+        await db_session.commit()
+
+        assert again is not None
+        assert again.id == case.id, "更新既有案件，不再开第二条"
+        assert again.final_action == ACTION_APPROVE
+        assert again.calibrated is True
+        assert again.state == STATE_AUTO_CLOSED, "旧行为会把它留在待人工，显示的还是旧结论"
+        logs = await _logs(db_session, case.id)
+        assert [bool(x.dedupe_hit) for x in logs] == [False, False]
+        assert logs[-1].action == ACTION_APPROVE
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
+async def test_engine_refusal_does_not_open_a_queue_case(db_session):
+    """引擎主动拒绝（正文超窗）不该变成一条人工案件。
+
+    作品正文动辄上万字，若每条拒绝都占一个队列名额，接上保存路径的那一刻
+    就是把队列灌满的那一刻——而那些行的真实状态是"机器没看"，人无从处置。
+    """
+    switch = Switchable(Verdict(action=ACTION_HUMAN, confidence=0.0, engine="fake:model",
+                                refusal="over_length:7003>6000"))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id, title="长稿", body="雨" * 7000)
+        await db_session.commit()
+        assert case is None
+        rows = await db_session.execute(
+            select(ModerationCase).where(ModerationCase.subject_id == subject_id))
+        assert rows.scalars().all() == []
+    finally:
+        await _purge(db_session, subject_id)
+
+
+class Dead:
+    """权威引擎没答话时的真实形状：sidecar 客户端把 URLError 翻成 abstain，不外抛。"""
+
+    name = "laya:sidecar"
+    authoritative = True
+
+    def model_version(self) -> str:
+        return "laya:unreachable"
+
+    def health_check(self) -> bool:
+        return False
+
+    def moderate(self, subject: ModerationSubject) -> Verdict:  # noqa: ARG002
+        return Verdict.abstain(self.name, "sidecar 不可达：URLError")
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_rejudge_keeps_the_model_verdict_it_cannot_match(db_session):
+    """真机测出来的覆盖事故：sidecar 崩着的时候点一次「让模型重判」，
+    案件上的 answers / confidence / clause_ids 被换成词表的空值——那条内容真正的
+    风险信号从案件上消失，队列的风险排序还把它挪到了后面。
+
+    降级判定从此只留一条备注，不动结论。
+    """
+    from app.domains.moderation.providers.lexicon import LexiconEngine
+
+    class Maybe:
+        name = "fake:model"
+        authoritative = True
+        dead = False
+
+        def model_version(self) -> str:
+            return f"fake:alive:{int(self.dead)}"
+
+        def health_check(self) -> bool:
+            return not self.dead
+
+        def moderate(self, subject: ModerationSubject) -> Verdict:  # noqa: ARG002
+            if self.dead:
+                return Verdict.abstain(self.name, "sidecar 不可达：URLError")
+            return Verdict(action=ACTION_HUMAN, confidence=0.98, engine=self.name,
+                           calibrated=True, clause_ids=["hate_incitement"],
+                           rule="hate_or_doxx_or_instruction",
+                           reasons=["规则「仇恨 / 隐私 / 违法教程」→ 自动驳回 置信 0.98"])
+
+    eng = Maybe()
+    svc = ModerationService(db_session, ModerationEngine([LexiconEngine(), eng], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(subject_type="project", subject_id=subject_id,
+                                title="夜航", body="加微信领 返利群")
+        await db_session.commit()
+        assert case is not None and case.authoritative is True
+        assert case.clause_ids == ["hate_incitement"]
+
+        eng.dead = True
+        again = await svc.review(subject_type="project", subject_id=subject_id,
+                                 title="夜航", body="加微信领 返利群")
+        await db_session.commit()
+        assert again is not None and again.id == case.id
+        assert again.authoritative is True, "没答话的引擎不许把自己的资格写进案件"
+        assert again.engine == "fake:model" and again.clause_ids == ["hate_incitement"]
+        assert any("未答话" in r for r in again.reasons), again.reasons
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
+async def test_a_dead_model_is_visible_on_the_saved_case(db_session):
+    """依据那一栏要能回答"这台模型当时在不在"。
+
+    引擎层的留痕如果进不到落库的 reasons，运营在队列里看到的还是
+    "词表判了转人工"，而真相是"只有词表判了"——两者的人工工作量完全不同。
+    """
+    from app.domains.moderation.providers.lexicon import LexiconEngine
+
+    svc = ModerationService(db_session, ModerationEngine([LexiconEngine(), Dead()], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id,
+            title="夜航", body="加微信领 返利群")
+        await db_session.commit()
+        assert case is not None
+        assert any("laya:sidecar 未答话" in r for r in case.reasons), case.reasons
+        assert case.engine == "lexicon" and case.authoritative is False
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
+async def test_queue_default_order_puts_suspicious_first(db_session):
+    """队列默认"先看可疑"：三级排序键都要各就各位（现阶段唯一安全的自动化）。
+
+    第一级必须是"有没有明确条款"而不是置信度——实测词表案件的 confidence 全是 0.0，
+    只按置信度排的话，在默认（未开模型）配置下这个控件等同于按时间排。
+    这里 limit 取大于全表行数：无条款的行本来就会被挤到分页之外，
+    那正是新排序的行为，测试不能假装看不见，所以把它显式包含进来再断言相对顺序。
+    """
+    switch = Switchable(Verdict(action=ACTION_HUMAN, confidence=0.85, engine="fake:model",
+                                calibrated=True, rule="manual_test"))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    ids = [f"life-{uuid.uuid4().hex[:8]}" for _ in range(3)]
+    try:
+        await svc.review(subject_type="project", subject_id=ids[0],
+                         title="高置信无条款", body="雨落下来")
+        # 三次独立的保存 = 三个独立事务：PG 的 now() 取事务开始时间，
+        # 同一个事务里插入的行 created_at 完全相同，"按时间"在批内没有定义。
+        await db_session.commit()
+        switch.verdict = Verdict(action=ACTION_HUMAN, confidence=0.30, engine="fake:model",
+                                 calibrated=True, rule="manual_test")
+        await svc.review(subject_type="project", subject_id=ids[1],
+                         title="低置信无条款", body="风也停了")
+        await db_session.commit()
+        switch.verdict = Verdict(action=ACTION_HUMAN, confidence=0.0, engine="fake:model",
+                                 calibrated=True, clause_ids=["doxxing"],
+                                 rule="hate_or_doxx_or_instruction")
+        await svc.review(subject_type="project", subject_id=ids[2],
+                         title="零置信但有明确条款", body="她就是住 XX 路 12 号楼")
+        await db_session.commit()
+
+        all_rows = (await svc.queue(limit=5000, order="risk"))["items"]
+        by_risk = [c.subject_id for c in all_rows if c.subject_id in ids]
+        by_new = [c.subject_id for c in (await svc.queue(limit=5000, order="new"))["items"]
+                  if c.subject_id in ids]
+        assert by_risk == [ids[2], ids[0], ids[1]], "条款 > 置信度 > 时间"
+        assert by_new == [ids[2], ids[1], ids[0]], "按时间则后落库的在前"
+    finally:
+        for sid in ids:
+            await _purge(db_session, sid)
+
+
+@pytest.mark.asyncio
+async def test_primary_clause_suggestion_reaches_the_admin_contract(db_session):
+    """单选建议要从模型答案 → 落库快照 → 中台契约一路可见（跨层不能只通一半）。
+
+    它同时是一条边界断言：这条建议**不进** clause_ids，因此不参与门控。
+    """
+    from app.domains.moderation.contracts import Answer
+    from app.domains.platform.admin_service import _auto_judgement
+
+    prim = Answer("primary_clause", "choice", "self_harm_unsafe", 0.73,
+                  {"self_harm_unsafe": 0.73, "none": 0.2})
+    switch = Switchable(replace(
+        _verdict(ACTION_HUMAN, confidence=0.4, calibrated=False),
+        answers={"primary_clause": prim}))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="雨落下来")
+        await db_session.commit()
+        assert case is not None
+        judgement = _auto_judgement(case)
+        assert judgement.primary_suggestion == "self_harm_unsafe"
+        assert judgement.primary_confidence == pytest.approx(0.73)
+        assert "self_harm_unsafe" not in judgement.clause_ids
+    finally:
+        await _purge(db_session, subject_id)
+
+
+@pytest.mark.asyncio
+async def test_machine_reopinion_does_not_override_a_human_resolution(db_session):
+    """人结过案的，机器的新意见只记日志，不改案件状态。"""
+    switch = Switchable(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))
+    svc = ModerationService(db_session, ModerationEngine([switch], Policy()))
+    subject_id = f"life-{uuid.uuid4().hex[:8]}"
+    try:
+        case = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="有争议的一段")
+        assert case is not None
+        resolved = await svc.resolve(case.id, outcome="resolved", actor="admin-role")
+        await db_session.commit()
+        assert resolved is not None and resolved.state == STATE_RESOLVED
+
+        switch.verdict = _verdict(ACTION_APPROVE, confidence=0.99, calibrated=True)
+        again = await svc.review(
+            subject_type="project", subject_id=subject_id, title="夜航", body="有争议的一段")
+        await db_session.commit()
+
+        assert again is not None and again.id == case.id
+        assert again.state == STATE_RESOLVED, "自动结论不重开人工决定"
+        assert again.resolved_by == "admin-role"
+        logs = await _logs(db_session, case.id)
+        assert logs[-1].action == ACTION_APPROVE, "新意见要留痕，只是不落执行"
+    finally:
+        await _purge(db_session, subject_id)
+
+
+async def test_queue_order_is_total_even_when_created_at_ties(db_session):
+    """同一事务插入的案件 `created_at` 完全相同（PG 的 now() 取事务开始时间）。
+
+    这时"按最新排"退化成数据库爱给什么给什么，翻页就会重复或漏项——而分页测试
+    本身抓不到它：两条同形状的查询可能恰好返回同样的任意顺序。所以这里把
+    **插入顺序**与 **id 降序**故意做成不一样（id 由本测试指定），
+    这样"末级键写没写"必须能被断出来。
+    """
+    from uuid import UUID
+
+    from app.domains.moderation.models import ModerationCase
+
+    ids = [UUID("00000000-0000-0000-0000-%012d" % i) for i in (1, 2, 3)]
+    now = datetime.now(timezone.utc)
+    try:
+        for n, cid in enumerate(ids):   # 插入顺序 = id 升序
+            db_session.add(ModerationCase(
+                id=cid, subject_type="comment", subject_id=f"tie-{n}-{uuid.uuid4().hex[:6]}",
+                author_id="a", fingerprint=f"fp-tie-{n}", state="pending",
+                engine="lexicon", answers={}, reasons=[], clause_ids=[],
+                created_at=now, policy_version="policy-1", questions_version="questions-3",
+            ))
+        await db_session.commit()
+
+        svc = ModerationService(db_session)  # queue() 不碰引擎，不用装配链
+        got = [c.id for c in (await svc.queue(order="new", limit=50))["items"] if c.id in ids]
+        assert got == list(reversed(ids)), (
+            f"平局时末级键必须是 id 降序：期望 {list(reversed(ids))}，实得 {got}")
+
+        first = [c.id for c in (await svc.queue(order="new", limit=2, offset=0))["items"]
+                 if c.id in ids]
+        second = [c.id for c in (await svc.queue(order="new", limit=2, offset=2))["items"]
+                  if c.id in ids]
+        assert first + second == got, "翻页拼起来必须等于按序读全量"
+    finally:
+        await db_session.execute(delete(ModerationCase).where(ModerationCase.id.in_(ids)))
+        await db_session.commit()
+
+
+async def test_stats_counts_conclusions_left_on_old_versions(db_session):
+    """改版不会自己回头重算：「待处置 994 条」不等于「994 条同等新鲜的证据」。
+
+    真机量过的形状：994 条里 264 条是 `questions-2` 时代判的、111 条挂着旧词表版本号，
+    而中台此前一个字都不说。这里用**增量**断言（dev 库上别的用例也在写行），
+    并在序列前 drain 后台判定——上一轮那条分页 flake 就是这个成因。
+    """
+    from uuid import UUID
+
+    from app.domains.moderation.background import drain_pending
+    from app.domains.moderation.providers.lexicon import LEXICON_VERSION, LexiconEngine
+    from app.domains.moderation.questions import QUESTIONS_VERSION
+
+    await drain_pending()
+    svc = ModerationService(db_session, ModerationEngine([LexiconEngine()], Policy()))
+    before = await svc._staleness()
+
+    now = datetime.now(timezone.utc)
+    spec = [
+        ("fresh", QUESTIONS_VERSION, LEXICON_VERSION, True),    # 新版本 + 权威引擎判的
+        ("stale-q", "questions-2", LEXICON_VERSION, False),     # 旧题集
+        ("stale-l", QUESTIONS_VERSION, "lexicon-1", False),     # 旧词表
+    ]
+    ids = [UUID("00000000-0000-0000-0000-%012d" % i) for i in (91, 92, 93)]
+    try:
+        for (tag, qv, lv, auth), cid in zip(spec, ids):
+            db_session.add(ModerationCase(
+                id=cid, subject_type="comment", subject_id=f"stale-{tag}-{uuid.uuid4().hex[:6]}",
+                author_id="a", fingerprint=f"fp-stale-{tag}", state="pending",
+                engine="laya:sidecar" if auth else "lexicon", answers={}, reasons=[],
+                clause_ids=[], created_at=now, policy_version="policy-1",
+                questions_version=qv, lexicon_version=lv, authoritative=auth,
+            ))
+        await db_session.commit()
+
+        after = await svc._staleness()
+        assert after["current_questions"] == QUESTIONS_VERSION
+        assert after["stale_questions"] - before["stale_questions"] == 1, "旧题集那条要数进来"
+        assert after["stale_lexicon"] - before["stale_lexicon"] == 1, "旧词表那条要数进来"
+        assert after["without_authoritative_verdict"] - before["without_authoritative_verdict"] == 2
+        assert after["total"] - before["total"] == 3
+    finally:
+        await db_session.execute(delete(ModerationCase).where(ModerationCase.id.in_(ids)))
+        await db_session.commit()
+
+
+class Reporting(Switchable):
+    """带标定覆盖面可上报的假引擎（实现 `calibration()`，即 CalibrationReporter）。"""
+
+    def __init__(self, verdict: Verdict, report: dict) -> None:
+        super().__init__(verdict)
+        self._report = report
+
+    def calibration(self) -> dict:
+        return self._report
+
+
+class Broken(Switchable):
+    def calibration(self) -> dict:
+        raise RuntimeError("sidecar 没起来")
+
+
+async def test_stats_names_the_questions_missing_from_the_temperature_table(db_session):
+    """「为什么一条都不会自动执行」要在界面上有答案，而答案不是布尔，是缺哪几题。"""
+    from app.domains.moderation.contracts import CalibrationReporter
+    from app.domains.moderation.providers.lexicon import LexiconEngine
+
+    provider = Reporting(
+        _verdict(ACTION_HUMAN, confidence=0.4, calibrated=False),
+        {"reachable": True, "declared": ["age_rating", "severity", "spam_promotion"],
+         "covered": ["age_rating", "spam_promotion"], "missing": ["severity"],
+         "temperatures": {"age_rating": 1.4}, "path": "/tmp/calibration.json"},
+    )
+    stats = await ModerationService(db_session, ModerationEngine([provider], Policy())).stats()
+    rep = next(r for r in stats["calibration"] if r["engine"] == "fake:model")
+    assert rep["missing"] == ["severity"]
+    assert rep["covered"] == ["age_rating", "spam_promotion"]
+    assert stats["policy"]["auto_approve"] == Policy().auto_approve_threshold
+
+    # 词表没有温度表：它是"没有这个能力"，不是"覆盖 0 题"。
+    # 混起来会让界面显示一个假的红色缺口，而真实的缺口被稀释。
+    assert not isinstance(LexiconEngine(), CalibrationReporter)
+    lex = await ModerationService(
+        db_session, ModerationEngine([LexiconEngine()], Policy())).stats()
+    assert lex["calibration"] == []
+
+
+async def test_a_failing_calibration_probe_degrades_to_one_error_row(db_session):
+    """探测失败要留一行带错误名的记录：整个 stats 不该因此 500，也不该静默跳过。"""
+    broken = Broken(_verdict(ACTION_HUMAN, confidence=0.4, calibrated=False))
+    stats = await ModerationService(db_session, ModerationEngine([broken], Policy())).stats()
+    assert len(stats["calibration"]) == 1, "静默跳过会让人以为这台引擎不需要标定"
+    assert stats["calibration"][0]["reachable"] is False
+    assert stats["calibration"][0]["error"] == "RuntimeError"

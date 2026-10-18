@@ -35,11 +35,11 @@ export default function OutlinerSection({
             <ChevronRight className="h-3 w-3 shrink-0 text-ink-faint" strokeWidth={2} />
           )}
           {icon}
-          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+          <span className="truncate text-3xs font-semibold uppercase tracking-wider text-ink-muted">
             {title}
           </span>
           {count != null && (
-            <span className="ml-auto font-mono text-[9px] text-ink-faint">{count}</span>
+            <span className="ml-auto font-mono text-3xs text-ink-faint">{count}</span>
           )}
         </button>
         {actions}
@@ -71,7 +71,7 @@ export function OutlinerRow({
       onDoubleClick={onDoubleClick}
       title={title}
       className={cn(
-        "flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-[11px] transition-colors",
+        "flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-left text-2xs transition-colors",
         active
           ? "bg-panel-raised text-ink"
           : "text-ink-muted hover:bg-surface-raised hover:text-ink",

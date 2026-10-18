@@ -210,9 +210,10 @@ describe("engine — restore 存档续玩（v1.2 桥4）", () => {
     const saved = {
       currentBeatId: null,
       cursor: 0,
-      vars: { memory: {}, flags: { met_alice: true }, characters: { c1: { affection: 30 } } },
+      vars: { memory: {}, flags: { met_alice: true }, characters: { c1: { affection: 30 } }, relationships: {} },
       codex: {},
       completedBeats: ["intro", "good"],
+      unlockedAchievements: [],
       status: "ended" as const,
       pendingChoiceLabel: null,
       pendingChoiceTarget: null,
@@ -291,5 +292,222 @@ describe("StoryRuntime 类封装", () => {
     expect(rt.view.beatId).toBe("bad");
     rt.proceed();
     expect(rt.ended).toBe(true);
+  });
+});
+
+/**
+ * 下面三组此前一条都没走到（实测 engine.ts 语句覆盖 77.44%，未覆盖行正是这些）。
+ * 「引擎不是业务代码」要求的是分支被证明过，而不是 happy path 跑通。
+ */
+describe("engine — wait 与未知指令", () => {
+  const pkgWith = (script: StoryPackage["beats"][number]["script"]): StoryPackage => ({
+    irVersion: 1,
+    projectId: "p1",
+    title: "T",
+    startBeatId: "b1",
+    characters: [],
+    scenes: [],
+    beats: [{ id: "b1", script }],
+    transitions: [],
+  });
+
+  it("wait 停在 waiting:wait 并带上毫秒；proceed 之后走到下一个 say", () => {
+    const pkg = pkgWith([{ op: "wait", ms: 800 }, { op: "say", text: "稍后" }]);
+    const first = start(pkg);
+    expect(first.view.waiting).toBe("wait");
+    expect(first.view.waitMs).toBe(800);
+    const next = proceed(pkg, first.state);
+    expect(next.view.waiting).toBe("say");
+    expect(next.view.line?.text).toBe("稍后");
+  });
+
+  it("未知指令被跳过而不是崩——新 op 要能被旧渲染器忽略", () => {
+    const pkg = pkgWith([
+      { op: "shake" } as unknown as StoryPackage["beats"][number]["script"][number],
+      { op: "say", text: "照旧" },
+    ]);
+    const r = start(pkg);
+    expect(r.view.waiting).toBe("say");
+    expect(r.view.line?.text).toBe("照旧");
+    expect(r.view.directives).toEqual([]);
+  });
+
+  it("脚本走完后没有出边 → ended；proceed 再点一次不越界、不重复推进", () => {
+    const pkg = pkgWith([{ op: "say", text: "最后一句" }]);
+    const r1 = start(pkg);
+    const r2 = proceed(pkg, r1.state);
+    expect(r2.view.waiting).toBe("end");
+    expect(r2.state.status).toBe("ended");
+    const r3 = proceed(pkg, r2.state);
+    expect(r3.state.cursor).toBe(r2.state.cursor);
+    expect(r3.view.directives).toEqual([]);
+  });
+});
+
+describe("engine — 起始 Beat 的回退", () => {
+  it("startBeatId 缺失时优先「无入边、无 trigger 且含 say」的 Beat", () => {
+    const pkg: StoryPackage = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: null,
+      characters: [], scenes: [],
+      beats: [
+        { id: "a", script: [{ op: "bg", image: "x.png" }], transitionsTo: undefined },
+        { id: "b", script: [{ op: "say", text: "开场白" }] },
+        { id: "c", script: [{ op: "say", text: "有入边" }], trigger: { type: "flag", key: "k" } },
+      ],
+      transitions: [{ from: "a", to: "c" }],
+    } as unknown as StoryPackage;
+    expect(start(pkg).view.beatId).toBe("b");
+  });
+
+  it("每个 Beat 都有入边时退回第一个；空 beats 不抛错而是 ended", () => {
+    const cyclic = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: null,
+      characters: [], scenes: [],
+      beats: [
+        { id: "a", script: [{ op: "say", text: "A" }] },
+        { id: "b", script: [{ op: "say", text: "B" }] },
+      ],
+      transitions: [{ from: "a", to: "b" }, { from: "b", to: "a" }],
+    } as unknown as StoryPackage;
+    expect(start(cyclic).view.beatId).toBe("a");
+
+    const empty = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: null,
+      characters: [], scenes: [], beats: [], transitions: [],
+    } as StoryPackage;
+    const r = start(empty);
+    expect(r.view.waiting).toBe("end");
+    expect(r.state.status).toBe("ended");
+  });
+
+  it("存档指向本包没有的 Beat（拿错工程的档）→ 从头开始而不是崩或空白", () => {
+    const pkg = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: "a",
+      characters: [], scenes: [],
+      beats: [{ id: "a", script: [{ op: "say", text: "A" }] }],
+      transitions: [],
+    } as StoryPackage;
+    const foreign = restore(pkg, {
+      currentBeatId: "别的工程的拍", cursor: 0,
+      vars: { memory: { flag: true }, flags: {}, characters: {}, relationships: {} },
+      completedBeats: [], codex: {}, unlockedAchievements: [], status: "playing",
+    } as never);
+    expect(foreign.view.beatId).toBe("a");
+    // 进度变量要留住：从头开始 ≠ 把玩家已经攒的东西清光
+    expect(foreign.state.vars.memory).toEqual({ flag: true });
+  });
+
+  it("旧版存档缺 characters/relationships 子表 → 补齐空表，不再白屏", () => {
+    const pkg = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: "a",
+      characters: [], scenes: [],
+      beats: [{ id: "a", script: [{ op: "say", text: "A" }] }],
+      transitions: [],
+    } as StoryPackage;
+    const legacy = restore(pkg, {
+      currentBeatId: "a", cursor: 0,
+      vars: { memory: {}, flags: { old: true } },
+      completedBeats: [], codex: null, unlockedAchievements: null, status: "playing",
+    } as never);
+    expect(legacy.view.line?.text).toBe("A");
+    expect(legacy.state.vars.flags).toEqual({ old: true });
+    expect(legacy.state.vars.characters).toEqual({});
+    expect(legacy.state.vars.relationships).toEqual({});
+  });
+});
+
+describe("engine — 成就门槛与播报", () => {
+  const achievementPkg = (): StoryPackage => ({
+    irVersion: 1,
+    projectId: "p1",
+    title: "T",
+    startBeatId: "a",
+    characters: [],
+    scenes: [],
+    beats: [
+      {
+        id: "a",
+        script: [{ op: "say", text: "第一句" }],
+        effects: [{ type: "flag", key: "seen", value: true }],
+        transitionsTo: "b",
+      },
+      {
+        id: "b",
+        script: [
+          {
+            op: "choice",
+            options: [
+              { label: " gated", requiresAchievement: "first_look" },
+              { label: "普通" },
+            ],
+          },
+        ],
+      },
+    ],
+    transitions: [{ from: "a", to: "b" }],
+    achievements: [
+      { id: "d1", key: "first_look", title: "初见", condition: { type: "flag", key: "seen", operator: "eq", value: true } },
+    ],
+  } as unknown as StoryPackage);
+
+  it("Beat 完成后条件成立 → 下一个暂停点带 newlyUnlockedAchievements，且只播一次", () => {
+    const pkg = achievementPkg();
+    const first = start(pkg);
+    expect(first.state.unlockedAchievements).toEqual([]);
+    const second = proceed(pkg, first.state);
+    // 越过 a 的最后一句 → 完成 a、解锁 first_look、走到 b 的 choice
+    expect(second.view.waiting).toBe("choice");
+    expect(second.view.newlyUnlockedAchievements?.map((a) => a.key)).toEqual(["first_look"]);
+    expect(second.state.unlockedAchievements).toEqual(["first_look"]);
+  });
+
+  it("requiresAchievement 未解锁时禁用并给出原因；解锁后同一条可选", () => {
+    const pkg = achievementPkg();
+    const atChoice = proceed(pkg, start(pkg).state);
+    const gated = atChoice.view.choices?.[0];
+    // 上一行刚解锁，所以这条此刻应可选——先用未解锁的存档验证禁用
+    const locked = restore(pkg, {
+      ...atChoice.state, unlockedAchievements: [], newlyUnlockedAchievements: undefined,
+    } as never);
+    expect(locked.view.choices?.[0]?.disabled).toBe(true);
+    expect(locked.view.choices?.[0]?.disabledReason).toContain("成就");
+    expect(gated?.disabled).toBe(false);
+  });
+});
+
+/**
+ * `choose` 的两条退化路（此前未覆盖）：不在选项暂停点上点、点了不存在的序号。
+ * 两者都退化为「继续」而不是抛错——渲染器在异步点击里完全可能带着过期状态进来。
+ */
+describe("engine — choose 的退化路", () => {
+  const pkg = (): StoryPackage => {
+    const src = explicitBranchPackage();
+    return src;
+  };
+
+  it("停在 say 时点选项 = 等同继续，不抛错也不越界", () => {
+    const p = pkg();
+    const atSay = start(p);
+    const r = choose(p, atSay.state, 0);
+    expect(r.state.cursor).toBe(atSay.state.cursor + 1);
+  });
+
+  it("序号越界与「当前拍不存在」都退化为继续，不抛错", () => {
+    // 专造一个「只有一个选项、且没有出边」的拍，好让退化后的行为可判：
+    // 越过选项 → 脚本走完 → 没有出边 → ended
+    const oneOption: StoryPackage = {
+      irVersion: 1, projectId: "p1", title: "T", startBeatId: "a",
+      characters: [], scenes: [],
+      beats: [{ id: "a", script: [{ op: "choice", options: [{ label: "唯" }] }] }],
+      transitions: [],
+    } as unknown as StoryPackage;
+    const atChoice = start(oneOption);
+    expect(atChoice.view.waiting).toBe("choice");
+    const oob = choose(oneOption, atChoice.state, 99);
+    expect(oob.state.cursor).toBe(atChoice.state.cursor + 1);
+    expect(oob.view.waiting).toBe("end");
+
+    const gone = choose(oneOption, { ...atChoice.state, currentBeatId: "已被删掉的拍" }, 0);
+    expect(gone.state.cursor).toBe(atChoice.state.cursor + 1);
   });
 });

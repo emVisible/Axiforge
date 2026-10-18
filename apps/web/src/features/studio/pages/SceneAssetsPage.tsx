@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { MapPin, Plus } from "lucide-react";
 
 import {
@@ -19,12 +19,15 @@ import {
   Modal,
   ModalActions,
   PageHeader,
+  QueryStatePanel,
   Textarea,
   WorkflowGuide,
 } from "@/shared/components/ui";
 import type { AssetSceneResponse } from "@/shared/types/asset";
 import { getCreatorId } from "@/shared/lib/creatorId";
+import { removeScene } from "@/shared/storage/assetPoolSaves";
 import { SCENE_WORKFLOW } from "@/shared/lib/workflowSteps";
+import { resolveQueryState } from "@/shared/lib/queryState";
 
 function SceneCard({
   scene,
@@ -80,9 +83,10 @@ const emptyForm = {
 
 export default function SceneAssetsPage() {
   const [showCreate, setShowCreate] = useState(false);
+  const tagLabelId = useId();
   const [form, setForm] = useState(emptyForm);
 
-  const { data: scenes, isLoading } = useSceneAssets({ author_id: getCreatorId() });
+  const { data: scenes, isLoading, error } = useSceneAssets({ author_id: getCreatorId() });
   const createScene = useCreateSceneAsset();
   const qc = useQueryClient();
 
@@ -118,8 +122,9 @@ export default function SceneAssetsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const { sceneAssetApi } = await import("@/shared/api/editor");
-    await sceneAssetApi.delete(id);
+    // 走分派口而不是 sceneAssetApi：桌面态这样删是"提示成功、下次打开还在"，
+    // 比报个网络错误更难发现。清单已经是本地读的，删除必须同一条路。
+    await removeScene(id);
     qc.invalidateQueries({ queryKey: SCENE_ASSET_KEYS.all });
   };
 
@@ -207,11 +212,12 @@ export default function SceneAssetsPage() {
             placeholder="场景特殊规则"
           />
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+            <label htmlFor={tagLabelId} className="mb-1.5 block text-xs font-medium text-ink-muted">
               标签
             </label>
             <div className="mb-2 flex items-center gap-2">
               <Input
+                id={tagLabelId}
                 value={form.tagInput}
                 onChange={(e) => setForm({ ...form, tagInput: e.target.value })}
                 onKeyDown={(e) =>
@@ -255,21 +261,21 @@ export default function SceneAssetsPage() {
         </div>
       </Modal>
 
-      {isLoading && (
-        <p className="py-10 text-center text-sm text-ink-muted">加载中...</p>
-      )}
-      {!isLoading && !scenes?.length && (
-        <EmptyState
-          icon={MapPin}
-          title="还没有场景"
-          description="创建第一个场景"
-        >
-          <WorkflowGuide steps={SCENE_WORKFLOW} compact className="max-w-2xl" />
-        </EmptyState>
-      )}
-      {scenes && scenes.length > 0 && (
+      <QueryStatePanel
+        state={resolveQueryState({ isLoading, error, count: scenes?.length ?? 0 })}
+        error={error}
+        errorTitle="场景清单读取失败"
+        onRetry={() => window.location.reload()}
+        loading={<p className="py-10 text-center text-sm text-ink-muted">加载中...</p>}
+        empty={
+          <EmptyState icon={MapPin} title="还没有场景" description="创建第一个场景">
+            <WorkflowGuide steps={SCENE_WORKFLOW} compact className="max-w-2xl" />
+          </EmptyState>
+        }
+      >
         <CardGrid>
-          {scenes.map((s) => (
+          {/* 面板保证只在 ready 态渲染到这里，但类型层面不知道，故仍用可选链 */}
+          {scenes?.map((s) => (
             <SceneCard
               key={s.id}
               scene={s}
@@ -279,7 +285,7 @@ export default function SceneAssetsPage() {
             />
           ))}
         </CardGrid>
-      )}
+      </QueryStatePanel>
     </Shell>
   );
 }

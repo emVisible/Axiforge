@@ -1,0 +1,10 @@
+{
+  "name": "stage-directives",
+  "title": "序章",
+  "role_names": ["堰纱"],
+  "default_speaker": "旁白",
+  "prose": "【背景 交汇港】\n【音乐 rain_theme】\n堰纱：你来了。\n雨下个不停。",
+  "axs": "# 序章\n@bg 交汇港\n@bgm rain_theme loop\n堰纱: 你来了。\n雨下个不停。\n",
+  "expected_ops": ["bg", "bgm", "say", "narration"],
+  "note": "括号是输入速记，产物必须是 @ 指令。@bgm 只吃单个 token，含空格的曲名会被截断——故用 rain_theme"
+}

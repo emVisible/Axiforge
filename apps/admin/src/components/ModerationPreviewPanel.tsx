@@ -3,13 +3,23 @@ import {
   Button,
   Card,
 } from "@axiforge/ui";
-import { ExternalLink, User } from "lucide-react";
-import type { AdminReport, AuthorModerationProfile, AdminCommentSnippet } from "@/api/adminClient";
+import { ExternalLink, RefreshCw, User } from "lucide-react";
+import type {
+  AdminReport,
+  AuthorModerationProfile,
+  AdminCommentSnippet,
+  AutoJudgement,
+} from "@/api/adminClient";
 import ModerationContextSections from "@/components/ModerationContextSections";
+import { useModerationVocabulary } from "@/hooks/useModerationVocabulary";
 import {
+  actionLabel,
+  clauseLabel,
   formatReportTime,
   maskToken,
+  suggestionLabel,
   targetTypeLabel,
+  viaLabel,
   webDiscoverUrl,
 } from "@/lib/moderation";
 
@@ -19,8 +29,11 @@ interface ModerationPreviewPanelProps {
   siblingReports?: AdminReport[];
   relatedComments?: AdminCommentSnippet[];
   authorProfile?: AuthorModerationProfile | null;
+  autoJudgement?: AutoJudgement | null;
   onDismiss: () => void;
   onTakeDown: () => void;
+  onRejudge?: () => void;
+  rejudging?: boolean;
   onHideComment?: (commentId: string) => void;
   hidingCommentId?: string | null;
   busy?: boolean;
@@ -32,8 +45,11 @@ export default function ModerationPreviewPanel({
   siblingReports = [],
   relatedComments = [],
   authorProfile,
+  autoJudgement,
   onDismiss,
   onTakeDown,
+  onRejudge,
+  rejudging = false,
   onHideComment,
   hidingCommentId,
   busy,
@@ -143,6 +159,14 @@ export default function ModerationPreviewPanel({
           <div className="font-mono text-[10px]">ID {report.target_id}</div>
         </section>
 
+        {autoJudgement && (
+          <AutoJudgementStrip
+            judgement={autoJudgement}
+            onRejudge={onRejudge}
+            rejudging={rejudging}
+          />
+        )}
+
         <ModerationContextSections
           comments={relatedComments}
           author={authorProfile}
@@ -174,5 +198,97 @@ export default function ModerationPreviewPanel({
         </div>
       </div>
     </Card>
+  );
+}
+
+
+/**
+ * 机器结论条。放在举报元信息之下、评论区之上——它是运营读这条举报时的第一屏信息。
+ *
+ * 明确标出"有没有执行资格"与"是否校准"：只有两者都成立，系统才会自己动手；
+ * 否则它只是把一个建议递到人面前。运营需要知道自己在替谁做最后那一步。
+ */
+function AutoJudgementStrip({
+  judgement,
+  onRejudge,
+  rejudging = false,
+}: {
+  judgement: AutoJudgement;
+  onRejudge?: () => void;
+  rejudging?: boolean;
+}) {
+  const vocab = useModerationVocabulary();
+  return (
+    <section className="rounded-xl border border-border bg-surface-raised px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-2xs uppercase tracking-wide text-ink-faint">自动判断</span>
+        <span className="text-xs font-medium">{actionLabel(vocab, judgement.final_action)}</span>
+        <span className="text-2xs text-ink-muted">{viaLabel(vocab, judgement.via)}</span>
+        <span className="ml-auto flex items-center gap-1">
+          <span className="rounded-full border border-border px-1.5 py-0.5 text-2xs">
+            {judgement.engine}
+          </span>
+          {!judgement.calibrated && (
+            <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-2xs text-amber-600">
+              未校准
+            </span>
+          )}
+          {judgement.authoritative && (
+            <span className="rounded-full border border-emerald-500/40 px-1.5 py-0.5 text-2xs text-emerald-600">
+              有执行资格
+            </span>
+          )}
+        </span>
+      </div>
+      {judgement.clause_ids.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {judgement.clause_ids.map((c) => (
+            <span
+              key={c}
+              className="rounded-full bg-brand-muted px-2 py-0.5 text-2xs text-brand"
+            >
+              {clauseLabel(vocab, c)}
+            </span>
+          ))}
+        </div>
+      )}
+      {judgement.primary_suggestion && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-2xs text-ink-faint">模型认为最主要</span>
+          <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-2xs text-ink-muted">
+            {suggestionLabel(vocab, judgement.primary_suggestion)}
+            {judgement.primary_confidence !== null &&
+              ` · ${Math.round(judgement.primary_confidence * 100)}%`}
+          </span>
+          <span className="text-2xs text-ink-faint">仅供参考，不参与执行</span>
+        </div>
+      )}
+      {judgement.reasons.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-2xs text-ink-muted">
+          {judgement.reasons.slice(0, 4).map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <span className="text-2xs text-ink-faint">
+          置信 {judgement.confidence === null ? "—" : `${(judgement.confidence * 100).toFixed(0)}%`}
+          <span className="mx-1">·</span>
+          {judgement.policy_version} / {judgement.questions_version}
+        </span>
+        {onRejudge && (
+          <Button
+            className="ml-auto"
+            size="sm"
+            variant="ghost"
+            disabled={rejudging}
+            onClick={onRejudge}
+          >
+            <RefreshCw className={rejudging ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
+            {rejudging ? "判定中" : "让模型重判"}
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }

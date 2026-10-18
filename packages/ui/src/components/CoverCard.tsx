@@ -88,7 +88,7 @@ export default function CoverCard({
   );
 
   const shellClass = cn(
-    "group flex cursor-pointer flex-col overflow-hidden border text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg",
+    "group flex cursor-pointer flex-col overflow-hidden border text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-lg",
     compact ? "rounded-xl" : "rounded-2xl",
     t.surface,
     className,

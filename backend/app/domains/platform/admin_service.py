@@ -16,6 +16,7 @@ from app.core.audit import write_audit_log
 from app.core.strike_policy import STRIKE_PUBLISH_BLOCK
 from app.domains.character.models import Character
 from app.domains.narrative.models import Project
+from app.domains.moderation.models import ModerationCase
 from app.domains.platform.admin_moderation import (
     build_moderation_preview,
     resolve_moderation_context,
@@ -28,6 +29,7 @@ from app.domains.platform.admin_schemas import (
     AdminUserResponse,
     AdminViolationResponse,
     AuditLogResponse,
+    AutoJudgement,
     AuthorModerationProfile,
     DashboardStatsResponse,
     DashboardTopProject,
@@ -37,6 +39,31 @@ from app.domains.platform.admin_schemas import (
     ReportResolveRequest,
 )
 from app.domains.platform.models import AuditLog, ContentReport, PlatformEvent, UserAccount, Violation
+
+
+def _auto_judgement(case: ModerationCase) -> AutoJudgement:
+    """ORM 字段叫 id，契约里叫 case_id（上下文里已经有 target_id，不叫 id 免得歧义）。"""
+    prim = (case.answers or {}).get("primary_clause") or {}
+    pconf = prim.get("confidence")
+    return AutoJudgement(
+        case_id=case.id,
+        state=case.state,
+        engine=case.engine,
+        suggested_action=case.suggested_action,
+        final_action=case.final_action,
+        via=case.via,
+        confidence=case.confidence,
+        authoritative=case.authoritative,
+        calibrated=case.calibrated,
+        clause_ids=list(case.clause_ids or []),
+        # 单选建议：值在 normalize 阶段已过白名单，这里只做形状防御，不再夹一次。
+        primary_suggestion=str(prim.get("choice") or ""),
+        primary_confidence=float(pconf) if isinstance(pconf, (int, float)) else None,
+        reasons=list(case.reasons or []),
+        policy_version=case.policy_version,
+        questions_version=case.questions_version,
+        decided_at=case.decided_at,
+    )
 
 
 class AdminService:
@@ -201,19 +228,30 @@ class AdminService:
         )
 
     async def list_reports(
-        self, *, status: str = "pending", limit: int = 50
-    ) -> List[AdminReportResponse]:
+        self, *, status: str = "pending", limit: int = 50, offset: int = 0
+    ) -> dict:
+        """举报队列分页。`total` 是**这个状态下的全量**，不是本页条数——
+        没有它，运营看到"50 条"就不知道后面还有没有，而 50 正是过去的硬上限。
+
+        排序末级必须带 `id`：同一事务里插入的多行 `created_at` 完全相同
+        （PG 的 now() 取事务开始时间），只排到时间会在翻页时重复或漏项。
+        """
+        base = select(ContentReport).where(ContentReport.status == status)
+        total = (
+            await self.db.execute(
+                select(func.count()).select_from(base.subquery())
+            )
+        ).scalar_one()
         result = await self.db.execute(
-            select(ContentReport)
-            .where(ContentReport.status == status)
-            .order_by(ContentReport.created_at.desc())
+            base.order_by(ContentReport.created_at.desc(), ContentReport.id.desc())
+            .offset(offset)
             .limit(limit)
         )
         rows = list(result.scalars().all())
         out: List[AdminReportResponse] = []
         for r in rows:
             out.append(await self._report_response(r))
-        return out
+        return {"items": out, "total": int(total)}
 
     async def get_moderation_context(
         self, *, target_type: str, target_id: str
@@ -225,6 +263,18 @@ class AdminService:
             self.db, target_type=target_type, target_id=target_id
         )
         profile = raw.get("author_profile")
+        # 人工打开举报上下文时先看到机器结论，而不是从空白开始判
+        judgement = (
+            await self.db.execute(
+                select(ModerationCase)
+                .where(
+                    ModerationCase.subject_type == target_type,
+                    ModerationCase.subject_id == target_id,
+                )
+                .order_by(ModerationCase.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
         return ModerationContextResponse(
             target_preview=ModerationTargetPreview.model_validate(preview),
             related_comments=[
@@ -233,6 +283,7 @@ class AdminService:
             author_profile=(
                 AuthorModerationProfile.model_validate(profile) if profile else None
             ),
+            auto_judgement=(_auto_judgement(judgement) if judgement else None),
         )
 
     async def hide_comment(self, comment_id: UUID, *, note: Optional[str] = None) -> bool:

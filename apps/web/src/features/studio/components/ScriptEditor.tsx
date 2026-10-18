@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { Instruction, InstructionOp, ChoiceOption } from "@axiforge/core";
+import type { Instruction, InstructionOp } from "@axiforge/core";
+import {
+  OP_LABEL,
+  OP_META,
+  POSITIONS,
+  defaultInstruction,
+} from "./instructionOps";
 import { Input, Select, Textarea, cn, labelSm, Button } from "@/shared/components/ui";
-import { aiApi } from "@/shared/api/ai";
+import ChoiceOptionsEditor from "./ChoiceOptionsEditor";
+import { applyDraft, requestDraft } from "@/shared/api/draftDispatch";
 import LlmStatusBadge from "@/shared/components/LlmStatusBadge";
 import { getCreatorId } from "@/shared/lib/creatorId";
 
@@ -23,61 +30,6 @@ interface ScriptEditorProps {
   highlightIndex?: number | null;
 }
 
-const OP_META: { op: InstructionOp; label: string }[] = [
-  { op: "say", label: "台词" },
-  { op: "narration", label: "旁白" },
-  { op: "show", label: "立绘进场" },
-  { op: "move", label: "立绘移动" },
-  { op: "hide", label: "立绘退场" },
-  { op: "bg", label: "背景" },
-  { op: "transition", label: "转场" },
-  { op: "camera", label: "镜头" },
-  { op: "fx", label: "特效" },
-  { op: "bgm", label: "音乐" },
-  { op: "se", label: "音效" },
-  { op: "voice", label: "语音" },
-  { op: "wait", label: "等待" },
-  { op: "choice", label: "分支" },
-];
-
-const OP_LABEL: Record<string, string> = Object.fromEntries(
-  OP_META.map((m) => [m.op, m.label]),
-);
-
-const POSITIONS = ["left", "center", "right"];
-
-function defaultInstruction(op: InstructionOp): Instruction {
-  switch (op) {
-    case "say":
-      return { op: "say", characterId: null, text: "" };
-    case "narration":
-      return { op: "narration", text: "" };
-    case "show":
-      return { op: "show", characterId: "", expression: "", position: "center" };
-    case "move":
-      return { op: "move", characterId: "", position: "center", ms: 300 };
-    case "hide":
-      return { op: "hide", characterId: "" };
-    case "bg":
-      return { op: "bg", image: "" };
-    case "transition":
-      return { op: "transition", kind: "fade", ms: 400 };
-    case "camera":
-      return { op: "camera", action: "zoom", scale: 1.2, ms: 300 };
-    case "fx":
-      return { op: "fx", effect: "flash", ms: 600 };
-    case "bgm":
-      return { op: "bgm", track: "", loop: true };
-    case "se":
-      return { op: "se", sound: "" };
-    case "voice":
-      return { op: "voice", sound: "" };
-    case "wait":
-      return { op: "wait", ms: 500 };
-    case "choice":
-      return { op: "choice", options: [{ label: "" }] };
-  }
-}
 
 const TRANSITION_KINDS = ["fade", "dissolve", "wipe", "cut"];
 const CAMERA_ACTIONS = ["zoom", "pan", "shake", "reset"];
@@ -94,7 +46,7 @@ export default function ScriptEditor({
   const [prose, setProse] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [aiSource, setAiSource] = useState<string | undefined>();
+  const [aiRun, setAiRun] = useState<{ source?: string; degradedFrom?: string }>({});
   const highlightRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -107,17 +59,17 @@ export default function ScriptEditor({
     setAiBusy(true);
     setAiError(null);
     try {
-      const res = await aiApi.proseToScript({
+      const res = await requestDraft({
         prose,
-        role_names: roles.map((r) => r.name),
-        author_id: getCreatorId(),
+        roleNames: roles.map((r) => r.name),
+        authorId: getCreatorId(),
       });
-      setAiSource(res.source);
-      onChange(mode === "replace" ? res.script : [...script, ...res.script]);
+      setAiRun({ source: res.source, degradedFrom: res.degradedFrom });
+      onChange(applyDraft(res, script, mode));
       setAiOpen(false);
       setProse("");
-    } catch {
-      setAiError("生成失败，请检查格式后重试");
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : "生成失败，请检查格式后重试");
     } finally {
       setAiBusy(false);
     }
@@ -159,15 +111,15 @@ export default function ScriptEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] leading-relaxed text-ink-muted">
+        <p className="text-2xs leading-relaxed text-ink-muted">
           演出脚本按顺序播放。填写后将取代下方「内容」的单句对话（ADR-009）。
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          <LlmStatusBadge lastSource={aiSource} />
+          <LlmStatusBadge lastSource={aiRun.source} degradedFrom={aiRun.degradedFrom} />
           <button
             type="button"
             onClick={() => setAiOpen(true)}
-            className="rounded-lg border border-brand/30 px-2 py-1 text-[10px] text-brand hover:bg-brand/10"
+            className="rounded-lg border border-brand/30 px-2 py-1 text-3xs text-brand hover:bg-brand/10"
           >
             AI 草稿
           </button>
@@ -176,10 +128,10 @@ export default function ScriptEditor({
 
       {aiOpen && (
         <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 space-y-2">
-          <p className="text-[11px] text-ink-muted">
-            粘贴散文/大纲。格式：<code className="text-[10px]">角色名：台词</code>、
-            <code className="text-[10px]">【旁白：…】</code>、
-            <code className="text-[10px]">{"> 选项A | 选项B"}</code>
+          <p className="text-2xs text-ink-muted">
+            粘贴散文/大纲。格式：<code className="text-3xs">角色名：台词</code>、
+            <code className="text-3xs">【旁白：…】</code>、
+            <code className="text-3xs">{"> 选项A | 选项B"}</code>
           </p>
           <Textarea
             rows={6}
@@ -187,7 +139,7 @@ export default function ScriptEditor({
             onChange={(e) => setProse(e.target.value)}
             placeholder={"【旁白：雨夜。】\n堰纱：……你为什么会来这里？\n> 我来帮你 | 只是路过"}
           />
-          {aiError && <p className="text-[11px] text-red-500">{aiError}</p>}
+          {aiError && <p className="text-2xs text-red-500">{aiError}</p>}
           <div className="flex flex-wrap gap-2">
             <Button size="sm" loading={aiBusy} onClick={() => runAiDraft("replace")}>
               替换脚本
@@ -223,7 +175,7 @@ export default function ScriptEditor({
           )}
         >
           <div className="mb-2 flex items-center justify-between">
-            <span className="rounded-md bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand">
+            <span className="rounded-md bg-brand/10 px-2 py-0.5 text-3xs font-medium text-brand">
               {i + 1}. {OP_LABEL[inst.op] || inst.op}
             </span>
             <div className="flex items-center gap-1 text-ink-muted">
@@ -448,10 +400,12 @@ export default function ScriptEditor({
                     roles.find((r) => r.characterRefId === inst.characterId)
                       ?.spriteKeys || [];
                   const listId = `sprites-${i}`;
+                  const expressionId = `expression-${i}`;
                   return (
                     <div>
-                      <label className={cn(labelSm, "mb-1 block")}>表情</label>
+                      <label htmlFor={expressionId} className={cn(labelSm, "mb-1 block")}>表情</label>
                       <input
+                        id={expressionId}
                         list={keys.length ? listId : undefined}
                         className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
                         value={inst.expression ?? ""}
@@ -546,69 +500,12 @@ export default function ScriptEditor({
             key={m.op}
             type="button"
             onClick={() => add(m.op)}
-            className="rounded-lg border border-border bg-surface px-2.5 py-1 text-[11px] text-ink-muted shadow-sm hover:border-brand hover:text-brand"
+            className="rounded-lg border border-border bg-surface px-2.5 py-1 text-2xs text-ink-muted shadow-sm hover:border-brand hover:text-brand"
           >
             + {m.label}
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-function ChoiceOptionsEditor({
-  options,
-  nodes,
-  onChange,
-}: {
-  options: ChoiceOption[];
-  nodes: NodeOption[];
-  onChange: (next: ChoiceOption[]) => void;
-}) {
-  const set = (index: number, next: ChoiceOption) =>
-    onChange(options.map((o, i) => (i === index ? next : o)));
-  return (
-    <div className="space-y-2">
-      <label className={cn(labelSm, "block")}>分支选项</label>
-      {options.map((opt, i) => (
-        <div key={i} className="rounded-lg border border-border/70 bg-canvas/40 p-2">
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <input
-              className="flex-1 rounded-md border border-border bg-surface px-2 py-1 text-xs"
-              value={opt.label}
-              onChange={(e) => set(i, { ...opt, label: e.target.value })}
-              placeholder="选项文本"
-            />
-            <button
-              type="button"
-              onClick={() => onChange(options.filter((_, j) => j !== i))}
-              className="px-1 text-red-400 hover:text-red-600"
-              aria-label="删除选项"
-            >
-              ✕
-            </button>
-          </div>
-          <select
-            className="w-full rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-ink-muted"
-            value={opt.to ?? ""}
-            onChange={(e) => set(i, { ...opt, to: e.target.value || null })}
-          >
-            <option value="">跳转：按标签匹配连线（默认）</option>
-            {nodes.map((n) => (
-              <option key={n.id} value={n.id}>
-                跳转到：{n.title}
-              </option>
-            ))}
-          </select>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() => onChange([...options, { label: "" }])}
-        className="rounded-lg border border-dashed border-border px-2.5 py-1 text-[11px] text-ink-muted hover:border-brand hover:text-brand"
-      >
-        + 添加选项
-      </button>
     </div>
   );
 }

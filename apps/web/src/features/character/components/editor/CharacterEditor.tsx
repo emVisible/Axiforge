@@ -152,7 +152,7 @@ export default function CharacterEditor({
         return (
           <div
             key={layer.key}
-            className={`border-2 rounded-xl transition-all duration-200 ${
+            className={`border-2 rounded-xl transition-colors duration-200 ${
               isExpanded
                 ? layer.color + " overflow-visible"
                 : "border-border hover:border-border overflow-hidden"
@@ -170,7 +170,7 @@ export default function CharacterEditor({
                   <span className="font-medium text-ink">
                     {layer.label}
                   </span>
-                  <span className="text-[10px] text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-3xs text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
                     {layer.distance}
                   </span>
                 </div>
@@ -180,7 +180,7 @@ export default function CharacterEditor({
                 <div className="hidden sm:flex items-center gap-2">
                   <div className="h-1.5 w-16 overflow-hidden rounded-full bg-border/60">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
+                      className={`h-full rounded-full transition-[width,background-color] duration-500 ${
                         progress > 0 ? "bg-brand" : "bg-transparent"
                       }`}
                       style={{ width: `${progress}%` }}
@@ -213,7 +213,7 @@ export default function CharacterEditor({
         const count = Object.keys((draft as any).sprites || {}).length;
         return (
           <div
-            className={`border-2 rounded-xl transition-all duration-200 ${
+            className={`border-2 rounded-xl transition-colors duration-200 ${
               isExpanded
                 ? "border-sky-400/40 bg-sky-500/10 overflow-visible"
                 : "border-border hover:border-border overflow-hidden"
@@ -229,7 +229,7 @@ export default function CharacterEditor({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-ink">立绘 / 表情差分</span>
-                  <span className="text-[10px] text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
+                  <span className="text-3xs text-ink-muted bg-canvas px-2 py-0.5 rounded-full font-medium">
                     演出资产
                   </span>
                 </div>

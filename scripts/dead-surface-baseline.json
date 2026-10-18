@@ -1,0 +1,15 @@
+{
+  "allow": [
+    "apps/web/src/features/discover/components/DiscoverStatsBar.tsx",
+    "apps/web/src/features/studio/components/GlossaryEditor.tsx",
+    "apps/web/src/shared/api/index.ts",
+    "apps/web/src/shared/components/BrandIconMark.tsx",
+    "apps/web/src/shared/components/ItemCard.tsx",
+    "apps/web/src/shared/components/ItemCreateDialog.tsx",
+    "apps/web/src/shared/components/RadarChart.tsx",
+    "apps/web/src/shared/components/SceneCreateDialog.tsx",
+    "apps/web/src/shared/hooks/index.ts",
+    "apps/web/src/shared/hooks/usePlayer.ts"
+  ],
+  "_note": "不在 main.tsx 的 import 闭包里的模块（第 15 道门禁的死表面棘轮基线）。摘掉一个之后重跑 --update 让它缩短，不要留着当豁免。"
+}

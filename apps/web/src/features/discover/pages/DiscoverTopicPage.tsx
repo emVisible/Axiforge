@@ -9,6 +9,8 @@ import type { ProjectResponse } from "@/shared/types/project";
 import DiscoverCommentSection from "@/features/discover/components/DiscoverCommentSection";
 import PageMeta from "@/shared/components/PageMeta";
 import ShareActions from "@/shared/components/ShareActions";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import {
   BackLink,
   CardGrid,
@@ -23,7 +25,12 @@ export default function DiscoverTopicPage() {
   const [loading, setLoading] = useState(true);
   const shareUrl = `${window.location.origin}/discover/topics/${encodeURIComponent(slug)}`;
 
+  // 桌面态这一页没有读者：它与 DiscoverPage 同进退（E35「入口与目标同生共死」），
+  // 否则直接输 URL 进来就是一次注定失败的云端请求。
+  const localOnly = isLocalOnlyDeployment();
+
   useEffect(() => {
+    if (localOnly) return;
     (async () => {
       setLoading(true);
       try {
@@ -33,7 +40,18 @@ export default function DiscoverTopicPage() {
         setLoading(false);
       }
     })();
-  }, [slug]);
+  }, [slug, localOnly]);
+
+  if (localOnly) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <CloudFeatureNotice feature="话题页" />
+        <div className="mt-4">
+          <BackLink to={routes.discover}>返回发现</BackLink>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-16">
@@ -80,7 +98,7 @@ export default function DiscoverTopicPage() {
                 ) : undefined
               }
               footer={
-                <span className="flex items-center gap-1 text-[10px] text-ink-muted">
+                <span className="flex items-center gap-1 text-3xs text-ink-muted">
                   <Play className="h-3 w-3" />
                   {p.play_count ?? 0}
                 </span>

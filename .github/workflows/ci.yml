@@ -2,10 +2,36 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # desktop 是当前唯一在推的工作分支（v0.8 起桌面化都在这里）。它原先不在列表里，
+    # 意味着直接推 desktop 的提交**一道 CI 都不跑**——门禁写在本地 pnpm gates 里，
+    # 但「推上去有没有人复查」这件事静默地不存在。
+    branches: [main, master, desktop]
   pull_request:
 
 jobs:
+  frontend-gates:
+    name: 前端门禁（类型 / 单测 / 覆盖率阈值 / lint / 内核纯净 / 循环依赖 / 行数棘轮 / 对比度）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 一条命令跑完宪章 G2/G4/G5/Q9 的全部可自动化部分：
+      # tsc --noEmit（4 个包）→ vitest（core/axs/editor-core/web/admin）
+      # → vitest coverage 阈值（core 与 editor-core 行+分支 ≥90%）→ oxlint + 颜色令牌
+      # → packages 零平台依赖断言 → dpdm 循环依赖=0 → 行数棘轮 → 双主题对比度 → 共享组件源扫描
+      #
+      # 这里原先还单独跑了一次 `--filter @axiforge/core test:coverage`：覆盖率已经进了 gates，
+      # 而且是两个包一起卡阈值。留两份就会漂——第二次跑的那个才是曾经真正被执行过的阈值。
+      - name: Run gates
+        run: pnpm gates
+
   build-and-test:
     runs-on: ubuntu-latest
 
@@ -39,8 +65,40 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build web
-        run: pnpm build
+      - name: Build renderer and internal Admin
+        run: pnpm build:web && pnpm build:admin
+
+      # 桌面主线（ADR-029：桌面是唯一构建与发布目标）的编译信号。
+      #
+      # 为什么是 `cargo check` 而不是 `pnpm build:desktop`：后者是
+      # `tauri build --bundles app`，而 `--bundles app` 是 **macOS 专有**的打包格式，
+      # 这一套 job 跑在 ubuntu-latest 上必然失败，且不是加一行能解决的。
+      # `cargo check` 给的是"桌面壳的 Rust 侧能编译"这一层，正好补上此前 CI 完全不构建主线产物的缺口。
+      #
+      # 必须排在上面那一步 web 构建**之后**：`tauri.conf.json` 的 `beforeBuildCommand`
+      # 是 web 包自己的 build、`frontendDist` 指向 `apps/web/dist`，
+      # 目录不存在时 tauri-build 的 codegen 过不去。
+      #
+      # 这段注释里刻意**不写**那条命令的字面量：`check-publish-target.mjs` 是按字符串匹配的，
+      # 注释里出现一次就会多出一条「CI 仍在构建非桌面目标」的假残差（实测踩过：
+      # 残差从 4 变 5，棘轮被迫放宽，而真问题只是我写了句话）。
+      - name: Install Tauri Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            file \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Type-check the desktop crate
+        run: pnpm check:desktop
 
       - uses: astral-sh/setup-uv@v5
 
@@ -60,3 +118,15 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/axiforge_test
           TESTING: "1"
         run: uv run pytest tests/ -v
+
+      # G3 行为基线：e2e 用独立库 axiforge_e2e（零接触 axiforge_test），
+      # 库本身需要先建好——本机 pnpm e2e 走的是 scripts/setup-db.sh 的自动建库，CI 里显式建。
+      - name: Create e2e database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE axiforge_e2e"
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run E2E behaviour baseline
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/axiforge_test
+          E2E_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/axiforge_e2e
+        run: pnpm e2e

@@ -51,9 +51,10 @@ export interface SaveSlotUpsert {
 export const playerApi = {
   // Story Package（编译 IR，ADR-008）——供 @axiforge/core 引擎本地播放
   getStory: (projectId: string, authorId?: string) =>
-    apiClient.get<StoryPackage>(`/play/story/${projectId}`, {
-      ...(authorId ? { author_id: authorId } : {}),
-    }),
+    apiClient.get<StoryPackage>(
+      `/play/story/${projectId}`,
+      authorId ? { author_id: authorId } : {},
+    ),
 
   // 存档：多槽读写
   listSaves: (projectId: string, playerToken: string) =>

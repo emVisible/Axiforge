@@ -1,0 +1,294 @@
+{
+  "id": "570e6b35-1a7d-4fc6-a4b4-6f89ce09850b",
+  "title": "【示范】缘起·选择",
+  "isPublic": true,
+  "worldSetting": "雨夜的老旧公寓",
+  "playMeta": {},
+  "nodes": [
+    {
+      "id": "cea7ab0c-a398-495c-b31a-3b7d55c91a66",
+      "stageId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "editorData": {
+        "position": {
+          "x": 120,
+          "y": 300
+        }
+      },
+      "narrativeData": {
+        "title": "信任",
+        "script": [
+          {
+            "op": "say",
+            "text": "……谢谢。我会记住今晚。",
+            "speaker": "堰纱"
+          }
+        ],
+        "effects": [
+          {
+            "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.met_player",
+            "type": "codex_write",
+            "value": true
+          },
+          {
+            "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.trust",
+            "type": "codex_write",
+            "value": "high"
+          }
+        ],
+        "is_ending": true,
+        "ending_label": "信任结局"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "404d8a1f-9e9b-437a-9881-ed6c70d28885",
+      "stageId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "editorData": {
+        "position": {
+          "x": 480,
+          "y": 300
+        }
+      },
+      "narrativeData": {
+        "title": "疏远",
+        "script": [
+          {
+            "op": "say",
+            "text": "……是吗。那请便。",
+            "speaker": "堰纱"
+          }
+        ],
+        "effects": [
+          {
+            "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.met_player",
+            "type": "codex_write",
+            "value": true
+          },
+          {
+            "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.trust",
+            "type": "codex_write",
+            "value": "low"
+          }
+        ],
+        "is_ending": true,
+        "ending_label": "疏远结局"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "4258f749-cc4a-489a-b976-5e96a15b2f54",
+      "stageId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "editorData": {
+        "position": {
+          "x": 100,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "开始",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事从这里开始...",
+        "description": "剧本起始节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "bf103852-27aa-4e38-beb1-50b2890a0c84",
+      "stageId": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "editorData": {
+        "position": {
+          "x": 100,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "开始",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事从这里开始...",
+        "description": "剧本起始节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "4106ff3d-fa1a-4ed6-b377-4a85b824db36",
+      "stageId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "editorData": {
+        "position": {
+          "x": 300,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "雨夜",
+        "script": [
+          {
+            "op": "bg",
+            "image": "apartment_rain"
+          },
+          {
+            "op": "bgm",
+            "loop": true,
+            "track": "rain_piano"
+          },
+          {
+            "op": "say",
+            "text": "……你为什么会来这里？",
+            "speaker": "堰纱"
+          },
+          {
+            "op": "choice",
+            "options": [
+              {
+                "to": "cea7ab0c-a398-495c-b31a-3b7d55c91a66",
+                "label": "我来帮你"
+              },
+              {
+                "to": "404d8a1f-9e9b-437a-9881-ed6c70d28885",
+                "label": "只是路过"
+              }
+            ]
+          }
+        ],
+        "speaker": "堰纱",
+        "dialogue": "……你为什么会来这里？"
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "11b7fd40-8897-4291-b76b-2a23620badcf",
+      "stageId": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "editorData": {
+        "position": {
+          "x": 800,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "结束",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事暂告一段落...",
+        "description": "剧本结束节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 1
+    },
+    {
+      "id": "1a6cdab4-3563-4c3e-9e6f-fc73dc7df688",
+      "stageId": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "editorData": {
+        "position": {
+          "x": 800,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "结束",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事暂告一段落...",
+        "description": "剧本结束节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 1
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeId": "4258f749-cc4a-489a-b976-5e96a15b2f54",
+      "targetNodeId": "4106ff3d-fa1a-4ed6-b377-4a85b824db36",
+      "label": "",
+      "condition": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": "bc96c7d8-044d-4f0f-a135-d01c56062627",
+      "title": "主场景",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": null,
+      "nodes": []
+    },
+    {
+      "id": "01ad6b10-2a4a-4b93-9e16-904078481a54",
+      "title": "公寓",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": null,
+      "nodes": []
+    }
+  ],
+  "roles": [
+    {
+      "characterRefId": "f12c6270-33c1-4cbf-9601-c841c5e55337"
+    }
+  ],
+  "characters": [
+    {
+      "id": "f12c6270-33c1-4cbf-9601-c841c5e55337",
+      "name": "堰纱",
+      "characterData": {
+        "bond": {
+          "group_role": null,
+          "hostile_pattern": null,
+          "intimate_pattern": null,
+          "attitude_to_others": "谨慎地敞开心扉"
+        },
+        "trace": {
+          "background": "曾在「缘起」中与玩家相遇",
+          "key_events": [],
+          "turning_point": null
+        },
+        "anchor": {
+          "name": "堰纱",
+          "tags": [
+            "RN",
+            "示范角色"
+          ],
+          "theme": null,
+          "essence": "背负过往、却仍在寻找答案的少女",
+          "summary": "跨作品记忆演示用角色",
+          "core_belief": null
+        },
+        "psyche": {
+          "fear": "再次被遗忘",
+          "desire": "被理解",
+          "conflict": null,
+          "self_perception": null
+        },
+        "contour": {
+          "age_era": null,
+          "identity": "神秘来客",
+          "appearance": null,
+          "first_impression": "安静，目光像在打量很久以前的故人"
+        },
+        "sprites": null,
+        "demeanor": {
+          "habits": null,
+          "speech_style": "克制、偶尔露出柔软",
+          "expressiveness": null,
+          "typical_reaction": null
+        }
+      },
+      "imagePath": null
+    }
+  ],
+  "items": []
+}

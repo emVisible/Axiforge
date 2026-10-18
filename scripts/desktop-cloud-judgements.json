@@ -1,0 +1,115 @@
+{
+  "$comment": [
+    "桌面云端面「判据台账」：`cloud:callmap` 第十四段读它，把『第十二段那 12 条已逐条有界面级判据』这句话",
+    "从散文升成机检。三条纪律：",
+    "① **身份用标题原文，不用 E 编号**——编号会被重组（E20/E29 已成幽灵编号，断言还在），标题才是可 grep 的锚。",
+    "② `endpoint` 一律照 `shared/api/*.ts` 里的**路径模板**写（带 `${...}` 的原样），查询串由匹配器剥掉，尾斜杠归一。",
+    "   前缀**不算**覆盖：`/comments` 挡不住 `/comments/${commentId}/report`，否则一条判据抵掉一整族。",
+    "③ 台账的棘轮方向只有一个：**B 档多出一条没有判据的端点 ⇒ 红**。条目多余（端点已不在 B 档）只打印不判红，",
+    "   因为那可能是量法退化；证据文件/标题找不到 ⇒ 红（那是台账在替不存在的东西说话）。"
+  ],
+  "endpoints": [
+    {
+      "endpoint": "/characters/public",
+      "mechanism": "组件内分派早退（CharacterSearchSelect 的 isTauriEnvironment() 支不碰 listPublic）＋ /discover 整页早退",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E17 桌面态点击路径写进本地库" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E57 发现页四个子视图参数在桌面都被同一句早退覆盖" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E14 桌面态不发云端请求" }
+      ],
+      "note": "E17 那条链在桌面态真往「搜索角色（公开 + 我的）」里打字并选中，链尾 hits === [] 盯着整条点击路径（第 780 行）。"
+    },
+    {
+      "endpoint": "/comments/${commentId}/report",
+      "mechanism": "宿主整页早退（四个 discover 详情页 + 话题页）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E58 评论举报：浏览器态真点得动，桌面态整块不给" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E44 云端专属详情路由在桌面给的是缺席说明，不是一次注定失败的请求" }
+      ],
+      "note": "E58 是第十二段里唯一一条**两头**判据：浏览器臂喂一条别人的评论把那颗键点亮并观察 POST，桌面臂断评论区与键都不给＋零请求。"
+    },
+    {
+      "endpoint": "/characters/${characterId}/relations",
+      "mechanism": "藏入口（visibleCharacterTabs 的 cloudOnly 把「关系」那一栏整条摘掉）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E49 桌面角色详情页不给「关系」栏与版本/Fork/删除入口" },
+        { "kind": "unit", "file": "apps/web/src/features/character/lib/characterTabs.test.ts", "title": "关系" }
+      ],
+      "note": "界面级那条正控是同排在场的「传记」，所以「关系」的 count 0 是「被摘了一栏」而不是「标签条没加载」。"
+    },
+    {
+      "endpoint": "/characters/${characterId}/relation-graph",
+      "mechanism": "藏入口（同上，关系图与关系栏同一条 cloudOnly）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E49 桌面角色详情页不给「关系」栏与版本/Fork/删除入口" },
+        { "kind": "unit", "file": "apps/web/src/features/character/lib/characterTabs.test.ts", "title": "关系" }
+      ]
+    },
+    {
+      "endpoint": "/characters/${characterId}/relations/${relationId}",
+      "mechanism": "藏入口（同上；这一条是写侧删除关系）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E49 桌面角色详情页不给「关系」栏与版本/Fork/删除入口" },
+        { "kind": "unit", "file": "apps/web/src/features/character/lib/characterTabs.test.ts", "title": "关系" }
+      ]
+    },
+    {
+      "endpoint": "/search/all?q=${encodeURIComponent(q)}",
+      "mechanism": "调用者侧闸门（挂载点 AppHeader 的 showSearch && !isLocalOnlyDeployment() && <GlobalSearch />）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E50 桌面 studio 顶栏不给全局搜索" }
+      ],
+      "note": "普查的限度明写它不认这种形状，所以这条永远留在「桌面真会打出」的保守上界里下不来；界面级证据是它唯一的判据。"
+    },
+    {
+      "endpoint": "/tags/",
+      "mechanism": "宿主整页早退（DiscoverPage 的早退在四个 tab 分支之前）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E57 发现页四个子视图参数在桌面都被同一句早退覆盖" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E14 桌面态不发云端请求" }
+      ],
+      "note": "加载面普查看不见 ?tab= 这类子视图参数（那是取数口径的边界），所以这一格由界面级判据补，不扩普查。"
+    },
+    {
+      "endpoint": "/users/profile",
+      "mechanism": "页面级早退（ProfilePage）＋ UserContext 在桌面直接 setProfile(null) 不发会话请求",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E47 桌面账户设置不许再承诺它做不到的事" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E36 账户设置在桌面是显式缺席，而不是六个必然失败的按钮" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E56 桌面账户页不给这三条按名从未被守过的动作入口" }
+      ]
+    },
+    {
+      "endpoint": "/users/resolve",
+      "mechanism": "藏入口（邮箱恢复那颗按钮在桌面不给）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E56 桌面账户页不给这三条按名从未被守过的动作入口" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E36 账户设置在桌面是显式缺席，而不是六个必然失败的按钮" }
+      ]
+    },
+    {
+      "endpoint": "/users/export",
+      "mechanism": "藏入口（导出我的数据那颗在桌面不给）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E56 桌面账户页不给这三条按名从未被守过的动作入口" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E36 账户设置在桌面是显式缺席，而不是六个必然失败的按钮" }
+      ]
+    },
+    {
+      "endpoint": "/users/account",
+      "mechanism": "藏入口（注销账号那颗在桌面不给）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E56 桌面账户页不给这三条按名从未被守过的动作入口" },
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E36 账户设置在桌面是显式缺席，而不是六个必然失败的按钮" }
+      ]
+    },
+    {
+      "endpoint": "/characters/${characterId}/versions/${versionId}/rollback",
+      "mechanism": "双层：查询层 enabled: !isLocalOnlyDeployment() ＋ 藏入口（「×× 个版本」那颗在守卫里，面板打不开）",
+      "evidence": [
+        { "kind": "e2e", "file": "e2e/desktop-http.spec.ts", "title": "E49 桌面角色详情页不给「关系」栏与版本/Fork/删除入口" }
+      ],
+      "note": "两条腿各自单独成立，所以这一条比其它 B 档更稳；但界面上真挡着它的是入口按钮，enabled 只是第二层。"
+    }
+  ]
+}

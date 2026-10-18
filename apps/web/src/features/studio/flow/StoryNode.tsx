@@ -24,7 +24,7 @@ function StoryNode({
   return (
     <div
       className={cn(
-        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-xl border-2 bg-surface shadow-sm transition-all duration-200",
+        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-xl border-2 bg-surface shadow-sm transition-[border-color,box-shadow] duration-200",
         selected
           ? "border-brand shadow-lg shadow-brand/15"
           : cn(stageBorder, "hover:border-border-strong"),
@@ -56,39 +56,39 @@ function StoryNode({
         </span>
         <div className="flex shrink-0 items-center gap-1">
           {hasScript && (
-            <span className="rounded bg-sky-500/15 px-1 py-0.5 text-[9px] text-sky-400">
+            <span className="rounded bg-sky-500/15 px-1 py-0.5 text-3xs text-sky-400">
               演出
             </span>
           )}
           {hasConditions && (
-            <span className="rounded bg-violet-500/15 px-1 py-0.5 text-[9px] text-violet-400">
+            <span className="rounded bg-violet-500/15 px-1 py-0.5 text-3xs text-violet-400">
               条件
             </span>
           )}
           {hasEffects && (
-            <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-[9px] text-emerald-400">
+            <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-3xs text-emerald-400">
               效果
             </span>
           )}
           {isAnchor && (
-            <span className="rounded bg-amber-500/20 px-1 py-0.5 text-[9px] text-amber-500">
+            <span className="rounded bg-amber-500/20 px-1 py-0.5 text-3xs text-amber-500">
               锚点
             </span>
           )}
           {speaker && (
-            <span className="rounded bg-brand-muted px-1 py-0.5 text-[9px] text-brand">
+            <span className="rounded bg-brand-muted px-1 py-0.5 text-3xs text-brand">
               {speaker}
             </span>
           )}
           {stageTitle && (
-            <span className="max-w-[72px] truncate rounded bg-panel px-1 py-0.5 text-[9px] text-ink-faint">
+            <span className="max-w-[72px] truncate rounded bg-panel px-1 py-0.5 text-3xs text-ink-faint">
               {stageTitle}
             </span>
           )}
         </div>
       </div>
       {description && (
-        <div className="line-clamp-2 border-b border-border/60 bg-surface px-3 py-2 text-[11px] leading-relaxed text-ink-muted">
+        <div className="line-clamp-2 border-b border-border/60 bg-surface px-3 py-2 text-2xs leading-relaxed text-ink-muted">
           {description}
         </div>
       )}
@@ -99,7 +99,7 @@ function StoryNode({
           id="output"
           className="!relative !bottom-auto !left-auto !right-auto !top-auto !h-3 !w-3 !translate-none !border-2 !border-surface !bg-brand"
         />
-        <span className="ml-1 text-[10px] text-ink-faint">输出</span>
+        <span className="ml-1 text-3xs text-ink-faint">输出</span>
       </div>
     </div>
   );

@@ -1,0 +1,264 @@
+{
+  "irVersion": 1,
+  "projectId": "7effbeda-d61e-4c1e-9bcc-69196e737cc9",
+  "title": "【示范】序章·交汇",
+  "startBeatId": "7f907d79-ba81-4565-afdf-25267acdcd50",
+  "beats": [
+    {
+      "id": "7f907d79-ba81-4565-afdf-25267acdcd50",
+      "sceneId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "sceneTitle": "甲板",
+      "stage": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事从这里开始...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": false,
+      "endingLabel": null
+    },
+    {
+      "id": "3e715e5b-d122-46a3-8d26-6f3f3daab96d",
+      "sceneId": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "sceneTitle": "主场景",
+      "stage": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事从这里开始...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    },
+    {
+      "id": "c68ff6a3-b60d-4130-a4de-6e5b4a4dd726",
+      "sceneId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "sceneTitle": "甲板",
+      "stage": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "bg",
+          "image": "deck_sunset",
+          "transition": null
+        },
+        {
+          "op": "bgm",
+          "track": "theme_calm",
+          "fadeMs": 1200,
+          "loop": true
+        },
+        {
+          "op": "narration",
+          "text": "夕阳把交汇港染成琥珀色。海风带着金属与海盐的气味。",
+          "voice": null,
+          "rich": null
+        },
+        {
+          "op": "transition",
+          "kind": "fade",
+          "ms": 800
+        },
+        {
+          "op": "camera",
+          "action": "zoom",
+          "scale": 1.08,
+          "x": null,
+          "y": null,
+          "intensity": null,
+          "ms": 600
+        },
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": "广播",
+          "text": "各位旅客，交汇港即将入港。",
+          "voice": null,
+          "rich": null
+        },
+        {
+          "op": "narration",
+          "text": "你望向远方逐渐靠近的都市轮廓。",
+          "voice": null,
+          "rich": null
+        },
+        {
+          "op": "choice",
+          "options": [
+            {
+              "label": "继续眺望",
+              "to": "76e3e2b2-c24c-4311-86eb-fa7feeaa2af6",
+              "condition": null
+            },
+            {
+              "label": "收回目光",
+              "to": "bea259d1-e68a-4ecc-875a-8fc987b434fc",
+              "condition": null
+            }
+          ]
+        }
+      ],
+      "effects": [],
+      "isEnding": false,
+      "endingLabel": null
+    },
+    {
+      "id": "bea259d1-e68a-4ecc-875a-8fc987b434fc",
+      "sceneId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "sceneTitle": "甲板",
+      "stage": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "transition",
+          "kind": "fade",
+          "ms": 500
+        },
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "你转身走向舱门。故事，才刚开始。",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": "入港结局"
+    },
+    {
+      "id": "76e3e2b2-c24c-4311-86eb-fa7feeaa2af6",
+      "sceneId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "sceneTitle": "甲板",
+      "stage": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "camera",
+          "action": "zoom",
+          "scale": 1.15,
+          "x": null,
+          "y": null,
+          "intensity": null,
+          "ms": 800
+        },
+        {
+          "op": "camera",
+          "action": "shake",
+          "scale": null,
+          "x": null,
+          "y": null,
+          "intensity": 4.0,
+          "ms": 400
+        },
+        {
+          "op": "narration",
+          "text": "灯火一盏盏亮起，像有人在对你说：欢迎回来。",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": "眺望结局"
+    },
+    {
+      "id": "6d7976e0-75cc-4e43-98a9-0fb811abfb3a",
+      "sceneId": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "sceneTitle": "主场景",
+      "stage": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事暂告一段落...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    },
+    {
+      "id": "bc4a9e58-a44b-401e-aa1a-cecc022f3a53",
+      "sceneId": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "sceneTitle": "甲板",
+      "stage": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "actors": [],
+      "props": [],
+      "trigger": null,
+      "script": [
+        {
+          "op": "say",
+          "characterId": null,
+          "speaker": null,
+          "text": "故事暂告一段落...",
+          "voice": null,
+          "rich": null
+        }
+      ],
+      "effects": [],
+      "isEnding": true,
+      "endingLabel": null
+    }
+  ],
+  "transitions": [
+    {
+      "from": "7f907d79-ba81-4565-afdf-25267acdcd50",
+      "to": "c68ff6a3-b60d-4130-a4de-6e5b4a4dd726",
+      "label": ""
+    }
+  ],
+  "characters": [],
+  "scenes": [
+    {
+      "id": "1debd229-7da0-423b-bdc7-a5066196b63d",
+      "title": "主场景",
+      "location": null,
+      "atmosphere": null,
+      "backgroundImage": null
+    },
+    {
+      "id": "774ca71b-1298-401e-9870-f97c9c514d8e",
+      "title": "甲板",
+      "location": null,
+      "atmosphere": null,
+      "backgroundImage": null
+    }
+  ],
+  "items": [],
+  "worldSetting": "近未来移动都市「交汇港」",
+  "glossary": [],
+  "characterProfiles": [],
+  "codexScope": []
+}

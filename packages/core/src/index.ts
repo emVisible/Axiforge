@@ -8,3 +8,4 @@
 export * from "./ir";
 export * from "./conditions";
 export * from "./engine";
+export * from "./compiler";

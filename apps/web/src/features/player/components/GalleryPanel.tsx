@@ -57,7 +57,7 @@ export default function GalleryPanel({
       </div>
       <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-6 sm:grid-cols-3">
         {items.length === 0 && (
-          <p className="col-span-full py-20 text-center text-sm text-white/15">
+          <p className="col-span-full py-20 text-center text-sm text-white/65">
             本作品暂无可鉴赏资产
           </p>
         )}
@@ -76,7 +76,7 @@ export default function GalleryPanel({
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 bg-white/[0.02]">
                   {!isUnlocked && <Lock className="h-5 w-5 text-white/15" strokeWidth={1.5} />}
-                  <span className="max-w-[90%] truncate px-2 text-[10px] text-white/20">
+                  <span className="max-w-[90%] truncate px-2 text-3xs text-white/20">
                     {isUnlocked ? path.split("/").pop() : "？？？"}
                   </span>
                 </div>

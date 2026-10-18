@@ -38,7 +38,7 @@ export default function TemplateSelector() {
             key={t.id}
             type="button"
             onClick={() => applyTemplate(t)}
-            className="group flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left transition-all hover:border-brand/30 hover:bg-brand-muted/40"
+            className="group flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left transition-colors hover:border-brand/30 hover:bg-brand-muted/40"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-muted text-xs font-semibold text-brand">
               {t.name.slice(0, 1)}
@@ -47,7 +47,7 @@ export default function TemplateSelector() {
               <h4 className="truncate text-sm font-medium text-ink group-hover:text-brand">
                 {t.name}
               </h4>
-              <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-muted">
+              <p className="mt-0.5 line-clamp-1 text-2xs text-ink-muted">
                 {t.summary}
               </p>
             </div>

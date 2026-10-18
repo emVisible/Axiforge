@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { useUser } from "@/app/providers/UserContext";
 import Toast from "@/shared/components/Toast";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import {
   Button,
   Card,
@@ -47,6 +49,29 @@ export default function ProfilePage() {
       setBusy(false);
     }
   };
+
+  /*
+   * 这一页每一件事都要协作服务：头像、昵称、邮箱绑定、邮箱恢复、导出数据、注销账户——
+   * 六个动作全直连 userApi，没有本地替身。桌面离线态留着它们，等于给用户六个
+   * 点了只会弹「操作失败」的按钮；按既定约定（CloudFeatureNotice 那句"缺席要说出来"）
+   * 换成显式缺席，同时把仍然真实存在的本地身份留在页面上。
+   */
+  if (isLocalOnlyDeployment()) {
+    return (
+      <>
+        <PageHeader
+          title="账户设置"
+          description="这一页在本机只保留你的身份；昵称、头像、邮箱与数据管理都在协作服务那一侧"
+        />
+        <div className="mx-auto max-w-lg">
+          <Card>
+            <p className="text-xs text-ink-muted">当前身份：{displayLabel}</p>
+            <CloudFeatureNotice feature="账户设置" className="mt-3" />
+          </Card>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

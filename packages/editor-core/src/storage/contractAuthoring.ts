@@ -1,0 +1,306 @@
+/**
+ * 创作主数据域的契约用例（角色传记 / 工程内舞台）——Phase 13 桌面本地化补进来的两块。
+ *
+ * 与 `contractPools.ts` 同一拆分理由：一份测试源、多实现验收，
+ * 拆成两个 runner 只为让每个文件留在 G1 的 400 行预算内。
+ * 契约测试的价值在覆盖面，不在挤进同一个文件。
+ */
+
+import { describe, expect, it } from "vitest";
+import type { StorageProvider } from "./types";
+
+export function runStorageAuthoringContractSuite(
+  name: string,
+  makeProvider: () => StorageProvider | Promise<StorageProvider>,
+): void {
+  describe(`存储契约 · ${name} · 创作主数据`, () => {
+    describe("角色传记（Phase 13 S13-1：桌面无后端也要读写传记）", () => {
+      it("建 → 列表 → 单条读 → 改 → 删；wordCount 由实现方重算；跨角色读不到", async () => {
+        const p = await makeProvider();
+        const owner = await p.saveCharacter({
+          id: "",
+          name: "凛",
+          characterData: { anchor: { name: "凛" } },
+          imagePath: null,
+          isPublic: false,
+          authorId: "u-contract",
+        });
+        if (!owner.ok) throw new Error("角色创建失败");
+        const stranger = await p.saveCharacter({
+          id: "",
+          name: "邻",
+          characterData: { anchor: { name: "邻" } },
+          imagePath: null,
+          isPublic: false,
+          authorId: "u-other",
+        });
+        if (!stranger.ok) throw new Error("第二角色创建失败");
+        const cid = owner.data.id;
+
+        const created = await p.saveStory({
+          id: "",
+          characterId: cid,
+          title: "序章",
+          content: "她来了。\n又走了。",
+          wordCount: 999,
+          sortOrder: 1,
+          updatedAt: "",
+        });
+        expect(created.ok).toBe(true);
+        if (!created.ok) return;
+        const sid = created.data.id;
+
+        const list = await p.listStories(cid);
+        expect(list.ok && list.data.map((s) => s.title)).toEqual(["序章"]);
+        // 入参写 999 也必须被实现方算的真实值覆盖：两端各信一份就是两个字数互相说谎
+        expect(list.ok && list.data[0]?.wordCount).toBe(2);
+
+        if (!list.ok) throw new Error("列表读取失败");
+        const patched = await p.saveStory({
+          ...list.data[0]!,
+          title: "序章·改",
+          sortOrder: 0,
+        });
+        expect(patched.ok && patched.data.id).toBe(sid);
+
+        const got = await p.getStory(cid, sid);
+        expect(got.ok && got.data.title).toBe("序章·改");
+        expect(got.ok && got.data.sortOrder).toBe(0);
+
+        // 归属即隔离：换角色读同一条按 not_found，不做「知道 id 就能读」
+        const foreign = await p.getStory(stranger.data.id, sid);
+        if (!foreign.ok) expect(foreign.error.code).toBe("not_found");
+        else throw new Error("跨角色不应读到他人传记");
+
+        const removed = await p.deleteStory(cid, sid);
+        expect(removed.ok).toBe(true);
+        const again = await p.deleteStory(cid, sid);
+        if (!again.ok) expect(again.error.code).toBe("not_found");
+        else throw new Error("删除不存在传记必须报错，不能演成成功");
+
+        const empty = await p.listStories(cid);
+        expect(empty.ok && empty.data).toEqual([]);
+      });
+    });
+
+    describe("工程舞台增删（Phase 13 S13-2a：剪辑台在桌面要能建幕、删幕）", () => {
+      it("新增给权威 id 并进 bundle；删舞台留节点，stageId 归 null", async () => {
+        const p = await makeProvider();
+        const created = await p.createProject({ title: "舞台" });
+        if (!created.ok) throw new Error("create failed");
+        const id = created.data.id;
+
+        const added = await p.addProjectScene(id, { title: "第二幕" });
+        expect(added.ok).toBe(true);
+        if (!added.ok) return;
+
+        const afterAdd = await p.loadProject(id);
+        if (!afterAdd.ok) throw new Error("load failed");
+        expect(afterAdd.data.scenes.map((s) => s.title)).toContain("第二幕");
+        const first = afterAdd.data.nodes[0];
+        expect(first).toBeDefined();
+
+        await p.saveNarrative(id, {
+          axsSource: null,
+          nodes: [
+            { ...first!, stageId: added.data.id },
+            { id: "n-keep", stageId: null, editorData: {}, narrativeData: {}, sortOrder: 1 },
+          ],
+          edges: [],
+        });
+
+        const removed = await p.removeProjectScene(id, added.data.id);
+        expect(removed.ok).toBe(true);
+
+        const afterDelete = await p.loadProject(id);
+        if (!afterDelete.ok) throw new Error("load failed");
+        expect(afterDelete.data.scenes.map((s) => s.id)).not.toContain(added.data.id);
+        // 删的是舞台，不是戏：两拍都还在，只是不再归属任何舞台
+        expect(afterDelete.data.nodes.length).toBe(2);
+        expect(afterDelete.data.nodes.every((n) => n.stageId === null)).toBe(true);
+
+        const again = await p.removeProjectScene(id, added.data.id);
+        if (!again.ok) expect(again.error.code).toBe("not_found");
+        else throw new Error("重复删除舞台必须可见地失败");
+
+        const foreign = await p.removeProjectScene("no-such-project", added.data.id);
+        if (!foreign.ok) expect(foreign.error.code).toBe("not_found");
+        else throw new Error("往不存在的工程里删舞台必须失败");
+      });
+
+      it("导入带来的地点/氛围/引用 id 读得回来——写进去读不回就是静默降级", async () => {
+        const p = await makeProvider();
+        const created = await p.createProject({ title: "导入" });
+        if (!created.ok) throw new Error("create failed");
+        const added = await p.addProjectScene(created.data.id, {
+          title: "地窖",
+          description: "只能从正门进",
+          location: "方舟·地下",
+          atmosphere: "潮、暗",
+          sceneRefId: "asset-scene-1",
+          source: "reference",
+        });
+        expect(added.ok).toBe(true);
+        if (!added.ok) return;
+
+        const bundle = await p.loadProject(created.data.id);
+        if (!bundle.ok) throw new Error("load failed");
+        expect(bundle.data.scenes.find((s) => s.id === added.data.id)).toMatchObject({
+          title: "地窖",
+          description: "只能从正门进",
+          location: "方舟·地下",
+          atmosphere: "潮、暗",
+          sceneRefId: "asset-scene-1",
+          source: "reference",
+        });
+      });
+    });
+
+    describe("导入器写序列（Phase 13 S13-2g：随包播种走的正是这一串，两支都得扛住）", () => {
+      it("全 undefined 的补丁不清空已有元信息；删到零舞台再重建，节点能挂回新舞台 id", async () => {
+        const p = await makeProvider();
+        const created = await p.createProject({ title: "示范作" });
+        if (!created.ok) throw new Error("create failed");
+        const id = created.data.id;
+        const seeded = await p.updateProjectMeta(id, {
+          description: "旧库里写好的描述",
+          worldSetting: "交汇港的世界观",
+        });
+        expect(seeded.ok).toBe(true);
+
+        // 空包（随包三份示范作的 meta 只有 id/title/updatedAt）逐项 patch=undefined。
+        // 契约语义是 undefined=不动这一栏；演成「写 NULL」的话，导入一次就把本机已有元信息清空。
+        const emptyPatch = await p.updateProjectMeta(id, {
+          description: undefined,
+          coverImage: undefined,
+          themeTags: undefined,
+          mechanism: undefined,
+          genre: undefined,
+          isMeta: undefined,
+          worldSetting: undefined,
+          rules: undefined,
+        });
+        expect(emptyPatch.ok).toBe(true);
+        const afterMeta = await p.loadProject(id);
+        if (!afterMeta.ok) throw new Error("load failed");
+        expect(afterMeta.data.meta.title).toBe("示范作");
+        expect(afterMeta.data.meta.description).toBe("旧库里写好的描述");
+        expect(afterMeta.data.meta.worldSetting).toBe("交汇港的世界观");
+
+        // 导入要先把 createProject 自带的 bootstrap 删掉——它是**最后一个**舞台，
+        // 于是中间态是「零舞台工程」。实现方若有「至少留一个舞台」的护栏，播种就直接失败。
+        const before = await p.loadProject(id);
+        if (!before.ok) throw new Error("load failed");
+        expect(before.data.scenes.length).toBeGreaterThan(0);
+        for (const s of before.data.scenes) {
+          const removed = await p.removeProjectScene(id, s.id);
+          expect(removed.ok, `删舞台 ${s.title} 失败`).toBe(true);
+        }
+        const emptied = await p.loadProject(id);
+        if (!emptied.ok) throw new Error("load failed");
+        expect(emptied.data.scenes).toHaveLength(0);
+
+        // 再按包内顺序重建，节点挂的是**这台机器上的新 id**（包里的旧 id 在这里不存在）
+        const added = await p.addProjectScene(id, {
+          title: "咖啡馆",
+          location: "街角",
+          source: "inline",
+        });
+        expect(added.ok).toBe(true);
+        if (!added.ok) return;
+        const saved = await p.saveNarrative(id, {
+          axsSource: null,
+          nodes: [{
+            id: "n1",
+            stageId: added.data.id,
+            editorData: {},
+            narrativeData: { title: "推门", script: [{ op: "say", speaker: "堰纱", text: "你来了。" }] },
+            sortOrder: 0,
+          }],
+          edges: [],
+        });
+        expect(saved.ok).toBe(true);
+        const final = await p.loadProject(id);
+        if (!final.ok) throw new Error("load failed");
+        expect(final.data.scenes.map((s) => s.title)).toEqual(["咖啡馆"]);
+        expect(final.data.scenes[0]?.location).toBe("街角");
+        expect(final.data.nodes.find((n) => n.id === "n1")?.stageId).toBe(added.data.id);
+      });
+    });
+
+    describe("工程道具引用增删（Phase 13 S13-2c：桌面离线也要能往编排台加道具）", () => {
+      it("加→读回→删；同件重复加不去重；引用不随叙事图覆写消失", async () => {
+        const p = await makeProvider();
+        const created = await p.createProject({ title: "道具" });
+        if (!created.ok) throw new Error("create failed");
+        const id = created.data.id;
+
+        const fresh = await p.loadProject(id);
+        if (!fresh.ok) throw new Error("load failed");
+        expect(fresh.data.assetRefs).toEqual([]);
+
+        const a = await p.addAssetRef(id, { assetType: "item", assetId: "item-1" });
+        expect(a.ok).toBe(true);
+        if (!a.ok) return;
+        const b = await p.addAssetRef(id, { assetType: "item", assetId: "item-1" });
+        expect(b.ok).toBe(true);
+        if (!b.ok) return;
+        // 后端就是裸 INSERT，不去重：客户端偷偷合并会让两端计数不一致
+        expect(b.data.id).not.toBe(a.data.id);
+
+        const withRefs = await p.loadProject(id);
+        if (!withRefs.ok) throw new Error("load failed");
+        expect(withRefs.data.assetRefs.map((r) => r.id).sort()).toEqual([a.data.id, b.data.id].sort());
+        expect(withRefs.data.assetRefs.every(
+          (r) => r.projectId === id && r.assetType === "item" && r.assetId === "item-1",
+        )).toBe(true);
+
+        // 叙事图和引用是两个域：剪辑台每次存稿都覆写 nodes/edges，
+        // 引用若跟着一起清掉，加进去的道具就活不过下一次保存。
+        const node = withRefs.data.nodes[0];
+        expect(node).toBeDefined();
+        const saved = await p.saveNarrative(id, {
+          axsSource: null,
+          nodes: [{ ...node!, id: "n-only", stageId: null, editorData: {}, narrativeData: {}, sortOrder: 0 }],
+          edges: [],
+        });
+        expect(saved.ok).toBe(true);
+
+        const afterSave = await p.loadProject(id);
+        if (!afterSave.ok) throw new Error("load failed");
+        expect(afterSave.data.assetRefs.map((r) => r.id).sort()).toEqual([a.data.id, b.data.id].sort());
+
+        const removed = await p.removeAssetRef(id, a.data.id);
+        expect(removed.ok).toBe(true);
+        const afterRemove = await p.loadProject(id);
+        if (!afterRemove.ok) throw new Error("load failed");
+        expect(afterRemove.data.assetRefs.map((r) => r.id)).toEqual([b.data.id]);
+
+        const again = await p.removeAssetRef(id, a.data.id);
+        if (!again.ok) expect(again.error.code).toBe("not_found");
+        else throw new Error("重复删除引用必须可见地失败，不能演成幂等成功");
+      });
+
+      it("引用 id 归属工程：换个工程删不动，往不存在的工程加也加不进", async () => {
+        const p = await makeProvider();
+        const first = await p.createProject({ title: "甲" });
+        const second = await p.createProject({ title: "乙" });
+        if (!first.ok || !second.ok) throw new Error("create failed");
+
+        const added = await p.addAssetRef(first.data.id, { assetType: "item", assetId: "item-1" });
+        if (!added.ok) throw new Error("add failed");
+
+        const cross = await p.removeAssetRef(second.data.id, added.data.id);
+        if (!cross.ok) expect(cross.error.code).toBe("not_found");
+        else throw new Error("跨工程删引用不该成功");
+        const still = await p.loadProject(first.data.id);
+        if (!still.ok) throw new Error("load failed");
+        expect(still.data.assetRefs.map((r) => r.id)).toEqual([added.data.id]);
+
+        const orphan = await p.addAssetRef("no-such-project", { assetType: "item", assetId: "item-1" });
+        if (!orphan.ok) expect(orphan.error.code).toBe("not_found");
+        else throw new Error("往不存在的工程加引用必须失败");
+      });
+    });
+  });
+}

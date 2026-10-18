@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Plus, Star, Trash2 } from "lucide-react";
 
-import { ginkgoApi, type AchievementDef } from "@/shared/api/ginkgo";
+import {
+  createAchievement,
+  deleteAchievement,
+  listAchievements,
+  updateAchievement,
+} from "@/shared/storage/achievementDefs";
+import type { AchievementDef } from "@/shared/api/ginkgo";
 import { Button, CheckboxField, Input, Textarea, cn, labelSm } from "@/shared/components/ui";
 
 interface AchievementPanelProps {
@@ -19,12 +25,17 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
   const [items, setItems] = useState<AchievementDef[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const conditionSelectId = useId();
+  /** 读取失败与「确实没有定义」必须可区分，否则错误会伪装成空态 */
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await ginkgoApi.list(projectId);
-      setItems(res.items);
+      setItems(await listAchievements(projectId));
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
@@ -38,10 +49,11 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
     setBusy(true);
     try {
       const key = `ach_${Date.now().toString(36)}`;
-      await ginkgoApi.create(projectId, {
+      await createAchievement(projectId, {
         key,
         title: "新成就",
         description: "",
+        icon: "star",
         condition: { type: "node_completed", value: "" },
       });
       await refresh();
@@ -51,20 +63,20 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
   };
 
   const save = async (item: AchievementDef, patch: Partial<AchievementDef>) => {
-    await ginkgoApi.update(item.id, patch);
+    await updateAchievement(projectId, item, patch);
     await refresh();
   };
 
   const remove = async (id: string) => {
     if (!confirm("删除此成就？")) return;
-    await ginkgoApi.remove(id);
+    await deleteAchievement(projectId, id);
     await refresh();
   };
 
   return (
     <div className="space-y-3 p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] text-ink-muted">
+        <p className="text-2xs text-ink-muted">
           项目成就：Beat 完成时按条件自动解锁，也可用于分支 gating。
         </p>
         <Button size="sm" icon={<Plus className="h-3.5 w-3.5" />} loading={busy} onClick={add}>
@@ -74,7 +86,13 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
 
       {loading && <p className="text-xs text-ink-faint">加载中…</p>}
 
-      {!loading && items.length === 0 && (
+      {loadError && (
+        <div className="rounded-xl border border-red-400/40 bg-red-500/5 px-3 py-2 text-xs text-red-300">
+          成就定义读取失败：{loadError}
+        </div>
+      )}
+
+      {!loading && !loadError && items.length === 0 && (
         <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-ink-muted">
           还没有成就定义
         </div>
@@ -83,7 +101,7 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
       {items.map((item) => (
         <div key={item.id} className="rounded-xl border border-border bg-surface p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1 text-[10px] font-medium text-brand">
+            <span className="flex items-center gap-1 text-3xs font-medium text-brand">
               <Star className="h-3 w-3" />
               {item.key}
             </span>
@@ -108,8 +126,9 @@ export default function AchievementPanel({ projectId }: AchievementPanelProps) {
             onChange={(e) => void save(item, { description: e.target.value })}
           />
           <div>
-            <label className={cn(labelSm, "mb-1 block")}>解锁条件</label>
+            <label htmlFor={conditionSelectId} className={cn(labelSm, "mb-1 block")}>解锁条件</label>
             <select
+              id={conditionSelectId}
               className="w-full rounded-md border border-border bg-canvas px-2 py-1.5 text-xs"
               value={(item.condition as { type?: string })?.type ?? "node_completed"}
               onChange={(e) => {

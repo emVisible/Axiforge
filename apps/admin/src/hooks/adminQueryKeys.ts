@@ -1,6 +1,6 @@
 export const adminQueryKeys = {
   stats: ["admin", "stats"] as const,
-  reports: (status: string) => ["admin", "reports", status] as const,
+  reports: (status: string, page: number) => ["admin", "reports", status, page] as const,
   moderation: (targetType: string, targetId: string) =>
     ["admin", "moderation", targetType, targetId] as const,
   users: (page: number, creatorId?: string, q?: string) =>
@@ -9,6 +9,11 @@ export const adminQueryKeys = {
     ["admin", "projects", page, q ?? "", status ?? ""] as const,
   characters: (page: number, q?: string, status?: string) =>
     ["admin", "characters", page, q ?? "", status ?? ""] as const,
+  moderationQueue: (state: string, order: string, page: number, axis = "") =>
+    ["admin", "moderation-queue", state, order, axis, page] as const,
+  moderationLabelTargets: () => ["admin", "moderation-label-targets"] as const,
+  moderationStats: () => ["admin", "moderation-stats"] as const,
+  moderationVocabulary: ["admin", "moderation-vocabulary"] as const,
   violations: (page: number, creatorId?: string) =>
     ["admin", "violations", page, creatorId ?? ""] as const,
   auditLogs: (page: number, action?: string) => ["admin", "audit", page, action ?? ""] as const,

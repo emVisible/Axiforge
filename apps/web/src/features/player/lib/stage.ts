@@ -71,7 +71,7 @@ export function foldStage(
         break;
       case "show":
         sprites[d.characterId] = {
-          expression: d.expression,
+          expression: d.expression ?? undefined,
           position: d.position || "center",
         };
         break;

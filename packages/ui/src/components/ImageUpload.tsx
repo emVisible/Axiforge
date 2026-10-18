@@ -8,6 +8,22 @@ interface ImageUploadProps {
   /** Fill parent instead of fixed 128px box */
   fill?: boolean;
   className?: string;
+  /**
+   * 字节落地方式；缺省 = POST /api/v1/upload（服务端行为，逐字段不变）。
+   * 桌面宿主注入本地实现，组件不判断平台。
+   */
+  upload?: (file: File) => Promise<string>;
+  /** 引用 → 可显示 URL；缺省 = 原样（宿主素材根目录解析由注入方负责） */
+  resolve?: (ref: string) => string;
+}
+
+/** 服务端上传口（组件默认行为） */
+export async function uploadToServer(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/v1/upload", { method: "POST", body: form });
+  const data = await res.json();
+  return data.url as string;
 }
 
 export default function ImageUpload({
@@ -15,6 +31,8 @@ export default function ImageUpload({
   onChange,
   fill = false,
   className,
+  upload,
+  resolve,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value || "");
@@ -28,18 +46,17 @@ export default function ImageUpload({
     if (!file.type.startsWith("image/")) return;
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/v1/upload", { method: "POST", body: form });
-      const data = await res.json();
-      setPreview(data.url);
-      onChange(data.url);
+      const url = await (upload ?? uploadToServer)(file);
+      setPreview(url);
+      onChange(url);
     } catch (e) {
       console.error("上传失败", e);
     } finally {
       setUploading(false);
     }
   };
+
+  const shown = preview ? (resolve ? resolve(preview) : preview) : "";
 
   return (
     <div className={cn("space-y-2", fill && "h-full w-full", className)}>
@@ -56,9 +73,9 @@ export default function ImageUpload({
           fill ? "h-full min-h-[7.5rem] w-full" : "h-32 w-32",
         )}
       >
-        {preview ? (
+        {shown ? (
           <>
-            <img src={preview} alt="" className="h-full w-full object-cover" />
+            <img src={shown} alt="" className="h-full w-full object-cover" />
             <div className="absolute inset-0 flex items-center justify-center bg-ink/40 text-xs text-surface opacity-0 transition-opacity group-hover:opacity-100">
               更换图片
             </div>

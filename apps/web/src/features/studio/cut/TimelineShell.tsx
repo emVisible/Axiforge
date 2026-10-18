@@ -5,8 +5,9 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  useMemo,
 } from "react";
-import type { Instruction } from "@axiforge/core";
+import type { Effect, Instruction } from "@axiforge/core";
 import { Minus, Plus, X } from "lucide-react";
 import { cn } from "@/shared/components/ui";
 import {
@@ -19,6 +20,9 @@ import {
   clipLeft,
   clipPositions,
   clipWidth,
+  effectColor,
+  effectLabel,
+  effectWidth,
   formatNarrativeTime,
   indexAtPixel,
   msFromClipWidth,
@@ -27,7 +31,8 @@ import {
   trackForOp,
   type CutTrackId,
   indicesOnTrack,
-  localIndexAtPixel,
+  localIndexAtPixelForIndices,
+  characterTrackGroups,
 } from "./timelineUtils";
 
 export type TimelineShellHandle = {
@@ -43,13 +48,16 @@ interface TimelineShellProps {
   onSelectClip: (index: number) => void;
   onScrub: (index: number) => void;
   onReorder?: (from: number, to: number) => void;
+  characterLabels?: Record<string, string>;
+  onSpriteDrop?: (characterId: string, expression: string, insertIndex: number) => void;
   onReorderTrack?: (
-    trackId: CutTrackId,
+    trackId: string,
     fromLocal: number,
     toLocal: number,
   ) => void;
   onDeleteClip?: (index: number) => void;
   onDurationChange?: (index: number, ms: number) => void;
+  effects?: Effect[];
 }
 
 const TRACK_H = 36;
@@ -68,13 +76,21 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       onScrub,
       onReorder,
       onReorderTrack,
+      characterLabels = {},
+      onSpriteDrop,
       onDeleteClip,
       onDurationChange,
+      effects = [],
     },
     ref,
   ) {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const width = totalTimelineWidth(script, zoom);
+    const baseWidth = totalTimelineWidth(script, zoom);
+    const effectsExtra = effects.length
+      ? effects.reduce((acc, e) => acc + effectWidth(effectLabel(e), zoom) + 6, 16)
+      : 0;
+    const effectsStart = baseWidth;
+    const width = effects.length ? Math.max(baseWidth, effectsStart + effectsExtra + 24) : baseWidth;
     const positions = clipPositions(script, zoom);
     const totalMs = totalDurationMs(script);
     const safeCursor =
@@ -86,13 +102,14 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         ? Math.max(0, Math.min(selectedIndex, script.length - 1))
         : 0;
 
+    // 轨道键：cut:<CutTrackId> 固定轨 | char:<characterId> 角色轨（F2）
     const [dragFrom, setDragFrom] = useState<{
-      trackId: CutTrackId;
+      trackId: string;
       localIndex: number;
       globalIndex: number;
     } | null>(null);
     const [dropTarget, setDropTarget] = useState<{
-      trackId: CutTrackId;
+      trackId: string;
       localIndex: number;
     } | null>(null);
     const dragFromRef = useRef<typeof dragFrom>(null);
@@ -100,6 +117,39 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
 
     dragFromRef.current = dragFrom;
     dropTargetRef.current = dropTarget;
+
+    const charGroups = useMemo(
+      () => characterTrackGroups(script),
+      [script],
+    );
+    const [collapsedChars, setCollapsedChars] = useState<Set<string>>(
+      () => new Set(),
+    );
+    const toggleCharTrack = useCallback((cid: string) => {
+      setCollapsedChars((prev) => {
+        const next = new Set(prev);
+        if (next.has(cid)) next.delete(cid);
+        else next.add(cid);
+        return next;
+      });
+    }, []);
+
+    /** 角色轨占用的全局下标（这些指令从固定轨 V2 分离） */
+    const charOpIndices = useMemo(
+      () => new Set(charGroups.flatMap((g) => g.indices)),
+      [charGroups],
+    );
+
+    const trackIndexOf = useCallback(
+      (key: string): number[] => {
+        if (key.startsWith("char:")) {
+          return charGroups.find((g) => `char:${g.characterId}` === key)?.indices ?? [];
+        }
+        return indicesOnTrack(script, key.slice(4) as CutTrackId);
+      },
+      [script, charGroups],
+    );
+
 
     const scrollToClip = useCallback(
       (index: number) => {
@@ -128,7 +178,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         return;
       }
       if (onReorder) {
-        const indices = indicesOnTrack(script, from.trackId);
+        const indices = trackIndexOf(from.trackId);
         const fromGlobal = indices[from.localIndex];
         const toGlobal = indices[to.localIndex];
         if (fromGlobal != null && toGlobal != null) {
@@ -145,11 +195,12 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         if (!el || !script.length || !dragFrom) return;
         const rect = el.getBoundingClientRect();
         const x = e.clientX - rect.left + el.scrollLeft - TIMELINE_PAD;
-        const local = localIndexAtPixel(script, dragFrom.trackId, x, zoom);
+        const indices = trackIndexOf(dragFrom.trackId);
+        const local = localIndexAtPixelForIndices(indices, script, x, zoom);
         const target = { trackId: dragFrom.trackId, localIndex: local };
         dropTargetRef.current = target;
         setDropTarget(target);
-        const globalIdx = indicesOnTrack(script, dragFrom.trackId)[local];
+        const globalIdx = indices[local];
         if (globalIdx != null) onScrub(globalIdx);
       };
 
@@ -161,7 +212,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
       };
-    }, [dragFrom, script, zoom, onScrub, finishDrag]);
+    }, [dragFrom, script, zoom, onScrub, finishDrag, trackIndexOf]);
 
     const playheadLeft =
       script.length > 0 && script[safeCursor]
@@ -175,7 +226,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       dragFrom != null &&
       dropTarget.trackId === dragFrom.trackId
         ? (() => {
-            const indices = indicesOnTrack(script, dropTarget.trackId);
+            const indices = trackIndexOf(dropTarget.trackId);
             const globalIdx = indices[dropTarget.localIndex];
             if (globalIdx == null) return null;
             return (
@@ -234,27 +285,31 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
       ...track,
       clips: script
         .map((inst, i) => ({ inst, i }))
-        .filter(({ inst }) => trackForOp(inst.op) === track.id),
+        .filter(
+          ({ inst, i }) =>
+            trackForOp(inst.op) === track.id &&
+            !(track.id === "visual" && charOpIndices.has(i)),
+        ),
     }));
 
     return (
       <div className="flex h-full min-h-0 flex-col bg-panel">
         <div className="flex h-8 shrink-0 items-center justify-between border-b border-border bg-surface-raised px-3">
-          <span className="text-[11px] font-medium tracking-wide text-ink-muted">
+          <span className="text-2xs font-medium tracking-wide text-ink-muted">
             指令轨 · 当前 Beat
             {onReorderTrack && (
-              <span className="ml-2 text-[9px] font-normal text-ink-faint">
+              <span className="ml-2 text-3xs font-normal text-ink-faint">
                 分轨内拖拽排序 · 右缘拖拽改时长
               </span>
             )}
             {!onReorderTrack && onReorder && (
-              <span className="ml-2 text-[9px] font-normal text-ink-faint">
+              <span className="ml-2 text-3xs font-normal text-ink-faint">
                 拖拽片段排序 · 右缘拖拽改时长
               </span>
             )}
           </span>
           <div className="flex items-center gap-1">
-            <span className="mr-2 text-[10px] text-ink-faint">缩放</span>
+            <span className="mr-2 text-3xs text-ink-faint">缩放</span>
             <button
               type="button"
               onClick={() => onZoomChange(Math.max(0.5, zoom - 0.15))}
@@ -262,7 +317,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
             >
               <Minus className="h-3 w-3" />
             </button>
-            <span className="w-8 text-center font-mono text-[10px] text-ink-muted">
+            <span className="w-8 text-center font-mono text-3xs text-ink-muted">
               {Math.round(zoom * 100)}%
             </span>
             <button
@@ -284,7 +339,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
               className="flex shrink-0 items-end border-b border-border px-2 pb-1"
               style={{ height: RULER_H }}
             >
-              <span className="text-[9px] text-ink-faint">进度</span>
+              <span className="text-3xs text-ink-faint">进度</span>
             </div>
             {CUT_TRACKS.map((track) => (
               <div
@@ -292,19 +347,61 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 className="flex shrink-0 items-center border-b border-border px-2"
                 style={{ height: TRACK_H }}
               >
-                <span className="font-mono text-[10px] font-semibold text-accent-soft">
+                <span className="font-mono text-3xs font-semibold text-accent-soft">
                   {track.short}
                 </span>
-                <span className="ml-1.5 truncate text-[9px] text-ink-faint">
+                <span className="ml-1.5 truncate text-3xs text-ink-faint">
                   {track.label.split(" ")[0]}
                 </span>
               </div>
             ))}
+            {effects.length > 0 && (
+              <div
+                className="flex shrink-0 items-center border-b border-border bg-pink-50/50 px-2 dark:bg-pink-950/20"
+                style={{ height: TRACK_H }}
+              >
+                <span className="font-mono text-3xs font-semibold text-pink-600 dark:text-pink-300">RN</span>
+                <span className="ml-1.5 truncate text-3xs text-ink-faint">关系</span>
+              </div>
+            )}
           </div>
 
           <div
             ref={scrollRef}
             className="relative min-w-0 flex-1 overflow-x-auto overflow-y-hidden"
+            onDragOver={(e) => {
+              if (e.dataTransfer.types.includes("application/axiforge/sprite")) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+              }
+            }}
+            onDrop={(e) => {
+              const raw = e.dataTransfer.getData("application/axiforge/sprite");
+              if (!raw || !onSpriteDrop || !scrollRef.current) return;
+              e.preventDefault();
+              try {
+                const { characterId, expression } = JSON.parse(raw) as {
+                  characterId: string;
+                  expression: string;
+                };
+                const el = scrollRef.current;
+                const rect = el.getBoundingClientRect();
+                const x = e.clientX - rect.left + el.scrollLeft - TIMELINE_PAD;
+                // 按像素定位插入下标
+                const charGroups = characterTrackGroups(script);
+                const charIndices = charGroups
+                  .filter((g) => g.characterId === characterId)
+                  .flatMap((g) => g.indices);
+                const allIndices = charIndices.length
+                  ? charIndices
+                  : script.map((_, i) => i);
+                const idx = localIndexAtPixelForIndices(allIndices, script, x, zoom);
+                const globalIdx = allIndices[idx] ?? script.length;
+                onSpriteDrop(characterId, expression, globalIdx);
+              } catch {
+                /* malformed data — ignore */
+              }
+            }}
             onClick={handleTrackClick}
           >
             <div className="relative" style={{ minWidth: width }}>
@@ -322,7 +419,7 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                     className="absolute top-0 flex h-full flex-col justify-end"
                     style={{ left: t.left }}
                   >
-                    <span className="mb-0.5 -translate-x-1/2 font-mono text-[9px] text-ink-faint">
+                    <span className="mb-0.5 -translate-x-1/2 font-mono text-3xs text-ink-faint">
                       {formatNarrativeTime(t.ms)}
                     </span>
                     <div className="h-1.5 w-px bg-border-strong" />
@@ -336,6 +433,64 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                 </div>
               ) : (
                 <>
+                  {charGroups.map((group) => {
+                    const key = `char:${group.characterId}`;
+                    const collapsed = collapsedChars.has(group.characterId);
+                    const label =
+                      characterLabels[group.characterId] ??
+                      `角色 ${group.characterId.slice(0, 8)}`;
+                    return (
+                      <div key={key}>
+                        <button
+                          type="button"
+                          onClick={() => toggleCharTrack(group.characterId)}
+                          className="flex h-6 w-full items-center gap-1.5 border-b border-border bg-surface-raised px-3 text-left transition-colors hover:bg-panel"
+                        >
+                          <span
+                            className={`text-3xs text-ink-faint transition-transform ${collapsed ? "" : "rotate-90"}`}
+                          >
+                            ▶
+                          </span>
+                          <span className="truncate text-3xs font-medium text-ink-muted">
+                            {label}
+                          </span>
+                          <span className="font-mono text-3xs text-ink-faint">
+                            角色 · {group.indices.length}
+                          </span>
+                        </button>
+                        {!collapsed && (
+                          <TrackRow
+                            trackId={key}
+                            script={script}
+                            positions={positions}
+                            zoom={zoom}
+                            zoomLevel={zoom}
+                            selectedIndex={safeSelected}
+                            dragFrom={
+                              dragFrom?.trackId === key ? dragFrom.localIndex : null
+                            }
+                            clipIndices={group.indices}
+                            onSelectClip={onSelectClip}
+                            onDragStartLocal={
+                              onReorderTrack
+                                ? (
+                                    localIndex: number,
+                                    globalIndex: number,
+                                  ) =>
+                                    setDragFrom({
+                                      trackId: key,
+                                      localIndex,
+                                      globalIndex,
+                                    })
+                                : undefined
+                            }
+                            onDeleteClip={onDeleteClip}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+
                   {clipsByTrack.map((track) => (
                     <TrackRow
                       key={track.id}
@@ -364,6 +519,28 @@ const TimelineShell = forwardRef<TimelineShellHandle, TimelineShellProps>(
                       zoomLevel={zoom}
                     />
                   ))}
+                  {effects.length > 0 && (
+                    <div className="relative border-b border-border bg-pink-50/30 dark:bg-pink-950/10" style={{ height: TRACK_H }}>
+                      <div className="absolute inset-0 flex items-center gap-1.5 px-2" style={{ left: 0 }}>
+                        {(() => {
+                          return effects.map((e, idx) => {
+                            const label = effectLabel(e);
+                            const w = effectWidth(label, zoom);
+                            return (
+                              <div
+                                key={`${e.type}-${e.key}-${idx}`}
+                                style={{ width: w, height: TRACK_H - 8 }}
+                                className={`inline-flex shrink-0 items-center justify-center rounded border px-1.5 text-3xs font-medium leading-none ${effectColor(e.type)}`}
+                                title={`${e.type}: ${e.key} = ${String(e.value)}`}
+                              >
+                                <span className="truncate">{label}</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
 
                   {dropMarkerLeft != null && dragFrom != null && (
                     <div
@@ -404,7 +581,7 @@ function TrackRow({
   onDeleteClip,
   onDurationChange,
 }: {
-  trackId: CutTrackId;
+  trackId: string;
   script: Instruction[];
   positions: number[];
   zoom: number;
@@ -488,14 +665,14 @@ function TrackRow({
               }}
               style={{ width: w, height: TRACK_H - 6 }}
               className={cn(
-                "cursor-grab overflow-hidden rounded-sm border px-1.5 text-left transition-shadow active:cursor-grabbing",
+                "cursor-grab overflow-hidden rounded-sm border px-1.5 text-left transition-[filter,box-shadow] hover:brightness-110 hover:shadow-sm active:cursor-grabbing",
                 clipColor(inst),
                 active && "ring-2 ring-accent-soft ring-offset-1 ring-offset-panel",
                 dragging && "opacity-60",
               )}
               title={clipLabel(inst)}
             >
-              <span className="block truncate text-[9px] font-medium leading-tight opacity-90">
+              <span className="block truncate text-3xs font-medium leading-tight opacity-90">
                 {clipLabel(inst)}
               </span>
             </button>

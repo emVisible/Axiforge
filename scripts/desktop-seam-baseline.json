@@ -1,0 +1,20 @@
+{
+  "allow": [
+    {
+      "file": "apps/nexus/electron/main.cjs",
+      "tier": "no-test",
+      "reason": "Electron 主进程 45 行：BrowserWindow 创建 + dev loadURL / prod loadFile 二选一 + 一条 ipcMain.handle + 三个 app 生命周期钩子，可测面全在 electron API 上。不补的三条理由：① apps/nexus 没有测试设施（vitest 只给 admin 建过）；② mock 整套 app/BrowserWindow/ipcMain 得到的判据只验 mock；③ 根本原因是 nexus 的处置本身挂在 ADR-029 未决清单第 2 条（sendToInbox / aiApi.suggestCharacter 判死还是本地化），给一支可能判死的 Electron 壳搭测试设施=替用户做决定。登记在此 ⇒ 它不再是被漏掉的，而是被记着的"
+    },
+    {
+      "file": "apps/nexus/electron/preload.cjs",
+      "tier": "no-test",
+      "reason": "5 行 contextBridge.exposeInMainWorld(\"nexus\", { getVersion: () => ipcRenderer.invoke(\"nexus:get-version\") })。它唯一的桥就是 main.cjs 那一条 handler，两者的判据必须一起补才有意义，所以跟 main.cjs 同一条待决捆绑；本机起不了 Electron，补了也拿不到壳内读数"
+    },
+    {
+      "file": "apps/web/src/shared/storage/desktopSmoke.ts",
+      "tier": "no-test",
+      "reason": "它本身就是 DEV 壳内冒烟（判据的载体，不是判据的对象）：给它写单测等于用 mock 验 mock。真壳内的执行仍归 §6 待决里的人工壳内验收那一条"
+    }
+  ],
+  "_note": "面=apps/+packages/ 里引用 Tauri 或 Electron 主进程桥的源码；tier=no-test 指没有同名测试，no-import 指有测试但没引用该模块，no-assert 指引用了却没有真断言，trivial-assert 指断言恒真（expect(true) 一类）。补一份判据后本表应变短"
+}

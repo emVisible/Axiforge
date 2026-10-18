@@ -37,13 +37,14 @@ async def admin_dashboard_stats(db: AsyncSession = Depends(get_db)):
     return await AdminService(db).dashboard_stats()
 
 
-@admin_router.get("/reports", response_model=List[AdminReportResponse])
+@admin_router.get("/reports", response_model=PaginatedResponse[AdminReportResponse])
 async def admin_list_reports(
     status: str = Query("pending"),
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    return await AdminService(db).list_reports(status=status, limit=limit)
+    return await AdminService(db).list_reports(status=status, limit=limit, offset=offset)
 
 
 @admin_router.post("/reports/{report_id}/resolve", response_model=AdminReportResponse)

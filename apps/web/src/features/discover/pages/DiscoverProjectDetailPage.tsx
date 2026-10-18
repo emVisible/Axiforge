@@ -10,6 +10,8 @@ import type { ProjectResponse } from "@/shared/types/project";
 import DiscoverCommentSection from "@/features/discover/components/DiscoverCommentSection";
 import PageMeta from "@/shared/components/PageMeta";
 import ShareActions from "@/shared/components/ShareActions";
+import CloudFeatureNotice from "@/shared/components/CloudFeatureNotice";
+import { isLocalOnlyDeployment } from "@/shared/lib/deployment";
 import {
   BackLink,
   Button,
@@ -27,7 +29,12 @@ export default function DiscoverProjectDetailPage() {
   const shareUrl = `${window.location.origin}/discover/projects/${id}`;
   const playUrl = `${window.location.origin}${routes.play(id)}`;
 
+  // 桌面态这一页没有读者：它与 DiscoverPage 同进退（E35「入口与目标同生共死」），
+  // 否则直接输 URL 进来就是一次注定失败的云端请求。
+  const localOnly = isLocalOnlyDeployment();
+
   useEffect(() => {
+    if (localOnly) return;
     (async () => {
       try {
         const data = await projectApi.get(id, { bump_view: true });
@@ -41,7 +48,18 @@ export default function DiscoverProjectDetailPage() {
         setStatus("error");
       }
     })();
-  }, [id]);
+  }, [id, localOnly]);
+
+  if (localOnly) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16">
+        <CloudFeatureNotice feature="公开剧本详情" />
+        <div className="mt-4">
+          <BackLink to={routes.discover}>返回发现</BackLink>
+        </div>
+      </div>
+    );
+  }
 
   const play = () => {
     projectApi.recordView(id, getPlayerToken()).catch(() => {});
@@ -115,7 +133,7 @@ export default function DiscoverProjectDetailPage() {
             </Button>
           </div>
           <ShareActions url={shareUrl} title={project.title} />
-          <p className="text-[10px] text-ink-faint">
+          <p className="text-3xs text-ink-faint">
             试玩直达：
             <a href={playUrl} className="ml-1 text-brand hover:underline">
               {playUrl.replace(/^https?:\/\//, "")}

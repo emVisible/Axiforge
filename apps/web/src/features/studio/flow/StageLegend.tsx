@@ -27,7 +27,7 @@ export default function StageLegend({
 
   return (
     <div className="space-y-2 rounded-xl border border-border bg-surface p-2.5 shadow-sm">
-      <p className="px-0.5 text-[10px] font-medium text-ink-muted">舞台泳道</p>
+      <p className="px-0.5 text-3xs font-medium text-ink-muted">舞台泳道</p>
       <div className="space-y-1">
         {scenes.map((scene) => {
           const idx = stageColorIndex(scene.id, stageIds);
@@ -57,8 +57,8 @@ export default function StageLegend({
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: palette.dot }}
                 />
-                <span className="truncate text-[10px] text-ink">{scene.title}</span>
-                <span className="ml-auto shrink-0 text-[9px] tabular-nums text-ink-muted">
+                <span className="truncate text-3xs text-ink">{scene.title}</span>
+                <span className="ml-auto shrink-0 text-3xs tabular-nums text-ink-muted">
                   {count}
                 </span>
               </button>
@@ -67,7 +67,7 @@ export default function StageLegend({
                 title="聚焦到此舞台"
                 disabled={count === 0}
                 onClick={() => onFocusStage(scene.id)}
-                className="shrink-0 rounded px-1 text-[9px] text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-30"
+                className="shrink-0 rounded px-1 text-3xs text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-30"
               >
                 聚焦
               </button>
@@ -76,7 +76,7 @@ export default function StageLegend({
                 title={filtered ? "取消筛选" : "仅显示此舞台"}
                 disabled={count === 0}
                 onClick={() => onToggleFilter(scene.id)}
-                className={`shrink-0 rounded px-1 text-[9px] ${
+                className={`shrink-0 rounded px-1 text-3xs ${
                   filtered
                     ? "bg-brand/10 font-medium text-brand"
                     : "text-ink-muted hover:bg-surface hover:text-ink"
@@ -88,7 +88,7 @@ export default function StageLegend({
           );
         })}
       </div>
-      <p className="px-0.5 text-[9px] leading-relaxed text-ink-muted/80">
+      <p className="px-0.5 text-3xs leading-relaxed text-ink-muted/80">
         点击圆点设默认舞台；聚焦缩放；筛选高亮泳道
       </p>
     </div>

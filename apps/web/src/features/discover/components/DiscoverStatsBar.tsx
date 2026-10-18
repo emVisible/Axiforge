@@ -63,7 +63,7 @@ export default function DiscoverStatsBar({
   ];
 
   const chipClass = inline
-    ? "rounded-full border border-border bg-panel px-2.5 py-1 text-[10px] text-ink-muted"
+    ? "rounded-full border border-border bg-panel px-2.5 py-1 text-3xs text-ink-muted"
     : "rounded-full border border-border bg-panel px-3 py-1.5 text-xs text-ink-muted";
 
   return (
@@ -76,7 +76,7 @@ export default function DiscoverStatsBar({
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          className="mr-1 flex items-center gap-0.5 text-[10px] text-ink-faint hover:text-ink-muted"
+          className="mr-1 flex items-center gap-0.5 text-3xs text-ink-faint hover:text-ink-muted"
           aria-expanded={!collapsed}
         >
           统计

@@ -12,6 +12,8 @@ export interface AxsBeat {
   endingLabel?: string | null;
   trigger?: Condition | null;
   script: Instruction[];
+  /** 每条指令对应的 AXS 源行号（1-based），与 script 平行 */
+  lineMap?: number[];
   effects?: Effect[];
   /** `-> 目标标题` 显式跳转（标题文本，解析边时映射为 id） */
   jumps?: string[];

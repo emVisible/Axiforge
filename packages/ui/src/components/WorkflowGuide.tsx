@@ -29,7 +29,7 @@ export default function WorkflowGuide({
           key={step.title}
           className="rounded-xl border border-border bg-canvas/60 p-4 text-left"
         >
-          <p className="mb-2 font-mono text-[10px] font-medium tracking-widest text-ink-muted">
+          <p className="mb-2 font-mono text-3xs font-medium tracking-widest text-ink-muted">
             {String(index + 1).padStart(2, "0")}
           </p>
           <p className="text-sm font-medium text-ink">{step.title}</p>

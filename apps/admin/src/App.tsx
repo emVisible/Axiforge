@@ -7,6 +7,7 @@ import UsersPage from "@/pages/UsersPage";
 import ContentPage from "@/pages/ContentPage";
 import AuditPage from "@/pages/AuditPage";
 import ViolationsPage from "@/pages/ViolationsPage";
+import ModerationPage from "@/pages/ModerationPage";
 import { getAdminToken } from "@/api/adminClient";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="users" element={<UsersPage />} />
         <Route path="content" element={<ContentPage />} />
         <Route path="violations" element={<ViolationsPage />} />
+        <Route path="moderation" element={<ModerationPage />} />
         <Route path="audit" element={<AuditPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

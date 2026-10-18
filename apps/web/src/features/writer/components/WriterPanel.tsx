@@ -200,7 +200,7 @@ export default function WriterPanel({
                   key={cmd}
                   type="button"
                   onClick={() => insertSnippet(cmd)}
-                  className="rounded bg-canvas px-1.5 py-0.5 font-mono text-[11px] text-ink-muted hover:bg-border/40"
+                  className="rounded bg-canvas px-1.5 py-0.5 font-mono text-2xs text-ink-muted hover:bg-border/40"
                 >
                   {cmd}
                 </button>
@@ -213,7 +213,7 @@ export default function WriterPanel({
               <h3 className="mb-2 text-xs font-medium text-amber-800">诊断</h3>
               <ul className="space-y-1.5">
                 {parsed.diagnostics.map((d, i) => (
-                  <li key={`${d.line}-${i}`} className="text-[11px] leading-snug text-amber-900">
+                  <li key={`${d.line}-${i}`} className="text-2xs leading-snug text-amber-900">
                     <span className="font-mono text-amber-700">L{d.line}</span> {d.message}
                   </li>
                 ))}

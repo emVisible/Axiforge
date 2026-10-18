@@ -28,6 +28,11 @@ from app.domains.runtime.schemas import (
 )
 
 
+# 哨兵：区分"属性不存在"与"属性值是假值"（0 / "" / False）。
+# 用 None 当哨兵是不行的——那正是这个 bug 的成因（见 `_match_character_state` 的注释）。
+_FIELD_MISSING = object()
+
+
 class PlayerService:
     """
     玩家运行时服务——叙事状态机
@@ -577,7 +582,17 @@ class PlayerService:
             if len(parts) == 2:
                 char_id_str, field = parts
                 if str(s.character_id) == char_id_str:
-                    field_value = getattr(s, field, None) or s.custom_state.get(field)
+                    # 回退到 custom_state 只在字段**真的缺席**时发生，**不是**在值为假值时。
+                    # 原写法是 `getattr(s, field, None) or s.custom_state.get(field)`
+                    # ——`or` 会把 0 / "" / False 这类假值短路成 None，于是
+                    # 「affection=0 且 custom_state 里没有这一项」读到的是 None 而不是 0。
+                    # 后果不是边缘情况：好感度的初值就是 0，于是
+                    # `affection >= 0` 这种**必然成立**的门在服务端恒为假、那条分支永远不开，
+                    # 而两端都报成功、零诊断（TS 侧用 `!(field in state)` 做存在性判断，不受此影响）。
+                    # 2026-10-01 复审按共享向量 `testdata/conditions/matcher.json` 两侧对齐。
+                    field_value = getattr(s, field, _FIELD_MISSING)
+                    if field_value is _FIELD_MISSING:
+                        field_value = (s.custom_state or {}).get(field)
                     return self._compare(field_value, operator, value)
         return operator == "ne"
 
@@ -607,6 +622,16 @@ class PlayerService:
         elif operator == "lt":
             try:
                 return float(actual) < float(expected)
+            except (TypeError, ValueError):
+                return False
+        elif operator == "gte":
+            try:
+                return float(actual) >= float(expected)
+            except (TypeError, ValueError):
+                return False
+        elif operator == "lte":
+            try:
+                return float(actual) <= float(expected)
             except (TypeError, ValueError):
                 return False
         elif operator == "contains":

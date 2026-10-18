@@ -1,5 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { isTauriEnvironment } from "@/shared/storage/tauriSqlBackend";
+import { loadStoryOffline } from "@/shared/storage/offlineStory";
 import { useParams, Link } from "react-router";
 import {
   Anchor,
@@ -25,7 +27,16 @@ import {
   type RuntimeState,
   type StoryView,
 } from "@axiforge/core";
-import { ginkgoApi } from "@/shared/api/ginkgo";
+import {
+  clearSave as clearSaveSlot,
+  getSave as readActiveSave,
+  listSaves as readSaveSlots,
+  readCodex,
+  syncCodex,
+  unlockAchievement,
+  writeSave as writeSaveSlot,
+  type SyncOutcome,
+} from "@/shared/storage/playerSaves";
 import { playerApi, type SaveSlotResponse, stateForSave } from "@/shared/api/player";
 import { getPlayerToken } from "@/shared/lib/playerToken";
 import { projectApi } from "@/shared/api/editor";
@@ -65,6 +76,7 @@ import GalleryPanel from "../components/GalleryPanel";
 import CodexPanel, { TermTipPopover } from "../components/CodexPanel";
 import RouteReplayPanel from "../components/RouteReplayPanel";
 import TimelinePanel from "../components/TimelinePanel";
+import PlayerStatePanel from "../components/PlayerStatePanel";
 import { playerTheme, playerScreenClass } from "@/shared/lib/playerTheme";
 import PlayerHudBrand from "@/shared/components/PlayerHudBrand";
 import UserAccountMenu from "@/shared/components/UserAccountMenu";
@@ -93,18 +105,6 @@ type Overlay =
   | "codex"
   | "route"
   | "timeline";
-
-function formatVal(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  if (typeof v === "object") {
-    try {
-      return JSON.stringify(v);
-    } catch {
-      return String(v);
-    }
-  }
-  return String(v);
-}
 
 /** 从视图构造存档摘要（列表页/续玩提示用） */
 function buildSummary(v: StoryView | null): string {
@@ -151,6 +151,18 @@ export default function PlayerPage() {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [galleryTab, setGalleryTab] = useState<"cg" | "music">("cg");
   const [saveSlots, setSaveSlots] = useState<SaveSlotResponse[]>([]);
+  /**
+   * 后台写入（自动存档 / 解锁 / 清档）的失败提示。
+   * 这些调用原先写作 `.catch(() => {})`——存不上与「本来就没什么可存」在界面上完全同形。
+   */
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const reportSyncFailure = useCallback((r: SyncOutcome) => {
+    if (r.ok) return;
+    setSyncNotice(
+      `本地进度未能保存（${r.via === "local" ? "桌面" : "服务端"}：${r.detail}）`,
+    );
+    window.setTimeout(() => setSyncNotice(null), 6000);
+  }, []);
   const [activeTerm, setActiveTerm] = useState<{
     term: string;
     definition: string;
@@ -294,10 +306,10 @@ export default function PlayerPage() {
     });
     const token = getPlayerToken();
     for (const a of list) {
-      ginkgoApi.unlock(pid, token, a.key).catch(() => {});
+      void unlockAchievement(pid, token, a.key).then(reportSyncFailure);
     }
     window.setTimeout(() => setAchievementToast(null), 4000);
-  }, []);
+  }, [reportSyncFailure]);
 
   // 应用一帧：折叠演出指令进舞台 + 触发音频
   const applyView = useCallback(
@@ -314,17 +326,24 @@ export default function PlayerPage() {
   );
 
   const codexSyncRef = useRef<string>("{}");
+  /** 非 null 就是一条要说出来的降级，不是错误弹窗——播错不如播得明白 */
+  const [codexNotice, setCodexNotice] = useState<string | null>(null);
 
   // ---------- 加载并启动 ----------
+  // 走分派口而不是直接 playerApi：桌面没有跨作品账本表，读不到是**设计如此**，
+  // 但这件事必须被说出来——原先的 .catch(() => ({})) 把「没读到」压成「没有记忆」。
   const fetchCodex = useCallback(
     async (scope?: string[]) => {
-      try {
-        const res = await playerApi.getCodex(playerToken, scope);
-        codexSyncRef.current = JSON.stringify(res.ledger ?? {});
-        return res.ledger ?? {};
-      } catch {
-        return {} as CodexLedger;
+      const r = await readCodex(playerToken, scope);
+      codexSyncRef.current = JSON.stringify(r.ledger);
+      if (r.via === "skipped-offline") {
+        setCodexNotice("桌面版尚未把跨作品记忆本地化，本次试玩不带上其它作品的记忆（开播时的记忆不受影响）。");
+      } else if (r.via === "failed") {
+        setCodexNotice(`跨作品记忆没读到（${r.detail ?? "未知原因"}），本次试玩不带上它。`);
+      } else {
+        setCodexNotice(null);
       }
+      return r.ledger;
     },
     [playerToken],
   );
@@ -343,29 +362,32 @@ export default function PlayerPage() {
     },
     [syncBgm, playOneShotsFromDirectives, trackUnlocks],
   );
-
   const load = useCallback(async () => {
     if (!projectId) return;
     try {
       setStatus("loading");
-      projectApi.recordView(projectId, playerToken).catch(() => {});
-      const story = await playerApi.getStory(projectId, getCreatorId());
+      if (!isTauriEnvironment()) projectApi.recordView(projectId, playerToken).catch(() => {});
+      // 桌面（Tauri）：Provider 数据本地编译，断网可玩；浏览器：后端编译
+      const story = isTauriEnvironment()
+        ? await loadStoryOffline(projectId)
+        : await playerApi.getStory(projectId, getCreatorId());
       setPkg(story);
       const codex = await fetchCodex(story.codexScope);
       // 有可续玩的存档 → 先给出选择，不自动开播
       try {
-        const save = await playerApi.getSave(projectId, playerToken);
+        const save = await readActiveSave(projectId, playerToken);
         if (save?.state?.status === "active" && save.state.currentBeatId) {
           setSaveOffer(save);
           setStatus("ready");
           return;
         }
       } catch {
-        // 无存档，忽略
+        // 读取存档失败不阻塞开播：没有可读的进度就当从头开始
       }
       beginStory(story, codex);
       setStatus("ready");
     } catch (err) {
+      console.error("AXIFORGE-PLAY-LOAD", err);
       const msg = err instanceof Error ? err.message : "";
       setLoadError(msg.includes("403") ? "private" : "generic");
       setStatus("error");
@@ -398,8 +420,8 @@ export default function PlayerPage() {
     setSaveOffer(null);
     const codex = await fetchCodex(pkg.codexScope);
     beginStory(pkg, codex);
-    if (projectId) playerApi.clearSave(projectId, playerToken).catch(() => {});
-  }, [pkg, beginStory, projectId, playerToken, fetchCodex]);
+    if (projectId) void clearSaveSlot(projectId, playerToken).then(reportSyncFailure);
+  }, [pkg, beginStory, projectId, playerToken, fetchCodex, reportSyncFailure]);
 
   // Codex 独立同步（跨作品记忆不落存档槽）
   useEffect(() => {
@@ -408,13 +430,10 @@ export default function PlayerPage() {
     if (json === codexSyncRef.current) return;
     const t = setTimeout(() => {
       codexSyncRef.current = json;
-      playerApi
-        .putCodex({
-          player_token: playerToken,
-          ledger: rtState.codex,
-          source_project_id: projectId,
-        })
-        .catch(() => {});
+      void syncCodex(projectId, playerToken, rtState.codex).then((r) => {
+        if (r.via === "skipped-offline") return;
+        reportSyncFailure(r);
+      });
     }, 800);
     return () => clearTimeout(t);
   }, [rtState?.codex, projectId, playerToken, saveOffer]);
@@ -428,23 +447,19 @@ export default function PlayerPage() {
       pkg.scenes.find((s) => s.id === beat?.sceneId)?.backgroundImage ||
       null;
     const t = setTimeout(() => {
-      if (rtState.status === "ended") {
-        playerApi.clearSave(projectId, playerToken, AUTO_SAVE_SLOT).catch(() => {});
-      } else {
-        playerApi
-          .putSave(projectId, {
-            player_token: playerToken,
+      const r = rtState.status === "ended"
+        ? clearSaveSlot(projectId, playerToken, AUTO_SAVE_SLOT)
+        : writeSaveSlot(projectId, playerToken, {
             state: stateForSave(rtState),
             summary: buildSummary(view),
-            beat_id: rtState.currentBeatId,
-            thumb_path: thumbPath,
+            beatId: rtState.currentBeatId,
+            thumbRef: thumbPath,
             slot: AUTO_SAVE_SLOT,
-          })
-          .catch(() => {});
-      }
+          });
+      void r.then(reportSyncFailure);
     }, 600);
     return () => clearTimeout(t);
-  }, [rtState, view, projectId, playerToken, saveOffer, stage.background, pkg]);
+  }, [rtState, view, projectId, playerToken, saveOffer, stage.background, pkg, reportSyncFailure]);
 
   // ---------- 推进 / 选择 ----------
   const doProceed = useCallback(() => {
@@ -566,7 +581,7 @@ export default function PlayerPage() {
   const refreshSaveSlots = useCallback(async () => {
     if (!projectId) return;
     try {
-      const list = await playerApi.listSaves(projectId, playerToken);
+      const list = await readSaveSlots(projectId, playerToken);
       setSaveSlots(list);
     } catch {
       setSaveSlots([]);
@@ -590,17 +605,17 @@ export default function PlayerPage() {
         stage.background ||
         pkg.scenes.find((s) => s.id === beat?.sceneId)?.backgroundImage ||
         null;
-      await playerApi.putSave(projectId, {
-        player_token: playerToken,
+      const written = await writeSaveSlot(projectId, playerToken, {
         state: stateForSave(rtState),
         summary: buildSummary(view),
-        beat_id: rtState.currentBeatId,
-        thumb_path: thumb,
+        beatId: rtState.currentBeatId,
+        thumbRef: thumb,
         slot,
       });
-      setOverlay(null);
+      reportSyncFailure(written);
+      if (written.ok) setOverlay(null);
     },
-    [projectId, rtState, pkg, stage.background, playerToken, view],
+    [projectId, rtState, pkg, stage.background, playerToken, view, reportSyncFailure],
   );
 
   const manualLoad = useCallback(
@@ -628,10 +643,11 @@ export default function PlayerPage() {
   const deleteSaveSlot = useCallback(
     async (slot: number) => {
       if (!projectId) return;
-      await playerApi.clearSave(projectId, playerToken, slot);
+      const cleared = await clearSaveSlot(projectId, playerToken, slot);
+      reportSyncFailure(cleared);
       await refreshSaveSlots();
     },
-    [projectId, playerToken, refreshSaveSlots],
+    [projectId, playerToken, refreshSaveSlots, reportSyncFailure],
   );
 
   const replayVoice = useCallback(
@@ -741,6 +757,10 @@ export default function PlayerPage() {
   const flagEntries = Object.entries(rtState?.vars.flags ?? {});
   const charEntries = Object.entries(rtState?.vars.characters ?? {});
   const stateCount = memEntries.length + flagEntries.length;
+  const charNames = useMemo(
+    () => Object.fromEntries(Object.entries(charById).map(([id, c]) => [id, c.name])),
+    [charById],
+  );
 
   const line = view?.waiting === "say" ? view.line : undefined;
   const isNarration = !!line && !line.speaker;
@@ -850,7 +870,7 @@ export default function PlayerPage() {
             <ScrollText className="h-7 w-7" strokeWidth={1.5} />
           </div>
           <h1 className="text-white/60 text-xl font-light">暂无内容</h1>
-          <p className="text-white/20 text-sm">该剧本还没有可播放的演出</p>
+          <p className="text-white/65 text-sm">该剧本还没有可播放的演出</p>
           <Link
             to={routes.project(projectId!)}
             className="inline-block rounded-xl bg-white/10 px-6 py-2.5 text-sm text-white/60 hover:bg-white/20"
@@ -877,7 +897,7 @@ export default function PlayerPage() {
               <p className="text-sm tracking-wider text-white/50">{endingLabel}</p>
             )}
           </div>
-          <p className="text-white/30 text-sm">故事已结束</p>
+          <p className="text-white/65 text-sm">故事已结束</p>
           <div className="flex flex-wrap gap-3 justify-center pt-4">
             <button
               onClick={restartFresh}
@@ -960,12 +980,12 @@ export default function PlayerPage() {
             return (
               <div
                 key={id}
-                className={`absolute bottom-[150px] transition-all duration-300 ${POSITION_CLASS[position] || POSITION_CLASS.center}`}
+                className={`absolute bottom-[150px] transition-[left,opacity,transform] duration-300 ${POSITION_CLASS[position] || POSITION_CLASS.center}`}
               >
                 <img
                   src={src}
                   alt={charById[id]?.name || ""}
-                  className={`max-h-[62vh] w-auto object-contain drop-shadow-2xl transition-all duration-300 ${active ? "opacity-100" : "opacity-55 saturate-[0.7]"}`}
+                  className={`max-h-[62vh] w-auto object-contain drop-shadow-2xl transition-[opacity,filter] duration-300 ${active ? "opacity-100" : "opacity-55 saturate-[0.7]"}`}
                 />
               </div>
             );
@@ -1091,77 +1111,14 @@ export default function PlayerPage() {
 
       {/* 状态面板 */}
       {showStatePanel && (
-        <div
-          className="absolute inset-0 z-50 flex animate-fade-in flex-col bg-black/95 backdrop-blur-sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between border-b border-white/5 p-6">
-            <h2 className="flex items-center gap-2 text-sm tracking-wider text-white/50">
-              <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-              会话状态
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowStatePanel(false)}
-              className="text-sm text-white/20 hover:text-white/50"
-            >
-              关闭
-            </button>
-          </div>
-          <div className="flex-1 space-y-8 overflow-y-auto p-8">
-            <section>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">
-                记忆 ({memEntries.length})
-              </h3>
-              {memEntries.length === 0 ? (
-                <p className="text-sm text-white/15">暂无记忆</p>
-              ) : (
-                <div className="space-y-2">
-                  {memEntries.map(([k, v]) => (
-                    <div key={k} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                      <span className="text-xs text-white/40">{k}</span>
-                      <p className="text-sm text-white/60">{formatVal(v)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">
-                标志 ({flagEntries.length})
-              </h3>
-              {flagEntries.length === 0 ? (
-                <p className="text-sm text-white/15">暂无标志</p>
-              ) : (
-                <div className="space-y-2">
-                  {flagEntries.map(([k, v]) => (
-                    <div key={k} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                      <span className="text-xs text-white/40">{k}</span>
-                      <p className="text-sm text-white/60">{formatVal(v)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section>
-              <h3 className="mb-3 text-xs font-medium uppercase tracking-wider text-white/30">
-                角色状态 ({charEntries.length})
-              </h3>
-              {charEntries.length === 0 ? (
-                <p className="text-sm text-white/15">暂无角色状态</p>
-              ) : (
-                <div className="space-y-2">
-                  {charEntries.map(([id, fields]) => (
-                    <div key={id} className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-                      <p className="text-sm text-white/70">{charById[id]?.name || id}</p>
-                      <p className="text-xs text-white/35">{formatVal(fields)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
+        <PlayerStatePanel
+          memory={memEntries}
+          flags={flagEntries}
+          characters={charEntries}
+          charNames={charNames}
+          notice={codexNotice}
+          onClose={() => setShowStatePanel(false)}
+        />
       )}
 
       {/* 回顾 */}
@@ -1296,7 +1253,7 @@ export default function PlayerPage() {
           <div className="bg-black/70 backdrop-blur-xl border border-white/5 rounded-2xl p-6">
             <div className="flex items-center gap-2 mb-3">
               {speakerExpression && (
-                <span className="rounded-md bg-white/5 px-2 py-0.5 text-[10px] text-white/40 tracking-wide">
+                <span className="rounded-md bg-white/5 px-2 py-0.5 text-3xs text-white/40 tracking-wide">
                   {expressionLabel(speakerExpression)}
                 </span>
               )}
@@ -1314,7 +1271,7 @@ export default function PlayerPage() {
             </p>
             {textComplete && (
               <div className="mt-4 text-right">
-                <span className="text-white/10 text-xs animate-pulse">空格继续</span>
+                <span className="text-white/70 text-xs animate-pulse">空格继续</span>
               </div>
             )}
           </div>
@@ -1336,7 +1293,7 @@ export default function PlayerPage() {
                   key={choice.index}
                   onClick={() => doChoose(choice.index)}
                   disabled={choice.disabled}
-                  className={`w-full text-left px-5 py-3.5 rounded-xl border transition-all duration-300 ${choice.disabled ? "bg-white/[0.02] border-white/5 text-white/10 cursor-not-allowed" : "bg-white/[0.03] border-white/5 text-white/60 hover:bg-white/[0.06] hover:border-white/10 hover:text-white/80"}`}
+                  className={`w-full text-left px-5 py-3.5 rounded-xl border transition-colors duration-300 ${choice.disabled ? "bg-white/[0.02] border-white/5 text-white/10 cursor-not-allowed" : "bg-white/[0.03] border-white/5 text-white/60 hover:bg-white/[0.06] hover:border-white/10 hover:text-white/80"}`}
                 >
                   <span className="text-white/15 text-xs font-mono mr-3">
                     {choice.index + 1}.
@@ -1358,6 +1315,14 @@ export default function PlayerPage() {
               <p className="text-xs text-white/70">{achievementToast.title}</p>
             </div>
           </div>
+        </div>
+      )}
+      {syncNotice && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 animate-fade-in rounded-xl border border-red-400/40 bg-black/85 px-4 py-2 text-xs text-red-200 shadow-lg backdrop-blur-md"
+        >
+          {syncNotice}
         </div>
       )}
     </div>

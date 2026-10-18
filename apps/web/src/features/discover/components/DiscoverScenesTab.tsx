@@ -9,6 +9,7 @@ import {
   Button,
   CardGrid,
   EmptyState,
+  ErrorDisplay,
   EntityCard,
   EntityIcon,
   LoadingSpinner,
@@ -28,6 +29,11 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
   const [items, setItems] = useState<AssetSceneResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  /** 请求失败必须与「库里确实没有内容」区分开：原先只有 try/finally 无 catch，
+   *  失败时 items 停在 []，页面照样渲染空态——公开发现页上的真实缺陷 */
+  const [error, setError] = useState<unknown>(null);
+  /** 重试要真的重新发请求：把 tick 放进 effect 依赖，否则按钮是死的 */
+  const [reloadTick, setReloadTick] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
@@ -52,8 +58,11 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
           search: debouncedSearch || undefined,
         });
         if (cancelled) return;
+        setError(null);
         setTotal(data.total);
         setItems((prev) => (page === 0 ? data.items : [...prev, ...data.items]));
+      } catch (e) {
+        if (!cancelled) setError(e);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -65,7 +74,7 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, reloadTick]);
 
   const hasMore = items.length < total;
 
@@ -77,7 +86,11 @@ export default function DiscoverScenesTab({ search }: DiscoverScenesTabProps) {
         </div>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && !!error && (
+        <ErrorDisplay message="场景清单加载失败" onRetry={() => setReloadTick((t) => t + 1)} />
+      )}
+
+      {!loading && !error && items.length === 0 && (
         <EmptyState
           framed
           title={debouncedSearch ? "没有匹配的场景" : "还没有公开场景"}

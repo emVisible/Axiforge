@@ -1,4 +1,6 @@
 @import "tailwindcss";
+
+@source "../../../packages/ui/src";
 @import "@axiforge/ui/styles/tokens.css";
 
 @layer base {

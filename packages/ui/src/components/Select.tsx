@@ -1,4 +1,4 @@
-import { type SelectHTMLAttributes, forwardRef } from "react";
+import { type SelectHTMLAttributes, forwardRef, useId } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { cn, inputBase, inputError, labelBase, fieldError } from "./formStyles";
@@ -11,11 +11,13 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, hint, className = "", children, ...props }, ref) => {
+    const autoId = useId(); // 调用方没给 id 时，label 与控件靠它连起来
     return (
       <div>
-        {label && <label className={labelBase}>{label}</label>}
+        {label && <label className={labelBase} htmlFor={autoId}>{label}</label>}
         <div className="relative">
           <select
+            id={autoId}
             ref={ref}
             className={cn(
               inputBase,

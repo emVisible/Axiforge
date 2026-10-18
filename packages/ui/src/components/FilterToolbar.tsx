@@ -27,7 +27,6 @@ export default function FilterToolbar({
   className = "",
   variant = "light",
 }: FilterToolbarProps) {
-  const isDark = variant === "dark";
 
   return (
     <div className={cn("mb-6 space-y-4", className)}>
@@ -52,8 +51,8 @@ export default function FilterToolbar({
       {expanded && (
         <div
           className={cn(
-            "border-t pt-4",
-            isDark ? "border-white/10" : "border-border",
+            /* 原按 isDark 手写过一层半透明白边框；语义边框本身已随主题取值 */
+            "border-t border-border-strong pt-4",
           )}
         >
           {expanded}

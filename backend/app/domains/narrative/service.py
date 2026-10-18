@@ -2,7 +2,8 @@
 
 import copy
 from datetime import datetime
-from typing import Optional, List
+from typing import Dict, List, Optional, Tuple
+import uuid
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, or_, select, delete
@@ -12,6 +13,7 @@ from app.core.content_validate import validate_publish_text
 from app.core.pagination import Page
 from app.core.strike_policy import publish_block_reasons
 from app.core.story_cache import story_cache
+from app.domains.moderation.background import schedule_review
 
 from app.domains.narrative.models import (
     Project,
@@ -685,9 +687,22 @@ class ProjectService:
             if node.id not in incoming_ids:
                 await self.db.delete(node)
 
+        # 跨工程 id 碰撞防御（.axsp 导入场景）：payload id 若已被「其他工程」的
+        # 节点占用（PK 全表唯一），为本工程重映射新 id，边引用随动。
+        id_map: Dict[UUID, UUID] = {}
         for n_sync in data.nodes:
             if n_sync.id:
                 existing = await self.db.get(ProjectNode, n_sync.id)
+                if existing and existing.project_id != project_id:
+                    id_map[n_sync.id] = UUID(str(uuid.uuid4()))
+
+        def mapped(nid: Optional[UUID]) -> Optional[UUID]:
+            return id_map.get(nid, nid) if nid else nid
+
+        for n_sync in data.nodes:
+            final_id = mapped(n_sync.id) if n_sync.id else None
+            if final_id:
+                existing = await self.db.get(ProjectNode, final_id)
                 if existing and existing.project_id == project_id:
                     existing.stage_id = n_sync.stage_id
                     existing.editor_data = n_sync.editor_data
@@ -696,7 +711,7 @@ class ProjectService:
                     continue
             self.db.add(
                 ProjectNode(
-                    id=n_sync.id,
+                    id=final_id,
                     project_id=project_id,
                     stage_id=n_sync.stage_id,
                     editor_data=n_sync.editor_data,
@@ -712,8 +727,8 @@ class ProjectService:
             self.db.add(
                 ProjectEdge(
                     project_id=project_id,
-                    source_node_id=edge.source_node_id,
-                    target_node_id=edge.target_node_id,
+                    source_node_id=mapped(edge.source_node_id) or edge.source_node_id,
+                    target_node_id=mapped(edge.target_node_id) or edge.target_node_id,
                     source_port=edge.source_port,
                     label=edge.label,
                     condition=edge.condition,
@@ -724,6 +739,10 @@ class ProjectService:
         if proj:
             proj.axs_source = data.axs_source
         await self.db.commit()
+        # 作品是平台的核心对象，判断层不接到这里就只是"审评论和角色"（ADR-028）。
+        # 派到后台，且派发点在 commit **之后**：后台用的是另一个 session，
+        # 看不见未提交的内容；早一步就会去判一篇还不存在的稿子。
+        schedule_review("project", project_id)
         story_cache.invalidate(str(project_id))
         loaded = await self._load_project(project_id)
         return await self._to_response(loaded) if loaded else None
@@ -768,20 +787,28 @@ class ProjectService:
 
     async def add_asset_ref(
         self, project_id: UUID, data: ProjectAssetRefCreate
-    ) -> ProjectAssetRefResponse:
+    ) -> Optional[ProjectAssetRefResponse]:
+        # 工程不存在时先返回 None，而不是把 FK 约束顶成 500：
+        # 本地 SQLite 支的 addAssetRef 就是 not_found，两端得报同一个错。
+        if await self.db.get(Project, project_id) is None:
+            return None
         ref = ProjectAssetRef(project_id=project_id, **data.model_dump())
         self.db.add(ref)
         await self.db.commit()
         await self.db.refresh(ref)
         return ProjectAssetRefResponse.model_validate(ref)
 
-    async def remove_asset_ref(self, ref_id: UUID) -> bool:
-        ref = await self.db.get(ProjectAssetRef, ref_id)
-        if not ref:
-            return False
-        await self.db.delete(ref)
+    async def remove_asset_ref(self, project_id: UUID, ref_id: UUID) -> bool:
+        # 按 (工程, 引用) 删：只认 ref_id 的话，任何拿得到别人引用 id 的请求
+        # 都能借自己工程的路径删掉那一行——本地契约明确要求跨工程删不动。
+        result = await self.db.execute(
+            delete(ProjectAssetRef).where(
+                ProjectAssetRef.id == ref_id,
+                ProjectAssetRef.project_id == project_id,
+            )
+        )
         await self.db.commit()
-        return True
+        return result.rowcount > 0
 
     # ================================================================
     # Edge CRUD

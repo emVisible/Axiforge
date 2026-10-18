@@ -39,7 +39,7 @@ export default function BacklogPanel({
               {entry.speaker && (
                 <p className="mb-0.5 text-xs text-white/40">{entry.speaker}</p>
               )}
-              <p className="text-sm leading-relaxed text-white/30">{entry.text}</p>
+              <p className="text-sm leading-relaxed text-white/70">{entry.text}</p>
             </div>
             {entry.voice && onReplayVoice && (
               <button
@@ -54,7 +54,7 @@ export default function BacklogPanel({
           </div>
         ))}
         {entries.length === 0 && (
-          <p className="py-20 text-center text-sm text-white/10">暂无对话记录</p>
+          <p className="py-20 text-center text-sm text-white/65">暂无对话记录</p>
         )}
       </div>
     </div>

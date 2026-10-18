@@ -55,7 +55,7 @@ export default function SaveSlotPanel({
           return (
             <div
               key={slot}
-              className={`relative overflow-hidden rounded-xl border transition-all ${
+              className={`relative overflow-hidden rounded-xl border transition-colors ${
                 currentSlot === slot
                   ? "border-white/20 bg-white/[0.06]"
                   : "border-white/5 bg-white/[0.02]"
@@ -75,11 +75,11 @@ export default function SaveSlotPanel({
                       className="h-full w-full object-cover opacity-70"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-white/10">
+                    <div className="flex h-full items-center justify-center text-xs text-white/65">
                       {save ? "无预览" : "空"}
                     </div>
                   )}
-                  <span className="absolute left-2 top-2 rounded bg-black/50 px-2 py-0.5 text-[10px] text-white/50">
+                  <span className="absolute left-2 top-2 rounded bg-black/50 px-2 py-0.5 text-3xs text-white/50">
                     {slotLabel(slot)}
                   </span>
                 </div>
@@ -92,7 +92,7 @@ export default function SaveSlotPanel({
                     </p>
                   )}
                   {save?.updated_at && (
-                    <p className="text-[10px] text-white/15">
+                    <p className="text-3xs text-white/15">
                       {new Date(save.updated_at).toLocaleString()}
                     </p>
                   )}

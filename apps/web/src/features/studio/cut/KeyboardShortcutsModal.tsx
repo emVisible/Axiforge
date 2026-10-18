@@ -12,6 +12,11 @@ const CUT_STUDIO_SHORTCUTS: ShortcutRow[] = [
   { keys: ["F"], label: "专注模式（隐藏侧栏与壳层）" },
   { keys: ["⌘", "."], label: "专注模式（备用）" },
   { keys: ["?"], label: "显示 / 关闭快捷键帮助" },
+  { keys: ["←"], label: "上一条指令" },
+  { keys: ["→"], label: "下一条指令" },
+  { keys: ["Alt", "↑"], label: "指令上移一位" },
+  { keys: ["Alt", "↓"], label: "指令下移一位" },
+  { keys: ["⌘", "D"], label: "复制选中指令" },
 ];
 
 interface KeyboardShortcutsModalProps {
@@ -22,7 +27,7 @@ interface KeyboardShortcutsModalProps {
 
 function KeyCap({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex min-w-[1.5rem] items-center justify-center rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink-muted">
+    <kbd className="inline-flex min-w-[1.5rem] items-center justify-center rounded border border-border bg-panel px-1.5 py-0.5 font-mono text-3xs font-medium text-ink-muted">
       {children}
     </kbd>
   );

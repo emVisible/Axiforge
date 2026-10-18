@@ -1,0 +1,295 @@
+{
+  "id": "f25e48cc-24a1-4339-90f5-e29a836c455e",
+  "title": "【示范】再会·记忆",
+  "isPublic": true,
+  "worldSetting": "一年后的交汇港咖啡馆",
+  "playMeta": {},
+  "nodes": [
+    {
+      "id": "d8290f53-3c62-4fb9-80be-523f9de6b031",
+      "stageId": "06c61923-ca24-4db9-8e9b-5d25fe97e633",
+      "editorData": {
+        "position": {
+          "x": 120,
+          "y": 280
+        }
+      },
+      "narrativeData": {
+        "title": "她记得你",
+        "script": [
+          {
+            "op": "show",
+            "position": "center",
+            "expression": "smile",
+            "characterId": "f12c6270-33c1-4cbf-9601-c841c5e55337"
+          },
+          {
+            "op": "say",
+            "text": "……你来了。我就知道你还会来。",
+            "speaker": "堰纱"
+          }
+        ],
+        "is_ending": true,
+        "ending_label": "再会·信任",
+        "trigger_condition": {
+          "type": "all",
+          "conditions": [
+            {
+              "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.trust",
+              "type": "codex",
+              "value": "high",
+              "operator": "eq"
+            }
+          ]
+        }
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "1939e684-6c9f-408c-bb55-76f94f14a5e3",
+      "stageId": "06c61923-ca24-4db9-8e9b-5d25fe97e633",
+      "editorData": {
+        "position": {
+          "x": 480,
+          "y": 280
+        }
+      },
+      "narrativeData": {
+        "title": "陌生重逢",
+        "script": [
+          {
+            "op": "say",
+            "text": "……我们，见过吗？",
+            "speaker": "堰纱"
+          }
+        ],
+        "is_ending": true,
+        "ending_label": "再会·陌生",
+        "trigger_condition": {
+          "type": "any",
+          "conditions": [
+            {
+              "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.met_player",
+              "type": "codex",
+              "value": true,
+              "operator": "ne"
+            },
+            {
+              "key": "f12c6270-33c1-4cbf-9601-c841c5e55337.trust",
+              "type": "codex",
+              "value": "low",
+              "operator": "eq"
+            }
+          ]
+        }
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "a96f226d-3c3d-4b8c-b46d-200a7ccb71f2",
+      "stageId": "06c61923-ca24-4db9-8e9b-5d25fe97e633",
+      "editorData": {
+        "position": {
+          "x": 100,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "开始",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事从这里开始...",
+        "description": "剧本起始节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "d36f6908-9691-4158-b66e-c45a95446460",
+      "stageId": "36641b37-cff1-4a33-b05a-7f81d8854a19",
+      "editorData": {
+        "position": {
+          "x": 100,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "开始",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事从这里开始...",
+        "description": "剧本起始节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "8f003e8c-b40b-4922-8eaf-7408cda85ff6",
+      "stageId": "06c61923-ca24-4db9-8e9b-5d25fe97e633",
+      "editorData": {
+        "position": {
+          "x": 300,
+          "y": 80
+        }
+      },
+      "narrativeData": {
+        "title": "推门",
+        "script": [
+          {
+            "op": "bg",
+            "image": "cafe_day"
+          },
+          {
+            "op": "narration",
+            "text": "推开咖啡馆的门，风铃轻响。"
+          }
+        ]
+      },
+      "sortOrder": 0
+    },
+    {
+      "id": "62c2de3c-e208-40eb-a577-187c30c3c266",
+      "stageId": "06c61923-ca24-4db9-8e9b-5d25fe97e633",
+      "editorData": {
+        "position": {
+          "x": 800,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "结束",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事暂告一段落...",
+        "description": "剧本结束节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 1
+    },
+    {
+      "id": "e069f02f-a497-4a28-961c-c46367563e63",
+      "stageId": "36641b37-cff1-4a33-b05a-7f81d8854a19",
+      "editorData": {
+        "position": {
+          "x": 800,
+          "y": 100
+        }
+      },
+      "narrativeData": {
+        "title": "结束",
+        "choices": [],
+        "effects": [],
+        "speaker": null,
+        "dialogue": null,
+        "is_anchor": true,
+        "narration": "故事暂告一段落...",
+        "description": "剧本结束节点",
+        "trigger_condition": null
+      },
+      "sortOrder": 1
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeId": "a96f226d-3c3d-4b8c-b46d-200a7ccb71f2",
+      "targetNodeId": "8f003e8c-b40b-4922-8eaf-7408cda85ff6",
+      "label": "",
+      "condition": null
+    },
+    {
+      "sourceNodeId": "8f003e8c-b40b-4922-8eaf-7408cda85ff6",
+      "targetNodeId": "d8290f53-3c62-4fb9-80be-523f9de6b031",
+      "label": "",
+      "condition": null
+    },
+    {
+      "sourceNodeId": "8f003e8c-b40b-4922-8eaf-7408cda85ff6",
+      "targetNodeId": "1939e684-6c9f-408c-bb55-76f94f14a5e3",
+      "label": "",
+      "condition": null
+    }
+  ],
+  "scenes": [
+    {
+      "id": "36641b37-cff1-4a33-b05a-7f81d8854a19",
+      "title": "主场景",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": null,
+      "nodes": []
+    },
+    {
+      "id": "06c61923-ca24-4db9-8e9b-5d25fe97e633",
+      "title": "咖啡馆",
+      "location": null,
+      "atmosphere": null,
+      "sceneRefId": null,
+      "nodes": []
+    }
+  ],
+  "roles": [
+    {
+      "characterRefId": "f12c6270-33c1-4cbf-9601-c841c5e55337"
+    }
+  ],
+  "characters": [
+    {
+      "id": "f12c6270-33c1-4cbf-9601-c841c5e55337",
+      "name": "堰纱",
+      "characterData": {
+        "bond": {
+          "group_role": null,
+          "hostile_pattern": null,
+          "intimate_pattern": null,
+          "attitude_to_others": "谨慎地敞开心扉"
+        },
+        "trace": {
+          "background": "曾在「缘起」中与玩家相遇",
+          "key_events": [],
+          "turning_point": null
+        },
+        "anchor": {
+          "name": "堰纱",
+          "tags": [
+            "RN",
+            "示范角色"
+          ],
+          "theme": null,
+          "essence": "背负过往、却仍在寻找答案的少女",
+          "summary": "跨作品记忆演示用角色",
+          "core_belief": null
+        },
+        "psyche": {
+          "fear": "再次被遗忘",
+          "desire": "被理解",
+          "conflict": null,
+          "self_perception": null
+        },
+        "contour": {
+          "age_era": null,
+          "identity": "神秘来客",
+          "appearance": null,
+          "first_impression": "安静，目光像在打量很久以前的故人"
+        },
+        "sprites": null,
+        "demeanor": {
+          "habits": null,
+          "speech_style": "克制、偶尔露出柔软",
+          "expressiveness": null,
+          "typical_reaction": null
+        }
+      },
+      "imagePath": null
+    }
+  ],
+  "items": []
+}

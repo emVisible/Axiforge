@@ -35,6 +35,7 @@ interface FlowCanvasProps {
   highlightedStageId?: string | null;
   fitViewTrigger?: number;
   onNodesChange: ReturnType<typeof import("reactflow").useNodesState>[2];
+  onNodeDragStop?: import("reactflow").NodeMouseHandler;
   onEdgesChange: ReturnType<typeof import("reactflow").useEdgesState>[2];
   onConnect: (params: Connection) => void;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
@@ -109,6 +110,7 @@ function FlowCanvasInner({
   highlightedStageId,
   fitViewTrigger = 0,
   onNodesChange,
+  onNodeDragStop,
   onEdgesChange,
   onConnect,
   onNodeClick,
@@ -138,6 +140,7 @@ function FlowCanvasInner({
           },
         }))}
         onNodesChange={onNodesChange}
+        onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}

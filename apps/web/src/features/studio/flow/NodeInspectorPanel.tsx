@@ -126,7 +126,7 @@ export default function NodeInspectorPanel({
                   type="button"
                   onClick={() => onActivePanelChange(tab.key)}
                   className={cn(
-                    "inline-flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium transition-all",
+                    "inline-flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors",
                     activePanel === tab.key
                       ? isNle
                         ? "border-b-2 border-accent-soft bg-panel-raised text-ink"
@@ -269,7 +269,7 @@ export default function NodeInspectorPanel({
                   onClick={onPreviewScript}
                   disabled={script.length === 0}
                   className={cn(
-                    "flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all",
+                    "flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-colors",
                     script.length === 0
                       ? "cursor-not-allowed bg-canvas text-ink-muted/50"
                       : "bg-brand/10 text-brand hover:bg-brand/20",
@@ -332,8 +332,8 @@ export default function NodeInspectorPanel({
             <h3 className="text-sm font-semibold text-ink">连线属性</h3>
           </div>
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
-            <div>
-              <label className={cn(labelSm, "mb-2 block")}>分支标签</label>
+            <div role="group" aria-labelledby="edge-branch-label-group">
+              <label id="edge-branch-label-group" className={cn(labelSm, "mb-2 block")}>分支标签</label>
               <div className="mb-3 flex flex-wrap gap-1.5">
                 {EDGE_LABELS.map((l) => (
                   <button
@@ -341,7 +341,7 @@ export default function NodeInspectorPanel({
                     type="button"
                     onClick={() => onEdgeLabelChange(selectedEdge.id, l)}
                     className={cn(
-                      "rounded-lg border px-2.5 py-1.5 text-[11px] transition-all",
+                      "rounded-lg border px-2.5 py-1.5 text-2xs transition-colors",
                       selectedEdge.label === l
                         ? "border-brand bg-brand text-white shadow-sm"
                         : "border-border text-ink-muted hover:border-ink-muted/30 hover:bg-canvas",
@@ -392,7 +392,7 @@ export default function NodeInspectorPanel({
               </p>
             </div>
             {!isNle && (
-            <div className="space-y-2 rounded-xl bg-canvas p-4 text-left text-[11px] text-ink-muted">
+            <div className="space-y-2 rounded-xl bg-canvas p-4 text-left text-2xs text-ink-muted">
               <p>
                 <strong>对话节点</strong> — 角色台词，连线分支
               </p>

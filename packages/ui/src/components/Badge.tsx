@@ -49,7 +49,7 @@ export default function Badge({
   onRemove,
 }: BadgeProps) {
   const resolvedTone = useResolvedSurfaceTheme(tone);
-  const sizeClass = size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs";
+  const sizeClass = size === "sm" ? "px-2 py-0.5 text-3xs" : "px-2.5 py-1 text-xs";
   const palette =
     resolvedTone === "dark" ? darkVariantClasses : lightVariantClasses;
 

@@ -3894,6 +3894,15 @@ main tip 停在 `777591f "feat: v0.4"`（**2026-07-09**，落后约三个月）�
 528 文件、+67711 / −3613。desktop 会顺带删掉 main 上的 2 个文件（`ProjectFlowPage.tsx`、
 `docs/ADMIN_VNEXT.md`）：都是重构有意删的，desktop 上只剩文档/历史提及、**无悬空 import**。
 
+> **更正一条我自己判错的事**（同一轮里先写进文档、后查清）：我曾把 `docs/archive/AXIFORGE_V2.md`
+> 里那条指向 `ADMIN_VEXT.md` 的相对链接记成「指向已删文件的死链」。**不成立**——
+> 那个链接相对 `docs/archive/` 解析，指向**归档副本** `docs/archive/ADMIN_VEXT.md`，文件在树里。
+> 我是拿 `git diff` 的删除清单直接套到相对链接上得出的结论，而相对链接的基点是**所在目录**。
+> 全仓实测：跟踪文档的 Markdown 链接**没有一条是死的**（唯一两个初判"死"的
+> `docs/user/README.md` 那两条是无扩展名的站点干净 URL，落点是 `desktop/desktop-and-axsp.md`
+> 与 `writing/axs-syntax.md`，都在）。
+> **教训**：从"某文件被删了"推出"指向它的链接死了"，中间隔着一步——链接基点是不是仓库根。
+
 ### 但"完全优于"不成立：合并进去的那棵树，CI 本来会红
 
 `package.json`（已跟踪）引用三个**不在树里**的脚本：`check:apibase` / `check:tracked` / `cloud:callmap`

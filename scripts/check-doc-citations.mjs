@@ -45,7 +45,7 @@
  * 指纹不是位置（句子搬家仍是同一句），所以两条要求同时满足：既不被插入顶红，也不被复述绕白。
  */
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
 
 const root = process.cwd();
@@ -208,6 +208,62 @@ function resolveRef(rawPath, docRel) {
 
 const violations = [];
 
+/*
+ * 第六档：**Markdown 链接**（2026-10-18 新增）。
+ *
+ * 为什么补：这一整个脚本只看**反引号里的 `路径:行号`**，链接目标一个都不看。
+ * 于是"文档里点不开的链接"整类不受任何门禁管——而那和悬空 `路径:行号`
+ * 是同一族欺骗：**读者点一下才知道那是坏的**。
+ *
+ * 两个口径，都是实测撞出来的：
+ * ① **链接的基点是所在目录，不是仓库根**。`docs/archive/X.md` 里的 `./Y.md` 解到
+ *    `docs/archive/Y.md`。第一次量的时候我把"某文件被删了"直接当成"指向它的链接死了"，
+ *    于是判错了一条——`docs/archive/ADMIN_VEXT.md` 明明在树里。
+ * ② **落点可以不带扩展名**（文档站用干净 URL）：`desktop/desktop-and-axsp`
+ *    的落点是 `desktop/desktop-and-axsp.md`。只按原样判，会把 2 条好链接报成死链。
+ *
+ * 还有一处必须剥：**行内代码 / 代码围栏里的链接语法不是链接**。
+ * 引述示例（例如"这条 ``[x](./y)`` 长这样"）若按原样判，就是假阳性——
+ * 而本脚本历史上最大的那类假阳性正是"按字面匹配、把示例当事实"。
+ */
+function mdLinkTarget(line) {
+  // 先剥行内代码（`…`），再剥围栏内的行
+  return line.replace(/`[^`]*`/g, "");
+}
+function mdLinkExists(fromDoc, target) {
+  const abs = resolve(dirname(fromDoc), target);
+  // 存在即算活：文件算，**目录也算**。
+  // 中途试过"目录必须再有 README.md"，那是自己加的规矩，当场造出 3 条假阳性
+  // （`./design/`、`./archive/`、`../../apps/admin/src` 都是真实存在的目录）——
+  // 这一档该问的是"落点还在不在"，不是"落点是不是文件"。
+  if (existsSync(abs)) return true;
+  // 文档站的干净 URL：落点省略 `.md`（`desktop/desktop-and-axsp` → `…-axsp.md`）。
+  return existsSync(abs + ".md");
+}
+let mdLinkCount = 0;
+const mdDead = [];
+let inFence = false;
+for (const file of files) {
+  for (const [i, rawLine] of readFileSync(file, "utf8").split("\n").entries()) {
+    if (/^\s*```/.test(rawLine)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    for (const m of mdLinkTarget(rawLine).matchAll(/\]\(([^)\s]+)\)/g)) {
+      const t = m[1];
+      if (/^(?:https?:|mailto:|tel:|data:|#)/.test(t)) continue;
+      const clean = t.split("#")[0];
+      if (!clean) continue;
+      mdLinkCount += 1;
+      if (!mdLinkExists(file, clean)) {
+        mdDead.push(`${relative(root, file).split("\\").join("/")}:${i + 1} → ${t}`);
+      }
+    }
+  }
+}
+
+
 /**
  * 身份键要同时满足两条（2026-10-01 连着各踩一次）：
  * ① **不含文档行号**——否则在它上方插入文字就把在册项变成"新增"，写一次文档假红一次，
@@ -312,6 +368,12 @@ if (process.argv.includes("--update")) {
 console.log(
   `[doc-citations] 仓外未纳管 ${tally.external} 次（清单 ${externalPairs.size} 对，被行使 ${matchedExternal.size} 对）`,
 );
+console.log(
+  `[doc-citations] Markdown 链接 ${mdLinkCount} 条，死链 ${mdDead.length} 条` +
+    "（口径：基点是所在目录；落点可省略 .md；行内代码与围栏内的链接语法不算链接）",
+);
+for (const d of mdDead) console.log(`  死链：${d}`);
+if (mdDead.length > 0) process.exitCode = 1;
 const staleExt = [...externalPairs].filter((k) => !matchedExternal.has(k));
 if (extControlFails.length) {
   console.log(

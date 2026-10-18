@@ -187,6 +187,51 @@ const ALIASES = aliasMap();
 const trackedSrc = execFileSync("git", ["ls-files", "--", "*.ts", "*.tsx"], { cwd: ROOT, encoding: "utf8" })
   .split("\n")
   .filter(Boolean);
+/**
+ * 把一条 import 说明符解成"仓库里真实存在的那个文件"。
+ *
+ * 抽成独立函数是为了让下面那组对照组**不依赖任何文件的 git 状态**——
+ * 原版把判据自证写成"某某文件必须未跟踪"，于是那些文件一旦被正确提交、
+ * 对照组就过期、脚本在**每一台**机器上 exit 1（本机与干净 clone 都红，已实测）。
+ * 现在这组对照只问"解析器还能不能解"，那是它真正要防的那件事。
+ */
+function resolveImportTarget(file, spec) {
+  const isRel = spec.startsWith(".");
+  // 同一个前缀可以来自多份 tsconfig（实测 `@/` 有三条：admin／nexus／web）。
+  // 只取第一条会把后面两根整个藏住——2026-10-10 那次"别名面没生效"就是这个原因：
+  // `@/shared/lib/clipboard` 被解成 `apps/admin/src/shared/lib/clipboard`（不存在）于是静默无命中。
+  const aliasRoots = isRel ? [] : ALIASES.filter((a) => spec.startsWith(a.prefix));
+  if (!isRel && aliasRoots.length === 0) return null;
+  const bases = isRel
+    ? [resolve(ROOT, dirname(file), spec)]
+    : aliasRoots.map((a) => resolve(ROOT, a.dir, spec.slice(a.prefix.length)));
+  /*
+   * 只认**磁盘上真存在**的那个落点：先按 .ts/.tsx/index 试出来，取第一个存在的；
+   * 一个都不存在就不是"缺文件"（可能是没写完的代码，那是 tsc 的事，不是这条面的）。
+   * 第一版把"无扩展名的原始说明符"也当成落点，于是 225 个假缺口——`./App` 这种
+   * 本来就靠扩展名解析的写法全被报成未跟踪。
+   */
+  const cands = bases
+    .flatMap((b) => EXTS.map((ext) => rel(b + ext)))
+    .filter((c) => {
+      try {
+        // 必须是**文件**：`./editor` 这种目录名先existsSync会命中目录本身，
+        // 而真实落点是目录里的 index.*（那些往往是已跟踪的）——只认文件就不误报。
+        return statSync(join(ROOT, c)).isFile();
+      } catch {
+        return false;
+      }
+    });
+  return cands[0] ?? null;
+}
+
+/** 一条数据字面量的两个候选落点（相对调用方 / 相对仓根），先滤掉逃出仓外的。抽出来只为让对照组能自证。 */
+function dataCandidates(file, literal) {
+  return [rel(resolve(ROOT, dirname(file), literal)), rel(resolve(ROOT, literal))].filter(
+    (cand) => !cand.startsWith(".."),
+  );
+}
+
 const compileGaps = [];
 for (const file of trackedSrc) {
   let src;
@@ -196,33 +241,7 @@ for (const file of trackedSrc) {
     continue;
   }
   for (const spec of [...src.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1])) {
-    const isRel = spec.startsWith(".");
-    // 同一个前缀可以来自多份 tsconfig（实测 `@/` 有三条：admin／nexus／web）。
-    // 只取第一条会把后面两根整个藏住——2026-10-10 那次"别名面没生效"就是这个原因：
-    // `@/shared/lib/clipboard` 被解成 `apps/admin/src/shared/lib/clipboard`（不存在）于是静默无命中。
-    const aliasRoots = isRel ? [] : ALIASES.filter((a) => spec.startsWith(a.prefix));
-    if (!isRel && aliasRoots.length === 0) continue;
-    const bases = isRel
-      ? [resolve(ROOT, dirname(file), spec)]
-      : aliasRoots.map((a) => resolve(ROOT, a.dir, spec.slice(a.prefix.length)));
-    /*
-     * 只认**磁盘上真存在**的那个落点：先按 .ts/.tsx/index 试出来，取第一个存在的；
-     * 一个都不存在就不是"缺文件"（可能是没写完的代码，那是 tsc 的事，不是这条面的）。
-     * 第一版把"无扩展名的原始说明符"也当成落点，于是 225 个假缺口——`./App` 这种
-     * 本来就靠扩展名解析的写法全被报成未跟踪。
-     */
-    const cands = bases
-      .flatMap((b) => EXTS.map((ext) => rel(b + ext)))
-      .filter((c) => {
-      try {
-        // 必须是**文件**：`./editor` 这种目录名先existsSync会命中目录本身，
-        // 而真实落点是目录里的 index.*（那些往往是已跟踪的）——只认文件就不误报。
-        return statSync(join(ROOT, c)).isFile();
-      } catch {
-        return false;
-      }
-    });
-    const hit = cands[0];
+    const hit = resolveImportTarget(file, spec);
     if (hit && !tracked.has(hit)) compileGaps.push(`${spec}（→ ${hit}）⇐ ${file}`);
   }
 }
@@ -232,20 +251,55 @@ console.log(
 );
 for (const g of compileGaps) console.log(`  编译缺口：${g}`);
 
-// 这条面自己的对照组：该拦的必须被拦、该放的必须被放，否则上面那份清单不可信
+/*
+ * 这条面自己的对照组，三条、两个方向都压住。
+ *
+ * **为什么不能问"某某文件是不是未跟踪"**（原版就是这么写的，2026-10-18 改）：
+ * 那样写等于把判据绑在本机树的状态上。那些文件被**正确提交**之后，对照组必然过期，
+ * 而脚本会在**每一台**机器上 exit 1——实测本机与干净 clone 都是红的，而它查的那件事
+ * （干净 clone 跑不起来）**早已修好**。一条会因为"事情被做对了"而变红的门禁，
+ * 教人忽略红灯，比没有门禁更坏。
+ *
+ * 现在这三条只问"解析器还能不能解"与"报出来的可不可能是真的"，两者都与树的形状无关：
+ *   A 解析能力（相对说明符）：解出来的必须是磁盘上真存在的那个文件。
+ *   B 解析能力（别名说明符）：同一前缀来自三份 tsconfig（实测 `@/` 有 admin／nexus／web 三条），
+ *     取哪一条都不能解错。**这一条曾经真的错过**——取第一条时
+ *     `@/shared/lib/clipboard` 被解成 `apps/admin/src/...`（不存在）⇒ 静默零命中。
+ *   C 无假阳性：报出来的每一条都必须**既在磁盘上、又确实未被跟踪**。
+ *     只压 A/B 的话，"什么都解不出来"也会全绿——那正是本项目反复在治的恒零退化。
+ */
 const CG_CONTROLS = [
-  { p: "packages/axs/src/condition.ts", want: true, why: "被 index.ts/parse.ts/print.ts import 且未跟踪" },
-  { p: "packages/axs/src/print.ts", want: false, why: "同样被 import，但它在树里，不该被报" },
   {
-    p: "apps/web/src/shared/lib/clipboard.ts",
-    want: true,
+    what: "相对说明符能解出真文件",
+    got: resolveImportTarget("packages/axs/src/index.ts", "./condition"),
+    want: "packages/axs/src/condition.ts",
+    why: "解 `./condition` 必须落到 packages/axs/src/condition.ts（无扩展名 + 相对）",
+  },
+  {
+    what: "别名说明符解到 web 那一份",
+    got: resolveImportTarget("apps/web/src/features/studio/hooks/useCharacters.ts", "@/shared/lib/clipboard"),
+    want: "apps/web/src/shared/lib/clipboard.ts",
     why:
-      "只被别名说明符 `@/shared/lib/clipboard` 指到。第一版这条面看不见它，根因是同一个 `@/` 前缀来自三份 tsconfig、" +
-      "而 `find()` 取第一条 ⇒ 解到 apps/admin/src 里不存在的路径，静默零命中",
+      "`@/` 来自三份 tsconfig（admin／nexus／web），取错一条就会解到不存在的地方、于是静默零命中。" +
+      "原版这条对照写成「clipboard.ts 必须未跟踪」，于是它被正确提交之后对照过期、脚本恒红",
+  },
+  {
+    what: "解不出来的说明符不硬造落点",
+    got: resolveImportTarget("packages/axs/src/index.ts", "./__no_such_module__"),
+    want: null,
+    why: "落点不存在时必须给 null——第一版把无扩展名的原始说明符也当落点，造出 225 个假缺口",
   },
 ];
-const cgFail = CG_CONTROLS.filter((c) => compileGapFiles.includes(c.p) !== c.want)
-  .map((c) => `${c.p}（${c.why}）`);
+const cgFail = CG_CONTROLS.filter((c) => c.got !== c.want)
+  .map((c) => `${c.what}：得到 ${JSON.stringify(c.got)}、期望 ${JSON.stringify(c.want)}（${c.why}）`);
+
+// C 档：不许报假阳性（与树形状无关的不变量，恒成立才叫对照组）
+const fakeGap = compileGapFiles.filter(
+  (f) => tracked.has(f) || !existsSync(join(ROOT, f)),
+);
+if (fakeGap.length > 0) {
+  cgFail.push(`报出了假缺口 ${fakeGap.join(", ")}：落点要么已被跟踪、要么磁盘上并不存在`);
+}
 
 /*
  * 第四面：**数据文件**的引用缺口。相对 import 只覆盖"`from \"./x\"`"这一种写法，
@@ -272,11 +326,10 @@ for (const file of dataFiles) {
     continue;
   }
   for (const m of src.matchAll(DATA_RE)) {
-    for (const cand of [
-      rel(resolve(ROOT, dirname(file), m[1])),
-      rel(resolve(ROOT, m[1])),
-    ]) {
-      if (cand.startsWith("..") || tracked.has(cand)) continue;
+    for (const cand of dataCandidates(file, m[1])) {
+      // 已跟踪的不算缺口——这一句正是本脚本的"该 add 什么"成立的前提，
+      // 也正是原版那条对照组会在文件被正确提交后失效的原因（见下面 DG_CONTROLS 的注释）。
+      if (tracked.has(cand)) continue;
       const abs = join(ROOT, cand);
       if (existsSync(abs) && statSync(abs).isFile()) dataRaw.set(cand, file);
     }
@@ -334,11 +387,30 @@ console.log(
   `[chain-tracked] 未跟踪的测试文件：${untrackedTests.length} 个 ⇒ 干净 clone 上 test:unit 会静默少掉这么多条判据`,
 );
 for (const p of untrackedTests) console.log(`  少掉的判据：${p}`);
+/*
+ * 这一档的对照组同样**不许问"某某文件现在是不是未跟踪"**（2026-10-18 改）。
+ * 原版写着「clipboard.test.ts 必须未跟踪——正是这一档该抓的形状」，
+ * 于是那个文件一旦被**正确提交**，这条对照就在**每一台**机器上变红。
+ * 写门禁的人正在被自己门禁的红字教育「红=有未跟踪测试」，而真相是「红=那个测试已经被提交了」。
+ *
+ * 改成问这一档**自己**的判定，而不是树的状态：
+ *   - 形状认得出来（`.test.ts` / `.spec.tsx` / 带目录前缀的那种写法）
+ *   - 形状认不错（`latest.ts` 里的 `test` 子串不算；已跟踪的 `.test.ts` 不算）
+ * 这两条与"现在有哪些文件没提交"完全无关。
+ */
+const isTestPath = (p) => /(?:^|[/.-])(?:[A-Za-z0-9._-]+\.)?(?:test|spec)\.(ts|tsx)$/.test(p);
 const UT_CONTROLS = [
-  { p: "apps/web/src/shared/lib/clipboard.test.ts", want: true, why: "本会话新增、未提交——正是这一档该抓的形状" },
-  { p: "apps/web/src/features/writer/lib/projection.test.ts", want: false, why: "已跟踪，不该被算成少掉的判据" },
+  { p: "apps/web/src/shared/lib/clipboard.test.ts", want: true, why: "`.test.ts` 形状必须认出来（文件名直接以 .test.ts 结尾）" },
+  { p: "packages/core/src/thing.spec.tsx", want: true, why: "`.spec.tsx` 形状必须认出来" },
+  { p: "apps/web/src/shared/lib/a.b.test.ts", want: true, why: "带前缀的写法 `a.b.test.ts` 也必须认出来" },
+  { p: "apps/web/src/features/writer/lib/latest.ts", want: false, why: "`latest.ts` 里那个 `test` 子串不是测试文件——放进来就是假阳性的形状" },
 ];
-const utFail = UT_CONTROLS.filter((c) => untrackedTests.includes(c.p) !== c.want).map((c) => `${c.p}（${c.why}）`);
+// 形状对照只问形状：把"是否已跟踪"混进来过一次（第一版改稿），于是已跟踪的 .test.ts
+// 把自己判成"认不出来"——形状对了、判据反而红。已跟踪那一条改成下面的不变量来压。
+const utFail = UT_CONTROLS.filter((c) => isTestPath(c.p) !== c.want).map((c) => `${c.p}（${c.why}）`);
+// 「未被跟踪」那一半是另一条腿，且必须与树形状无关：报出来的每一条都得真的没被跟踪。
+const utFake = untrackedTests.filter((f) => tracked.has(f));
+if (utFake.length > 0) utFail.push(`把已跟踪文件算成了少掉的判据：${utFake.join(", ")}`);
 
 const needAdd = [
   ...new Set([
@@ -359,14 +431,47 @@ console.log(
 );
 for (const p of needAdd) console.log(`  待 add：${p}`);
 
+/*
+ * 这一档的对照组（2026-10-18 重写）。
+ *
+ * 原版第一行是「`scripts/ports.json` 必须出现在缺口里」——而这一面**故意跳过已跟踪文件**
+ * （"该 add 什么"只该列没进树的）。2026-10-18 把那批文件提交进树之后，
+ * 这条对照就在**每一台**机器上失效：脚本红着，而它查的那件事早已修好。
+ *
+ * 改成与树形状无关的两类：
+ *   A 解析能力：字面量 → 候选路径的映射必须算得对（不依赖任何文件是否已跟踪）。
+ *   B 无假阳性：报出来的每一条都得**真的既存在、又没被跟踪、也没被 gitignore**。
+ *     只压 A 的话，"什么都扫不到"照样全绿——那正是本项目反复在治的恒零退化。
+ */
 const DG_CONTROLS = [
-  { p: "scripts/ports.json", want: true, why: "被三个 config 与 loader 读，却没进树" },
-  { p: "apps/desktop/src-tauri/gen/schemas/desktop-schema.json", want: false, why: "Tauri 生成物，gitignore 内，不该报" },
-  { p: "scripts/file-size-baseline.json", want: false, why: "已跟踪，不该出现在缺口里" },
+  {
+    what: "相对字面量解成调用方同目录",
+    got: dataCandidates("scripts/check-chain-tracked.mjs", "./ports.json").includes("scripts/ports.json"),
+    want: true,
+    why: "`./ports.json` 写在 scripts/ 下 ⇒ 必须解成 scripts/ports.json",
+  },
+  {
+    what: "仓根相对字面量也能解",
+    got: dataCandidates("packages/core/src/x.ts", "scripts/ports.json").includes("scripts/ports.json"),
+    want: true,
+    why: "字面量按仓根给时也要能解出来，不能只认相对写法",
+  },
+  {
+    what: "逃出仓外的落点被丢掉",
+    got: dataCandidates("scripts/x.mjs", "../../../etc/passwd").some((c) => c.startsWith("..")),
+    want: false,
+    why: "`../..` 往上跑的落点必须被滤掉，否则这条面会去指仓外的文件",
+  },
 ];
-const dgFail = DG_CONTROLS.filter(
-  (c) => dataGaps.some(([p]) => p === c.p) !== c.want,
-).map((c) => `${c.p}（${c.why}）`);
+const dgFail = DG_CONTROLS.filter((c) => c.got !== c.want)
+  .map((c) => `${c.what}：得到 ${JSON.stringify(c.got)}、期望 ${JSON.stringify(c.want)}（${c.why}）`);
+// B 档：每条真缺口都得真的未跟踪、真的存在、真的没被 ignore
+const dgFake = dataRealGaps.filter(
+  ([p]) => tracked.has(p) || ignoredSet.has(p) || !existsSync(join(ROOT, p)),
+);
+if (dgFake.length > 0) {
+  dgFail.push(`报出了假缺口 ${dgFake.map(([p]) => p).join(", ")}：落点要么已跟踪、要么被 ignore、要么磁盘上不存在`);
+}
 
 /*
  * 第二档：**清单**，不参与判定。退出码只由上面几条腿决定；这里只是把全部未跟踪路径
@@ -384,7 +489,10 @@ const BUCKETS = [
   [/^testdata\//, "夹具与 golden"],
   [/^(?:apps|packages)\//, "生产模块"],
   [/^(?:docs\/|README)/, "文档"],
-  [/^(?:backend\/|Clearance\/)/, "非本战场（他人在飞／域外）"],
+  // 仓外/本机私有的顶层目录与 backend/ 同一桶：`Clearance/`（未纳管、含 .env）与
+  // `articles/`（用户私稿）**刻意留在仓外**，把它们报成"该 add 什么"不只是噪声——
+  // 一句"把 Clearance/ 加进去"就是危险建议（里面有 .env）。
+  [/^(?:backend\/|Clearance\/|articles\/|Clearance\/)/, "非本战场（他人在飞／域外）"],
 ];
 const bucketCount = new Map();
 const bucketLeftover = [];
@@ -406,6 +514,12 @@ if (missingNow.length) {
 }
 
 const verdicts = [];
+/*
+ * `facts` 与 `verdicts` 分开：前者只打印、不碰退出码，后者才判红。
+ * 判据该不该红取决于**有没有可行动的修法**——一条自己都说"不由 git add 解决"的观察，
+ * 红了只会让人学会忽略红灯（2026-10-18 把仓外依赖那条从 verdicts 挪进这里）。
+ */
+const facts = [];
 if (ALIASES.length === 0) {
   verdicts.push(
     "UNRELIABLE — 一条 `compilerOptions.paths` 都没解析到：编译面退化成只认相对说明符，" +
@@ -462,9 +576,22 @@ if (dataRealGaps.length) {
       "。干净 clone 上这些不是编译错，是测试／脚本跑起来才炸",
   );
 }
+/*
+ * 仓外依赖：**事实，不判红**（2026-10-18 从 `verdicts` 里移出来）。
+ *
+ * 它原来是一条 `REGRESSION`，可这条消息**自己**就写着"不由 git add 解决（那些路径本就不该进树）"，
+ * 而脚本也已经把它排除在"该 add 什么"之外（`needAdd` 用的是 `dataRealGaps`，不含它）。
+ * 一条声明自己不可行动、又已被排除在建议清单外的判据，却驱动退出码——
+ * 那是**自相矛盾**，而且判红时间还取决于"这台机器隔壁有没有那个目录"：
+ * 有 `Clearance/` 的机器红、没有的绿，同一份代码两种读数，正是本脚本这一轮在治的那件事。
+ *
+ * 现在它照旧打印（证据一个字不少，`externalRefs` 那几行一直在），但不进 `verdicts`。
+ * 要把它变成"可行动的判据"得先有**行动**：那属 `backend/` 退场那条线（S13-6），
+ * 判据该在那条线上长出来，而不是在这里假装已经红了。
+ */
 if (externalRefs.length) {
-  verdicts.push(
-    `REGRESSION — ${externalRefs.length} 处**已跟踪代码引用了仓外未纳管目录**：` +
+  facts.push(
+    `事实（不判红）— ${externalRefs.length} 处**已跟踪代码引用了仓外未纳管目录**：` +
       externalRefs.map(([p]) => p).join(", ") +
       "。这条不由 git add 解决（那些路径本就不该进树），它是 `backend/` 退场决策的证据：现在连后端都必须在有隔壁目录的机器上才跑得起来",
   );
@@ -480,7 +607,8 @@ if (untracked.length > 0 || missingNow.length > 0) {
  * 等于一条没被真实语料行使过的判据——它有没有牙没人知道。
  */
 if (verdicts.length) {
-  for (const v of verdicts) console.log(v);
+  for (const f of facts) console.log(f);
+for (const v of verdicts) console.log(v);
   process.exitCode = 1;
 } else {
   console.log(
